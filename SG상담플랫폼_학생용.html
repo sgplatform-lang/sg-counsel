@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head> <meta property="og:image" content="og-student.png"> </head>
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -241,6 +241,8 @@ async function doLogin(){
     if(!student){if(err)err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';return;}
     const tests=await fbAll('tests');
     CU=student;
+    // 세션 저장 (F5 새로고침 시 유지)
+    try{ sessionStorage.setItem('sg_stu_session', JSON.stringify({id:student.id, loginId:student.studentLoginId||''})); }catch(e){}
     DATA={student,tests:tests.filter(function(t){
       if(t.orgId && student.orgId && t.orgId!==student.orgId) return false;
       if(!t.classNames||t.classNames.length===0) return true;
@@ -265,7 +267,7 @@ function renderHdr(){
     </div>
     <div style="display:flex;gap:6px">
       <button class="btn-sm" onclick="refreshData()">🔄 새로고침</button>
-      <button class="btn-sm" onclick="if(confirm('로그아웃?')){if(_unsubscribeStudent){try{_unsubscribeStudent();}catch(e){}}_unsubscribeStudent=null;CU=null;render();}">로그아웃</button>
+      <button class="btn-sm" onclick="if(confirm('로그아웃?')){if(_unsubscribeStudent){try{_unsubscribeStudent();}catch(e){}}_unsubscribeStudent=null;CU=null;try{sessionStorage.removeItem('sg_stu_session');}catch(e){}render();}">로그아웃</button>
     </div>
   </div>`;
 }
@@ -1301,7 +1303,30 @@ async function refreshData(){
   }catch(e){toast('오류: '+e.message);}
 }
 
-render();
+// ── F5 세션 복원 ──
+(async function(){
+  try{
+    const sess = JSON.parse(sessionStorage.getItem('sg_stu_session')||'null');
+    if(sess && sess.id){
+      // 세션 있으면 자동 로그인 시도
+      const students = await fbAll('students').catch(()=>null);
+      const tests = await fbAll('tests').catch(()=>[]);
+      const student = students && students.find(s=>String(s.id)===String(sess.id));
+      if(student){
+        CU = student;
+        DATA = {student, tests:(tests||[]).filter(function(t){
+          if(t.orgId && student.orgId && t.orgId!==student.orgId) return false;
+          if(!t.classNames||!t.classNames.length) return true;
+          return t.classNames.includes(student.className);
+        }), students:students||[]};
+        render();
+        startStudentRealtimeSync(String(student.id));
+        return;
+      }
+    }
+  }catch(e){}
+  render(); // 세션 없으면 로그인 화면
+})();
 </script>
 </body>
 </html>
