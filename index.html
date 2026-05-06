@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head> <meta property="og:image" content="og-admin.png"> </head>  
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -409,6 +409,7 @@ async function saveAll(){
       ...ST.teachers.map(t => fbSave('teachers', t.id, t)),
     ];
     if(saves.length) Promise.all(saves).catch(e=>console.warn('FB save error:',e));
+    // tests는 Firebase에서 onSnapshot으로 관리 (삭제/추가 시 fbDelete/fbSave 직접 호출)
   }
 }
 
@@ -416,24 +417,48 @@ async function saveAll(){
 async function fbLoadAll_all(){
   if(!FB_USE()) return false;
   try{
-    const [students, teachers, tests, config] = await Promise.all([
+    const [students, teachers, tests, config, orgs] = await Promise.all([
       fbLoadAll('students'),
       fbLoadAll('teachers'),
       fbLoadAll('tests'),
       fbLoadAll('config'),
+      fbLoadAll('orgs'),
     ]);
     if(students && students.length){
-      ST.students = students.filter(s=>s.id && s.name); // 유효한 학생만
-      // ST.sel/adminSel 동기화 - 최신 데이터로 갱신
+      const role = ST.currentUser?.role;
+      const curOrgId = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+      const curName = ST.currentUser?.name || '';
+
+      // 역할별 학생 필터링
+      let filteredStudents = students.filter(s=>s.id && s.name);
+      if(role==='orgAdmin' && curOrgId){
+        filteredStudents = filteredStudents.filter(s=>String(s.orgId||'')===String(curOrgId));
+      } else if(role==='teacher'){
+        filteredStudents = filteredStudents.filter(s=>{
+          const sameOrg = !curOrgId || String(s.orgId||'')===String(curOrgId);
+          if(!sameOrg) return false;
+          const sc=[...(s.counselors||[])];
+          if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
+          return sc.includes(curName);
+        });
+      }
+      ST.students = filteredStudents;
       if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel.id))||ST.sel;
       if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel.id))||ST.adminSel;
     }
-    // teachers: Firebase에 데이터 있을 때만 덮어씀
-    // Firebase에 없으면 localStorage 데이터 유지
     if(teachers && teachers.length){
-      ST.teachers = teachers;
+      const role = ST.currentUser?.role;
+      const curOrgId = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+      if(role==='admin'){
+        // 최종관리자: 전체 사용
+        ST.teachers = teachers;
+      } else if(curOrgId){
+        // 기관관리자/선생님: 본인 기관 것만
+        ST.teachers = teachers.filter(t=>String(t.orgId||'')===String(curOrgId));
+      } else {
+        ST.teachers = teachers;
+      }
     } else {
-      // Firebase teachers 비어있음 → localStorage에서 복원
       const localT = dbL(SKT);
       if(localT && localT.length) ST.teachers = localT;
     }
@@ -441,8 +466,27 @@ async function fbLoadAll_all(){
     if(config){
       const gs = config.find(c=>c.id==='grade_subjs');
       if(gs?.subjs) GRADE_SUBJS = gs.subjs;
+      // 최종관리자가 등록한 API 키 → 모든 계정 공유
+      const ak = config.find(c=>c.id==='api_key');
+      if(ak?.value){
+        window._sharedApiKey = ak.value; // 항상 갱신
+        // ANTHROPIC_API_KEY가 비어있으면 공유키로 채움
+        if(!(window.ANTHROPIC_API_KEY||'').trim()){
+          window.ANTHROPIC_API_KEY = ak.value;
+        }
+        console.log('✅ Firebase 공유 API 키 로드 완료');
+      }
     }
-    // 로컬에도 백업
+    // orgs(기관) 데이터 - Firebase에 있으면 로컬 병합
+    if(orgs && orgs.length){
+      try{
+        const localOrgs = JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+        // Firebase orgs와 localOrgs 병합 (id 기준, Firebase 우선)
+        const fbOrgIds = new Set(orgs.map(o=>String(o.id)));
+        const mergedOrgs = [...orgs, ...localOrgs.filter(o=>!fbOrgIds.has(String(o.id)))];
+        localStorage.setItem(SK_ORGS, JSON.stringify(mergedOrgs));
+      }catch(e){}
+    }
     dbS(SK, ST.students); dbS(SKT, ST.teachers); dbS(SK_TEST, ST.tests);
     saveAccounts();
     return true;
@@ -893,7 +937,11 @@ function doLogin(){
   if(id==='admin' && pw==='admin1234'){
     ST.currentUser={id:'admin',name:'최종관리자',role:'admin',teacherId:null};
     ST.currentOrg=null;
-    ST.page='admin'; render(); return;
+    sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:null}));
+    ST.page='admin'; render();
+    // Firebase에서 최신 데이터 로드
+    if(FB_USE()){ setTimeout(async()=>{ await fbLoadAll_all(); render(); startRealtimeSync(); },500); }
+    return;
   }
 
   // 기관관리자 로그인
@@ -951,10 +999,16 @@ function doLogin(){
         const foundOrg=orgs.find(o=>o.id===found.orgId)||null;
         ST.currentOrg=foundOrg;
         if(foundOrg){
-          // 기관 소속 학생/선생님만 로드
+          // 기관 소속 학생/선생님만 로드 (localStorage 우선, Firebase로 최신화)
           const allStudents=JSON.parse(localStorage.getItem(SK)||'[]');
           const allTeachers=JSON.parse(localStorage.getItem(SKT)||'[]');
-          ST.students=allStudents.filter(s=>s.orgId===foundOrg.id);
+          // 본인 기관 + 본인 담당 학생만
+          ST.students=allStudents.filter(s=>{
+            if(s.orgId!==foundOrg.id) return false;
+            const sc=[...(s.counselors||[])];
+            if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
+            return sc.includes(found.name);
+          });
           ST.teachers=allTeachers.filter(t=>t.orgId===foundOrg.id);
         }
       }catch(e){ console.warn('기관 데이터 로드 오류:',e); }
@@ -962,7 +1016,15 @@ function doLogin(){
       ST.currentOrg=null;
     }
     sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:ST.currentOrg}));
-    ST.page='main'; render(); return;
+    ST.page='main'; render();
+    // Firebase에서 최신 데이터로 갱신 (비동기)
+    if(FB_USE()){
+      setTimeout(async()=>{
+        const loaded = await fbLoadAll_all();
+        if(loaded) render();
+      }, 500);
+    }
+    return;
   }
 
   if(err) err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';
@@ -2202,7 +2264,7 @@ function openBookModal(sid){
 // ── AI 분석 ──
 // ══ Claude API 호출 ══
 async function callClaude(userPrompt){
-  const apiKey = (window.ANTHROPIC_API_KEY||'').trim();
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
   if(!apiKey) throw new Error('API_KEY_MISSING');
 
   // Anthropic 공식 브라우저 직접 호출 헤더 (2024.08 공식 지원)
@@ -2773,7 +2835,7 @@ function renderAiPlanTab(s){
     ...extraSubjs,
     ...(ST.customSubjs||[])
   ];
-  const apiReady = !!(window.ANTHROPIC_API_KEY||'').trim();
+  const apiReady = !!(window.ANTHROPIC_API_KEY||window._sharedApiKey||'').trim();
 
   return`<div>
     <!-- 안내 박스 -->
@@ -2929,7 +2991,7 @@ function printAiPlan(sid){
 }
 async function generateAiPlan(sid){
   const s = ST.students.find(x=>String(x.id)===String(sid)); if(!s) return;
-  const apiKey = (window.ANTHROPIC_API_KEY||'').trim();
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
   if(!apiKey){ openApiModal(); return; }
 
   const el = document.getElementById('ai-plan-result');
@@ -4526,7 +4588,7 @@ async function runAiConsultAnalysis(sid){
   const memo = document.getElementById('c_memo')?.value?.trim();
   const ctype = document.getElementById('c_type')?.value||'기타';
   if(!topic||!memo){alert('상담 주제와 내용을 먼저 입력해주세요.');return;}
-  const apiKey = window.ANTHROPIC_API_KEY||localStorage.getItem('apiKey')||'';
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
   if(!apiKey){alert('API 키를 먼저 설정해주세요.');return;}
   const el = document.getElementById('ai_consult_result');
   if(el) el.textContent='⏳ AI 분석 중...';
@@ -4796,8 +4858,12 @@ function openSForm(s){
 
 function _renderSForm(s){
   document.querySelectorAll('.sform-overlay').forEach(e=>e.remove());
-  const cList = ST.teachers.map(t=>t.name);
-  if(!cList.length) cList.push('이선생','김선생','박선생');
+  // 기관 소속 선생님만 표시 (기관관리자/선생님 계정)
+  const curFormOrg = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  const formTeachers = curFormOrg
+    ? ST.teachers.filter(t=>String(t.orgId||'')===String(curFormOrg))
+    : ST.teachers;
+  const cList = formTeachers.map(t=>t.name);
   const isNew = !s;
   const curOrg = ST.currentOrg; // 현재 기관
 
@@ -4846,7 +4912,8 @@ function _renderSForm(s){
         <div>
           <div style="font-size:11px;color:#777;font-weight:600;margin-bottom:4px">담당 선생님</div>
           <select id="sf_c" class="inp">
-            ${cList.map(c=>`<option${(s?.counselor||cList[0])===c?' selected':''}>${esc(c)}</option>`).join('')}
+            <option value=""${(!s?.counselor||s?.counselor==='미정')?' selected':''}>미정 (선생님 미배정)</option>
+            ${cList.map(c=>`<option value="${esc(c)}"${(s?.counselor)===c?' selected':''}>${esc(c)}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -4929,9 +4996,12 @@ window._saveSForm = function(sid){
 
   const baseInfo = {
     name, school,
-    grade:     document.getElementById('sf_g')?.value||'3학년',
+    grade:     document.getElementById('sf_g')?.value||'고3',
     phone:     document.getElementById('sf_p')?.value||'',
-    counselor: document.getElementById('sf_c')?.value||(ST.teachers[0]?.name||''),
+    // 선생님 계정이면 본인 이름 자동 설정, 아니면 폼 값 사용
+    counselor: ST.currentUser?.role==='teacher'
+      ? ST.currentUser.name
+      : (document.getElementById('sf_c')?.value||''),  // 빈 값 = 미정
     className: document.getElementById('sf_cls')?.value?.trim()||'',
     studentLoginId: document.getElementById('sf_lid')?.value?.trim()||existing?.studentLoginId||'',
     studentPassword: document.getElementById('sf_lpw')?.value?.trim()||existing?.studentPassword||'',
@@ -4954,11 +5024,14 @@ window._saveSForm = function(sid){
     ST.sel = updated;
   } else {
     // ── 신규 등록: 모든 데이터 기본값으로 초기화 ──
+    // orgId: 기관관리자/선생님 계정이면 본인 기관 ID 사용
+    const newOrgId = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+    const newOrgName = ST.currentOrg?.name || ST.currentUser?.orgName || null;
     const ns = {
       id: Date.now(),
       ...baseInfo,
-      orgId:   ST.currentOrg?.id||null,
-      orgName: ST.currentOrg?.name||null,
+      orgId:   newOrgId,
+      orgName: newOrgName,
       // 성적 데이터 - 신규 등록 시 null (입력 전까지 - 표시)
       subjects: {korean:null,math:null,english:null,science:null,social:null},
       gradeDetail:    gradeDetailPatch,
@@ -4982,6 +5055,11 @@ window._saveSForm = function(sid){
     ST.tab = 'overview';
   }
 
+  // Firebase에 즉시 저장 (신규/수정 모두)
+  if(FB_USE()){
+    const targetStudent = ST.students.find(x=>String(x.id)===String(sid||ST.sel?.id));
+    if(targetStudent) fbSave('students', targetStudent.id, targetStudent);
+  }
   save();
   document.querySelector('.sform-overlay')?.remove();
   render();
@@ -5053,36 +5131,62 @@ function renderTestMain(){
   const teacher2 = isAdmin2?null:ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId));
 
   // 담당 학생 반 목록 (선생님 계정이면 담당 학생의 반만)
-  const myStudents = isAdmin2 ? ST.students : ST.students.filter(s=>{
-    const sc2=[...(s.counselors||[])];
-    if(s.counselor&&!sc2.includes(s.counselor)) sc2.unshift(s.counselor);
-    if(sc2.length===0) return false;
-    if(sc2.includes(curUserName)) return true;
-    if(teacher2&&sc2.includes(teacher2.name)) return true;
-    return false;
-  });
+  const isOrgAdmin2 = ST.currentUser?.role==='orgAdmin';
+  const myOrgId2 = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  const myStudents = isAdmin2
+    ? ST.students
+    : isOrgAdmin2
+      ? ST.students.filter(s=> !myOrgId2 || String(s.orgId||'')===String(myOrgId2))
+      : ST.students.filter(s=>{
+          const sc2=[...(s.counselors||[])];
+          if(s.counselor&&!sc2.includes(s.counselor)) sc2.unshift(s.counselor);
+          if(sc2.length===0) return false;
+          if(sc2.includes(curUserName)) return true;
+          if(teacher2&&sc2.includes(teacher2.name)) return true;
+          return false;
+        });
   const myClasses = [...new Set(myStudents.map(s=>s.className).filter(Boolean))];
 
   const allTests=ST.tests||[];
-  // 선생님이면 담당 학생 반의 테스트만 표시
-  // 기관관리자/선생님: 자기 기관 테스트만
-  const myOrgId2 = ST.currentOrg?.id||null;
-  const isOrgAdmin3 = ST.currentUser?.role==='orgAdmin';
+  // 기관/역할 기반 엄격한 테스트 필터링
+  const isOrgAdmin3 = isOrgAdmin2;
+  const isTeacher3 = ST.currentUser?.role==='teacher';
   const tests = isAdmin2 ? allTests : allTests.filter(t=>{
-    // 기관 ID 필터 (기관이 다르면 제외)
-    if(myOrgId2 && t.orgId && t.orgId!==myOrgId2) return false;
-    if(!t.classNames||t.classNames.length===0) return true;
-    return t.classNames.some(cls=>myClasses.includes(cls));
+    // ① orgId 기준 필터 (최우선)
+    const tOrgId = t.orgId||null;
+    if(tOrgId && myOrgId2 && tOrgId!==myOrgId2) return false; // 다른 기관 테스트 제외
+    if(!tOrgId && myOrgId2) return false; // 최종관리자가 만든 테스트(orgId없음)는 기관계정에서 제외
+    // ② 선생님: 담당 학생 반 기준 추가 필터
+    if(isTeacher3){
+      if(!t.classNames||t.classNames.length===0) return true;
+      return t.classNames.some(cls=>myClasses.includes(cls));
+    }
+    // ③ 기관관리자: 같은 기관 테스트 전체 표시
+    return true;
   });
 
   const filterM=ST._testFilterMonth||'';
   const filterCls=ST._testFilterClass||'';
+  const filterOrg=ST._testFilterOrg||'';
+  const filterTeacher=ST._testFilterTeacher||'';
   const classesList=[...new Set(myStudents.map(s=>s.className).filter(Boolean))];
   const months=[...new Set(tests.map(t=>t.date.slice(0,7)))].sort((a,b)=>b.localeCompare(a));
+
+  // 최종관리자용 기관 목록 - 등록된 기관 기반
+  const _allOrgsData = isAdmin2
+    ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]')
+    : [];
+  const allOrgsForFilter = _allOrgsData.map(o=>({id:o.id,name:o.name}));
+  // 기관관리자용 선생님 목록 - ST.teachers 기반 (기관 내 등록된 선생님)
+  const teachersForFilter = isOrgAdmin2
+    ? ST.teachers.filter(t=>!myOrgId2||String(t.orgId||'')===String(myOrgId2)).map(t=>t.name)
+    : [];
 
   const filteredTests=tests.filter(t=>{
     if(filterM&&!t.date.startsWith(filterM)) return false;
     if(filterCls&&!(t.classNames||[]).includes(filterCls)) return false;
+    if(filterOrg&&String(t.orgId||'')!==String(filterOrg)) return false;
+    if(filterTeacher&&(t.createdBy||'')!==filterTeacher) return false; // 선생님 이름 기반
     return true;
   }).sort((a,b)=>b.date.localeCompare(a.date));
 
@@ -5111,15 +5215,29 @@ function renderTestMain(){
 
     <!-- 필터 -->
     <div class="box" style="margin-bottom:12px">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:600;color:#555">월 필터:</span>
-        <button onclick="ST._testFilterMonth='';render()" style="background:${!filterM?'#e53935':'#f4f6fb'};color:${!filterM?'#fff':'#555'};border:1.5px solid ${!filterM?'#e53935':'#e8eaf6'};border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">전체</button>
-        ${months.map(m=>`<button onclick="ST._testFilterMonth='${m}';render()" style="background:${filterM===m?'#e53935':'#f4f6fb'};color:${filterM===m?'#fff':'#555'};border:1.5px solid ${filterM===m?'#e53935':'#e8eaf6'};border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">${m.replace('-','년 ')}월</button>`).join('')}
+      <!-- 최종관리자: 기관 필터 -->
+      ${isAdmin2&&allOrgsForFilter.length?`<div style="display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:600;color:#e53935;min-width:48px">🏫 기관:</span>
+        <button onclick="ST._testFilterOrg='';render()" style="background:${!filterOrg?'#e53935':'#f4f6fb'};color:${!filterOrg?'#fff':'#555'};border:1.5px solid ${!filterOrg?'#e53935':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">전체</button>
+        ${allOrgsForFilter.map(o=>`<button onclick="ST._testFilterOrg='${esc(o.id)}';render()" style="background:${filterOrg===o.id?'#e53935':'#f4f6fb'};color:${filterOrg===o.id?'#fff':'#555'};border:1.5px solid ${filterOrg===o.id?'#e53935':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">${esc(o.name)}</button>`).join('')}
+      </div>`:''}
+      <!-- 기관관리자: 선생님 필터 -->
+      ${isOrgAdmin2&&teachersForFilter.length?`<div style="display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:600;color:#8b5cf6;min-width:48px">👨‍🏫 선생님:</span>
+        <button onclick="ST._testFilterTeacher='';render()" style="background:${!filterTeacher?'#8b5cf6':'#f4f6fb'};color:${!filterTeacher?'#fff':'#555'};border:1.5px solid ${!filterTeacher?'#8b5cf6':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">전체</button>
+        ${teachersForFilter.map(tc=>`<button onclick="ST._testFilterTeacher='${esc(tc)}';render()" style="background:${filterTeacher===tc?'#8b5cf6':'#f4f6fb'};color:${filterTeacher===tc?'#fff':'#555'};border:1.5px solid ${filterTeacher===tc?'#8b5cf6':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">${esc(tc)}</button>`).join('')}
+      </div>`:''}
+      <!-- 월 필터 -->
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;${(isAdmin2&&allOrgsForFilter.length)||(isOrgAdmin2&&teachersForFilter.length)?'margin-bottom:7px':''}">
+        <span style="font-size:11px;font-weight:600;color:#555;min-width:48px">📅 월:</span>
+        <button onclick="ST._testFilterMonth='';render()" style="background:${!filterM?'#e53935':'#f4f6fb'};color:${!filterM?'#fff':'#555'};border:1.5px solid ${!filterM?'#e53935':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">전체</button>
+        ${months.map(m=>`<button onclick="ST._testFilterMonth='${m}';render()" style="background:${filterM===m?'#e53935':'#f4f6fb'};color:${filterM===m?'#fff':'#555'};border:1.5px solid ${filterM===m?'#e53935':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">${m.replace('-','년 ')}월</button>`).join('')}
       </div>
-      ${classesList.length?`<div style="display:flex;gap:6px;align-items:center;margin-top:7px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:600;color:#555">반 필터:</span>
-        <button onclick="ST._testFilterClass='';render()" style="background:${!filterCls?'#3b5bdb':'#f4f6fb'};color:${!filterCls?'#fff':'#555'};border:1.5px solid ${!filterCls?'#3b5bdb':'#e8eaf6'};border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">전체반</button>
-        ${classesList.map(c=>`<button onclick="ST._testFilterClass='${esc(c)}';render()" style="background:${filterCls===c?'#3b5bdb':'#f4f6fb'};color:${filterCls===c?'#fff':'#555'};border:1.5px solid ${filterCls===c?'#3b5bdb':'#e8eaf6'};border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">${esc(c)}</button>`).join('')}
+      <!-- 반 필터 -->
+      ${classesList.length?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:600;color:#555;min-width:48px">🏷 반:</span>
+        <button onclick="ST._testFilterClass='';render()" style="background:${!filterCls?'#3b5bdb':'#f4f6fb'};color:${!filterCls?'#fff':'#555'};border:1.5px solid ${!filterCls?'#3b5bdb':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">전체반</button>
+        ${classesList.map(c=>`<button onclick="ST._testFilterClass='${esc(c)}';render()" style="background:${filterCls===c?'#3b5bdb':'#f4f6fb'};color:${filterCls===c?'#fff':'#555'};border:1.5px solid ${filterCls===c?'#3b5bdb':'#e8eaf6'};border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">${esc(c)}</button>`).join('')}
       </div>`:''}
     </div>
 
@@ -5318,6 +5436,22 @@ function openTestForm(testId){
   const t=testId?ST.tests.find(x=>String(x.id)===String(testId)):null;
   const ov=document.createElement('div');ov.className='overlay';
   const classesList=[...new Set(ST.students.map(s=>s.className).filter(Boolean))];
+
+  // 역할별 학생 목록 (학생 직접 선택용)
+  const _tfRole = ST.currentUser?.role;
+  const _tfOrgId = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  const _tfName = ST.currentUser?.name || '';
+  const myStudents = _tfRole==='admin'
+    ? ST.students
+    : _tfRole==='orgAdmin'
+      ? ST.students.filter(s=>!_tfOrgId||String(s.orgId||'')===String(_tfOrgId))
+      : ST.students.filter(s=>{
+          const sameOrg = !_tfOrgId || String(s.orgId||'')===String(_tfOrgId);
+          if(!sameOrg) return false;
+          const sc=[...(s.counselors||[])];
+          if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
+          return sc.includes(_tfName);
+        });
   const now=new Date();
   const DAYS=['일','월','화','수','목','금','토'];
 
@@ -5350,6 +5484,31 @@ function openTestForm(testId){
     </div>
     <div style="padding:16px 18px 24px;overflow-y:auto;max-height:82vh">
 
+      <!-- 기관 표시 (역할별) -->
+      ${(()=>{
+        const _r=ST.currentUser?.role;
+        const _orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+        if(_r==='admin'){
+          // 최종관리자: 기관 선택 드롭다운
+          return`<div style="margin-bottom:12px;background:#fff8e1;border:1.5px solid #fde68a;border-radius:10px;padding:10px 14px">
+            <div style="font-size:11px;color:#92400e;font-weight:700;margin-bottom:6px">🏫 대상 기관 선택</div>
+            <select id="tf_org_select" class="inp" style="font-size:12px">
+              <option value="">기관 없음 (최종관리자 전용)</option>
+              ${_orgs.map(o=>`<option value="${esc(o.id)}" data-name="${esc(o.name)}" ${t?.orgId===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}
+            </select>
+          </div>`;
+        } else {
+          // 기관관리자/선생님: 기관명 고정 표시
+          const _orgName=ST.currentOrg?.name||'';
+          if(!_orgName) return'';
+          return`<div style="margin-bottom:12px;background:#eef1ff;border:1.5px solid #c5cae9;border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:#3b5bdb;font-weight:700">🏫 기관:</span>
+            <span style="font-size:13px;font-weight:800;color:#1a1a2e">${esc(_orgName)}</span>
+            <span style="font-size:10px;color:#aaa">(자동 설정)</span>
+          </div>`;
+        }
+      })()}
+
       <!-- 테스트 유형 선택 -->
       <div style="margin-bottom:14px">
         <div style="font-size:11px;color:#777;font-weight:600;margin-bottom:6px">테스트 유형 *</div>
@@ -5377,9 +5536,61 @@ function openTestForm(testId){
         <div><div style="font-size:11px;color:#777;font-weight:600;margin-bottom:4px">대상 반</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:#f4f6fb;border-radius:8px;min-height:36px">
             ${classesList.length?classesList.map(cls=>`<label style="display:flex;align-items:center;gap:4px;background:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;border:1px solid #e0e3ef">
-              <input type="checkbox" id="tf_cls_${esc(cls)}" ${t?.classNames?.includes(cls)?'checked':''} style="accent-color:#e53935"> ${esc(cls)}</label>`).join('')
+              <input type="checkbox" id="tf_cls_${esc(cls)}" ${t?.classNames?.includes(cls)?'checked':''} style="accent-color:#e53935" onchange="(function(){
+                const checked=Array.from(document.querySelectorAll('[id^=tf_cls_]')).filter(c=>c.checked).map(c=>c.id.replace('tf_cls_',''));
+                document.querySelectorAll('[id^=tf_stu_wrap_]').forEach(wrap=>{
+                  const cls2=wrap.dataset.cls;
+                  wrap.style.display=(checked.length===0||checked.includes(cls2))?'':'none';
+                });
+                const noCls=document.getElementById('tf_stu_nocls');
+                if(noCls) noCls.style.display=(checked.length===0)?'':'none';
+                if(checked.length>0){
+                  document.querySelectorAll('[id^=tf_stu_]').forEach(c=>{
+                    const wrap=c.closest('[id^=tf_stu_wrap_]');
+                    if(wrap) c.checked=(checked.includes(wrap.dataset.cls));
+                  });
+                }
+              })()"> ${esc(cls)}</label>`).join('')
             :`<div style="font-size:11px;color:#aaa;padding:2px">반 없음</div>`}
           </div>
+        </div>
+      </div>
+
+      <!-- 학생 직접 선택 (반 필터 연동) -->
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:11px;color:#777;font-weight:600">대상 학생 직접 선택 <span style="color:#aaa;font-weight:400">(반 선택 시 해당 반 학생 자동 표시)</span></div>
+          <div style="display:flex;gap:6px">
+            <button onclick="document.querySelectorAll('[id^=tf_stu_]').forEach(c=>{if(c.closest('[id^=tf_stu_wrap_]')?.style.display!=='none')c.checked=true})" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer">전체선택</button>
+            <button onclick="document.querySelectorAll('[id^=tf_stu_]').forEach(c=>c.checked=false)" style="background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer">선택해제</button>
+          </div>
+        </div>
+        <div style="max-height:200px;overflow-y:auto;border:1px solid #e8eaf6;border-radius:8px;padding:6px;background:#fafafa">
+          ${myStudents.length ? (()=>{
+            const grouped={};
+            myStudents.forEach(s=>{
+              const cls2=s.className||'__nocls__';
+              if(!grouped[cls2]) grouped[cls2]=[];
+              grouped[cls2].push(s);
+            });
+            const initCls=(t?.classNames||[]);
+            return Object.entries(grouped).map(([cls2,stuList])=>{
+              const isNoCls=cls2==='__nocls__';
+              const showWrap=initCls.length===0||(!isNoCls&&initCls.includes(cls2))||(isNoCls&&initCls.length===0);
+              const wrapId=isNoCls?'tf_stu_nocls':'tf_stu_wrap_'+cls2.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+              return '<div id="'+wrapId+'"'+(isNoCls?'':' data-cls="'+esc(cls2)+'"')+' style="display:'+(showWrap?'block':'none')+'">'
+                +(isNoCls?'':'<div style="font-size:10px;font-weight:700;color:#3b5bdb;padding:3px 4px;margin-bottom:2px">🏫 '+esc(cls2)+'반</div>')
+                +stuList.map(s=>'<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;border-bottom:1px solid #f4f6fb">'
+                  +'<input type="checkbox" id="tf_stu_'+s.id+'" value="'+s.id+'" '
+                  +((t?.studentIds||[]).includes(String(s.id))||(initCls.length>0&&!isNoCls&&initCls.includes(cls2))?'checked':'')+' style="accent-color:#3b5bdb;width:14px;height:14px;cursor:pointer;flex-shrink:0">'
+                  +'<span style="font-size:12px;font-weight:600">'+esc(s.name)+'</span>'
+                  +'<span style="font-size:10px;color:#888">'+esc(s.school||'')+' · '+esc(s.grade||'')+(s.className?' · '+esc(s.className):'')+'</span>'
+                  +'</label>').join('')
+                +'</div>';
+            }).join('');
+          })()
+          : '<div style="font-size:11px;color:#aaa;padding:8px;text-align:center">등록된 학생이 없습니다</div>'
+          }
         </div>
       </div>
 
@@ -5485,14 +5696,26 @@ function openTestForm(testId){
     });
     if(!qs.length){alert('문항을 1개 이상 입력해주세요.');return;}
     const clsBoxes=Array.from(ov.querySelectorAll('[id^=tf_cls_]')).filter(el=>el.checked).map(el=>el.id.replace('tf_cls_',''));
+    const studentIds=Array.from(ov.querySelectorAll('[id^=tf_stu_]')).filter(el=>el.checked).map(el=>el.id.replace('tf_stu_',''));
+    // 기관 설정: 최종관리자는 선택값, 기관관리자/선생님은 고정
+    const _selOrgEl = ov.querySelector('#tf_org_select');
+    const _selOrgId = _selOrgEl ? _selOrgEl.value || null
+      : (ST.currentOrg?.id || ST.currentUser?.orgId || null);
+    const _selOrgName = _selOrgEl
+      ? (_selOrgEl.options[_selOrgEl.selectedIndex]?.dataset.name || null)
+      : (ST.currentOrg?.name || null);
     const td2={
       id:t?t.id:Date.now(),
       testType,title,
       subject:ov.querySelector('#tf_subj').value||'',
       date:ov.querySelector('#tf_date').value||new Date().toISOString().slice(0,10),
       timeSlot:ov.querySelector('#tf_time').value||'',
-      classNames:clsBoxes,questions:qs,
-      orgId:ST.currentOrg?.id||null,  // 기관 ID 저장
+      classNames:clsBoxes,
+      studentIds:studentIds,
+      questions:qs,
+      orgId:_selOrgId,
+      orgName:_selOrgName,
+      createdBy:ST.currentUser?.name||'',  // 작성자(선생님 필터용)
       results:t?(ST.tests.find(x=>x.id===t.id)?.results||[]):[]
     };
     if(t) ST.tests=ST.tests.map(x=>x.id===t.id?td2:x);
@@ -6060,7 +6283,7 @@ async function aiScoreEssays(testId, studentId){
   const t=ST.tests.find(x=>x.id===testId);
   const s=ST.students.find(x=>x.id===studentId);
   if(!t||!s){alert('데이터가 없습니다.');return;}
-  const apiKey=window.ANTHROPIC_API_KEY||localStorage.getItem('apiKey')||'';
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
   if(!apiKey){alert('API 키를 먼저 설정해주세요.');return;}
 
   const essayQs=t.questions.map((q,i)=>({...q,idx:i})).filter(q=>q.type==='서술형');
@@ -6134,7 +6357,7 @@ async function generateAiComment(testId,studentId){
   const s=ST.students.find(x=>x.id===studentId);
   const res=(t?.results||[]).find(r=>r.studentId===studentId);
   if(!t||!s||!res){alert('데이터가 없습니다. 먼저 답안을 저장해주세요.');return;}
-  const apiKey=window.ANTHROPIC_API_KEY||localStorage.getItem('apiKey')||'';
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
   if(!apiKey){alert('API 키를 설정해주세요.');return;}
   const totalScore=t.questions.reduce((a,q)=>a+(+q.score||0),0);
   const myScore=res.answers.reduce((a,a2)=>a+(+a2.score||0),0);
@@ -6290,7 +6513,7 @@ async function printItemAnalysis(testId){
   const stdDev = Math.sqrt(scores.reduce((a,v)=>a+Math.pow(v-avgScore,2),0)/scores.length);
 
   // AI 분석 요청
-  const apiKey = window.ANTHROPIC_API_KEY||localStorage.getItem('apiKey')||'';
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
   let aiAnalysis = '';
   if(apiKey){
     try{
@@ -7272,7 +7495,7 @@ function renderAdminTeacher(){
             <div style="display:flex;gap:4px;flex-shrink:0">
               <button onclick="openTForm(ST.teachers.find(x=>x.id===${t.id}))" style="background:#fff;color:#555;border:1px solid #e8eaf6;border-radius:6px;padding:4px 9px;font-size:10px">✏️</button>
               <button onclick="openAssignStudents(${t.id})" style="background:#f5f3ff;color:#8b5cf6;border:1px solid #ddd6fe;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:700">👥 배정</button>
-              <button onclick="if(confirm('삭제?')){const ms=ST.students.filter(s=>s.counselor==='${esc(t.name)}').length;if(ms&&!confirm(ms+'명 담당자 해제됩니다. 계속?'))return;ST.students=ST.students.map(s=>s.counselor==='${esc(t.name)}'?{...s,counselor:''}:s);ST.teachers=ST.teachers.filter(x=>x.id!==${t.id});save();render();}" class="btn-r" style="padding:4px 9px;font-size:10px">🗑</button>
+              <button onclick="if(confirm('삭제?')){const ms=ST.students.filter(s=>s.counselor==='${esc(t.name)}').length;if(ms&&!confirm(ms+'명 담당자 해제됩니다. 계속?'))return;ST.students=ST.students.map(s=>s.counselor==='${esc(t.name)}'?{...s,counselor:''}:s);ST.teachers=ST.teachers.filter(x=>x.id!==${t.id});if(FB_USE())fbDelete('teachers',String(${t.id}));saveAccounts();save();render();}" class="btn-r" style="padding:4px 9px;font-size:10px">🗑</button>
             </div>
           </div>
           <div class="g3" style="margin-bottom:${ms.length?'12px':'0'}">
@@ -7485,14 +7708,16 @@ function openAssignStudents(tid){
 
   ov.querySelector('#as_close').addEventListener('click',()=>ov.remove());
   ov.querySelector('#as_cancel').addEventListener('click',()=>ov.remove());
-  ov.querySelector('#as_save').addEventListener('click',()=>{
+  ov.querySelector('#as_save').addEventListener('click',async ()=>{
     const checked=allStudents.map(s=>s.id).filter(id=>ov.querySelector('#assign_'+id)?.checked);
     const tName=t.name;
+    const changedStudents=[];
     ST.students=ST.students.map(s=>{
       const wasChecked=checked.includes(s.id);
       // counselors 배열 관리 (다중 배정 지원)
       let counselors=[...(s.counselors||[])];
       if(s.counselor&&!counselors.includes(s.counselor)) counselors=[s.counselor,...counselors]; // 기존 데이터 마이그레이션
+      const beforeStr=JSON.stringify(counselors.slice().sort());
       if(wasChecked){
         if(!counselors.includes(tName)) counselors.push(tName);
       } else {
@@ -7500,10 +7725,19 @@ function openAssignStudents(tid){
       }
       // counselor(단일)는 첫 번째 담당자로 유지 (하위호환)
       const mainCounselor=counselors[0]||'';
-      return{...s, counselors, counselor:mainCounselor};
+      const updated={...s, counselors, counselor:mainCounselor};
+      if(JSON.stringify(counselors.slice().sort())!==beforeStr) changedStudents.push(updated);
+      return updated;
     });
-    save(); ov.remove(); render();
-    alert('✅ 학생 배정이 완료되었습니다.');
+    save();
+    // Firebase에 변경된 학생 즉시 저장
+    if(FB_USE() && changedStudents.length){
+      for(const cs of changedStudents){
+        await fbSave('students', cs.id, cs);
+      }
+    }
+    ov.remove(); render();
+    alert('✅ 학생 배정이 완료되었습니다.'+(changedStudents.length?' ('+changedStudents.length+'명 변경)':''));
   });
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
@@ -7809,7 +8043,7 @@ function bindEvents(){
 // ══ 초기화 ══
 
 function openApiModal(){
-  const cur = window.ANTHROPIC_API_KEY||'';
+  const cur = (window.ANTHROPIC_API_KEY||window._sharedApiKey||'').trim();
   const isSet = cur.length > 10;
   const ov=document.createElement('div');ov.className='overlay';
   ov.innerHTML=`<div class="modal" style="max-width:500px">
@@ -7848,7 +8082,7 @@ function openApiModal(){
 
       <div style="display:flex;gap:8px">
         <button class="btn-g" style="flex:1" onclick="this.closest('.overlay').remove()">취소</button>
-        ${isSet?`<button style="flex:1;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer" onclick="window.ANTHROPIC_API_KEY='';alert('API 키가 삭제되었습니다.');this.closest('.overlay').remove();render()">키 삭제</button>`:''}
+        ${isSet?`<button style="flex:1;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer" onclick="window.ANTHROPIC_API_KEY='';window._sharedApiKey='';if(FB_USE())fbSave('config','api_key',{id:'api_key',value:''});alert('API 키가 삭제되었습니다.');this.closest('.overlay').remove();render()">키 삭제</button>`:''}
         <button style="flex:2;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer" onclick="
           const k=document.getElementById('api_inp').value.trim();
           if(!k){alert('API 키를 입력해주세요.');return;}
@@ -7856,10 +8090,13 @@ function openApiModal(){
             if(!confirm('입력하신 키가 sk-ant로 시작하지 않습니다.\\n올바른 키인지 확인해주세요.\\n계속하시겠습니까?'))return;
           }
           window.ANTHROPIC_API_KEY=k;
-          alert('✅ API 키가 저장되었습니다!\\n이제 수시 탭에서 AI 분석을 사용할 수 있습니다.');
+          window._sharedApiKey=k;
+          // Firebase에 저장 → 기관/선생님 계정에서 자동 로드
+          if(FB_USE()) fbSave('config','api_key',{id:'api_key',value:k}).then(()=>console.log('API 키 Firebase 저장 완료'));
+          alert('✅ API 키가 저장되었습니다!\\n기관/선생님 계정에도 자동으로 적용됩니다.');
           this.closest('.overlay').remove();
           render();
-        ">✅ 저장하기</button>
+        ">✅ 저장하기 (전체 적용)</button>
       </div>
     </div>
   </div>`;
@@ -7905,19 +8142,52 @@ function init(){
   ST.students = Array.isArray(s) ? s : DEMO_S;
   ST.teachers = Array.isArray(t) ? t : [];
   ST.tests = Array.isArray(ts) ? ts : [];
-  ST.currentUser = null;
-  ST.currentOrg = null;
 
-  // 로그인 화면 강제 표시
+  // ── F5/새로고침 시 세션 복원 ──
+  let sessionRestored = false;
+  try{
+    const sess = JSON.parse(sessionStorage.getItem('sg_session')||'null');
+    if(sess && sess.user && sess.user.role){
+      ST.currentUser = sess.user;
+      ST.currentOrg  = sess.org || null;
+      sessionRestored = true;
+      console.log('✅ 세션 복원:', sess.user.role, sess.user.name);
+    }
+  }catch(e){}
+
+  if(!sessionRestored){
+    ST.currentUser = null;
+    ST.currentOrg  = null;
+  }
+
+  // 로그인 화면 / 앱 화면 결정
   try{
     const _ls = document.getElementById('login-screen');
     const _app = document.getElementById('app');
-    if(_ls){ _ls.style.display='flex'; _ls.style.alignItems='center'; _ls.style.justifyContent='center'; }
-    if(_app){ _app.style.display='none'; _app.innerHTML=''; }
+    if(sessionRestored){
+      if(_ls) _ls.style.display='none';
+      if(_app) _app.style.display='';
+    } else {
+      if(_ls){ _ls.style.display='flex'; _ls.style.alignItems='center'; _ls.style.justifyContent='center'; }
+      if(_app){ _app.style.display='none'; _app.innerHTML=''; }
+    }
   }catch(e){}
   render();
+  // Firebase 초기 로드 (API 키 포함)
   setTimeout(async()=>{
     if(FB_USE()){
+      // 1단계: config만 먼저 로드 (API 키 빠르게 확보)
+      try{
+        const cfgSnap = await window._fb.db.collection('config').get();
+        const cfgData = cfgSnap.docs.map(d=>({...d.data(),id:d.id}));
+        const ak = cfgData.find(c=>c.id==='api_key');
+        if(ak?.value){
+          window._sharedApiKey = ak.value;
+          if(!(window.ANTHROPIC_API_KEY||'').trim()) window.ANTHROPIC_API_KEY = ak.value;
+          console.log('✅ API 키 선로드 완료');
+        }
+      }catch(e){ console.warn('config 선로드 실패:', e.message); }
+      // 2단계: 전체 데이터 로드
       const loaded = await fbLoadAll_all();
       if(loaded){
         console.log("✅ Firebase 데이터 로드 완료, teachers:", ST.teachers.length);
@@ -7925,7 +8195,7 @@ function init(){
       }
       startRealtimeSync();
     }
-  }, 1000);
+  }, 500);
 }
 
 // 수동 새로고침
@@ -8406,19 +8676,63 @@ function startRealtimeSync(){
     // students 컬렉션 변경 감지
     db.collection('students').onSnapshot(snap=>{
       if(!snap || !ST.currentUser) return;
+      const role = ST.currentUser.role;
+      const curOrgId = ST.currentOrg?.id || ST.currentUser.orgId || null;
+      const curName = ST.currentUser.name || '';
+
       const incoming = snap.docs
         .map(d=>Object.assign({},d.data(),{id:d.id}))
-        .filter(s=>s.id); // id 있는 문서만 (name 없어도 허용)
-      if(!incoming.length) return;
+        .filter(s=>s.id) // id 있는 문서만
+        .filter(s=>{
+          // ── 역할별 필터링 ──
+          if(role==='admin') return true; // 최종관리자: 전체
+          if(role==='orgAdmin'){
+            // 기관관리자: 본인 기관 학생만
+            return !curOrgId || String(s.orgId||'')===String(curOrgId);
+          }
+          if(role==='teacher'){
+            // 선생님: 본인 기관 + 본인이 담당인 학생만
+            const sameOrg = !curOrgId || String(s.orgId||'')===String(curOrgId);
+            if(!sameOrg) return false;
+            // 담당 선생님 필터 (counselor 또는 counselors 배열)
+            const sc=[...(s.counselors||[])];
+            if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
+            return sc.includes(curName);
+          }
+          return true;
+        });
+
+      if(!incoming.length && role!=='admin') {
+        // 선생님/기관관리자인데 담당 학생이 없는 경우 - 기존 유지
+        if(ST.currentUser) render();
+        return;
+      }
+
       const savingIds = ST._savingIds||new Set();
       // 저장 중인 학생은 로컬 데이터 유지, 나머지는 Firebase 데이터 사용
       incoming.forEach(fbStudent=>{
         const sid = String(fbStudent.id);
-        if(savingIds.has(sid)) return; // 내가 저장 중인 학생은 건드리지 않음
+        if(savingIds.has(sid)) return;
         const idx = ST.students.findIndex(x=>String(x.id)===sid);
         if(idx>=0) ST.students[idx] = fbStudent;
         else ST.students.push(fbStudent);
       });
+
+      // 역할에 맞지 않는 학생 제거 (선생님/기관관리자만)
+      if(role==='orgAdmin' && curOrgId){
+        ST.students = ST.students.filter(s=>
+          String(s.orgId||'')===String(curOrgId)
+        );
+      } else if(role==='teacher'){
+        ST.students = ST.students.filter(s=>{
+          const sameOrg = !curOrgId || String(s.orgId||'')===String(curOrgId);
+          if(!sameOrg) return false;
+          const sc=[...(s.counselors||[])];
+          if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
+          return sc.includes(curName);
+        });
+      }
+
       if(ST.sel) ST.sel = ST.students.find(s=>String(s.id)===String(ST.sel.id))||ST.sel;
       if(ST.adminSel) ST.adminSel = ST.students.find(s=>String(s.id)===String(ST.adminSel.id))||ST.adminSel;
       dbS(SK, ST.students);
@@ -8427,12 +8741,11 @@ function startRealtimeSync(){
     // tests 컬렉션 변경 감지 (학생 답안 제출 시)
     db.collection('tests').onSnapshot(snap=>{
       if(!snap) return;
+      // snap.docs가 빈 배열이어도 처리 (마지막 테스트 삭제 반영)
       const updated = snap.docs.map(d=>({...d.data(),id:d.id}));
-      if(updated.length){
-        ST.tests = updated;
-        dbS(SK_TEST, ST.tests);
-        if(ST.currentUser) render();
-      }
+      ST.tests = updated; // 빈 배열도 허용
+      dbS(SK_TEST, ST.tests);
+      if(ST.currentUser) render();
     });
     console.log("✅ 실시간 동기화 시작");
   }catch(e){
