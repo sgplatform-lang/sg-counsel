@@ -186,6 +186,108 @@ async function fbAll(col){
   }catch(e){console.warn('fbAll error:',e.message);return[];}
 }
 
+// ── 개인정보동의 ──
+function showConsentModal(student){
+  if(student.consent && student.consent.agreed) return;
+  const ov = document.createElement('div');
+  ov.id = 'consent-modal';
+  ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+      <div style="background:linear-gradient(135deg,#1e3a8a,#3b5bdb);color:#fff;padding:18px 22px;border-radius:16px 16px 0 0">
+        <div style="font-size:17px;font-weight:900;margin-bottom:3px">📋 개인정보 수집·이용 동의</div>
+        <div style="font-size:11px;color:#bfdbfe">SG상담플랫폼 서비스 이용을 위해 동의가 필요합니다</div>
+      </div>
+      <div style="padding:18px 20px">
+        <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:12px;border:1px solid #e2e8f0;font-size:11px;color:#334155;line-height:1.8">
+          <div style="font-size:12px;font-weight:700;color:#1e3a8a;margin-bottom:6px">📌 개인정보 수집·이용 동의서</div>
+          <b>1. 수집 항목:</b> 이름, 학교, 학년, 성적 정보, 상담 내용, 수시 지원 정보<br>
+          <b>2. 수집 목적:</b> 학생 맞춤형 수시 상담 및 학습 관리 서비스 제공<br>
+          <b>3. 보유 기간:</b> 서비스 이용 종료 후 3년<br>
+          <b>4. 제3자 제공:</b> 원칙적으로 외부 제공 없음<br>
+          <b>5. 동의 거부:</b> 거부 가능하나 서비스 이용이 제한될 수 있습니다
+        </div>
+        <div style="background:#f0fdf4;border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid #86efac;font-size:11px;color:#334155;line-height:1.8">
+          <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:6px">📋 서비스 이용약관</div>
+          <b>1. 서비스 목적:</b> 수시 입시 상담 및 학습 관리 목적으로 운영됩니다<br>
+          <b>2. 이용자 의무:</b> 정확한 정보 입력 및 타인 계정 도용 금지<br>
+          <b>3. 서비스 변경:</b> 사전 공지 후 서비스를 변경·중단할 수 있습니다<br>
+          <b>4. 면책 조항:</b> AI 분석 결과는 참고용이며 최종 판단은 상담사와 협의하세요
+        </div>
+        <!-- 체크박스 1: 개인정보 -->
+        <div id="chk_privacy_box" onclick="toggleConsent('privacy')" style="display:flex;align-items:center;gap:12px;margin-bottom:10px;cursor:pointer;padding:12px 14px;background:#eef1ff;border-radius:10px;border:2px solid #c5cae9;transition:all .2s;user-select:none">
+          <div id="chk_privacy_icon" style="width:22px;height:22px;border-radius:5px;border:2px solid #3b5bdb;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;color:#3b5bdb;font-weight:900"></div>
+          <span style="font-size:13px;font-weight:600;color:#1e3a8a">[필수] 개인정보 수집·이용에 동의합니다</span>
+        </div>
+        <!-- 체크박스 2: 약관 -->
+        <div id="chk_terms_box" onclick="toggleConsent('terms')" style="display:flex;align-items:center;gap:12px;margin-bottom:18px;cursor:pointer;padding:12px 14px;background:#f0fdf4;border-radius:10px;border:2px solid #86efac;transition:all .2s;user-select:none">
+          <div id="chk_terms_icon" style="width:22px;height:22px;border-radius:5px;border:2px solid #15803d;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;color:#15803d;font-weight:900"></div>
+          <span style="font-size:13px;font-weight:600;color:#15803d">[필수] 서비스 이용약관에 동의합니다</span>
+        </div>
+        <button onclick="submitConsent('${student.id}')" id="consent_submit_btn" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:700;cursor:pointer">
+          ✅ 동의하고 시작하기
+        </button>
+        <div style="font-size:11px;color:#aaa;text-align:center;margin-top:10px">모든 필수 항목에 동의해야 서비스를 이용할 수 있습니다</div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+
+// 커스텀 체크박스 토글
+const _consentState = {privacy: false, terms: false};
+function toggleConsent(type){
+  _consentState[type] = !_consentState[type];
+  const icon = document.getElementById('chk_'+type+'_icon');
+  const box  = document.getElementById('chk_'+type+'_box');
+  if(!icon || !box) return;
+  if(_consentState[type]){
+    icon.textContent = '✓';
+    icon.style.background = type==='privacy'?'#3b5bdb':'#15803d';
+    icon.style.color = '#fff';
+    icon.style.border = '2px solid '+(type==='privacy'?'#3b5bdb':'#15803d');
+    box.style.border = '2px solid '+(type==='privacy'?'#3b5bdb':'#15803d');
+    box.style.background = type==='privacy'?'#eef1ff':'#dcfce7';
+  } else {
+    icon.textContent = '';
+    icon.style.background = '#fff';
+    icon.style.color = type==='privacy'?'#3b5bdb':'#15803d';
+    icon.style.border = '2px solid '+(type==='privacy'?'#3b5bdb':'#86efac');
+    box.style.border = '2px solid '+(type==='privacy'?'#c5cae9':'#86efac');
+    box.style.background = type==='privacy'?'#eef1ff':'#f0fdf4';
+  }
+}
+
+async function submitConsent(studentId){
+  if(!_consentState.privacy || !_consentState.terms){
+    // 미동의 항목 강조
+    if(!_consentState.privacy){
+      const b=document.getElementById('chk_privacy_box');
+      if(b){b.style.border='2px solid #e53935';setTimeout(()=>b.style.border='2px solid #c5cae9',1500);}
+    }
+    if(!_consentState.terms){
+      const b=document.getElementById('chk_terms_box');
+      if(b){b.style.border='2px solid #e53935';setTimeout(()=>b.style.border='2px solid #86efac',1500);}
+    }
+    alert('모든 필수 항목에 동의해주세요.');
+    return;
+  }
+  const consentData = {
+    agreed: true,
+    agreedAt: new Date().toISOString(),
+    privacy: true,
+    terms: true
+  };
+  try{
+    if(FB()){
+      const db = window._fb.db;
+      await db.collection('students').doc(String(studentId)).update({ consent: consentData });
+    }
+  }catch(e){ console.warn('동의 저장 실패:', e.message); }
+  if(CU) CU.consent = consentData;
+  if(DATA && DATA.student) DATA.student.consent = consentData;
+  document.getElementById('consent-modal')?.remove();
+}
+
 function render(){
   const app=document.getElementById('app');
   if(!app)return;
@@ -257,6 +359,8 @@ async function doLogin(){
     toast(`${student.name}님 환영합니다 👋`);
     // 실시간 동기화 시작 - 관리자 변경사항 자동 반영
     startStudentRealtimeSync(String(student.id));
+    // 개인정보동의 팝업 (미동의 시)
+    setTimeout(()=>showConsentModal(student), 800);
   }catch(e){if(err)err.textContent='오류: '+e.message;}
 }
 
