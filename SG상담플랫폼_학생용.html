@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head> 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 학생용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (학생용) -->
-    <link rel="icon" href="logo_student.png" type="image/png">
-    <link rel="shortcut icon" href="logo_student.png">
-    <link rel="apple-touch-icon" href="logo_student.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG학생용">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/SG상담플랫폼_학생용.html">
-    <meta property="og:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta property="og:image" content="og-student.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-student.png"> </head>
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -148,6 +121,8 @@ details summary::-webkit-details-marker{display:none}
 <div id="toast"></div>
 <script>
 let CU=null, DATA={student:null,tests:[],students:[]}, curTab='timetable';
+// 초기 history state 등록 (페이지 로드 즉시)
+history.replaceState({tab:'timetable', loggedIn:false, ts:Date.now()}, '');
 function toast(msg,d=2000){const e=document.getElementById('toast');if(!e)return;e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),d);}
 const FB=()=>window._fbReady&&window._fb;
 function fmtMock(val){
@@ -315,10 +290,56 @@ async function submitConsent(studentId){
   document.getElementById('consent-modal')?.remove();
 }
 
+// ── 모바일 뒤로가기 History API ──
+let _histPushing = false;
+
+function _getHist(){
+  return { tab: curTab || 'timetable', loggedIn: !!CU, ts: Date.now() };
+}
+
+function _pushHist(){
+  if(_histPushing) return;
+  const state = _getHist();
+  const cur = history.state;
+  if(cur && cur.tab === state.tab && cur.loggedIn === state.loggedIn) return;
+  history.pushState(state, '');
+}
+
+window.addEventListener('popstate', function(e){
+  const st = e.state;
+
+  // 로그인 상태 + 첫화면(기본탭)인지 판단
+  const isFirstScreen = !!CU && (curTab === 'timetable' || curTab === 'test');
+
+  if(isFirstScreen){
+    // 첫화면에서 뒤로가기 → 종료 확인
+    history.pushState(_getHist(), ''); // 이탈 방지용 재등록
+    if(window.confirm('SG상담플랫폼을 종료하시겠습니까?')){
+      history.go(-2);
+    }
+    return;
+  }
+
+  _histPushing = true;
+
+  if(st && CU && st.tab){
+    // 이전 탭으로 복원
+    curTab = st.tab;
+  }
+
+  // 현재 상태 재등록 (이탈 방지)
+  history.pushState(_getHist(), '');
+
+  _histPushing = false;
+  render();
+});
+
 function render(){
   const app=document.getElementById('app');
   if(!app)return;
   if(!CU){app.innerHTML=renderLogin();return;}
+  // 상태 변화 시 history push
+  if(!_histPushing) _pushHist();
   const fbStatus=FB()?'<div class="fb-bar fb-ok">🟢 Firebase 연결됨</div>':'<div class="fb-bar fb-no">⚠️ Firebase 미연결</div>';
   app.innerHTML=`
     ${fbStatus}
