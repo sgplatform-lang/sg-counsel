@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head> 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -863,11 +836,84 @@ function upd(s){
 }
 
 // ══ 렌더 (스크롤 위치 유지) ══
+// ── 모바일 뒤로가기 History API ──
+let _historyPushing = false;
+
+function _getNavState(){
+  return {
+    sel: ST.sel?.id || null,
+    adminSel: ST.adminSel?.id || null,
+    tab: ST.tab || 'overview',
+    adminTab: ST.adminTab || 'report',
+    page: ST.page || 'main',
+    ts: Date.now()
+  };
+}
+
+function _pushHistory(){
+  if(_historyPushing) return;
+  const state = _getNavState();
+  const cur = history.state;
+  if(cur &&
+     cur.sel===state.sel &&
+     cur.tab===state.tab &&
+     cur.adminSel===state.adminSel &&
+     cur.page===state.page &&
+     cur.adminTab===state.adminTab) return;
+  history.pushState(state, '');
+}
+
+window.addEventListener('popstate', function(e){
+  const st = e.state;
+  const cur = _getNavState();
+
+  // 로그인 상태 + 첫화면(기본탭, 학생미선택)인지 판단
+  const isFirstScreen = ST.currentUser && (
+    cur.tab === 'overview' || cur.tab === 'report'
+  ) && !cur.adminSel;
+
+  if(isFirstScreen){
+    if(window.confirm('SG상담플랫폼을 종료하시겠습니까?')){
+      // 확인 → 히스토리를 완전히 소진해서 이탈
+      history.go(-(history.length));
+      setTimeout(function(){ window.close(); }, 300);
+    } else {
+      // 취소 → 현재 상태 재등록해서 유지
+      history.pushState(_getNavState(), '');
+    }
+    return;
+  }
+
+  _historyPushing = true;
+
+  if(st && ST.currentUser){
+    if(st.page)     ST.page     = st.page;
+    if(st.tab)      ST.tab      = st.tab;
+    if(st.adminTab) ST.adminTab = st.adminTab;
+    if(st.sel){
+      const found = ST.students.find(x=>String(x.id)===String(st.sel));
+      if(found) ST.sel = found;
+    }
+    if(st.adminSel){
+      const found2 = ST.students.find(x=>String(x.id)===String(st.adminSel));
+      if(found2) ST.adminSel = found2;
+    }
+  }
+
+  // 현재 상태 히스토리 재등록 (이탈 방지)
+  history.pushState(_getNavState(), '');
+
+  _historyPushing = false;
+  render();
+});
+
 function render(){
   const app=document.getElementById('app');
   // 탭 전환 여부 감지
   const isTabSwitch=ST._prevTab!==ST.tab;
   ST._prevTab=ST.tab;
+  // 상태 변화 시 history push (뒤로가기 지원)
+  if(!_historyPushing) _pushHistory();
   // main-area 스크롤 저장 (타임테이블 등 위치 유지)
   const ma=document.querySelector('.main-area');
   const sy=ma?ma.scrollTop:0;
@@ -6546,31 +6592,37 @@ ${essayData.map(q=>`${q.no}번: [점수]점 | [채점이유 한줄]`).join('\n')
 }
 
 async function generateAiComment(testId,studentId){
-  const t=ST.tests.find(x=>x.id===testId);
-  const s=ST.students.find(x=>x.id===studentId);
-  const res=(t?.results||[]).find(r=>r.studentId===studentId);
-  if(!t||!s||!res){alert('데이터가 없습니다. 먼저 답안을 저장해주세요.');return;}
-  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||'').trim();
-  if(!apiKey){alert('API 키를 설정해주세요.');return;}
+  // 타입 통일 (String 비교로 id 불일치 방지)
+  const t=ST.tests.find(x=>String(x.id)===String(testId));
+  const s=ST.students.find(x=>String(x.id)===String(studentId));
+  const res=(t?.results||[]).find(r=>String(r.studentId)===String(studentId));
+  if(!t){alert('테스트를 찾을 수 없습니다.');return;}
+  if(!s){alert('학생을 찾을 수 없습니다.');return;}
+  if(!res||!(res.answers||[]).length){alert('답안이 입력되지 않았습니다.\n답안을 먼저 입력해주세요.');return;}
+  const apiKey=(window.ANTHROPIC_API_KEY||window._sharedApiKey||localStorage.getItem('apiKey')||''). trim();
+  if(!apiKey){alert('API 키를 설정해주세요.\n상단 설정에서 API 키를 입력해주세요.');return;}
   const totalScore=t.questions.reduce((a,q)=>a+(+q.score||0),0);
-  const myScore=res.answers.reduce((a,a2)=>a+(+a2.score||0),0);
-  const wrongQ=t.questions.filter(q=>{const a=res.answers.find(x=>x.no===q.no);return !a||+a.score<+q.score;});
+  const myScore=(res.answers||[]).reduce((a,a2)=>a+(+a2.score||0),0);
+  const wrongQ=t.questions.filter(q=>{const a=(res.answers||[]).find(x=>x.no===q.no);return !a||+a.score<+q.score;});
   const unitWrong=[...new Set(wrongQ.map(q=>q.unit).filter(Boolean))];
-  const prompt=`학생 ${s.name}(${s.grade}${s.className?' '+s.className:''})의 ${t.title}(${t.subject}) 결과 분석:
-총점: ${myScore}/${totalScore}점(${Math.round(myScore/totalScore*100)}%)
-틀린문항: ${wrongQ.map(q=>q.no+'번('+q.unit+')').join(', ')||'없음'}
-취약단원: ${unitWrong.join(', ')||'없음'}
-
-200자 이내 총평 작성 (수행평가, 강약점, 다음 학습방향 포함):`;
+  const prompt=`학생 ${s.name}(${s.grade}${s.className?' '+s.className:''})의 ${t.title}(${t.subject}) 결과 분석:\n총점: ${myScore}/${totalScore}점(${totalScore?Math.round(myScore/totalScore*100):0}%)\n틀린문항: ${wrongQ.map(q=>q.no+'번('+q.unit+')').join(', ')||'없음'}\n취약단원: ${unitWrong.join(', ')||'없음'}\n\n200자 이내 총평 작성 (수행평가, 강약점, 다음 학습방향 포함):`;
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:400,messages:[{role:'user',content:prompt}]})});
     const data=await resp.json();
+    if(data.error){alert('AI 오류: '+data.error.message);return;}
     const comment=data.content?.[0]?.text||'분석 실패';
-    const tt2=ST.tests.find(x=>x.id===testId);
-    const r2=(tt2?.results||[]).find(r=>r.studentId===studentId);
-    if(r2){r2.aiComment=comment;ST.tests=ST.tests.map(x=>x.id===testId?tt2:x);save();}
+    const tt2=ST.tests.find(x=>String(x.id)===String(testId));
+    const r2=(tt2?.results||[]).find(r=>String(r.studentId)===String(studentId));
+    if(r2){
+      r2.aiComment=comment;
+      ST.tests=ST.tests.map(x=>String(x.id)===String(testId)?tt2:x);
+      save();
+      if(typeof FB_USE==='function'&&FB_USE()){
+        window._fb.db.collection('tests').doc(String(testId)).update({results:tt2.results}).catch(()=>{});
+      }
+    }
     alert('✅ AI 총평 생성 완료!\n\n'+comment);
   }catch(e){alert('오류: '+e.message);}
 }
@@ -6950,8 +7002,9 @@ setTimeout(function(){
 async function printItemAnalysis(testId){
   const t=ST.tests.find(x=>String(x.id)===String(testId));
   if(!t){alert('테스트를 찾을 수 없습니다.');return;}
-  const results=t.results||[];const questions=t.questions||[];
-  if(!results.length){alert('입력된 답안이 없습니다.');return;}
+  const results=t.results||[];
+  const questions=t.questions||[];
+  if(!results.length){alert('입력된 답안이 없습니다.\n먼저 학생 답안을 입력해주세요.');return;}
   const totalStudents=results.length;
   const maxScore=questions.reduce((a,q)=>a+(+q.score||0),0);
   const scores=results.map(r=>(r.answers||[]).reduce((a,a2)=>a+(+a2.score||0),0));
@@ -6960,85 +7013,155 @@ async function printItemAnalysis(testId){
   const sortedSc=[...scores].sort((a,b)=>a-b);
   const median=sortedSc[Math.floor(sortedSc.length/2)]||0;
   const stdDev=Math.sqrt(scores.reduce((a,v)=>a+Math.pow(v-avgScore,2),0)/scores.length);
+
   const itemData=questions.map(q=>{
-    const correct=results.filter(r=>{const a=(r.answers||[]).find(a=>a.no===q.no);return a&&+a.score>=+q.score;}).length;
-    const partial=results.filter(r=>{const a=(r.answers||[]).find(a=>a.no===q.no);return a&&+a.score>0&&+a.score<+q.score;}).length;
+    const correct=results.filter(r=>{const a=(r.answers||[]).find(x=>x.no===q.no);return a&&+a.score>=+q.score;}).length;
+    const partial=results.filter(r=>{const a=(r.answers||[]).find(x=>x.no===q.no);return a&&+a.score>0&&+a.score<+q.score;}).length;
     const wrong=totalStudents-correct-partial;
     const cr=totalStudents?Math.round(correct/totalStudents*100):0;
     let diff,diffC;
-    if(cr>=80){diff='하(쉬움)';diffC='#0f9d58';}else if(cr>=60){diff='중';diffC='#f59e0b';}else if(cr>=40){diff='중상';diffC='#e37400';}else{diff='상(어려움)';diffC='#e53935';}
-    const s2=results.map(r=>{const tot=(r.answers||[]).reduce((a,a2)=>a+(+a2.score||0),0);const got=(r.answers||[]).find(a=>a.no===q.no)?.score||0;return{total:tot,got:+got};}).sort((a,b)=>b.total-a.total);
+    if(cr>=80){diff='하(쉬움)';diffC='#0f9d58';}
+    else if(cr>=60){diff='중';diffC='#f59e0b';}
+    else if(cr>=40){diff='중상';diffC='#e37400';}
+    else{diff='상(어려움)';diffC='#e53935';}
+    const sorted2=results.map(r=>{
+      const tot=(r.answers||[]).reduce((a,a2)=>a+(+a2.score||0),0);
+      const got=+((r.answers||[]).find(x=>x.no===q.no)?.score||0);
+      return{tot,got};
+    }).sort((a,b)=>b.tot-a.tot);
     const n27=Math.max(1,Math.floor(totalStudents*0.27));
-    const disc=Math.round(((s2.slice(0,n27).filter(x=>x.got>=+q.score).length/n27)-(s2.slice(-n27).filter(x=>x.got>=+q.score).length/n27))*100)/100;
-    let discL,discC;if(disc>=0.4){discL='우수';discC='#0f9d58';}else if(disc>=0.2){discL='양호';discC='#3b5bdb';}else if(disc>=0){discL='미흡';discC='#f59e0b';}else{discL='부적절';discC='#e53935';}
+    const upperRate=sorted2.slice(0,n27).filter(x=>x.got>=+q.score).length/n27;
+    const lowerRate=sorted2.slice(-n27).filter(x=>x.got>=+q.score).length/n27;
+    const disc=Math.round((upperRate-lowerRate)*100)/100;
+    let discL,discC;
+    if(disc>=0.4){discL='우수';discC='#0f9d58';}
+    else if(disc>=0.2){discL='양호';discC='#3b5bdb';}
+    else if(disc>=0){discL='미흡';discC='#f59e0b';}
+    else{discL='부적절';discC='#e53935';}
     return{q,correct,partial,wrong,cr,diff,diffC,disc,discL,discC};
   });
-  const qL=questions.map(q=>q.no+'번');
-  const qD=itemData.map(d=>d.cr);
-  const qC=qD.map(p=>p>=80?'rgba(15,157,88,.75)':p>=60?'rgba(245,158,11,.75)':'rgba(229,57,53,.7)');
-  const diffCnt=['하(쉬움)','중','중상','상(어려움)'].map(d=>itemData.filter(x=>x.diff===d).length);
-  const discD=itemData.map(d=>Math.round(d.disc*100));
-  const discC=discD.map(d=>d>=40?'rgba(15,157,88,.75)':d>=20?'rgba(59,91,219,.75)':d>=0?'rgba(245,158,11,.75)':'rgba(229,57,53,.7)');
+
+  const qLabels=questions.map(q=>q.no+'번');
+  const qData=itemData.map(d=>d.cr);
+  const qColors=qData.map(p=>p>=80?'rgba(15,157,88,.75)':p>=60?'rgba(245,158,11,.75)':'rgba(229,57,53,.7)');
+  const diffBuckets=['하(쉬움)','중','중상','상(어려움)'];
+  const diffCounts=diffBuckets.map(d=>itemData.filter(x=>x.diff===d).length);
+  const diffPcts=diffCounts.map(c=>questions.length?Math.round(c/questions.length*100):0);
+  const discData=itemData.map(d=>Math.round(d.disc*100));
+  const discColors=discData.map(d=>d>=40?'rgba(15,157,88,.75)':d>=20?'rgba(59,91,219,.75)':d>=0?'rgba(245,158,11,.75)':'rgba(229,57,53,.7)');
   const bins=[0,10,20,30,40,50,60,70,80,90,100];
-  const hL=bins.slice(0,-1).map((b,i)=>b+'~'+bins[i+1]+'%');
-  const hD=bins.slice(0,-1).map((b,i)=>{const bMax=bins[i+1]+(i===bins.length-2?1:0);return scores.filter(sc=>{const p=maxScore?Math.round(sc/maxScore*100):0;return p>=b&&p<bMax;}).length;});
+  const histLabels=bins.slice(0,-1).map((b,i)=>b+'~'+bins[i+1]+'%');
+  const histData=bins.slice(0,-1).map((b,i)=>{
+    const bMax=bins[i+1]+(i===bins.length-2?1:0);
+    return scores.filter(sc=>{const p=maxScore?Math.round(sc/maxScore*100):0;return p>=b&&p<bMax;}).length;
+  });
+  const discMin=Math.min(Math.min(...discData)-15,-30);
+  const discMax=Math.max(Math.max(...discData)+15,50);
+
+  // AI 총평 수집
+  const aiComments=results.filter(r=>r.aiComment).map(r=>{
+    const s=ST.students.find(x=>String(x.id)===String(r.studentId));
+    return{name:s?.name||'?',comment:r.aiComment};
+  });
+
+  // 표 HTML 생성
+  const tableRows=itemData.map(d=>'<tr>'
+    +'<td style="font-weight:700;color:#e53935">'+d.q.no+'</td>'
+    +'<td><span style="background:'+(d.q.type==='서술형'?'#f5f3ff':d.q.type==='객관식'?'#fff8e1':'#eef1ff')+';color:'+(d.q.type==='서술형'?'#7c3aed':d.q.type==='객관식'?'#d97706':'#3b5bdb')+';border-radius:4px;padding:1px 5px;font-size:9px">'+d.q.type+'</span></td>'
+    +'<td style="text-align:left;font-size:10px">'+esc(d.q.unit||'-')+'</td>'
+    +'<td>'+d.q.score+'점</td>'
+    +'<td style="color:#0f9d58;font-weight:600">'+esc(d.q.answer||'-')+'</td>'
+    +'<td style="color:'+d.diffC+';font-weight:700">'+d.diff+'</td>'
+    +'<td><div style="display:flex;align-items:center;gap:4px"><div style="flex:1;background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden"><div style="background:'+(d.cr>=60?'#0f9d58':'#e53935')+';height:6px;width:'+d.cr+'%;border-radius:3px"></div></div><span style="color:'+(d.cr>=60?'#0f9d58':'#e53935')+';font-weight:700;min-width:28px;font-size:10px">'+d.cr+'%</span></div></td>'
+    +'<td style="color:#0f9d58">'+d.correct+'</td>'
+    +'<td style="color:#f59e0b">'+d.partial+'</td>'
+    +'<td style="color:#e53935">'+d.wrong+'</td>'
+    +'<td style="color:'+d.discC+';font-weight:700">'+d.disc.toFixed(2)+'<br><span style="font-size:8px">'+d.discL+'</span></td>'
+    +'</tr>'
+  ).join('');
+
+  // AI 총평 HTML
+  const aiHtml=aiComments.length
+    ?'<h3>🤖 AI 문항 총평</h3>'+aiComments.map(ac=>'<div style="background:#f5f3ff;border-radius:8px;padding:10px 12px;border-left:4px solid #8b5cf6;margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:#6d28d9;margin-bottom:4px">🎓 '+esc(ac.name)+'</div><div style="font-size:11px;color:#333;line-height:1.7">'+esc(ac.comment)+'</div></div>').join('')
+    :'<div style="background:#f5f3ff;border-radius:8px;padding:10px 14px;border-left:4px solid #8b5cf6;margin-bottom:12px;font-size:11px;color:#6d28d9">🤖 <strong>AI 문항 총평</strong>: 답안 입력 화면에서 학생별 [🤖 AI 총평] 버튼을 클릭하면 AI 총평이 생성됩니다.</div>';
+  // 그래프 데이터 JSON
+  const gData='var qL='+JSON.stringify(qLabels)+';'
+    +'var qD='+JSON.stringify(qData)+';'
+    +'var qC='+JSON.stringify(qColors)+';'
+    +'var dN='+JSON.stringify(diffBuckets)+';'
+    +'var dC='+JSON.stringify(diffCounts)+';'
+    +'var dP='+JSON.stringify(diffPcts)+';'
+    +'var diD='+JSON.stringify(discData)+';'
+    +'var diC='+JSON.stringify(discColors)+';'
+    +'var hL='+JSON.stringify(histLabels)+';'
+    +'var hD='+JSON.stringify(histData)+';'
+    +'var discMin='+discMin+';'
+    +'var discMax='+discMax+';';
+
+  // 그래프 초기화 코드
+  const chartCode=[
+    'new Chart(document.getElementById("ch1"),{type:"bar",data:{labels:qL,datasets:[{data:qD,backgroundColor:qC,borderRadius:3,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100,ticks:{stepSize:25,font:{size:8},callback:function(v){return v+"%"}},grid:{color:"#f0f4f8"}},x:{ticks:{font:{size:8}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.raw+"%"}}}},animation:{duration:0}}});',
+    'new Chart(document.getElementById("ch2"),{type:"doughnut",data:{labels:dN.map(function(n,i){return n+" "+dP[i]+"%"}),datasets:[{data:dC,backgroundColor:["rgba(15,157,88,.8)","rgba(245,158,11,.8)","rgba(227,116,0,.8)","rgba(229,57,53,.8)"],borderWidth:2,borderColor:"#fff"}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{font:{size:9},padding:8,boxWidth:12}},tooltip:{callbacks:{label:function(c){return dN[c.dataIndex]+": "+c.raw+"문항 ("+dP[c.dataIndex]+"%)" }}}},cutout:"52%",animation:{duration:0}}});',
+    'new Chart(document.getElementById("ch3"),{type:"bar",data:{labels:qL,datasets:[{label:"변별도(×100)",data:diD.map(function(v){return v===0?0.01:v;}),backgroundColor:diC,borderRadius:3,borderWidth:0,minBarLength:4}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:discMin,max:discMax,ticks:{font:{size:8},callback:function(v){return (v/100).toFixed(2)}},grid:{color:"#f0f4f8",lineWidth:function(ctx){return ctx.tick&&ctx.tick.value===0?2:1;}},title:{display:true,text:"변별도 (-1.0~+1.0)",font:{size:8}}},x:{ticks:{font:{size:8}}}},plugins:{annotation:{},legend:{display:false},tooltip:{callbacks:{label:function(c){var real=Math.round(c.raw)/100;return "변별도: "+real.toFixed(2)+(real>=0.4?" [우수]":real>=0.2?" [양호]":real>=0?" [미흡]":" [부적절]")}}}},animation:{duration:0}}});',
+    'new Chart(document.getElementById("ch4"),{type:"bar",data:{labels:hL,datasets:[{data:hD,backgroundColor:"rgba(59,91,219,.65)",borderRadius:3,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{stepSize:1,font:{size:8},callback:function(v){return v+"명"}},grid:{color:"#f0f4f8"}},x:{ticks:{font:{size:7},maxRotation:45}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.raw+"명"}}}},animation:{duration:0}}})',
+  ].join('');
+
   const pop=window.open('','_blank','width=960,height=820,scrollbars=yes,resizable=yes');
   if(!pop){alert('팝업을 허용해주세요.');return;}
   pop.document.open();
-  pop.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-<title>${esc(t.title)} 문항분석</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>
-${_testPrintCSS()}
-</head><body>
-${_testPrintNavBar(esc(t.title)+' 문항분석표')}
-<div class="np-spacer"></div>
-<div class="hdr" style="background:linear-gradient(135deg,#0891b2,#0e7490)">
-  <div style="font-size:8px;color:#a5f3fc;margin-bottom:2px">문항분석표 · SG상담플랫폼 · ${td()}</div>
-  <div style="font-size:15px;font-weight:900;margin-bottom:1px">${esc(t.title)}</div>
-  <div style="font-size:10px;color:#cffafe">${esc(t.subject)} · ${esc(t.date)} · 응시 ${totalStudents}명 · 만점 ${maxScore}점</div>
-</div>
-<div class="stat-grid">
-  <div class="stat-box"><div class="stat-v" style="color:#3b5bdb">${avgScore.toFixed(1)}점</div><div class="stat-l">평균점수</div></div>
-  <div class="stat-box"><div class="stat-v" style="color:#0f9d58">${avgPct}%</div><div class="stat-l">평균정답률</div></div>
-  <div class="stat-box"><div class="stat-v" style="color:#8b5cf6">${median}점</div><div class="stat-l">중앙값</div></div>
-  <div class="stat-box"><div class="stat-v" style="color:#e53935">${stdDev.toFixed(1)}</div><div class="stat-l">표준편차</div></div>
-</div>
-<h3>📋 문항별 분석표</h3>
-<table><thead><tr><th>번호</th><th>유형</th><th>단원</th><th>배점</th><th>정답</th><th>난이도</th><th>정답률</th><th>정답수</th><th>부분</th><th>오답</th><th>변별도</th></tr></thead><tbody>
-${itemData.map(d=>`<tr><td style="font-weight:700;color:#e53935">${d.q.no}</td><td style="font-size:9px">${d.q.type}</td><td style="text-align:left">${esc(d.q.unit||'-')}</td><td>${d.q.score}점</td><td style="color:#0f9d58;font-weight:600">${esc(d.q.answer||'-')}</td><td style="color:${d.diffC};font-weight:700">${d.diff}</td><td><div style="display:flex;align-items:center;gap:4px"><div style="flex:1;background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden"><div style="background:${d.cr>=60?'#0f9d58':'#e53935'};height:6px;width:${d.cr}%;border-radius:3px"></div></div><span style="color:${d.cr>=60?'#0f9d58':'#e53935'};font-weight:700;min-width:28px">${d.cr}%</span></div></td><td style="color:#0f9d58">${d.correct}</td><td style="color:#f59e0b">${d.partial}</td><td style="color:#e53935">${d.wrong}</td><td style="color:${d.discC};font-weight:700">${d.disc.toFixed(2)}<br><span style="font-size:8px">${d.discL}</span></td></tr>`).join('')}
-</tbody></table>
-<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;font-size:9px;color:#64748b;margin-bottom:12px">변별도: 0.4이상=우수 / 0.2~0.4=양호 / 0~0.2=미흡 / 0미만=부적절</div>
-<h3>📈 4가지 분석 그래프</h3>
-<div class="dash-grid">
-  <div class="dash-card"><div class="dash-title">📊 문항별 정답률</div><div class="dash-canvas-wrap"><canvas id="ch1"></canvas></div></div>
-  <div class="dash-card"><div class="dash-title">🍩 난이도 분포</div><div class="dash-canvas-wrap"><canvas id="ch2"></canvas></div></div>
-  <div class="dash-card"><div class="dash-title">📈 변별도</div><div class="dash-canvas-wrap"><canvas id="ch3"></canvas></div></div>
-  <div class="dash-card"><div class="dash-title">📉 점수 분포</div><div class="dash-canvas-wrap"><canvas id="ch4"></canvas></div></div>
-</div>
-<script>
-(function(){
-  var qL=${JSON.stringify(qL)};
-  var qD=${JSON.stringify(qD)};
-  var qC=${JSON.stringify(qC)};
-  var dC=${JSON.stringify(diffCnt)};
-  var diD=${JSON.stringify(discD)};
-  var diC=${JSON.stringify(discC)};
-  var hL=${JSON.stringify(hL)};
-  var hD=${JSON.stringify(hD)};
-  function go(){
-    try{
-      Chart.defaults.font.family="'Malgun Gothic','Apple SD Gothic Neo',sans-serif";
-      Chart.defaults.font.size=9;
-      new Chart(document.getElementById('ch1'),{type:'bar',data:{labels:qL,datasets:[{data:qD,backgroundColor:qC,borderRadius:3,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100,ticks:{stepSize:25,font:{size:8}},grid:{color:'#f0f4f8'}},x:{ticks:{font:{size:8}}}},plugins:{legend:{display:false}},animation:{duration:0}}});
-      new Chart(document.getElementById('ch2'),{type:'doughnut',data:{labels:['하(쉬움)','중','중상','상(어려움)'],datasets:[{data:dC,backgroundColor:['rgba(15,157,88,.8)','rgba(245,158,11,.8)','rgba(227,116,0,.8)','rgba(229,57,53,.8)'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:8},padding:6}},tooltip:{callbacks:{label:ctx=>ctx.label+': '+ctx.raw+'문항'}}},cutout:'55%',animation:{duration:0}}});
-      new Chart(document.getElementById('ch3'),{type:'bar',data:{labels:qL,datasets:[{data:diD,backgroundColor:diC,borderRadius:3,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{font:{size:8}},grid:{color:'#f0f4f8'}},x:{ticks:{font:{size:8}}}},plugins:{legend:{display:false}},animation:{duration:0}}});
-      new Chart(document.getElementById('ch4'),{type:'bar',data:{labels:hL,datasets:[{data:hD,backgroundColor:'rgba(59,91,219,.65)',borderRadius:3,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{stepSize:1,font:{size:8}},grid:{color:'#f0f4f8'}},x:{ticks:{font:{size:7},maxRotation:45}}},plugins:{legend:{display:false}},animation:{duration:0}}});
-    }catch(e){console.error('Chart error:',e);}
-  }
-  if(document.readyState==='complete'){setTimeout(go,300);}else{window.addEventListener('load',function(){setTimeout(go,300);});}
-})();
-<\/script>
-</body></html>`);
+  // ★ pop.document.write에 백틱 중첩 없이 문자열 연결 방식 사용 ★
+  pop.document.write(
+    '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+    +'<title>'+esc(t.title)+' 문항분석</title>'
+    +'<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>'
+    +_testPrintCSS()
+    +'</head><body>'
+    +_testPrintNavBar(esc(t.title)+' 문항분석표')
+    +'<div class="np-spacer"></div>'
+    +'<div class="hdr" style="background:linear-gradient(135deg,#0891b2,#0e7490)">'
+    +'<div style="font-size:8px;color:#a5f3fc;margin-bottom:2px">문항분석표 · SG상담플랫폼 · '+td()+'</div>'
+    +'<div style="font-size:15px;font-weight:900;margin-bottom:1px">'+esc(t.title)+'</div>'
+    +'<div style="font-size:10px;color:#cffafe">'+esc(t.subject||'')+' · '+esc(t.date||'')+' · 응시 '+totalStudents+'명 · 만점 '+maxScore+'점</div>'
+    +'</div>'
+    +'<div class="stat-grid">'
+    +'<div class="stat-box"><div class="stat-v" style="color:#3b5bdb">'+avgScore.toFixed(1)+'점</div><div class="stat-l">평균점수</div></div>'
+    +'<div class="stat-box"><div class="stat-v" style="color:#0f9d58">'+avgPct+'%</div><div class="stat-l">평균정답률</div></div>'
+    +'<div class="stat-box"><div class="stat-v" style="color:#8b5cf6">'+median+'점</div><div class="stat-l">중앙값</div></div>'
+    +'<div class="stat-box"><div class="stat-v" style="color:#e53935">'+stdDev.toFixed(1)+'</div><div class="stat-l">표준편차</div></div>'
+    +'</div>'
+    +'<h3>📋 문항별 분석표</h3>'
+    +'<table><thead><tr>'
+    +'<th style="width:28px">번호</th><th>유형</th><th>단원</th><th>배점</th>'
+    +'<th style="color:#0f9d58">정답</th><th>난이도</th><th>정답률</th>'
+    +'<th style="color:#0f9d58">정답</th><th style="color:#f59e0b">부분</th>'
+    +'<th style="color:#e53935">오답</th><th>변별도</th>'
+    +'</tr></thead><tbody>'+tableRows+'</tbody></table>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;font-size:9px;color:#64748b;margin-bottom:12px">'
+    +'<strong>변별도 기준:</strong> 0.40이상=우수 / 0.20~0.40=양호 / 0~0.20=미흡 / 0미만=부적절 &nbsp;|&nbsp;'
+    +'<strong>난이도 기준:</strong> 80%↑=하(쉬움) / 60~80%=중 / 40~60%=중상 / 40%↓=상(어려움)'
+    +'</div>'
+    +aiHtml
+    +'<h3>📈 4가지 분석 그래프</h3>'
+    +'<div class="dash-grid">'
+    +'<div class="dash-card"><div class="dash-title">📊 문항별 정답률</div><div class="dash-canvas-wrap"><canvas id="ch1"></canvas></div></div>'
+    +'<div class="dash-card"><div class="dash-title">🍩 난이도 분포 (문항수/비율)</div><div class="dash-canvas-wrap"><canvas id="ch2"></canvas></div></div>'
+    +'<div class="dash-card"><div class="dash-title">📈 문항별 변별도</div><div class="dash-canvas-wrap"><canvas id="ch3"></canvas></div></div>'
+    +'<div class="dash-card"><div class="dash-title">📉 점수 분포 히스토그램</div><div class="dash-canvas-wrap"><canvas id="ch4"></canvas></div></div>'
+    +'</div>'
+    +'<script>'
+    +'(function(){'
+    +gData
+    +'function go(){try{'
+    +'Chart.defaults.font.family="\'Malgun Gothic\',\'Apple SD Gothic Neo\',sans-serif";'
+    +'Chart.defaults.font.size=9;'
+    +chartCode
+    +'}catch(e){console.error("Chart error:",e);}}'
+    +'if(document.readyState==="complete"){setTimeout(go,300);}'
+    +'else{window.addEventListener("load",function(){setTimeout(go,300);});}'
+    +'})();'
+    +'<\/script>'
+    +'</body></html>'
+  );
   pop.document.close();
 }
 // ── 테스트 인쇄 공통 CSS ──
@@ -8665,7 +8788,8 @@ function loadAccounts(){
 }
 
 function init(){
-  // ── localStorage 전체 키 안전 점검 ──
+  // 초기 history state 등록 (뒤로가기 이탈 방지)
+  history.replaceState({tab:'overview',page:'main',sel:null,adminSel:null,adminTab:'report',ts:Date.now()}, '');
   const ALL_KEYS=[SK,SKT,SK_TEST,SK_AUTH,SK_ACCOUNTS,SK_ORGS];
   ALL_KEYS.forEach(function(k){
     try{ const v=localStorage.getItem(k); if(v) JSON.parse(v); }
