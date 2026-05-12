@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 학생용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (학생용) -->
-    <link rel="icon" href="logo_student.png" type="image/png">
-    <link rel="shortcut icon" href="logo_student.png">
-    <link rel="apple-touch-icon" href="logo_student.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG학생용">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/SG상담플랫폼_학생용.html">
-    <meta property="og:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta property="og:image" content="og-student.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-student.png"> </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -172,6 +145,10 @@ function fmtMockShort(val){
   return String(val);
 }
 
+// 해당 월의 최대 주차 수
+function getMaxWeeks(y, m){ const d=new Date(y,m,0).getDate(); const fd=new Date(y,m-1,1).getDay(); return Math.ceil((d+fd)/7); }
+// 주차 키 생성
+function getWeekNum(y,m,w){ return y+'-'+String(m).padStart(2,'0')+'-w'+w; }
 // 주차 시작/종료 날짜 계산
 function getWeekRange(year, month, week){
   // 해당 월 1일의 요일 (0=일, 1=월~6=토)
@@ -184,15 +161,6 @@ function getWeekRange(year, month, week){
   return `${fmt(startDate)}~${fmt(endDate)}`;
 }
 
-
-function getWeekRange(year, month, week){
-  const firstDay = new Date(year, month-1, 1).getDay();
-  const firstMonday = 1 - (firstDay===0?6:firstDay-1);
-  const startDate = new Date(year, month-1, firstMonday + (week-1)*7);
-  const endDate = new Date(year, month-1, firstMonday + (week-1)*7 + 6);
-  const fmt = (d) => `${d.getMonth()+1}/${d.getDate()}`;
-  return `${fmt(startDate)}~${fmt(endDate)}`;
-}
 function getWeekOfMonth(year, month, day){
   const firstDay = new Date(year, month-1, 1).getDay();
   const firstMonStart = 1 - (firstDay===0?6:firstDay-1);
@@ -642,8 +610,9 @@ function renderTimetable(){
         ${[1,2,3,4,5].map(w=>`<option value="${w}" ${w===selWeek?'selected':''}>${w}주차 (${getWeekRange(selYear,selMonth,w)})</option>`).join('')}
       </select>
       ${selYear===curYear&&selMonth===curMonth&&selWeek===curWeek
-        ?`<span style="background:#e8f5e9;color:#2e7d32;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700">이번 주</span>`
-        :`<button onclick="CU._ttYear=undefined;CU._ttMonth=undefined;CU._ttWeek=undefined;render()" style="background:#eef1ff;color:#3b5bdb;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">이번 주로</button>`}
+        ?`<span style="background:#e8f5e9;color:#2e7d32;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700">✅ 현재 주차</span>`
+        :`<button onclick="CU._ttYear=undefined;CU._ttMonth=undefined;CU._ttWeek=undefined;render()" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">오늘</button>`}
+      <button onclick="copyPrevWeekPlanStudent(${selYear},${selMonth},${selWeek})" style="background:#f0fdf4;color:#059669;border:1.5px solid #6ee7b7;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📋 지난주 가져오기</button>
     </div>
 
     <!-- 플랜 있는 주차 빠른 이동 -->
@@ -1438,6 +1407,65 @@ function renderInfo(){
 
 // 실시간 동기화 - 관리자가 변경하면 자동으로 학생 화면 갱신
 let _unsubscribeStudent = null;
+// ── 학생용: 지난주 플랜 가져오기 ──
+function copyPrevWeekPlanStudent(selYear, selMonth, selWeek){
+  if(!CU) return;
+  // 이전 주차 계산
+  var py=selYear, pm=selMonth, pw=selWeek-1;
+  if(pw<1){
+    pm-=1;
+    if(pm<1){ pm=12; py-=1; }
+    pw=getMaxWeeks(py,pm);
+  }
+  var prevKey=py+'-'+String(pm).padStart(2,'0')+'-w'+pw;
+  // 현재 주차
+  var now=new Date();
+  var curYear=now.getFullYear(), curMonth=now.getMonth()+1;
+  var curWeek=getWeekOfMonth(curYear,curMonth,now.getDate());
+  var curKey=curYear+'-'+String(curMonth).padStart(2,'0')+'-w'+curWeek;
+  var isCurrentSel=(selYear===curYear&&selMonth===curMonth&&selWeek===curWeek);
+  // 이전 주차 플랜 조회
+  var hist=CU._weeklyHistory||{};
+  var srcPlan={}, srcBm={};
+  if(hist[prevKey]&&Object.keys(hist[prevKey].plan||{}).length>0){
+    srcPlan=hist[prevKey].plan||{};
+    srcBm=hist[prevKey].ttBookMap||hist[prevKey].bookMap||{};
+  } else if((CU._planWeek||'')===prevKey){
+    srcPlan=CU.weeklyPlan||{};
+    srcBm=CU.weeklyBookMap||{};
+  }
+  if(!Object.keys(srcPlan).length){
+    alert('이전 주차('+py+'년 '+pm+'월 '+pw+'주차)에 저장된 플랜이 없습니다.');
+    return;
+  }
+  var pLabel=py+'년 '+pm+'월 '+pw+'주차';
+  var wLabel=selYear+'년 '+selMonth+'월 '+selWeek+'주차';
+  if(!confirm(pLabel+' 플랜을 '+wLabel+'로 가져올까요?\n기존 내용은 덮어쓰입니다.')) return;
+  if(isCurrentSel){
+    CU.weeklyPlan=Object.assign({},srcPlan);
+    CU.weeklyBookMap=Object.assign({},srcBm);
+    CU._planWeek=curKey;
+  } else {
+    if(!CU._weeklyHistory) CU._weeklyHistory={};
+    var wKey=selYear+'-'+String(selMonth).padStart(2,'0')+'-w'+selWeek;
+    if(!CU._weeklyHistory[wKey]) CU._weeklyHistory[wKey]={plan:{},ttBookMap:{}};
+    CU._weeklyHistory[wKey].plan=Object.assign({},srcPlan);
+    CU._weeklyHistory[wKey].ttBookMap=Object.assign({},srcBm);
+    CU._weeklyHistory[wKey].savedAt=Date.now();
+  }
+  // Firebase 저장
+  if(typeof fbRef==='function'&&fbRef()){
+    fbRef().update({
+      weeklyPlan: CU.weeklyPlan||{},
+      weeklyBookMap: CU.weeklyBookMap||{},
+      _planWeek: CU._planWeek||'',
+      _weeklyHistory: CU._weeklyHistory||{}
+    }).catch(function(e){ console.warn('저장 오류:', e); });
+  }
+  render();
+  alert('✅ 지난주 플랜을 가져왔습니다!');
+}
+
 function startStudentRealtimeSync(studentId){
   if(!FB() || !window._db) return;
   // 기존 리스너 해제
