@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
    <meta charset="UTF-8">
+   <link rel="manifest" href="manifest.json">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>SG상담플랫폼 - 학생용</title>
     <!-- 1. 바탕화면 아이콘 설정 (학생용) -->
@@ -1572,6 +1573,11 @@ async function refreshData(){
   }catch(e){}
   render(); // 세션 없으면 로그인 화면
 })();
+</script>
+   <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
 </script>
 </body>
 </html>
