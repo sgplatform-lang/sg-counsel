@@ -1,0 +1,20 @@
+{
+  "name": "SG상담플랫폼 - 학생용",
+  "short_name": "SG상담",
+  "start_url": "./SG상담플랫폼_학생용.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "logo_student.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo_student.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
