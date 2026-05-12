@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -1030,7 +1003,7 @@ function render(){
     app.innerHTML='<div style="padding:40px;text-align:center;color:#e53935"><h3>⚠️ 화면 오류</h3><p style="margin:10px 0">'+e.message+'</p><button onclick="location.reload()" style="background:#3b5bdb;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px">🔄 새로고침</button></div>';
   }
   bindEvents();
-  // 스크롤 복원 - setTimeout으로 DOM 완전 안정화 후 복원
+  // 스크롤 복원 + 검색창 포커스 복원
   if(restoreY>0){
     requestAnimationFrame(()=>{
       const nma=document.querySelector('.main-area');
@@ -1038,8 +1011,13 @@ function render(){
         if(isTabSwitch){ nma.scrollTop=0; }
         else { nma.scrollTop=restoreY; }
       }
+      // 검색창 포커스 복원 (입력 중이었으면 커서 위치도 복원)
+      if(ST._searchFocused){
+        const si=document.getElementById('search_input');
+        if(si){ si.focus(); const l=si.value.length; si.setSelectionRange(l,l); }
+        ST._searchFocused=false;
+      }
     });
-    // 한 번 더 - 일부 브라우저에서 rAF 한 번으로 부족한 경우
     setTimeout(()=>{
       const nma2=document.querySelector('.main-area');
       if(nma2 && !isTabSwitch) nma2.scrollTop=restoreY;
@@ -1048,6 +1026,12 @@ function render(){
     requestAnimationFrame(()=>{
       const nma=document.querySelector('.main-area');
       if(nma && isTabSwitch) nma.scrollTop=0;
+      // 검색창 포커스 복원
+      if(ST._searchFocused){
+        const si2=document.getElementById('search_input');
+        if(si2){ si2.focus(); const l2=si2.value.length; si2.setSelectionRange(l2,l2); }
+        ST._searchFocused=false;
+      }
     });
   }
 }
@@ -1320,7 +1304,7 @@ function renderMain(){
   <div class="layout">
     <div class="sidebar">
       <div style="padding:10px">
-        <input class="inp" placeholder="이름/학교 검색..." value="${esc(ST.search)}" oninput="ST.search=this.value;render()" style="font-size:12px;margin-bottom:6px">
+        <input class="inp" id="search_input" placeholder="이름/학교 검색..." value="${esc(ST.search)}" style="font-size:12px;margin-bottom:6px">
         <div style="font-size:10px;color:#888">총 ${filt.length}명</div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0 10px 10px">
@@ -1349,10 +1333,26 @@ function renderMain(){
 function renderDetail(s){
   if(!s || !s.id){ return '<div style="padding:40px;text-align:center;color:#aaa">학생 데이터를 불러오는 중...</div>'; }
   // ── 상위 탭 정의 (하위탭 보유 여부 표시) ──
-  const isAdmin2 = ST.currentUser?.role==='admin' || ST.currentUser?.role==='orgAdmin';
-  const teacher2 = isAdmin2 ? null : ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId));
-  const teacherPerms = isAdmin2 ? null : (teacher2?.permissions||[]);
-  const hasPerm = (key)=> isAdmin2 || (teacherPerms!==null && teacherPerms.includes(key));
+  const isAdmin2 = ST.currentUser?.role==='admin';
+  const isOrgAdmin2 = ST.currentUser?.role==='orgAdmin';
+  const teacher2 = (isAdmin2||isOrgAdmin2) ? null : ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId));
+  const teacherPerms = (isAdmin2||isOrgAdmin2) ? null : (teacher2?.permissions||[]);
+  // 기관 권한 조회 (기관관리자 or 선생님 모두 해당 기관 permissions 적용)
+  const _orgPerms2 = (()=>{
+    const oid = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+    if(!oid) return null; // 기관 없으면 전체 허용
+    try{
+      const allOrgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+      const fo=allOrgs.find(o=>String(o.id)===String(oid));
+      return fo?.permissions||null; // null이면 전체 허용
+    }catch(e){return null;}
+  })();
+  const hasPerm = (key)=>{
+    if(isAdmin2) return true; // 최종관리자: 전체 허용
+    if(_orgPerms2 && !_orgPerms2.includes(key)) return false; // 기관 미허용 기능 차단
+    if(isOrgAdmin2) return true; // 기관관리자: 기관 허용 기능은 모두 가능
+    return teacherPerms!==null && teacherPerms.includes(key); // 선생님: 개인 권한
+  };
   const mainTabs = [
     {id:'overview',  label:'개요',       icon:'📋', sub:false,  perm:null},
     {id:'grade',     label:'성적',       icon:'📊', sub:false,  perm:'grade'},
@@ -7738,7 +7738,7 @@ function renderAdminReport(){
   return`<div class="layout">
     <div class="sidebar">
       <div style="padding:10px">
-        <input class="inp" placeholder="이름/학교..." value="${esc(ST.search)}" oninput="ST.search=this.value;render()" style="font-size:12px;margin-bottom:6px">
+        <input class="inp" id="search_input" placeholder="이름/학교..." value="${esc(ST.search)}" style="font-size:12px;margin-bottom:6px">
         <div style="font-size:10px;color:#888">총 ${filt.length}명</div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0 10px 10px">
@@ -7759,12 +7759,21 @@ function renderAdminReport(){
         </div>
         <div style="font-size:11px;color:#555;font-weight:700;margin-bottom:8px">📋 항목별 인쇄 / PDF 저장</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button onclick="printGrade(${ST.adminSel.id})" style="background:#3b82f618;color:#3b82f6;border:1px solid #3b82f640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📊 성적 리포트 🖨️</button>
-          <button onclick="printSusiReport(${ST.adminSel.id})" style="background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">🏫 수시 리포트 🖨️</button>
-          <button onclick="printTab(${ST.adminSel.id},'weekly')" style="background:#10b98118;color:#10b981;border:1px solid #10b98140;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📅 주간 리포트 🖨️</button>
-          <button onclick="printTab(${ST.adminSel.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">💬 상담 리포트 🖨️</button>
-          <button onclick="exportGradeXls(${ST.adminSel.id})" class="btn-gr" style="padding:6px 11px;font-size:11px">📊 성적 엑셀</button>
-          <button onclick="exportStudentXls(${ST.adminSel.id})" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📋 전체 엑셀</button>
+          ${(()=>{
+            // 기관 권한 체크
+            const _oid=ST.currentOrg?.id||null;
+            let _orgP=null;
+            if(_oid){try{const _os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');const _fo=_os.find(o=>String(o.id)===String(_oid));_orgP=_fo?.permissions||null;}catch(e){}}
+            const _hp=(key)=>{if(ST.currentUser?.role==='admin')return true;if(_orgP&&!_orgP.includes(key))return false;return true;};
+            const btns=[];
+            btns.push(`<button onclick="printGrade(${ST.adminSel.id})" style="background:#3b82f618;color:#3b82f6;border:1px solid #3b82f640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📊 성적 리포트 🖨️</button>`);
+            if(_hp('susi')) btns.push(`<button onclick="printSusiReport(${ST.adminSel.id})" style="background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">🏫 수시 리포트 🖨️</button>`);
+            if(_hp('weekly')) btns.push(`<button onclick="printTab(${ST.adminSel.id},'weekly')" style="background:#10b98118;color:#10b981;border:1px solid #10b98140;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📅 주간 리포트 🖨️</button>`);
+            if(_hp('consult')) btns.push(`<button onclick="printTab(${ST.adminSel.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">💬 상담 리포트 🖨️</button>`);
+            if(_hp('grade')) btns.push(`<button onclick="exportGradeXls(${ST.adminSel.id})" class="btn-gr" style="padding:6px 11px;font-size:11px">📊 성적 엑셀</button>`);
+            btns.push(`<button onclick="exportStudentXls(${ST.adminSel.id})" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📋 전체 엑셀</button>`);
+            return btns.join('');
+          })()}
         </div>
       </div>
       <div class="box" style="background:#fff">${renderDetail(ST.adminSel)}</div>`
@@ -8002,13 +8011,23 @@ function renderOrgMgmt(){
           ${org.mobile?`📱 ${esc(org.mobile)}<br>`:''}
           ${org.email?`✉️ ${esc(org.email)}`:''}
         </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e8eaf6;display:flex;gap:8px">
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e8eaf6;display:flex;gap:8px;flex-wrap:wrap">
           <span style="background:#f0fdf4;color:#0f9d58;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700">
             선생님 ${ST.teachers.filter(t=>t.orgId===org.id).length}명
           </span>
           <span style="background:#f0f9ff;color:#0369a1;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700">
             학생 ${ST.students.filter(s=>s.orgId===org.id).length}명
           </span>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9">
+          <div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:4px">🔑 허용 기능 권한</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${(()=>{
+              const ALL=[{key:'grade',label:'📊성적'},{key:'weekly',label:'📅주간플랜'},{key:'test',label:'📝테스트'},{key:'consult',label:'💬상담'},{key:'susi',label:'🏫수시'},{key:'addStudent',label:'➕학생추가'}];
+              const perms=org.permissions||ALL.map(p=>p.key);
+              return ALL.map(p=>`<span style="font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600;background:${perms.includes(p.key)?'#eef1ff':'#f8fafc'};color:${perms.includes(p.key)?'#3b5bdb':'#cbd5e1'};border:1px solid ${perms.includes(p.key)?'#c7d2fe':'#e2e8f0'}">${p.label}</span>`).join('');
+            })()}
+          </div>
         </div>
       </div>`).join('')}
     </div>`}
@@ -8135,6 +8154,25 @@ function openOrgForm(orgData){
         💡 기관관리자로 로그인하면 해당 기관의 선생님·학생만 관리할 수 있습니다.<br>
         상단에 <strong>SG상담플랫폼_기관명</strong> 으로 표시됩니다.
       </div>
+
+      <hr style="border:none;border-top:1.5px solid #e8eaf6;margin:4px 0">
+      <!-- 기관 기능 권한 -->
+      <div style="font-size:12px;font-weight:700;color:#1e3a8a;margin-bottom:4px">🔑 이 기관에서 사용 가능한 기능 권한</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px">이 기관 소속 선생님은 아래에서 허용된 기능만 권한을 받을 수 있습니다.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${[
+          {key:'grade',     label:'📊 성적 조회/입력'},
+          {key:'weekly',    label:'📅 주간플랜 관리'},
+          {key:'test',      label:'📝 테스트 관리'},
+          {key:'consult',   label:'💬 상담 입력'},
+          {key:'susi',      label:'🏫 수시 분석'},
+          {key:'addStudent',label:'➕ 학생 추가'},
+        ].map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:8px;border:1.5px solid #e8eaf6;cursor:pointer">
+          <input type="checkbox" id="org_perm_${p.key}" ${(org?.permissions||['grade','weekly','test','consult','susi','addStudent']).includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:#3b5bdb">
+          <span style="font-size:12px;font-weight:600;color:#333">${p.label}</span>
+        </label>`).join('')}
+      </div>
+
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
         <button id="of_cancel" class="btn-g">취소</button>
         <button id="of_save" class="btn-b">💾 저장</button>
@@ -8164,7 +8202,8 @@ function openOrgForm(orgData){
       phone:  ov.querySelector('#of_phone').value.trim(),
       mobile: ov.querySelector('#of_mobile').value.trim(),
       email:  ov.querySelector('#of_email').value.trim(),
-      createdAt: org?.createdAt||Date.now()
+      createdAt: org?.createdAt||Date.now(),
+      permissions: ['grade','weekly','test','consult','susi','addStudent'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked)
     };
 
     const idx=orgs.findIndex(o=>o.id===org?.id);
@@ -8417,6 +8456,16 @@ function openTForm(t){
     {key:'addStudent',label:'➕ 학생 추가'},
   ];
   const curPerms=t?.permissions||PERMS.map(p=>p.key); // 기본: 전체 허용
+  // 소속 기관의 허용 권한 (기관 권한 범위 내에서만 선택 가능)
+  const teacherOrgId = t?.orgId || (ST.currentUser?.role==='orgAdmin' ? ST.currentOrg?.id : null);
+  const orgPerms = (()=>{
+    if(!teacherOrgId) return PERMS.map(p=>p.key); // 기관 없으면 전체 허용
+    try{
+      const allOrgs = JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+      const foundOrg = allOrgs.find(o=>String(o.id)===String(teacherOrgId));
+      return foundOrg?.permissions || PERMS.map(p=>p.key);
+    }catch(e){ return PERMS.map(p=>p.key); }
+  })();
 
   ov.innerHTML=`<div class="modal" style="max-width:520px"><div class="mhd">
     <span style="font-size:15px;font-weight:800">${t?'선생님 정보 수정':'새 선생님 등록'}</span>
@@ -8463,10 +8512,14 @@ function openTForm(t){
     <div style="background:#f0fdf4;border-radius:10px;padding:12px 14px;margin-bottom:12px;border:1.5px solid #86efac">
       <div style="font-size:11px;font-weight:700;color:#0f9d58;margin-bottom:10px">🔑 사용 가능 기능 설정</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px" id="perm_wrap">
-        ${PERMS.map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:8px;border:1.5px solid #e8eaf6;cursor:pointer">
-          <input type="checkbox" id="perm_${p.key}" ${(curPerms||[]).includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:#0f9d58">
-          <span style="font-size:12px;font-weight:600;color:#333">${p.label}</span>
-        </label>`).join('')}
+        ${PERMS.map(p=>{
+          const orgAllows = orgPerms.includes(p.key);
+          const isChecked = orgAllows && (curPerms||[]).includes(p.key);
+          return `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${orgAllows?'#fff':'#f8fafc'};border-radius:8px;border:1.5px solid ${orgAllows?'#e8eaf6':'#e2e8f0'};cursor:${orgAllows?'pointer':'not-allowed'};opacity:${orgAllows?1:0.45}">
+          <input type="checkbox" id="perm_${p.key}" ${isChecked?'checked':''} ${orgAllows?'':'disabled'} style="width:15px;height:15px;accent-color:#0f9d58">
+          <span style="font-size:12px;font-weight:600;color:#333">${p.label}${orgAllows?'':'<span style="font-size:10px;color:#94a3b8;margin-left:4px">(기관 미허용)</span>'}</span>
+        </label>`;
+        }).join('')}
       </div>
       <div style="margin-top:8px;display:flex;gap:6px">
         <button onclick="document.querySelectorAll('#perm_wrap input[type=checkbox]').forEach(c=>c.checked=true)" style="font-size:10px;color:#0f9d58;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:3px 9px;cursor:pointer">전체 허용</button>
@@ -8502,7 +8555,11 @@ function openTForm(t){
     if(dup){alert('이미 사용 중인 아이디입니다.');return;}
     const pw=lpw ? lpw : (t ? (t.password||'') : '');
     // 권한 수집
-    const perms=PERMS.map(p=>p.key).filter(k=>ov.querySelector('#perm_'+k)?.checked);
+    // 기관 허용 권한 내에서만 저장 (disabled 항목은 자동 제외)
+    const perms=PERMS.map(p=>p.key).filter(k=>{
+      const cb=ov.querySelector('#perm_'+k);
+      return cb && !cb.disabled && cb.checked;
+    });
     const d={
       id:t?t.id:Date.now(),
       name,subject:ov.querySelector('#tf_s').value,
@@ -8953,6 +9010,34 @@ function bindEvents(){
   document.querySelectorAll('[data-filter]').forEach(b=>{
     b.addEventListener('click',()=>{ST.filterC=b.dataset.filter;render();});
   });
+
+  // ── 검색창 IME 처리 (한글 자모 분리 방지) ──
+  const si = document.getElementById('search_input');
+  if(si && !si._bound){
+    si._bound = true;
+    let _composing = false;
+    si.addEventListener('compositionstart', ()=>{ _composing=true; });
+    si.addEventListener('compositionend', ()=>{
+      _composing=false;
+      ST.search=si.value;
+      ST._searchFocused=true;
+      render();
+      // render 후 포커스 복원
+      requestAnimationFrame(()=>{
+        const ni=document.getElementById('search_input');
+        if(ni){ ni.focus(); const l=ni.value.length; ni.setSelectionRange(l,l); }
+      });
+    });
+    si.addEventListener('input', ()=>{
+      if(_composing) return; // 조합 중이면 무시 (compositionend에서 처리)
+      ST.search=si.value;
+      ST._searchFocused=true;
+      render();
+    });
+    // 포커스 유지
+    si.focus();
+    const l=si.value.length; si.setSelectionRange(l,l);
+  }
 
   // 로그인 이벤트
   const loginBtn = document.getElementById('login_btn');
