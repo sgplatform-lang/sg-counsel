@@ -1,34 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-   <meta charset="UTF-8">
-   <link rel="manifest" href="manifest.json">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 학생용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (학생용) -->
-    <link rel="icon" href="logo_student.png" type="image/png">
-    <link rel="shortcut icon" href="logo_student.png">
-    <link rel="apple-touch-icon" href="logo_student.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG학생용">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/SG상담플랫폼_학생용.html">
-    <meta property="og:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta property="og:image" content="og-student.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-student.png"> </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1114,6 +1086,9 @@ function renderGrade(){
   const MOCK_SUBJ_LIST=['국어','수학','영어','탐구1','탐구2'];
   const SEMS=['1-1','1-2','2-1','2-2','3-1'];
   const MOCK_TESTS_LIST=['3월모의','6월모의','9월모의','수능'];
+  // 관리자 설정 커스텀 과목명 적용
+  const _csn = s.customSubjNames||{};
+  const _subjLabel = (k)=>_csn[k]||{korean:'국어',math:'수학',english:'영어',science:'과학',social:'사회'}[k]||k;
 
   return`<div>
     <div class="stitle">📊 성적</div>
@@ -1125,7 +1100,7 @@ function renderGrade(){
         <button onclick="openGradeEdit()" style="background:#3b5bdb;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">✏️ 성적 입력/수정</button>
       </div>
       ${Object.keys(s.subjects||{}).length?`
-        <div class="grd-grid">${Object.entries(s.subjects||{}).map(([k,v])=>{const col=gc(+v);const lb={korean:'국어',math:'수학',english:'영어',science:'과학',social:'사회'}[k]||k;return`<div class="grd-item" style="background:${col}12;border-color:${col}40">
+        <div class="grd-grid">${Object.entries(s.subjects||{}).filter(([k,v])=>v!==null&&v!==undefined&&v!=='').map(([k,v])=>{const numV=isNaN(+v)?null:+v;const col=numV!==null?gc(numV):'#cbd5e1';const lb=_subjLabel(k);return`<div class="grd-item" style="background:${col}12;border-color:${col}40">
           <div style="font-size:10px;color:#666;margin-bottom:3px">${lb}</div>
           <div style="font-size:22px;font-weight:900;color:${col}">${v}</div>
           <div style="font-size:9px;color:#aaa">등급</div>
@@ -1174,7 +1149,15 @@ window.openGradeEdit=function(){
   const s=CU;
   const SEMS=['1-1','1-2','2-1','2-2','3-1'];
   const BASE_SUBJS=[['korean','국어'],['math','수학'],['english','영어'],['science','과학'],['social','사회']];
+  // 관리자가 설정한 학생별 커스텀 과목명 반영
+  const adminCustomNames=s.customSubjNames||{};
   const customNames=s._customNames||{};
+  // 우선순위: 학생 직접 설정(_customNames) > 관리자 설정(customSubjNames) > 기본값
+  const mergedCustomNames={};
+  BASE_SUBJS.forEach(([k,defaultLb])=>{
+    if(customNames[defaultLb]) mergedCustomNames[defaultLb]=customNames[defaultLb];
+    else if(adminCustomNames[k]) mergedCustomNames[defaultLb]=adminCustomNames[k];
+  });
   const gd=s.gradeDetail||{};
   if(!window._stuExtraSubjs) window._stuExtraSubjs=[];
   window._stuExtraSubjs=[...(s.extraSubjs||[])];
@@ -1185,7 +1168,7 @@ window.openGradeEdit=function(){
     ov.className='stu-grade-ov';
     ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow-y:auto;-webkit-overflow-scrolling:touch';
 
-    const allSubjs=[...BASE_SUBJS.map(([k,lb])=>customNames[lb]||lb), ...window._stuExtraSubjs];
+    const allSubjs=[...BASE_SUBJS.map(([k,lb])=>mergedCustomNames[lb]||lb), ...window._stuExtraSubjs];
 
     ov.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:600px;margin:auto;overflow:hidden">
       <div style="padding:14px 16px;border-bottom:1px solid #e8eaf6;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1">
@@ -1195,7 +1178,7 @@ window.openGradeEdit=function(){
       <div style="padding:14px 16px;overflow-y:auto;max-height:calc(100vh - 120px)">
 
         <!-- 대표 등급 자동계산 (숨김) -->
-        ${BASE_SUBJS.map(([k,lb])=>`<input type="hidden" id="sg_${k}" value="${s.subjects?.[k]||3}">`).join('')}
+        ${BASE_SUBJS.map(([k,lb])=>`<input type="hidden" id="sg_${k}" value="${s.subjects?.[k]??''}">`).join('')}
         <div style="font-size:11px;color:#888;background:#f0fdf4;border-radius:8px;padding:8px 12px;margin-bottom:14px;border:1px solid #86efac">💡 학기별 세부 내신을 입력하면 <strong style="color:#0f9d58">대표 등급이 자동으로 계산</strong>됩니다</div>
 
         <!-- 학기별 세부 내신 -->
@@ -1296,12 +1279,14 @@ window.openGradeEdit=function(){
       // 대표 등급 자동 계산 (3-1 → 2-2 → ... 최신 학기)
       const newSubjs={};
       BASE_SUBJS.forEach(([k,lb])=>{
+        let autoGrade=null;
         for(const sem of ['3-1','2-2','2-1','1-2','1-1']){
           const cv=newGd[lb]?.[sem];
           const g=fmtGrade(cv);
-          if(g){newSubjs[k]=g;break;}
+          if(g!==null){autoGrade=g;break;}
         }
-        if(!newSubjs[k]) newSubjs[k]=+(ov.querySelector(`#sg_${k}`)?.value||3);
+        // 학기 입력 있으면 그 값, 없으면 null (기존 hidden input 값 무시)
+        newSubjs[k]=autoGrade;
       });
 
       const saveData={subjects:newSubjs, gradeDetail:newGd, extraSubjs:[...window._stuExtraSubjs.filter(Boolean)]};
@@ -1573,11 +1558,6 @@ async function refreshData(){
   }catch(e){}
   render(); // 세션 없으면 로그인 화면
 })();
-</script>
-   <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
-  }
 </script>
 </body>
 </html>

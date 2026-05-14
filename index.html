@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-   <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -674,6 +647,17 @@ function fmtGradeDisplay(val){
   return s || '–';
 }
 function saveGradeSubjs(){dbS(SK_GS,GRADE_SUBJS);}
+
+// 학생별 커스텀 과목명 헬퍼 - 학생 개별 설정 우선, 없으면 전역 사용
+function getStudentSubjName(s, key){
+  if(s && s.customSubjNames && s.customSubjNames[key]) return s.customSubjNames[key];
+  const gs = GRADE_SUBJS.find(([k])=>k===key);
+  return gs ? gs[1] : key;
+}
+// 학생별 GRADE_SUBJS 배열 반환 (커스텀 적용)
+function getStudentGradeSubjs(s){
+  return GRADE_SUBJS.map(([k,lb])=>[k, getStudentSubjName(s, k)]);
+}
 
 // ══ 유틸 ══
 function gAvg(s){const v=Object.values(s||{}).filter(x=>x!==null&&x!==undefined&&!isNaN(+x)&&+x>0);return v.length?+(v.reduce((a,b)=>+a+ +b,0)/v.length).toFixed(2):0;}
@@ -1415,7 +1399,7 @@ function renderDetail(s){
         <div style="font-size:11px;color:#777;margin-top:1px">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0">
-        <button class="btn-g" style="font-size:10px;padding:5px 11px" onclick="openSForm(ST.sel)">✏️ 수정</button>
+        <button class="btn-g" style="font-size:10px;padding:5px 11px" onclick="openSForm(ST.students.find(x=>String(x.id)==='${s.id}'))">✏️ 수정</button>
         <button class="btn-r" style="font-size:10px;padding:5px 9px" onclick="deleteStudent('${s.id}')">🗑 삭제</button>
       </div>
     </div>
@@ -1488,10 +1472,10 @@ function renderOverview(s){
     </div>
     ${GRADE_SUBJS.map(([k,lb])=>{
   const raw=s.subjects[k];
-  const v=(raw===null||raw===undefined||raw==='')?null:(+raw||null);
+  const v=(raw===null||raw===undefined||raw==='')?null:(isNaN(+raw)?null:+raw);
   const c=v?gc(v):'#cbd5e1';
   const pct=v?((6-v)/5*100).toFixed(0):'0';
-  const label=v?v+'등급':'미입력';
+  const label=(v!==null)?v+'등급':'미입력';
   return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:#555;width:36px;flex-shrink:0">${lb}</span><div class="bb" style="flex:1"><div class="bf" style="width:${pct}%;background:${c}"></div></div><span style="font-size:12px;font-weight:700;color:${c};min-width:36px;text-align:right">${label}</span></div>`;}).join('')}
   </div>
   <div class="box">
@@ -1520,8 +1504,9 @@ function renderGrade(s){
   const gd=s.gradeDetail||{};
   const mg=s.mockGrades||{};
   const activeCols=MOCK_TESTS.filter(t=>MOCK_SUBJS.some(sb=>(mg[sb]||{})[t]));
+  const SGRADE_SUBJS=getStudentGradeSubjs(s); // 학생별 커스텀 과목명 적용
   const extraSubjs=s.extraSubjs||[];
-  const allDetailSubjs=[...GRADE_SUBJS.map(([,lb])=>lb),...extraSubjs];
+  const allDetailSubjs=[...SGRADE_SUBJS.map(([,lb])=>lb),...extraSubjs];
   const hasDetail=allDetailSubjs.some(lb=>Object.keys(gd[lb]||{}).length>0);
 
   // 추가 과목 대표 등급 (학기별 세부 내신에서 최신 학기 값 사용)
@@ -1555,12 +1540,12 @@ function renderGrade(s){
     </div>
 
     <!-- 주요 5과목 + 추가 과목 바 차트 (동일 디자인) -->
-    ${GRADE_SUBJS.map(([k,lb])=>{
+    ${SGRADE_SUBJS.map(([k,lb])=>{
       const raw=s.subjects[k];
       const v=(raw===null||raw===undefined||raw===''||isNaN(+raw))?null:(+raw);
-      const c=v?gc(v):'#cbd5e1';
-      const pct=v?((6-v)/5*100).toFixed(0):'0';
-      const label=v?v+'등급':'미입력';
+      const c=(v!==null)?gc(v):'#cbd5e1';
+      const pct=(v!==null)?((6-v)/5*100).toFixed(0):'0';
+      const label=(v!==null)?v+'등급':'미입력';
       return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">
         <span style="font-size:12px;color:#555;width:52px;flex-shrink:0;font-weight:600">${lb}</span>
         <div class="bb" style="flex:1"><div class="bf" style="width:${pct}%;background:${c}"></div></div>
@@ -1592,7 +1577,7 @@ function renderGrade(s){
             <th style="text-align:left;background:#f4f6fb;color:#666;font-weight:700;padding:7px 10px">과목</th>
             ${SEMS.map(s2=>`<th>${s2}</th>`).join('')}
           </tr>
-          ${allDetailSubjs.filter(lb=>Object.keys(gd[lb]||{}).length>0||GRADE_SUBJS.some(([,l])=>l===lb)).map(lb=>`
+          ${allDetailSubjs.filter(lb=>Object.keys(gd[lb]||{}).length>0||SGRADE_SUBJS.some(([,l])=>l===lb)).map(lb=>`
           <tr>
             <td style="padding:7px 10px;border:1px solid #e8eaf6;background:#f4f6fb;font-weight:600;white-space:nowrap;color:#333">${esc(lb)}</td>
             ${SEMS.map(sem=>{const cv=(gd[lb]||{})[sem];const g=fmtGrade(cv);const r=fmtGradeRaw(cv);return`<td style="padding:4px 3px;border:1px solid #e8eaf6;text-align:center;color:${g?gc(g):'#ccc'};font-weight:${g?700:400};font-size:12px">${g||'–'}${r?`<br><small style='font-size:9px;color:#888'>${r}점</small>`:''}</td>`;}).join('')}
@@ -1638,13 +1623,14 @@ function openGradeForm(sid){
 function _renderGradeModal(sid){
   const s = ST.students.find(x=>String(x.id)===String(sid)); if(!s) return;
   const gd = s.gradeDetail||{};
+  const SGRADE_SUBJS = getStudentGradeSubjs(s); // 학생별 커스텀 과목명
 
   // 기존 오버레이 제거 후 재생성
   document.querySelectorAll('.grade-overlay').forEach(e=>e.remove());
   const ov = document.createElement('div');
   ov.className = 'overlay grade-overlay';
 
-  const allSubjs = [...GRADE_SUBJS.map(([,lb])=>lb), ..._gradeExtraSubjs];
+  const allSubjs = [...SGRADE_SUBJS.map(([,lb])=>lb), ..._gradeExtraSubjs];
 
   ov.innerHTML = `<div class="modal" style="max-height:95vh;overflow-y:auto">
     <div class="mhd">
@@ -1654,7 +1640,7 @@ function _renderGradeModal(sid){
     <div style="padding:16px 18px 28px">
 
       <!-- 대표 등급 자동계산 안내 -->
-      ${GRADE_SUBJS.map(([k,lb])=>`<input type="hidden" id="gf_${k}" value="${s.subjects[k]||3}">`).join('')}
+      ${SGRADE_SUBJS.map(([k,lb])=>`<input type="hidden" id="gf_${k}" value="${s.subjects[k]??''}">`).join('')}
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:11px;color:#0f9d58;font-weight:600">
         💡 학기별 세부 내신을 입력하면 <strong>대표 등급이 자동으로 계산</strong>됩니다 (최신 학기 기준)
       </div>
@@ -1679,13 +1665,13 @@ function _renderGradeModal(sid){
             <th style="min-width:36px;background:#f4f6fb"></th>
           </tr>
           ${allSubjs.map((lb,idx)=>{
-            const isExtra = idx >= GRADE_SUBJS.length;
+            const isExtra = idx >= SGRADE_SUBJS.length;
             return `<tr id="gd-row-${idx}">
               <td style="padding:6px 8px;border:1px solid #e8eaf6;background:#f4f6fb;font-weight:600;white-space:nowrap;color:#333">
                 ${isExtra
                   ? `<input id="gd_name_${idx}" value="${esc(lb)}" placeholder="과목명"
                       style="background:#fff;border:1.5px solid #dde1f0;color:#1a1a2e;border-radius:6px;padding:4px 7px;font-size:12px;width:80px;outline:none;font-weight:600"
-                      oninput="window._gradeExtraSubjs[${idx-GRADE_SUBJS.length}]=this.value">`
+                      oninput="window._gradeExtraSubjs[${idx-SGRADE_SUBJS.length}]=this.value">`
                   : lb}
               </td>
               ${SEMS.map(sem=>{
@@ -1703,7 +1689,7 @@ function _renderGradeModal(sid){
                 </td>`;
               }).join('')}
               <td style="padding:3px;border:1px solid #e8eaf6;text-align:center">
-                ${isExtra ? `<button onclick="window._removeExtraSubj(${sid},${idx-GRADE_SUBJS.length})"
+                ${isExtra ? `<button onclick="window._removeExtraSubj(${sid},${idx-SGRADE_SUBJS.length})"
                   style="background:#fff0f0;color:#e53935;border:1px solid #ffcdd2;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">✕</button>` : ''}
               </td>
             </tr>`;
@@ -1743,13 +1729,14 @@ window._removeExtraSubj = function(sid, extraIdx){
 
 function saveGradeForm(sid){
   const s = ST.students.find(x=>String(x.id)===String(sid)); if(!s) return;
+  const SGRADE_SUBJS = getStudentGradeSubjs(s); // 학생별 커스텀 과목명 (s 선언 후 사용)
 
   // 학기별 세부 내신 - 등급+원점수 객체로 저장
   const gd = {};
-  const allSubjs = [...GRADE_SUBJS.map(([,lb])=>lb), ..._gradeExtraSubjs];
+  const allSubjs = [...SGRADE_SUBJS.map(([,lb])=>lb), ..._gradeExtraSubjs];
 
   allSubjs.forEach((lb, idx)=>{
-    const finalName = idx >= GRADE_SUBJS.length
+    const finalName = idx >= SGRADE_SUBJS.length
       ? (document.getElementById(`gd_name_${idx}`)?.value?.trim() || lb)
       : lb;
     if(!finalName) return;
@@ -1767,23 +1754,26 @@ function saveGradeForm(sid){
     });
   });
 
-  // 대표 등급 자동 계산 (최신 학기 순으로 첫 번째 값 사용)
-  const subjects = {...(s.subjects||{})};
-  GRADE_SUBJS.forEach(([k, lb])=>{
-    // select 값 우선
-    const selVal = document.getElementById(`gf_${k}`)?.value;
-    // 학기별 입력값 최신순 탐색
+  // 대표 등급: 학기별 입력값에서만 계산 (hidden input 기존값 무시)
+  // 학기 모두 비우면 → null (성적 없음), 잠금 해제
+  const subjects = {};
+  SGRADE_SUBJS.forEach(([k, lb])=>{
     let autoGrade = null;
     for(const sem of ['3-1','2-2','2-1','1-2','1-1']){
       const cv = (gd[lb]||{})[sem];
       const g = fmtGrade(cv);
-      if(g){ autoGrade = g; break; }
+      if(g !== null){ autoGrade = g; break; }
     }
-    subjects[k] = autoGrade || (selVal ? +selVal : (s.subjects?.[k] || 3));
+    // 학기 입력 있으면 그 값, 없으면 null (0도 null로 간주 → 미입력 처리)
+    subjects[k] = autoGrade;
+  });
+  // 기존 subjects에 있지만 SGRADE_SUBJS에 없는 키는 유지 (추가 과목 등)
+  Object.keys(s.subjects||{}).forEach(k=>{
+    if(!(k in subjects)) subjects[k] = s.subjects[k];
   });
 
   const extraSubjs = _gradeExtraSubjs.map((lb, i)=>{
-    return document.getElementById(`gd_name_${GRADE_SUBJS.length+i}`)?.value?.trim() || lb;
+    return document.getElementById(`gd_name_${SGRADE_SUBJS.length+i}`)?.value?.trim() || lb;
   }).filter(Boolean);
 
   upd({...s, subjects, gradeDetail:gd, extraSubjs});
@@ -1887,8 +1877,9 @@ function printGrade(sid){
   const a=gAvg(s.subjects);
   const gd=s.gradeDetail||{};
   const mg=s.mockGrades||{};
+  const SGRADE_SUBJS=getStudentGradeSubjs(s); // 학생별 커스텀 과목명
   const extraSubjs=s.extraSubjs||[];
-  const allDetailSubjs=[...GRADE_SUBJS.map(([,lb])=>lb),...extraSubjs];
+  const allDetailSubjs=[...SGRADE_SUBJS.map(([,lb])=>lb),...extraSubjs];
   const activeCols=MOCK_TESTS.filter(t=>MOCK_SUBJS.some(sb=>(mg[sb]||{})[t]));
   const activeSubjs=MOCK_SUBJS.filter(sb=>mg[sb]&&Object.values(mg[sb]).some(v=>v));
   const gc2=v=>v<=1.5?'#1967d2':v<=2.5?'#0f9d58':v<=3.5?'#e37400':'#c5221f';
@@ -1916,7 +1907,7 @@ function printGrade(sid){
     <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc2(Math.min(..._vs)):'#94a3b8';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.min(..._vs)+'등급':'미입력';})()}</div><div class="sl">최고 등급</div></div>
     <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc2(Math.max(..._vs)):'#94a3b8';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.max(..._vs)+'등급':'미입력';})()}</div><div class="sl">최저 등급</div></div>
   </div>
-  ${GRADE_SUBJS.map(([k,lb])=>{const rv=s.subjects[k];const v=(rv===null||rv===undefined||isNaN(+rv))?null:+rv;if(v===null)return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${lb}</span><div class="bar-bg" style="flex:1"></div><span style="font-size:12px;color:#bbb;min-width:48px;text-align:right">미입력</span></div>`;const c=gc2(v),pct=((6-v)/5*100).toFixed(0);return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${lb}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:48px;text-align:right">${v}등급</span></div>`;}).join('')}
+  ${SGRADE_SUBJS.map(([k,lb])=>{const rv=s.subjects[k];const v=(rv===null||rv===undefined||isNaN(+rv))?null:+rv;if(v===null)return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${lb}</span><div class="bar-bg" style="flex:1"></div><span style="font-size:12px;color:#bbb;min-width:48px;text-align:right">미입력</span></div>`;const c=gc2(v),pct=((6-v)/5*100).toFixed(0);return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${lb}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:48px;text-align:right">${v}등급</span></div>`;}).join('')}
   ${extraSubjs.map(lb=>{const v=getExtraGrade(lb);if(v===null)return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${esc(lb)}</span><div class="bar-bg" style="flex:1"></div><span style="font-size:12px;color:#bbb;min-width:48px;text-align:right">미입력</span></div>`;const c=gc2(v),pct=((6-v)/5*100).toFixed(0);return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${esc(lb)}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:48px;text-align:right">${v}등급</span></div>`;}).join('')}`;
 
   // 학기별 세부 내신 (추가 과목 포함, 동일 스타일)
@@ -4989,7 +4980,7 @@ function printTab(sid,tab){
       popPrint(`${esc(s.name)} - 수시 상담 자료`,body);
       return;
     }
-    body+=`<h3>📊 내신 성적</h3>${GRADE_SUBJS.map(([k,lb])=>{const raw=s.subjects[k];const v=(raw===null||raw===undefined||isNaN(+raw))?null:(+raw);const c=v?gc2(v):'#cbd5e1';const pct=v?((6-v)/5*100).toFixed(0):'0';const label=v?v+'등급':'미입력';return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:40px;font-size:12px;color:#888">${lb}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:44px;text-align:right">${label}</span></div>`;}).join('')}`;
+    body+=`<h3>📊 내신 성적</h3>${GRADE_SUBJS.map(([k,lb])=>{const raw=s.subjects[k];const v=(raw===null||raw===undefined||isNaN(+raw))?null:(+raw);const c=(v!==null)?gc2(v):'#cbd5e1';const pct=(v!==null)?((6-v)/5*100).toFixed(0):'0';const label=(v!==null)?v+'등급':'미입력';return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:40px;font-size:12px;color:#888">${lb}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:44px;text-align:right">${label}</span></div>`;}).join('')}`;
     if((s.targets||[]).length){
       body+=`<h3>🏫 수시 지원 대학</h3>`;
       s.targets.forEach((t,i)=>{
@@ -5228,8 +5219,10 @@ ${cardsHtml}
 let _sfExtraSubjs = []; // 모달 내 임시 추가 과목
 
 function openSForm(s){
-  _sfExtraSubjs = s?.extraSubjs ? [...s.extraSubjs] : [];
-  _renderSForm(s);
+  // s가 undefined/null이면 최신 ST.sel로 대체 (안전 처리)
+  const target = s || null;
+  _sfExtraSubjs = target?.extraSubjs ? [...target.extraSubjs] : [];
+  _renderSForm(target);
 }
 
 function _renderSForm(s){
@@ -5354,11 +5347,11 @@ window._saveSForm = function(sid){
   ).filter(Boolean);
 
   const subjects = {
-    korean:  +document.getElementById('sf_korean')?.value||3,
-    math:    +document.getElementById('sf_math')?.value||3,
-    english: +document.getElementById('sf_english')?.value||3,
-    science: +document.getElementById('sf_science')?.value||3,
-    social:  +document.getElementById('sf_social')?.value||3,
+    korean:  (()=>{const v=document.getElementById('sf_korean')?.value?.trim();return v!==''&&v!==undefined?+v:(existing?.subjects?.korean??null);})(),
+    math:    (()=>{const v=document.getElementById('sf_math')?.value?.trim();return v!==''&&v!==undefined?+v:(existing?.subjects?.math??null);})(),
+    english: (()=>{const v=document.getElementById('sf_english')?.value?.trim();return v!==''&&v!==undefined?+v:(existing?.subjects?.english??null);})(),
+    science: (()=>{const v=document.getElementById('sf_science')?.value?.trim();return v!==''&&v!==undefined?+v:(existing?.subjects?.science??null);})(),
+    social:  (()=>{const v=document.getElementById('sf_social')?.value?.trim();return v!==''&&v!==undefined?+v:(existing?.subjects?.social??null);})(),
   };
 
   // 추가 과목 등급 → gradeDetail로 저장 (1-1 학기에 대표 등급 저장)
@@ -5389,8 +5382,8 @@ window._saveSForm = function(sid){
     className: document.getElementById('sf_cls')?.value?.trim()||'',
     studentLoginId: document.getElementById('sf_lid')?.value?.trim()||existing?.studentLoginId||'',
     studentPassword: document.getElementById('sf_lpw')?.value?.trim()||existing?.studentPassword||'',
-    subjects,
     extraSubjs: finalExtra,
+    // ※ subjects는 baseInfo에 포함하지 않음 - 성적은 성적 입력 폼에서만 수정
   };
 
   if(sid){
@@ -5403,7 +5396,8 @@ window._saveSForm = function(sid){
       if(!mergedGD[lb]) mergedGD[lb] = v;
       else mergedGD[lb] = {...mergedGD[lb], ...v};
     });
-    const updated = {...prev, ...baseInfo, gradeDetail: mergedGD};
+    // subjects는 건드리지 않음 (성적 입력 폼에서만 수정)
+    const updated = {...prev, ...baseInfo, subjects: prev.subjects||{korean:null,math:null,english:null,science:null,social:null}, gradeDetail: mergedGD};
     ST.students = ST.students.map(x=>String(x.id)===String(sid)?updated:x);
     ST.sel = updated;
   } else {
@@ -7695,6 +7689,66 @@ function renderSubjConfig(){
           style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:12px;font-weight:700;cursor:pointer">💾 전체 저장</button>
       </div>
     </div>
+
+    <!-- 학생별 과목명 커스텀 -->
+    ${(()=>{
+      const sel = ST.adminSel || ST.sel;
+      if(!sel) return '<div class="box" style="border-left:4px solid #f59e0b"><div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:6px">👤 학생별 과목명 커스텀</div><div style="font-size:12px;color:#888">학생 목록에서 학생을 선택하면 해당 학생의 과목명을 개별 설정할 수 있습니다.</div></div>';
+      const csn = sel.customSubjNames||{};
+      return `<div class="box" style="border-left:4px solid #f59e0b">
+        <div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:4px">👤 학생별 과목명 커스텀 — ${esc(sel.name)}</div>
+        <div style="font-size:11px;color:#888;margin-bottom:12px">이 학생에게만 적용되는 과목명입니다. 비워두면 전역 설정이 사용됩니다.</div>
+        <div style="display:grid;gap:8px">
+        ${GRADE_SUBJS.map(([k,globalLb],i)=>{
+            // subjects에 유효한 양수 등급이 있는지
+            const sv = sel.subjects?.[k];
+            const hasScore = sv !== null && sv !== undefined && sv !== '' && !isNaN(+sv) && +sv > 0;
+            // gradeDetail에 실제 등급값이 있는지 (빈 객체/null 제외, 커스텀명도 포함)
+            const gdKey1 = globalLb;
+            const gdKey2 = csn[k] || globalLb;
+            const gdObj = sel.gradeDetail?.[gdKey1] || sel.gradeDetail?.[gdKey2] || {};
+            const hasDetail = Object.values(gdObj).some(v=>{
+              if(!v) return false;
+              const g = typeof v==='object' ? v.grade : v;
+              return g !== null && g !== undefined && g !== '' && !isNaN(+g) && +g > 0;
+            });
+            const isLocked = hasScore || hasDetail;
+            return `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${isLocked?'#fff7ed':'#fffbeb'};border-radius:10px;border:1.5px solid ${isLocked?'#fed7aa':'#fde68a'}">
+              <div style="width:36px;height:36px;border-radius:9px;background:${isLocked?'#f97316':'#f59e0b'};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0">${i+1}</div>
+              <div style="flex:1;font-size:12px;color:#888">전역: <b>${esc(globalLb)}</b></div>
+              <div style="flex:2">
+                ${isLocked
+                  ? `<div style="font-size:11px;color:#ea580c;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:6px 10px">
+                      🔒 이미 성적이 입력된 과목입니다.<br>
+                      <span style="font-size:10px;color:#9a3412">이름 변경 불가 — 새 과목을 추가해 주세요</span>
+                     </div>`
+                  : `<input id="csn_${k}" class="inp" value="${esc(csn[k]||'')}" placeholder="${esc(globalLb)} (비우면 전역 사용)" style="font-size:13px;font-weight:600">`
+                }
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button onclick="
+            const _s3=ST.adminSel||ST.sel;
+            if(!_s3){alert('학생을 먼저 선택해주세요.');return;}
+            const _csn3={};
+            ['korean','math','english','science','social'].forEach(function(k){
+              var sv=_s3.subjects?.[k];
+              var locked=(sv!=null&&sv!==''&&!isNaN(+sv)&&+sv>0);
+              if(!locked){var inp=document.getElementById('csn_'+k);if(inp&&inp.value.trim())_csn3[k]=inp.value.trim();}
+            });
+            upd({..._s3, customSubjNames:_csn3});
+            alert('✅ '+_s3.name+' 학생의 과목명이 저장되었습니다.');"
+            style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">💾 이 학생에게 저장</button>
+          <button onclick="
+            upd({...ST.adminSel||ST.sel, customSubjNames:{}});
+            alert('✅ 초기화 완료 (전역 설정 사용).');"
+            style="background:#f4f6fb;color:#555;border:1.5px solid #e0e3ef;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">🔄 초기화</button>
+        </div>
+      </div>`;
+    })()}
 
     <!-- 현재 과목 미리보기 -->
     <div class="box" style="border-left:4px solid #0f9d58">
