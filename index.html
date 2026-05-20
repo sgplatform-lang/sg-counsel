@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -694,11 +667,11 @@ function dbL(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;
 function dbS(k,d){try{localStorage.setItem(k,JSON.stringify(d));}catch{}}
 function td(){return new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});}
 function csv_dl(data,name){const b=new Blob(['\uFEFF'+data],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name+'.csv';a.click();}
-function popPrint(title, body){
-  // 기관명 결정: 1) 현재 로그인 기관 2) 선택 학생의 기관 (localStorage에서 조회)
+function popPrint(title, body, opts){
+  opts = opts || {};
+  // ── 기관명 결정 ──
   const stu = ST.sel || ST.adminSel;
   const orgId = stu?.orgId || null;
-  // 학생에 orgId가 없으면 기관명 표시 안함
   let orgName = '';
   if(orgId){
     orgName = ST.currentOrg?.name || '';
@@ -709,74 +682,329 @@ function popPrint(title, body){
       }catch(e){}
     }
   }
-  const orgLabel = orgName
-    ? '<div style="display:inline-block;font-size:11px;color:#3b5bdb;font-weight:700;background:#eef1ff;border-radius:6px;padding:3px 10px;margin-bottom:8px">🏫 ' + esc(orgName) + '</div><br>'
-    : '';
-  body = orgLabel + body;
+
+  // ── 날짜 범위 계산 ──
+  const now = new Date();
+  const y = opts.year || now.getFullYear();
+  const m = opts.month || (now.getMonth()+1);
+  let dateRange;
+  if(opts.dateFrom && opts.dateTo){
+    // 명시적 날짜 범위
+    dateRange = opts.dateFrom + ' - ' + opts.dateTo;
+  } else if(opts.weekLabel && opts.weekLabel.match(/\d+년 \d+월 \d+주차/)){
+    // 주차 레이블에서 날짜 범위 계산 (opts.week 우선 사용)
+    const _wMatch = opts.weekLabel.match(/(\d+)년 (\d+)월 (\d+)주차/);
+    if(_wMatch){
+      const _wy=+_wMatch[1], _wm=+_wMatch[2];
+      // opts.week 가 있으면 우선 사용, 없으면 레이블에서 추출
+      const _ww = opts.week != null ? opts.week : +_wMatch[3];
+      const _firstDay = new Date(_wy, _wm-1, 1).getDay();
+      const _firstMon = 1 - (_firstDay===0?6:_firstDay-1);
+      const _wStart = new Date(_wy, _wm-1, _firstMon + (_ww-1)*7);
+      const _wEnd = new Date(_wy, _wm-1, _firstMon + (_ww-1)*7 + 6);
+      const _fmt = d => d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
+      dateRange = _fmt(_wStart) + ' - ' + _fmt(_wEnd);
+    } else {
+      const dateFrom2 = y+'.'+String(m).padStart(2,'0')+'.01';
+      const lastDay2 = new Date(y, m, 0).getDate();
+      dateRange = dateFrom2 + ' - ' + y+'.'+String(m).padStart(2,'0')+'.'+String(lastDay2).padStart(2,'0');
+    }
+  } else if(opts.weekLabel && opts.weekLabel.includes(' ~ ')){
+    // "YYYY.MM.DD ~ YYYY.MM.DD" 형식
+    dateRange = opts.weekLabel;
+  } else {
+    const dateFrom2 = y+'.'+String(m).padStart(2,'0')+'.01';
+    const lastDay2 = new Date(y, m, 0).getDate();
+    dateRange = dateFrom2 + ' - ' + y+'.'+String(m).padStart(2,'0')+'.'+String(lastDay2).padStart(2,'0');
+  }
+
+  // ── 표지용 정보 ──
+  const stuName = stu ? esc(stu.name) : '';
+  const stuSchool = stu ? esc(stu.school||'') : '';
+  const stuGrade = stu ? esc(stu.grade||'') : '';
+  // 보고서 타입 라벨
+  const reportTypeMap = {
+    '성적 리포트': 'Grade Report',
+    '수시 상담 자료': 'Admission Report',
+    '주간플랜': 'Weekly Report',
+    '학습플랜': 'Weekly Report',
+    'AI 추천 주간 학습 플랜': 'Weekly Report',
+    '플랜점검': 'Weekly Report',
+    '주간 학습 이력': 'Weekly Report',
+    '월간': 'Weekly Report',
+    '이력': 'Weekly Report',
+    '상담이력': 'Counsel Report',
+    '상담 기록': 'Counsel Report',
+  };
+  let reportEn = '';
+  for(const [k,v] of Object.entries(reportTypeMap)){
+    if(title.includes(k)){ reportEn = v; break; }
+  }
+  if(!reportEn) reportEn = 'Monthly Report';
+  // 주간 플랜: opts.weekLabel이 있으면 주차 범위 표시
+  const reportKo = opts.reportKo || (opts.weekLabel
+    ? opts.weekLabel
+    : (y+'년 '+m+'월 보고서'));
+
+  // ── 로고 SVG (스파르타 스타일 - 졸업모) ──
+  const logoSvg = orgName
+    ? `<div style="text-align:center;margin-top:auto;padding-top:32px">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="10" fill="#6b1d1d"/>
+            <polygon points="24,10 42,20 24,26 6,20" fill="#fff" opacity="0.95"/>
+            <rect x="20" y="26" width="8" height="10" rx="2" fill="#fff" opacity="0.85"/>
+            <rect x="38" y="20" width="3" height="10" rx="1.5" fill="#fff" opacity="0.7"/>
+            <circle cx="39.5" cy="31" r="2" fill="#fff" opacity="0.7"/>
+          </svg>
+          <div style="font-size:13px;font-weight:800;color:#6b1d1d;letter-spacing:1px">${esc(orgName)}</div>
+          <div style="font-size:9px;color:#999;letter-spacing:0.5px">SG 상담플랫폼</div>
+        </div>
+      </div>`
+    : `<div style="text-align:center;margin-top:auto;padding-top:32px">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="10" fill="#6b1d1d"/>
+            <polygon points="24,10 42,20 24,26 6,20" fill="#fff" opacity="0.95"/>
+            <rect x="20" y="26" width="8" height="10" rx="2" fill="#fff" opacity="0.85"/>
+            <rect x="38" y="20" width="3" height="10" rx="1.5" fill="#fff" opacity="0.7"/>
+            <circle cx="39.5" cy="31" r="2" fill="#fff" opacity="0.7"/>
+          </svg>
+          <div style="font-size:13px;font-weight:800;color:#6b1d1d;letter-spacing:1px">SG상담플랫폼</div>
+          <div style="font-size:9px;color:#999;letter-spacing:0.5px">SG 상담플랫폼</div>
+        </div>
+      </div>`;
+
+  // ── 표지 HTML ──
+  const coverHtml = `
+  <div class="print-cover">
+    <div class="cover-top-bar">
+      <div class="cover-date-range">${dateRange}</div>
+    </div>
+    <div class="cover-body">
+      <div class="cover-title-area">
+        <div class="cover-year-month">${y}.${String(m).padStart(2,'0')}</div>
+        <div class="cover-report-en">${reportEn}</div>
+        <div class="cover-report-detail">
+          <div>${reportKo}</div>
+          ${stuSchool||stuGrade ? `<div>${stuSchool}${stuGrade?' '+stuGrade:''}${stuName?' '+stuName+' 학생':''}</div>` : (stuName?`<div>${stuName} 학생</div>`:'')}
+        </div>
+      </div>
+      ${logoSvg}
+    </div>
+  </div>
+  <div class="print-page-break"></div>`;
+
+  // ── 본문 페이지 헤더 (각 페이지 상단에 반복) ──
+  const pageHeaderHtml = `
+  <div class="print-page-header">
+    <div class="pph-left">${esc(title)}</div>
+    <div class="pph-right">${dateRange}${stuName?' · '+stuName:''}</div>
+  </div>`;
 
   const css = `
-    /* ── A4 세로, 상하좌우 20mm ── */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap');
     @page {
       size: 210mm 297mm portrait;
-      margin: 20mm;
+      margin: 18mm 15mm 15mm 15mm;
+    }
+    @page :first {
+      margin: 0;
     }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     html { font-size: 11px; }
     body {
       margin: 0; padding: 0;
       background: #fff;
-      font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
       font-size: 11px;
-      color: #0f172a;
-      line-height: 1.6;
-      max-width: 700px;
+      color: #1a1a1a;
+      line-height: 1.65;
+    }
+    .print-wrap {
+      max-width: 680px;
       margin: 0 auto;
     }
-    @media print {
-      @page { size: 210mm 297mm portrait; margin: 15mm; }
-      .np, .np-spacer { display: none !important; }
-      body { margin: 0 !important; padding: 0 !important; }
-      /* 잘림 방지 */
-      h3, h4 { page-break-after: avoid; }
-      .card, .box-s, .g2, .g3, .g4 { page-break-inside: avoid; }
-      .newpage { page-break-before: always; }
+
+    /* ── 표지 ── */
+    .print-cover {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      page-break-after: always;
     }
+    .cover-top-bar {
+      padding: 22mm 20mm 12px 20mm;
+      border-bottom: 1.5px solid #333;
+    }
+    .cover-date-range {
+      font-size: 11px;
+      color: #555;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+    .cover-body {
+      flex: 1;
+      padding: 0 20mm 20mm 20mm;
+      display: flex;
+      flex-direction: column;
+    }
+    .cover-title-area {
+      margin-top: auto;
+      text-align: right;
+      padding-bottom: 24px;
+      padding-top: 30mm;
+    }
+    .cover-year-month {
+      font-size: 52px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+    }
+    .cover-report-en {
+      font-size: 38px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .cover-report-detail {
+      font-size: 12px;
+      color: #555;
+      font-weight: 500;
+      line-height: 1.9;
+    }
+
+    /* ── 페이지 구분 ── */
+    .print-page-break {
+      page-break-before: always;
+      height: 0;
+    }
+
+    /* ── 각 페이지 상단 헤더 ── */
+    .print-page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      color: #999;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 6px;
+      margin-bottom: 18px;
+      letter-spacing: 0.2px;
+    }
+    .pph-left { font-weight: 700; color: #555; font-size: 9px; }
+    .pph-right { font-size: 9px; color: #aaa; }
+
+    /* ── 섹션 헤더 ── */
+    .sec-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #1a1a1a;
+      margin: 20px 0 10px;
+      padding-bottom: 5px;
+      border-bottom: 1.5px solid #e0e0e0;
+      letter-spacing: -0.3px;
+    }
+
     /* ── 기본 요소 ── */
-    h3 { font-size: 13px; font-weight: 800; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px; margin: 18px 0 10px; }
-    h4 { font-size: 12px; font-weight: 700; margin: 12px 0 8px; }
+    h3 { font-size: 13px; font-weight: 800; color: #1a1a1a; border-bottom: 1.5px solid #e0e0e0; padding-bottom: 5px; margin: 20px 0 10px; letter-spacing: -0.3px; }
+    h4 { font-size: 12px; font-weight: 700; margin: 12px 0 8px; color: #333; }
     p { margin: 4px 0; }
+
+    /* ── 상단 인포 박스 (학생 요약) ── */
+    .info-box {
+      background: #f9f9f9;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .info-box-main { flex: 1; }
+    .info-box-name { font-size: 18px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.5px; margin-bottom: 3px; }
+    .info-box-sub { font-size: 11px; color: #666; }
+    .info-box-stats { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+    .info-stat-item { text-align: center; }
+    .info-stat-v { font-size: 16px; font-weight: 900; color: #1a1a1a; }
+    .info-stat-l { font-size: 9px; color: #999; margin-top: 1px; }
+
     /* ── 표 ── */
     table { border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 14px; }
-    th, td { border: 1px solid #cbd5e1; padding: 5px 7px; }
-    th { background: #f1f5f9; font-weight: 700; text-align: center; }
-    td { text-align: center; }
-    td.lbl { text-align: left; background: #f8fafc; font-weight: 600; white-space: nowrap; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; }
+    th { background: #f5f5f5; font-weight: 700; text-align: center; color: #333; font-size: 10px; }
+    td { text-align: center; color: #1a1a1a; }
+    td.lbl { text-align: left; background: #fafafa; font-weight: 600; white-space: nowrap; color: #444; }
+
     /* ── 카드/그리드 ── */
-    .card, .box-s { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .card, .box-s {
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 13px 15px;
+      margin-bottom: 10px;
+    }
     .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
     .g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 12px; }
     .g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 12px; }
-    .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center; }
-    .sv { font-size: 15px; font-weight: 900; }
-    .sl { font-size: 9px; color: #64748b; margin-top: 2px; }
+    .stat {
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 6px;
+      padding: 9px 6px;
+      text-align: center;
+    }
+    .sv { font-size: 15px; font-weight: 900; color: #1a1a1a; }
+    .sl { font-size: 9px; color: #888; margin-top: 2px; }
+
     /* ── 바 ── */
-    .bar-bg { background: #e2e8f0; height: 7px; border-radius: 4px; overflow: hidden; margin: 2px 0; }
-    .bar-fill { height: 7px; border-radius: 4px; }
+    .bar-bg { background: #eaeaea; height: 6px; border-radius: 3px; overflow: hidden; margin: 3px 0; }
+    .bar-fill { height: 6px; border-radius: 3px; }
+
     /* ── 배지 ── */
     .chip { border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700; display: inline-block; }
+
     /* ── 타임테이블 ── */
-    .tt { border-collapse: collapse; width: 100%; font-size: 9px; }
-    .tt th, .tt td { border: 1px solid #cbd5e1; padding: 3px 2px; text-align: center; }
-    .tt th { background: #f1f5f9; font-weight: 700; }
-    .tt td.th-time { background: #f8fafc; color: #64748b; font-size: 8px; width: 22px; }
+    .tt-wrap { overflow-x: auto; margin-bottom: 14px; }
+    .tt { border-collapse: collapse; width: 100%; font-size: 9px; table-layout: fixed; }
+    .tt th, .tt td { border: 1px solid #ddd; padding: 3px 2px; text-align: center; }
+    .tt th { background: #f5f5f5; font-weight: 700; color: #333; }
+    .tt td.th-time { background: #fafafa; color: #888; font-size: 8px; width: 26px; }
+
     /* ── 조건 그리드 ── */
     .cond-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
-    .cond-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 8px; }
-    .cond-label { font-size: 8px; color: #64748b; margin-bottom: 2px; }
-    .cond-val { font-size: 10px; font-weight: 700; }
+    .cond-item { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 5px; padding: 7px 8px; }
+    .cond-label { font-size: 8px; color: #999; margin-bottom: 2px; }
+    .cond-val { font-size: 10px; font-weight: 700; color: #1a1a1a; }
+
+    /* ── 주간 플랜 페이지 나누기 방지 ── */
+    .tt-page-safe { page-break-inside: avoid; break-inside: avoid; }
+
+    @media print {
+      @page { size: 210mm 297mm portrait; margin: 18mm 15mm 15mm 15mm; }
+      @page :first { margin: 0; }
+      .np, .np-spacer { display: none !important; }
+      body { margin: 0 !important; padding: 0 !important; }
+      h3, h4 { page-break-after: avoid; break-after: avoid; }
+      .card, .box-s { page-break-inside: avoid; break-inside: avoid; }
+      .newpage { page-break-before: always; break-before: page; }
+      .print-cover { page-break-after: always; break-after: page; min-height: 297mm; }
+      .tt-page-safe { page-break-inside: avoid; break-inside: avoid; }
+      .print-page-header { page-break-after: avoid; break-after: avoid; }
+    }
   `;
 
-  const pop = window.open('', '_blank', 'width=900,height=750,scrollbars=yes,resizable=yes');
+  const pop = window.open('', '_blank', 'width=960,height=800,scrollbars=yes,resizable=yes');
   if(!pop){ alert('팝업을 허용해주세요.'); return; }
   pop.document.open();
   pop.document.write(
@@ -786,13 +1014,17 @@ function popPrint(title, body){
     +'<title>'+esc(title)+'</title>'
     +'<style>'+css+'</style>'
     +'</head><body>'
-    +'<div class="np" style="position:fixed;top:0;left:0;right:0;background:#fff;padding:8px 20px;display:flex;gap:8px;align-items:center;border-bottom:2px solid #e2e8f0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.07)">'
-    +'<span style="font-size:13px;font-weight:700;color:#1a1a2e;flex:1">'+esc(title)+'</span>'
-    +'<button onclick="window.print()" style="padding:8px 20px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF</button>'
-    +'<button onclick="window.close()" style="padding:8px 16px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">✕ 닫기</button>'
+    +'<div class="np" style="position:fixed;top:0;left:0;right:0;background:#fff;padding:8px 20px;display:flex;gap:8px;align-items:center;border-bottom:1.5px solid #e0e0e0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06)">'
+    +'<span style="font-size:13px;font-weight:700;color:#1a1a1a;flex:1">'+esc(title)+'</span>'
+    +'<button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄 / PDF</button>'
+    +'<button onclick="window.close()" style="padding:7px 14px;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕ 닫기</button>'
     +'</div>'
-    +'<div class="np-spacer" style="height:44px"></div>'
-    +'<div style="padding:2px 0 20px">'+body+'</div>'
+    +'<div class="np-spacer" style="height:46px"></div>'
+    + coverHtml
+    +'<div class="print-wrap">'
+    + pageHeaderHtml
+    +'<div>'+body+'</div>'
+    +'</div>'
     +'</body></html>'
   );
   pop.document.close();
@@ -1516,7 +1748,7 @@ function renderOverview(s){
         const raw=latest?(mg[subj]||{})[latest]:null;
         if(!raw)return'';
         const gv=typeof raw==='object'?raw.grade:raw;
-        const c=gv&&!isNaN(+gv)&&+gv>=1&&+gv<=9?gc(+gv):'#94a3b8';
+        const c=gv&&!isNaN(+gv)&&+gv>=1&&+gv<=9?gc(+gv):'#aaa';
         const display=fmtMock(raw);
         return`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #e8eaf6"><span style="color:#555">${subj}</span><span style="color:${c};font-weight:700">${display}${latest?'<span style="font-size:9px;color:#888;font-weight:400;margin-left:4px">('+latest+')</span>':''}</span></div>`;
       }).filter(Boolean).join('')||'<div style="color:#888;font-size:12px">성적 없음</div>'
@@ -1562,8 +1794,8 @@ function renderGrade(s){
     </div>
     <div class="g3" style="margin-bottom:14px">
       <div class="stat"><div class="sv" style="color:${gc(a)}">${a.toFixed(2)}</div><div class="sl">평균등급</div></div>
-      <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc(Math.min(..._vs)):'#94a3b8';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.min(..._vs)+'등급':'미입력';})()}</div><div class="sl">최고등급</div></div>
-      <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc(Math.max(..._vs)):'#94a3b8';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.max(..._vs)+'등급':'미입력';})()}</div><div class="sl">최저등급</div></div>
+      <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc(Math.min(..._vs)):'#aaa';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.min(..._vs)+'등급':'미입력';})()}</div><div class="sl">최고등급</div></div>
+      <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc(Math.max(..._vs)):'#aaa';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.max(..._vs)+'등급':'미입력';})()}</div><div class="sl">최저등급</div></div>
     </div>
 
     <!-- 주요 5과목 + 추가 과목 바 차트 (동일 디자인) -->
@@ -1923,16 +2155,16 @@ function printGrade(sid){
     return null;
   }
 
-  let body=`<div style="background:linear-gradient(135deg,#3b5bdb,#1d4ed8);color:#fff;padding:18px 22px;border-radius:10px;margin-bottom:18px">
-    <div style="font-size:9px;color:#93c5fd;letter-spacing:2px;margin-bottom:3px">성적 분석 리포트 · SG상담플랫폼</div>
-    <div style="font-size:20px;font-weight:900;margin-bottom:2px">${esc(s.name)}</div>
-    <div style="font-size:11px;color:#bfdbfe">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)} · ${td()}</div>
+  let body=`<div class="info-box" style="margin-bottom:18px">
+    <div class="info-box-main">
+      <div class="info-box-name">${esc(s.name)}</div>
+      <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
+    </div>
   </div>
   <h3>📚 내신 성적</h3>
-  <div class="g3" style="margin-bottom:12px">
-    <div class="stat"><div class="sv" style="color:${gc2(a)}">${a.toFixed(2)}등급</div><div class="sl">내신 평균</div></div>
-    <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc2(Math.min(..._vs)):'#94a3b8';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.min(..._vs)+'등급':'미입력';})()}</div><div class="sl">최고 등급</div></div>
-    <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc2(Math.max(..._vs)):'#94a3b8';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.max(..._vs)+'등급':'미입력';})()}</div><div class="sl">최저 등급</div></div>
+  <div class="g2" style="margin-bottom:12px">
+    <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc2(Math.min(..._vs)):'#aaa';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.min(..._vs)+'등급':'미입력';})()}</div><div class="sl">최고 등급</div></div>
+    <div class="stat"><div class="sv" style="color:${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?gc2(Math.max(..._vs)):'#aaa';})()}">${(()=>{const _vs=Object.values(s.subjects||{}).filter(v=>v!==null&&v!==undefined&&!isNaN(+v)&&+v>0);return _vs.length?Math.max(..._vs)+'등급':'미입력';})()}</div><div class="sl">최저 등급</div></div>
   </div>
   ${SGRADE_SUBJS.map(([k,lb])=>{const rv=s.subjects[k];const v=(rv===null||rv===undefined||isNaN(+rv))?null:+rv;if(v===null)return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${lb}</span><div class="bar-bg" style="flex:1"></div><span style="font-size:12px;color:#bbb;min-width:48px;text-align:right">미입력</span></div>`;const c=gc2(v),pct=((6-v)/5*100).toFixed(0);return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${lb}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:48px;text-align:right">${v}등급</span></div>`;}).join('')}
   ${extraSubjs.map(lb=>{const v=getExtraGrade(lb);if(v===null)return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${esc(lb)}</span><div class="bar-bg" style="flex:1"></div><span style="font-size:12px;color:#bbb;min-width:48px;text-align:right">미입력</span></div>`;const c=gc2(v),pct=((6-v)/5*100).toFixed(0);return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px"><span style="font-size:12px;width:52px;color:#555;font-weight:600">${esc(lb)}</span><div class="bar-bg" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:13px;font-weight:900;color:${c};min-width:48px;text-align:right">${v}등급</span></div>`;}).join('')}`;
@@ -2195,19 +2427,26 @@ function printSusiReport(sid){
   }
 
   let body = `
-  <div style="background:linear-gradient(135deg,#3b5bdb,#1d4ed8);color:#fff;padding:18px 22px;border-radius:10px;margin-bottom:20px">
-    ${(()=>{let orgName='';if(s.orgId){orgName=ST.currentOrg?.name||'';if(!orgName){try{const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');orgName=orgs.find(o=>String(o.id)===String(s.orgId))?.name||'';}catch(e){}}}return orgName?`<div style="display:inline-block;background:rgba(255,255,255,.2);border-radius:6px;padding:2px 10px;font-size:10px;font-weight:700;margin-bottom:6px">🏫 ${esc(orgName)}</div>`:'';})()} 
-    <div style="font-size:9px;color:#93c5fd;letter-spacing:2px;margin-bottom:4px">수시 상담 자료 · ${td()}</div>
-    <div style="font-size:22px;font-weight:900;margin-bottom:4px">${esc(s.name)}</div>
-    <div style="font-size:11px;color:#bfdbfe">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
-    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-      ${[['내신 평균',a.toFixed(2)+'등급'],['지원 대학',allCards.length+'개'],
-         ['안정·하향',allCards.filter(t=>{const c=edits[t.id]?.chance||t.chance;return c==='하향'||c==='안정';}).length+'개'],
-         ['적정·상향',allCards.filter(t=>{const c=edits[t.id]?.chance||t.chance;return c==='상향'||c==='적정';}).length+'개'],
-        ].map(([l,v])=>`<div style="background:rgba(255,255,255,.15);border-radius:7px;padding:7px 12px;text-align:center">
-        <div style="font-size:14px;font-weight:900">${v}</div>
-        <div style="font-size:9px;color:#bfdbfe;margin-top:1px">${l}</div>
-      </div>`).join('')}
+  <div class="info-box" style="margin-bottom:18px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+      <div class="info-box-main" style="flex:1">
+        <div class="info-box-name">${esc(s.name)}</div>
+        <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
+      </div>
+      <div style="display:flex;gap:14px;flex-shrink:0;align-items:center;padding-top:2px">
+        <div style="text-align:center">
+          <div style="font-size:16px;font-weight:900;color:#1a1a1a">${allCards.length}개</div>
+          <div style="font-size:9px;color:#999;margin-top:1px">지원 대학</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:16px;font-weight:900;color:#1a1a1a">${allCards.filter(t=>{const c=edits[t.id]?.chance||t.chance;return c==='하향'||c==='안정';}).length}개</div>
+          <div style="font-size:9px;color:#999;margin-top:1px">안정·하향</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:16px;font-weight:900;color:#1a1a1a">${allCards.filter(t=>{const c=edits[t.id]?.chance||t.chance;return c==='상향'||c==='적정';}).length}개</div>
+          <div style="font-size:9px;color:#999;margin-top:1px">적정·상향</div>
+        </div>
+      </div>
     </div>
   </div>`;
 
@@ -3316,13 +3555,14 @@ function printAiPlan(sid){
   }).join('');
 
   const body = `
-    <div style="background:linear-gradient(135deg,#3b5bdb,#1d4ed8);color:#fff;padding:18px 20px;border-radius:10px;margin-bottom:20px">
-      <div style="font-size:9px;color:#93c5fd;letter-spacing:2px;margin-bottom:4px">AI 추천 주간 학습 플랜 · ${new Date().toLocaleDateString('ko-KR')}</div>
-      <div style="font-size:20px;font-weight:900;margin-bottom:4px">${esc(s.name)}</div>
-      <div style="font-size:11px;color:#bfdbfe">${esc(s.school||'')} · ${esc(s.grade||'')} · 내신 ${gAvg(s.subjects).toFixed(2)}등급</div>
+    <div class="info-box" style="margin-bottom:18px">
+      <div class="info-box-main">
+        <div class="info-box-name">${esc(s.name)}</div>
+        <div class="info-box-sub">${esc(s.school||'')} · ${esc(s.grade||'')} · 담당: ${esc(s.counselor||'')} </div>
+      </div>
     </div>
     <h3>📅 AI 추천 주간 시간표</h3>
-    <div style="overflow-x:auto;margin-bottom:16px">${ttHtml}</div>
+    <div style="overflow-x:auto;margin-bottom:16px" class="tt-page-safe">${ttHtml}</div>
     <h3>📊 과목별 학습 시간 배분</h3>
     <div style="margin-bottom:16px">${statsHtml}</div>
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:11px;color:#475569;line-height:1.8">
@@ -3332,7 +3572,7 @@ function printAiPlan(sid){
     </div>
   `;
 
-  popPrint(`${esc(s.name)} - AI 추천 주간 학습 플랜`, body);
+  const _now=new Date(); popPrint(`${esc(s.name)} - AI 추천 주간 학습 플랜`, body, {weekLabel: `${_now.getFullYear()}년 ${_now.getMonth()+1}월 AI 추천 플랜`, year: _now.getFullYear(), month: _now.getMonth()+1});
 }
 async function generateAiPlan(sid){
   const s = ST.students.find(x=>String(x.id)===String(sid)); if(!s) return;
@@ -4080,24 +4320,28 @@ function printAchieve(sid){
   const minH=usedH[0]??6,maxH=usedH[usedH.length-1]??23;
   const ph=[];for(let h=minH;h<=maxH;h++)ph.push(h);
 
-  let body=`<div style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:16px">
-    <div style="font-size:9px;color:#ddd6fe;letter-spacing:2px;margin-bottom:3px">플랜 점검표 · SG상담플랫폼 · ${td()}</div>
-    <div style="font-size:20px;font-weight:900;margin-bottom:2px">${esc(s.name)} · ${wLabel}</div>
-    <div style="font-size:11px;color:#e9d5ff">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
-    <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
-      ${[['총 과목',studySubjs.length+'개'],['계획시간',tots.p+'h'],['순공시간',tots.r+'h'],['전체달성',overallPct!==null?overallPct+'%':'–']].map(([l,v])=>`<div style="background:rgba(255,255,255,.15);border-radius:7px;padding:6px 12px;text-align:center"><div style="font-size:13px;font-weight:900">${v}</div><div style="font-size:9px;color:#ddd6fe;margin-top:1px">${l}</div></div>`).join('')}
+  let body=`<div class="info-box" style="margin-bottom:18px">
+    <div class="info-box-main">
+      <div class="info-box-name">${esc(s.name)} <span style="font-size:14px;font-weight:600;color:#888">${wLabel}</span></div>
+      <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
+      <div class="info-box-stats">
+        <div class="info-stat-item"><div class="info-stat-v">${studySubjs.length}개</div><div class="info-stat-l">총 과목</div></div>
+        <div class="info-stat-item"><div class="info-stat-v">${tots.p}h</div><div class="info-stat-l">계획시간</div></div>
+        <div class="info-stat-item"><div class="info-stat-v">${tots.r}h</div><div class="info-stat-l">순공시간</div></div>
+        <div class="info-stat-item"><div class="info-stat-v">${overallPct!==null?overallPct+'%':'–'}</div><div class="info-stat-l">전체달성</div></div>
+      </div>
     </div>
   </div>`;
 
   // 시간표
   if(ph.length){
-    body+=`<h3>📅 주간 학습플랜</h3><table class="tt" style="margin-bottom:14px">
+    body+=`<h3>📅 주간 학습플랜</h3><div class="tt-page-safe"><table class="tt" style="margin-bottom:14px">
       <tr><th style="width:24px;font-size:8px">시간</th>${DAYS.map(d=>`<th style="${d==='토'||d==='일'?'color:#e53935':''}">${d}</th>`).join('')}</tr>
       ${ph.map(h=>`<tr><td class="th-time">${h===0?"자정":h===1?"1시":h+"시"}</td>${DAYS.map(d=>{
         const subj=plan[`${d}-${h}`];const bk=bm[`${d}-${h}`]||'';const col=subj?(SC[subj]||'#3b5bdb'):null;
         return subj?`<td style="background:${col}20;color:${col};font-weight:800;font-size:9px;border:1px solid ${col}44;padding:2px 3px;text-align:center"><div>${esc(subj)}</div>${bk?`<div style="font-size:7px;opacity:.7">📖${esc(bk)}</div>`:''}</td>`:`<td></td>`;
       }).join('')}</tr>`).join('')}
-    </table>`;
+    </table></div>`;
   }
 
   // 과목별 점검표
@@ -4175,7 +4419,7 @@ function printAchieve(sid){
       </div>`;
     }
   }
-  popPrint(`${s.name} - ${wLabel} 플랜점검`, body);
+  popPrint(`${s.name} - ${wLabel} 플랜점검`, body, {weekLabel: wLabel, year: wy, month: wm, week: ww});
 }
 
 // ── 플랜점검 엑셀 ──
@@ -4264,10 +4508,11 @@ function printWeeklyHistoryMonth(sid, mKey){
   entries.forEach(h=>Object.values(h.plan||{}).forEach(subj=>{mStats[subj]=(mStats[subj]||0)+1;}));
   const mTotal=Object.values(mStats).reduce((a,v)=>a+v,0);
 
-  let body=`<div style="background:linear-gradient(135deg,#3b5bdb,#0f9d58);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:18px">
-    <div style="font-size:9px;color:#a7f3d0;letter-spacing:2px;margin-bottom:3px">월간 학습 이력 · ${td()}</div>
-    <div style="font-size:20px;font-weight:900;margin-bottom:2px">${esc(s.name)} · ${mLabel}</div>
-    <div style="font-size:11px;color:#d1fae5">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)} · ${entries.length}주 기록</div>
+  let body=`<div class="info-box" style="margin-bottom:18px">
+    <div class="info-box-main">
+      <div class="info-box-name">${esc(s.name)} <span style="font-size:14px;font-weight:600;color:#888">${mLabel}</span></div>
+      <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)} · ${entries.length}주 기록</div>
+    </div>
   </div>`;
 
   body+=`<h3>📊 ${mLabel} 과목별 누적</h3><div class="g4" style="margin-bottom:12px">
@@ -4299,7 +4544,7 @@ function printWeeklyHistoryMonth(sid, mKey){
       ${h.memo?`<div style="margin-top:6px;padding:5px 9px;background:#fffbeb;border-radius:5px;border-left:3px solid #f59e0b;font-size:10px;color:#444">${esc(h.memo)}</div>`:''}
     </div>`;
   });
-  popPrint(`${s.name} - ${mLabel} 이력`,body);
+  popPrint(`${s.name} - ${mLabel} 이력`, body, {weekLabel: mLabel, year: entries[0]?.year||new Date().getFullYear(), month: entries[0]?.month||(new Date().getMonth()+1)});
 }
 
 // ── 주간 이력 전체 인쇄 ──
@@ -4309,11 +4554,12 @@ function printWeeklyHistory(sid){
   if(!history.length){ alert('저장된 이력이 없습니다.'); return; }
 
   let body = `
-  <div style="background:linear-gradient(135deg,#0f9d58,#3b5bdb);color:#fff;padding:16px 20px;border-radius:10px;margin-bottom:18px">
-    <div style="font-size:9px;color:#a7f3d0;letter-spacing:2px;margin-bottom:3px">주간 학습 이력 · SG상담플랫폼 · ${td()}</div>
-    <div style="font-size:20px;font-weight:900;margin-bottom:2px">${esc(s.name)}</div>
-    <div style="font-size:11px;color:#d1fae5">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
-    <div style="margin-top:8px;font-size:11px;color:#a7f3d0">총 ${history.length}주 이력 · ${history[0]?.date} ~ ${history[history.length-1]?.date}</div>
+  <div class="info-box" style="margin-bottom:18px">
+    <div class="info-box-main">
+      <div class="info-box-name">${esc(s.name)}</div>
+      <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
+      <div style="font-size:10px;color:#888;margin-top:6px">총 ${history.length}주 이력 · ${history[0]?.date} ~ ${history[history.length-1]?.date}</div>
+    </div>
   </div>`;
 
   // 월별 그룹
@@ -4363,7 +4609,7 @@ function printWeeklyHistory(sid){
           ${Object.entries(hStats).sort((a,b)=>b[1]-a[1]).map(([subj,hrs])=>{const col=SC[subj]||'#3b5bdb';return`<span style="background:${col}18;color:${col};border:1px solid ${col}44;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:600">${esc(subj)} ${hrs}h</span>`;}).join('')}
         </div>
         <!-- 미니 시간표 -->
-        ${ph.length?`<table class="tt" style="margin-bottom:8px">
+        ${ph.length?`<div class="tt-page-safe"><table class="tt" style="margin-bottom:8px">
           <tr><th style="width:24px;font-size:8px">시간</th>${DAYS.map(d=>`<th style="${d==='토'||d==='일'?'color:#e53935':''}">${d}</th>`).join('')}</tr>
           ${ph.map(hh=>`<tr>
             <td class="th-time">${hh}시</td>
@@ -4399,7 +4645,7 @@ function printWeeklyHistory(sid){
     });
   });
 
-  popPrint(`${s.name} - 주간 학습 이력`, body);
+  popPrint(`${s.name} - 주간 학습 이력`, body, {weekLabel: `${history[0]?.date||''} ~ ${history[history.length-1]?.date||''}`, year: history[0]?.year||new Date().getFullYear(), month: history[0]?.month||(new Date().getMonth()+1)});
 }
 
 // ── 단일 주차 이력 인쇄 ──
@@ -4414,10 +4660,11 @@ function printWeeklyHistoryOne(sid, hid){
   const achieve=(s.weeklyAchieve||{})[getWeekNum(h.year,h.month,h.weekNum)]||{};
   const achieveEntries=Object.entries(achieve).filter(([,v])=>v.actual!==undefined&&v.actual!=='');
 
-  let body=`<div style="background:linear-gradient(135deg,#0f9d58,#3b5bdb);color:#fff;padding:14px 18px;border-radius:10px;margin-bottom:16px">
-    <div style="font-size:9px;color:#a7f3d0;letter-spacing:2px;margin-bottom:3px">주간 학습 플랜 · ${td()}</div>
-    <div style="font-size:18px;font-weight:900;margin-bottom:2px">${esc(s.name)} · ${esc(h.label)}</div>
-    <div style="font-size:11px;color:#d1fae5">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)} · ${esc(h.date)}</div>
+  let body=`<div class="info-box" style="margin-bottom:18px">
+    <div class="info-box-main">
+      <div class="info-box-name">${esc(s.name)} <span style="font-size:14px;font-weight:600;color:#888">${esc(h.label)}</span></div>
+      <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)} · ${esc(h.date)}</div>
+    </div>
   </div>`;
 
   // 통계
@@ -4438,7 +4685,7 @@ function printWeeklyHistoryOne(sid, hid){
 
   // 시간표
   if(ph.length){
-    body+=`<h3>📋 주간 학습플랜</h3><div class="tt-wrap"><table class="tt">
+    body+=`<h3>📋 주간 학습플랜</h3><div class="tt-wrap tt-page-safe"><table class="tt">
       <tr><th style="width:24px;font-size:8px">시간</th>${DAYS.map(d=>`<th style="${d==='토'||d==='일'?'color:#e53935':''}">${d}</th>`).join('')}</tr>
       ${ph.map(hh=>`<tr><td class="th-time">${hh===0?"자정":hh===1?"1시":hh+"시"}</td>${DAYS.map(d=>{
         const subj=(h.plan||{})[`${d}-${hh}`];
@@ -4467,7 +4714,7 @@ function printWeeklyHistoryOne(sid, hid){
     </div>`;
   }
   if(h.memo) body+=`<div style="margin-top:12px;padding:8px 10px;background:#fffbeb;border-radius:7px;border-left:3px solid #f59e0b;font-size:11px;color:#444"><strong>📝 메모</strong> ${esc(h.memo)}</div>`;
-  popPrint(`${s.name} - ${h.label}`,body);
+  popPrint(`${s.name} - ${h.label}`, body, {weekLabel: h.label, year: h.year, month: h.month});
 }
 
 function renderWeeklyDetail(s){
@@ -4971,10 +5218,11 @@ function printConsultOne(sid, idx){
   const CCOLORS2={'입학상담':'#3b82f6','학습상담':'#10b981','성적상담':'#f59e0b','입시상담':'#8b5cf6','퇴원상담':'#ef4444','기타':'#64748b'};
   const col = CCOLORS2[c.ctype]||'#334155';
   const body = `
-  <div style="background:linear-gradient(135deg,${col},${col}cc);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:16px">
-    <div style="font-size:9px;color:rgba(255,255,255,.7);margin-bottom:3px">상담 기록 · SG상담플랫폼 · ${td()}</div>
-    <div style="font-size:20px;font-weight:900;margin-bottom:2px">${esc(s.name)}</div>
-    <div style="font-size:11px;color:rgba(255,255,255,.8)">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''}</div>
+  <div class="info-box" style="margin-bottom:18px">
+    <div class="info-box-main">
+      <div class="info-box-name">${esc(s.name)}</div>
+      <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''}</div>
+    </div>
   </div>
   <div style="background:#f8f9ff;border-radius:10px;padding:14px 16px;margin-bottom:12px;border-left:4px solid ${col}">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
@@ -4991,14 +5239,14 @@ function printConsultOne(sid, idx){
     <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:6px">📋 상담 상세 내용</div>
     <div style="font-size:13px;color:#333;line-height:1.9;background:#f5f3ff;border-radius:8px;padding:14px;white-space:pre-wrap">${esc(c.aiAnalysis)}</div>
   </div>`:''}`;
-  popPrint(`${s.name} - ${c.ctype||'상담'} 기록`, body);
+  const _cdate = c.date||''; const _cparts = _cdate.split('-'); popPrint(`${s.name} - ${c.ctype||'상담'} 기록`, body, {year: +(_cparts[0]||new Date().getFullYear()), month: +(_cparts[1]||new Date().getMonth()+1)});
 }
 
 // ══ 인쇄 (학생 탭별) ══
 function printTab(sid,tab){
   const s=ST.students.find(x=>String(x.id)===String(sid));if(!s)return;
   const a=gAvg(s.subjects);
-  const hdr=`<div style="background:linear-gradient(135deg,#3b5bdb,#1d4ed8);color:#fff;padding:8px 14px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap"><div style="min-width:0"><div style="font-size:8px;color:#93c5fd;letter-spacing:1px">SG상담플랫폼 리포트 · ${td()}</div><div style="font-size:14px;font-weight:900;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</div><div style="font-size:10px;color:#bfdbfe;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:18px;font-weight:900;color:#fff">${a.toFixed(2)}</div><div style="font-size:8px;color:#93c5fd">내신평균</div></div></div>`;
+  const hdr=`<div class="info-box" style="margin-bottom:18px"><div class="info-box-main"><div class="info-box-name">${esc(s.name)}</div><div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)} · 담당: ${esc(s.counselor)}</div></div></div>`;
   const gc2=v=>v<=1.5?'#3b82f6':v<=2.5?'#10b981':v<=3.5?'#f59e0b':'#ef4444';
   let body=hdr;
   if(tab==='susi'){
@@ -5021,15 +5269,25 @@ function printTab(sid,tab){
       });
     }
   } else if(tab==='weekly'){
-    const plan = s.weeklyPlan||{};
+    // ── 선택 주차 결정 (renderWeekly와 동일한 로직) ──
+    const _tabNow=new Date(),_tabCy=_tabNow.getFullYear(),_tabCm=_tabNow.getMonth()+1;
+    const _tabCw=getWeekOfMonth(_tabCy,_tabCm,_tabNow.getDate());
+    const wy=(ST.weekYear!=null&&ST.weekYear!==undefined)?ST.weekYear:_tabCy;
+    const wm=(ST.weekMonth!=null&&ST.weekMonth!==undefined)?ST.weekMonth:_tabCm;
+    const ww=(ST.weekWeek!=null&&ST.weekWeek!==undefined&&ST.weekWeek!==0)?ST.weekWeek:_tabCw;
+    const wLabel = getWeekLabel(wy,wm,ww);
+    const wKey = getWeekNum(wy,wm,ww);
+    // 현재 주차 여부 판단
+    const _printIsCurrentWeek=(wy===_tabCy&&wm===_tabCm&&ww===_tabCw);
+    // 이력에서 해당 주차 데이터 조회
+    const _printHEntry=(s.weeklyHistory||[]).find(h=>h.date&&getWeekNum(h.year,h.month,h.weekNum)===wKey);
+    // 플랜/교재맵/과목플랜: 현재 주차면 s.weeklyPlan, 과거 주차면 이력 데이터
+    const plan = _printIsCurrentWeek ? (s.weeklyPlan||{}) : ((_printHEntry&&_printHEntry.plan)||{});
+    const _printBm = _printIsCurrentWeek ? (s.weeklyBookMap||{}) : ((_printHEntry&&_printHEntry.bookMap)||{});
+    const sp = _printIsCurrentWeek ? (s.weeklySubjPlans||{}) : ((_printHEntry&&_printHEntry.subjPlans)||{});
     const ws = {}; Object.values(plan).forEach(x=>{ws[x]=(ws[x]||0)+1;});
     const wt = Object.values(plan).length;
     const studyT = Object.entries(ws).filter(([x])=>x!=='휴식').reduce((a,[,v])=>a+v,0);
-    const sp = s.weeklySubjPlans||{};
-    // 현재 선택된 월/주차 라벨
-    const wy=ST.weekYear||new Date().getFullYear(), wm=ST.weekMonth||new Date().getMonth()+1, ww=ST.weekWeek||1;
-    const wLabel = getWeekLabel(wy,wm,ww);
-    const wKey = getWeekNum(wy,wm,ww);
     const achieve = (s.weeklyAchieve||{})[wKey]||{};
 
     // ── 1. 통계 요약 ──
@@ -5065,7 +5323,7 @@ function printTab(sid,tab){
     const bookEntries = Object.entries(sp)
       .filter(([,p])=>p?.subj && (p.books||[]).filter(Boolean).length > 0);
     // 시간표 셀 개별 교재도 수집
-    const bm = s.weeklyBookMap||{};
+    const bm = _printBm;
     const cellBookMap = {}; // 과목 → Set(교재)
     Object.entries(bm).forEach(([k,b])=>{
       const subj = plan[k];
@@ -5104,7 +5362,7 @@ function printTab(sid,tab){
       for(let h=minH; h<=maxH; h++) printH.push(h);
 
       body += `<h3>📋 주간 학습플랜</h3>
-      <div class="tt-wrap">
+      <div class="tt-wrap tt-page-safe">
         <table class="tt">
           <tr>
             <th style="width:28px;font-size:8px">시간</th>
@@ -5114,8 +5372,8 @@ function printTab(sid,tab){
             <td class="th-time">${h===0?"자정":h===1?"1시":h+"시"}</td>
             ${DAYS.map(d=>{
               const subj=plan[`${d}-${h}`];
-              const cellBook=(s.weeklyBookMap||{})[`${d}-${h}`]||
-                ((s.weeklySubjPlans||{})[subj]?.books||[]).filter(Boolean)[0]||'';
+              const cellBook=_printBm[`${d}-${h}`]||
+                (sp[subj]?.books||[]).filter(Boolean)[0]||'';
               const col=subj?(SC[subj]||'#3b5bdb'):null;
               const isSat=d==='토'||d==='일';
               if(!subj) return`<td style="${isSat?'background:#fff9f9':''}"></td>`;
@@ -5198,47 +5456,32 @@ function printTab(sid,tab){
       </div>`;
     }).join('');
 
-    // popPrint 대신 직접 팝업 생성 (공백 완전 제거)
-    const pop=window.open('','_blank','width=900,height=750,scrollbars=yes,resizable=yes');
-    if(!pop){alert('팝업을 허용해주세요.');return;}
-    pop.document.open();
-    pop.document.write(`<!DOCTYPE html><html lang="ko"><head>
-<meta charset="UTF-8">
-<title>${esc(s.name)} - 상담이력</title>
-<style>
-@page{size:210mm 297mm portrait;margin:15mm;}
-*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-body{margin:0;padding:0;background:#fff;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#0f172a;line-height:1.6;max-width:720px;margin:0 auto;}
-@media print{
-  @page{size:210mm 297mm portrait;margin:15mm;}
-  .np{display:none!important;}
-  .np-sp{display:none!important;}
-  body{margin:0!important;padding:0!important;}
-}
-.np{position:fixed;top:0;left:0;right:0;background:#fff;padding:7px 16px;display:flex;gap:8px;align-items:center;border-bottom:2px solid #e2e8f0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06);}
-</style>
-</head><body>
-<div class="np">
-  <span style="font-size:12px;font-weight:700;flex:1">${(()=>{let oN=ST.currentOrg?.name||'';if(!oN&&s?.orgId){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');oN=os.find(o=>String(o.id)===String(s.orgId))?.name||'';}catch(e){}}return oN?'<span style="font-size:10px;background:#eef1ff;color:#3b5bdb;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">🏫 '+esc(oN)+'</span>':'';})()} ${esc(s.name)} - 상담이력 (${consultList.length}건)</span>
-  <button onclick="window.print()" style="padding:6px 16px;background:#3b5bdb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>
-  <button onclick="window.close()" style="padding:6px 12px;background:#64748b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>
-</div>
-<div class="np-sp" style="height:44px"></div>
-<!-- 상단 헤더 (내신평균 없음) -->
-<div style="background:linear-gradient(135deg,#3b5bdb,#1d4ed8);color:#fff;padding:8px 14px;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-  <div>
-    <div style="font-size:8px;color:#93c5fd">${(()=>{const _sid=(ST.sel||ST.adminSel)?.orgId;if(!_sid)return '';let n=ST.currentOrg?.name||'';if(!n){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');n=os.find(o=>String(o.id)===String(_sid))?.name||'';}catch(e){}}return n?'<span style="background:rgba(255,255,255,.2);border-radius:5px;padding:1px 8px;font-size:9px;font-weight:700;margin-right:6px">🏫 '+n+'</span>':'';})()}}SG상담플랫폼 · 상담이력 · ${td()}</div>
-    <div style="font-size:15px;font-weight:900;margin:1px 0">${esc(s.name)} 상담이력</div>
-    <div style="font-size:10px;color:#bfdbfe">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
-  </div>
-</div>
-<div style="font-size:12px;font-weight:800;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin:0 0 10px;color:#1e3a8a">💬 상담 이력 (${consultList.length}건)</div>
-${cardsHtml}
-</body></html>`);
-    pop.document.close();
+    // popPrint로 통일
+    const consultBody = `<div class="info-box" style="margin-bottom:18px">
+      <div class="info-box-main">
+        <div class="info-box-name">${esc(s.name)} 상담이력</div>
+        <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
+        <div style="font-size:10px;color:#888;margin-top:6px">총 ${consultList.length}건</div>
+      </div>
+    </div>
+    <h3>💬 상담 이력 (${consultList.length}건)</h3>
+    ${cardsHtml}`;
+    popPrint(`${s.name} - 상담이력`, consultBody, {year: new Date().getFullYear(), month: new Date().getMonth()+1});
     return;
   }
-  popPrint(`${s.name} - ${({susi:'수시분석',weekly:'주간플랜',consult:'상담이력'}[tab]||tab)} 리포트`,body);
+  const _tabLabel = ({susi:'수시분석',weekly:'주간플랜',consult:'상담이력'}[tab]||tab);
+  const _tabOpts = tab==='weekly'
+    ? (()=>{
+        const _now2=new Date();
+        const _cy2=_now2.getFullYear(),_cm2=_now2.getMonth()+1;
+        const _cw2=getWeekOfMonth(_cy2,_cm2,_now2.getDate());
+        const _wy2=(ST.weekYear!=null&&ST.weekYear!==undefined)?ST.weekYear:_cy2;
+        const _wm2=(ST.weekMonth!=null&&ST.weekMonth!==undefined)?ST.weekMonth:_cm2;
+        const _ww2=(ST.weekWeek!=null&&ST.weekWeek!==undefined&&ST.weekWeek!==0)?ST.weekWeek:_cw2;
+        return {weekLabel:_wy2+'년 '+_wm2+'월 '+_ww2+'주차', year:_wy2, month:_wm2, week:_ww2};
+      })()
+    : {};
+  popPrint(`${s.name} - ${_tabLabel} 리포트`, body, _tabOpts);
 }
 
 // ══ 학생 등록/수정 폼 ══
@@ -6937,77 +7180,69 @@ function printTestResult(testId,studentId){
 <title>${esc(s.name)} - ${esc(t.title)} 결과지</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>
 <style>
-@page{size:210mm 297mm portrait;margin:12mm;}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap');
+@page{size:210mm 297mm portrait;margin:18mm 15mm 15mm 15mm;}
+@page :first{margin:0;}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 html{font-size:11px;}
-body{margin:0;padding:0;background:#fff;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#0f172a;line-height:1.6;width:186mm;max-width:186mm;}
+body{margin:0;padding:0;background:#fff;font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:11px;color:#1a1a1a;line-height:1.65;}
 @media print{
-  @page{size:210mm 297mm portrait;margin:12mm;}
+  @page{size:210mm 297mm portrait;margin:18mm 15mm 15mm 15mm;}
+  @page :first{margin:0;}
   .np,.np-spacer{display:none!important;}
-  html,body{width:186mm;max-width:186mm;}
-  .no-break{page-break-inside:avoid;}
+  .no-break{page-break-inside:avoid;break-inside:avoid;}
+  .print-cover{page-break-after:always;break-after:page;min-height:297mm;}
 }
-/* 상단 버튼바 */
-.np{position:fixed;top:0;left:0;right:0;background:#fff;padding:7px 16px;display:flex;gap:8px;align-items:center;border-bottom:2px solid #e2e8f0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06);}
-/* 헤더 배너 */
-.hdr{background:linear-gradient(135deg,#e53935,#b71c1c);color:#fff;padding:12px 16px;border-radius:10px;margin-bottom:12px;}
+.print-wrap{max-width:680px;margin:0 auto;padding:0 2px;}
+/* ── 표지 ── */
+.print-cover{width:210mm;min-height:297mm;margin:0;padding:0;background:#fff;display:flex;flex-direction:column;position:relative;}
+.cover-top-bar{padding:22mm 20mm 12px 20mm;border-bottom:1.5px solid #333;}
+.cover-date-range{font-size:11px;color:#555;font-weight:500;letter-spacing:0.3px;}
+.cover-body{flex:1;padding:0 20mm 20mm 20mm;display:flex;flex-direction:column;}
+.cover-title-area{margin-top:auto;text-align:right;padding-bottom:24px;padding-top:30mm;}
+.cover-year-month{font-size:52px;font-weight:700;color:#1a1a1a;letter-spacing:-1px;line-height:1.1;}
+.cover-report-en{font-size:38px;font-weight:700;color:#1a1a1a;letter-spacing:-0.5px;line-height:1.2;margin-bottom:20px;}
+.cover-report-detail{font-size:12px;color:#555;font-weight:500;line-height:1.9;}
+.cover-logo{text-align:center;margin-top:auto;padding-top:32px;}
+/* ── 페이지 헤더 ── */
+.print-page-header{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#999;border-bottom:1px solid #e0e0e0;padding-bottom:6px;margin-bottom:18px;}
+.pph-left{font-weight:700;color:#555;font-size:9px;}
+.pph-right{font-size:9px;color:#aaa;}
+/* ── 인포박스 ── */
+.info-box{background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;padding:14px 18px;margin-bottom:18px;}
+.info-box-name{font-size:18px;font-weight:800;color:#1a1a1a;letter-spacing:-0.5px;margin-bottom:3px;}
+.info-box-sub{font-size:11px;color:#666;}
+.info-box-stats{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+.info-stat-item{text-align:center;}
+.info-stat-v{font-size:16px;font-weight:900;color:#1a1a1a;}
+.info-stat-l{font-size:9px;color:#999;margin-top:1px;}
+/* ── 버튼바 ── */
+.np{position:fixed;top:0;left:0;right:0;background:#fff;padding:8px 16px;display:flex;gap:8px;align-items:center;border-bottom:1.5px solid #e0e0e0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+/* ── 헤더박스 ── */
+.hdr{background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;padding:14px 18px;margin-bottom:14px;}
 .hdr-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
-.hdr-info .name{font-size:17px;font-weight:900;margin-bottom:2px;}
-.hdr-info .sub{font-size:10px;color:#ffcdd2;}
-.score-badge{background:rgba(255,255,255,.2);border-radius:10px;padding:8px 16px;text-align:center;min-width:80px;}
+.hdr-info .name{font-size:17px;font-weight:800;color:#1a1a1a;margin-bottom:2px;}
+.hdr-info .sub{font-size:10px;color:#888;}
+.score-badge{background:#fff;border:1.5px solid #e0e0e0;border-radius:10px;padding:8px 16px;text-align:center;min-width:80px;}
 .score-badge .big{font-size:26px;font-weight:900;line-height:1;}
-.score-badge .sm{font-size:9px;color:#ffcdd2;margin-top:2px;}
+.score-badge .sm{font-size:9px;color:#999;margin-top:2px;}
 .hdr-chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-.hdr-chip{background:rgba(255,255,255,.15);border-radius:6px;padding:3px 10px;font-size:10px;}
-/* 단원 박스 */
+.hdr-chip{background:#f0f0f0;border-radius:6px;padding:3px 10px;font-size:10px;color:#555;}
+/* ── 단원 박스 ── */
 .unit-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
 .unit-box{border-radius:7px;padding:8px 10px;border-left:4px solid;}
-/* 문항 테이블 */
+/* ── 표/h3 ── */
 table{border-collapse:collapse;width:100%;font-size:10px;margin-bottom:10px;}
-th,td{border:1px solid #dde1f0;padding:4px 6px;}
-th{background:#f1f5f9;font-weight:700;text-align:center;}
-td{text-align:center;}
-h3{font-size:12px;font-weight:800;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin:12px 0 8px;color:#1e3a8a;}
-/* ━━━ 대시보드 그리드 ━━━ */
-.dashboard-container{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  grid-template-rows:1fr 1fr;
-  gap:10px;
-  width:186mm;
-  height:95mm;
-  margin-top:14px;
-  page-break-inside:avoid;
-}
-.dash-card{
-  background:#f8fafc;
-  border:1px solid #e2e8f0;
-  border-radius:9px;
-  padding:8px 10px;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-.dash-title{
-  font-size:10px;
-  font-weight:800;
-  color:#1e3a8a;
-  margin-bottom:5px;
-  display:flex;
-  align-items:center;
-  gap:4px;
-  flex-shrink:0;
-}
-.dash-canvas-wrap{
-  flex:1;
-  position:relative;
-  min-height:0;
-}
-.dash-canvas-wrap canvas{
-  width:100%!important;
-  height:100%!important;
-}
-/* 게이지 카드 내부 */
+th,td{border:1px solid #ddd;padding:5px 7px;}
+th{background:#f5f5f5;font-weight:700;text-align:center;color:#333;}
+td{text-align:center;color:#1a1a1a;}
+h3{font-size:12px;font-weight:800;border-bottom:1.5px solid #e0e0e0;padding-bottom:4px;margin:14px 0 8px;color:#1a1a1a;}
+/* ── 대시보드 ── */
+.dashboard-container{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;width:100%;height:95mm;margin-top:14px;page-break-inside:avoid;}
+.dash-card{background:#fafafa;border:1px solid #e8e8e8;border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;overflow:hidden;}
+.dash-title{font-size:10px;font-weight:800;color:#333;margin-bottom:5px;display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.dash-canvas-wrap{flex:1;position:relative;min-height:0;}
+.dash-canvas-wrap canvas{width:100%!important;height:100%!important;}
 .gauge-info{display:flex;align-items:center;gap:10px;height:100%;}
 .gauge-donut{position:relative;flex-shrink:0;width:70px;height:70px;}
 .gauge-donut canvas{width:70px!important;height:70px!important;}
@@ -7017,22 +7252,67 @@ h3{font-size:12px;font-weight:800;border-bottom:2px solid #e2e8f0;padding-bottom
 .gauge-bars{flex:1;min-width:0;}
 .g-bar-row{display:flex;align-items:center;gap:4px;margin-bottom:3px;}
 .g-bar-lbl{font-size:8px;color:#555;width:38px;overflow:hidden;white-space:nowrap;flex-shrink:0;}
-.g-bar-bg{flex:1;background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden;}
+.g-bar-bg{flex:1;background:#e8e8e8;height:6px;border-radius:3px;overflow:hidden;}
 .g-bar-fill{height:6px;border-radius:3px;}
 .g-bar-pct{font-size:8px;font-weight:700;width:24px;text-align:right;flex-shrink:0;}
 </style></head><body>
 <div class="np">
-  <span style="font-size:12px;font-weight:700;flex:1">${(()=>{let oN=ST.currentOrg?.name||'';if(!oN&&s?.orgId){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');oN=os.find(o=>String(o.id)===String(s.orgId))?.name||'';}catch(e){}}return oN?'<span style="font-size:10px;background:#eef1ff;color:#3b5bdb;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">🏫 '+esc(oN)+'</span>':'';})()} ${esc(s.name)} - ${esc(t.title)} 결과지</span>
-  <button onclick="window.print()" style="padding:6px 16px;background:#3b5bdb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>
-  <button onclick="window.close()" style="padding:6px 12px;background:#64748b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>
+  <span style="font-size:12px;font-weight:700;flex:1;color:#1a1a1a">${(()=>{let oN=ST.currentOrg?.name||'';if(!oN&&s?.orgId){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');oN=os.find(o=>String(o.id)===String(s.orgId))?.name||'';}catch(e){}}return oN?'<span style="font-size:10px;background:#f0f0f0;color:#333;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">'+esc(oN)+'</span>':'';})()} ${esc(s.name)} · ${esc(t.title)} 결과지</span>
+  <button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>
+  <button onclick="window.close()" style="padding:7px 14px;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>
 </div>
-<div class="np-spacer" style="height:44px"></div>
+<div class="np-spacer" style="height:46px"></div>
+
+<!-- 표지 -->
+${(()=>{
+  const _cNow=new Date();
+  // 테스트 날짜 기준으로 dateRange 설정
+  const _tDateStr=t.date||'';
+  const _tDateParts=_tDateStr.split('-');
+  const _cy=_tDateParts[0]?+_tDateParts[0]:_cNow.getFullYear();
+  const _cm=_tDateParts[1]?+_tDateParts[1]:_cNow.getMonth()+1;
+  const _df=_cy+'.'+String(_cm).padStart(2,'0')+'.01';
+  const _ld=new Date(_cy,_cm,0).getDate();
+  const _dt=_cy+'.'+String(_cm).padStart(2,'0')+'.'+String(_ld).padStart(2,'0');
+  const _dr=_df+' - '+_dt;
+  let _orgN=ST.currentOrg?.name||'';
+  if(!_orgN&&(s?.orgId||(ST.sel||ST.adminSel)?.orgId)){
+    try{const _os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');const _oid=s?.orgId||(ST.sel||ST.adminSel)?.orgId;_orgN=_os.find(o=>String(o.id)===String(_oid))?.name||'';}catch(e){}
+  }
+  const _logoSvg='<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="10" fill="#6b1d1d"/><polygon points="24,10 42,20 24,26 6,20" fill="#fff" opacity="0.95"/><rect x="20" y="26" width="8" height="10" rx="2" fill="#fff" opacity="0.85"/><rect x="38" y="20" width="3" height="10" rx="1.5" fill="#fff" opacity="0.7"/><circle cx="39.5" cy="31" r="2" fill="#fff" opacity="0.7"/></svg>';
+  return '<div class="print-cover">'
+    +'<div class="cover-top-bar"><div class="cover-date-range">'+_dr+'</div></div>'
+    +'<div class="cover-body">'
+    +'<div class="cover-title-area">'
+    +'<div class="cover-year-month">'+_cy+'.'+String(_cm).padStart(2,'0')+'</div>'
+    +'<div class="cover-report-en">Test Report</div>'
+    +'<div class="cover-report-detail">'
+    +_cy+'년 '+_cm+'월 테스트 리포트<br>'
+    +esc(s.school)+' '+esc(s.grade)+' '+esc(s.name)+' 학생<br>'
+    +esc(t.subject||'')+' · '+esc(t.title||'')
+    +'</div>'
+    +'</div>'
+    +'<div class="cover-logo"><div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px">'
+    +_logoSvg
+    +'<div style="font-size:13px;font-weight:800;color:#6b1d1d;letter-spacing:1px">'+(_orgN?esc(_orgN):'SG상담플랫폼')+'</div>'
+    +'<div style="font-size:9px;color:#999;letter-spacing:0.5px">SG 상담플랫폼</div>'
+    +'</div></div>'
+    +'</div>'
+    +'</div>';
+})()}
+
+<!-- 본문 -->
+<div class="print-wrap">
+<div class="print-page-header">
+  <span class="pph-left">${esc(s.name)} · ${esc(t.title)} 결과지</span>
+  <span class="pph-right">${(()=>{const _n=new Date();return _n.getFullYear()+'.'+String(_n.getMonth()+1).padStart(2,'0')+'.'+String(_n.getDate()).padStart(2,'0');})()} · ${esc(s.name)}</span>
+</div>
 
 <!-- ① 헤더 -->
 <div class="hdr no-break">
   <div class="hdr-row">
     <div class="hdr-info">
-      <div style="font-size:9px;color:#ffcdd2;margin-bottom:2px">${(()=>{const _sid=(ST.sel||ST.adminSel)?.orgId;if(!_sid)return '';let n=ST.currentOrg?.name||'';if(!n){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');n=os.find(o=>String(o.id)===String(_sid))?.name||'';}catch(e){}}return n?'<span style="background:rgba(255,255,255,.2);border-radius:5px;padding:1px 8px;font-size:9px;font-weight:700;margin-right:6px">🏫 '+n+'</span>':'';})()}}테스트 결과지 · SG상담플랫폼 · ${td()}</div>
+      <div style="font-size:9px;color:#888;margin-bottom:2px">테스트 결과지 · SG상담플랫폼</div>
       <div class="name">${esc(s.name)} · ${esc(t.title)}</div>
       <div class="sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
       <div class="hdr-chips">
@@ -7241,6 +7521,7 @@ setTimeout(function(){
   });
 }, 500);
 <\/script>
+</div><!-- /print-wrap -->
 </body></html>`);
   pop.document.close();
 }
@@ -7367,10 +7648,12 @@ async function printItemAnalysis(testId){
     +'</head><body>'
     +_testPrintNavBar(esc(t.title)+' 문항분석표', (ST.sel||ST.adminSel)?.orgId)
     +'<div class="np-spacer"></div>'
-    +'<div class="hdr" style="background:linear-gradient(135deg,#0891b2,#0e7490)">'
-    +(()=>{let n=ST.currentOrg?.name||'';if(!n){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');const sid=(ST.sel||ST.adminSel)?.orgId;if(sid)n=os.find(o=>String(o.id)===String(sid))?.name||'';}catch(e){}}return '<div style="font-size:8px;color:#a5f3fc;margin-bottom:2px">'+(n?'<span style="background:rgba(255,255,255,.2);border-radius:5px;padding:1px 8px;font-size:9px;font-weight:700;margin-right:6px">🏫 '+n+'</span>':'')+"문항분석표 · SG상담플랫폼 · ";})()+td()+'</div>'
-    +'<div style="font-size:15px;font-weight:900;margin-bottom:1px">'+esc(t.title)+'</div>'
-    +'<div style="font-size:10px;color:#cffafe">'+esc(t.subject||'')+' · '+esc(t.date||'')+' · 응시 '+totalStudents+'명 · 만점 '+maxScore+'점</div>'
+    +_testPrintCover(esc(t.title)+' 문항분석표', esc(t.subject||'')+' · '+esc(t.date||'')+' · 응시 '+totalStudents+'명', (ST.sel||ST.adminSel)?.orgId, t.date)
+    +'<div class="print-wrap">'
+    +_testPrintPageHeader(esc(t.title)+' 문항분석표', (ST.sel||ST.adminSel)?.orgId)
+    +'<div class="info-box">'
+    +'<div class="info-box-name">'+esc(t.title)+'</div>'
+    +'<div class="info-box-sub">'+esc(t.subject||'')+' · '+esc(t.date||'')+' · 응시 '+totalStudents+'명 · 만점 '+maxScore+'점</div>'
     +'</div>'
     +'<div class="stat-grid">'
     +'<div class="stat-box"><div class="stat-v" style="color:#3b5bdb">'+avgScore.toFixed(1)+'점</div><div class="stat-l">평균점수</div></div>'
@@ -7409,46 +7692,115 @@ async function printItemAnalysis(testId){
     +'else{window.addEventListener("load",function(){setTimeout(go,300);});}'
     +'})();'
     +'<\/script>'
+    +'</div><!-- /print-wrap -->'
     +'</body></html>'
   );
   pop.document.close();
 }
 // ── 테스트 인쇄 공통 CSS ──
 function _testPrintCSS(){return `<style>
-@page{size:210mm 297mm portrait;margin:12mm;}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap');
+@page{size:210mm 297mm portrait;margin:18mm 15mm 15mm 15mm;}
+@page :first{margin:0;}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-body{margin:0;padding:0;background:#fff;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#0f172a;line-height:1.6;max-width:720px;margin:0 auto;}
-@media print{.np,.np-spacer{display:none!important;}.no-break{page-break-inside:avoid;break-inside:avoid;}.graph-section{page-break-before:always;break-before:page;}.dash-grid{page-break-inside:avoid;break-inside:avoid;}}
-.np{position:fixed;top:0;left:0;right:0;background:#fff;padding:7px 16px;display:flex;gap:8px;align-items:center;border-bottom:2px solid #e2e8f0;z-index:100;}
-.np-spacer{height:42px;}
-.hdr{color:#fff;padding:10px 16px;border-radius:8px;margin-bottom:10px;}
+body{margin:0;padding:0;background:#fff;font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:11px;color:#1a1a1a;line-height:1.65;max-width:720px;margin:0 auto;}
+@media print{
+  @page{size:210mm 297mm portrait;margin:18mm 15mm 15mm 15mm;}
+  @page :first{margin:0;}
+  .np,.np-spacer{display:none!important;}
+  .no-break{page-break-inside:avoid;break-inside:avoid;}
+  .graph-section{page-break-before:always;break-before:page;}
+  .dash-grid{page-break-inside:avoid;break-inside:avoid;}
+  .print-cover{page-break-after:always;break-after:page;min-height:297mm;}
+}
+.np{position:fixed;top:0;left:0;right:0;background:#fff;padding:8px 16px;display:flex;gap:8px;align-items:center;border-bottom:1.5px solid #e0e0e0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.np-spacer{height:46px;}
+/* 표지 */
+.print-cover{width:210mm;min-height:297mm;padding:0;background:#fff;display:flex;flex-direction:column;box-sizing:border-box;}
+.cover-top-bar{padding:22mm 20mm 12px 20mm;border-bottom:1.5px solid #333;}
+.cover-date-range{font-size:11px;color:#555;font-weight:500;letter-spacing:0.3px;}
+.cover-body{flex:1;padding:0 20mm 20mm 20mm;display:flex;flex-direction:column;}
+.cover-title-area{margin-top:auto;text-align:right;padding-bottom:24px;}
+.cover-year-month{font-size:52px;font-weight:700;color:#1a1a1a;letter-spacing:-1px;line-height:1.1;}
+.cover-report-en{font-size:38px;font-weight:700;color:#1a1a1a;letter-spacing:-0.5px;line-height:1.2;margin-bottom:20px;}
+.cover-report-detail{font-size:12px;color:#555;font-weight:500;line-height:1.9;}
+.cover-logo{text-align:center;padding-top:32px;margin-top:auto;}
+/* 페이지 헤더 */
+.print-page-header{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#999;border-bottom:1px solid #e0e0e0;padding-bottom:6px;margin-bottom:18px;}
+.pph-left{font-weight:700;color:#555;font-size:9px;}
+/* 인포박스 */
+.info-box{background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;padding:14px 18px;margin-bottom:14px;}
+.info-box-name{font-size:16px;font-weight:800;color:#1a1a1a;margin-bottom:3px;}
+.info-box-sub{font-size:11px;color:#666;}
+/* 기존 헤더 박스 - 테스트용 */
+.hdr{background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;padding:12px 16px;margin-bottom:10px;}
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
-.stat-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center;}
-.stat-v{font-size:16px;font-weight:900;}
-.stat-l{font-size:9px;color:#64748b;margin-top:1px;}
+.stat-box{background:#fafafa;border:1px solid #e8e8e8;border-radius:7px;padding:8px;text-align:center;}
+.stat-v{font-size:16px;font-weight:900;color:#1a1a1a;}
+.stat-l{font-size:9px;color:#888;margin-top:1px;}
 .dash-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:210px 210px;gap:12px;margin:10px 0 14px;page-break-inside:avoid;break-inside:avoid;}
-.dash-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;height:210px;overflow:hidden;page-break-inside:avoid;break-inside:avoid;}
-.dash-title{font-size:10px;font-weight:800;color:#1e3a8a;margin-bottom:5px;flex-shrink:0;}
+.dash-card{background:#fafafa;border:1px solid #e8e8e8;border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;height:210px;overflow:hidden;page-break-inside:avoid;break-inside:avoid;}
+.dash-title{font-size:10px;font-weight:800;color:#333;margin-bottom:5px;flex-shrink:0;}
 .dash-canvas-wrap{position:relative;flex:1;min-height:150px;}
 .dash-canvas-wrap canvas{position:absolute!important;top:0;left:0;width:100%!important;height:100%!important;}
-h3{font-size:12px;font-weight:800;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin:12px 0 8px;color:#1e3a8a;page-break-after:avoid;}
+h3{font-size:12px;font-weight:800;border-bottom:1.5px solid #e0e0e0;padding-bottom:4px;margin:14px 0 8px;color:#1a1a1a;page-break-after:avoid;}
 table{border-collapse:collapse;width:100%;font-size:10px;margin-bottom:10px;page-break-inside:auto;}
-th,td{border:1px solid #dde1f0;padding:4px 6px;}
-th{background:#f1f5f9;font-weight:700;text-align:center;}
-td{text-align:center;}
+th,td{border:1px solid #ddd;padding:4px 7px;}
+th{background:#f5f5f5;font-weight:700;text-align:center;color:#333;}
+td{text-align:center;color:#1a1a1a;}
 </style>`;}
 function _testPrintNavBar(title, orgId){
-  // 기관명: 파라미터 orgId > 현재 로그인 기관 > 선택 학생 기관
   let orgN=ST.currentOrg?.name||'';
   const resolveId = orgId || ST.sel?.orgId || ST.adminSel?.orgId;
   if(!orgN && resolveId){
     try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');orgN=os.find(o=>String(o.id)===String(resolveId))?.name||'';}catch(e){}
   }
-  const orgBadge=orgN?'<span style="font-size:10px;background:#eef1ff;color:#3b5bdb;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">🏫 '+esc(orgN)+'</span>':'';
+  const orgBadge=orgN?'<span style="font-size:10px;background:#f0f0f0;color:#333;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">'+esc(orgN)+'</span>':'';
   return '<div class="np">'
-    +'<span style="font-size:12px;font-weight:700;flex:1">'+orgBadge+title+'</span>'
-    +'<button onclick="window.print()" style="padding:6px 16px;background:#3b5bdb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>'
-    +'<button onclick="window.close()" style="padding:6px 12px;background:#64748b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>'
+    +'<span style="font-size:12px;font-weight:700;flex:1;color:#1a1a1a">'+orgBadge+title+'</span>'
+    +'<button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>'
+    +'<button onclick="window.close()" style="padding:7px 14px;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>'
+    +'</div>';
+}
+// 테스트 인쇄용 표지 HTML 생성
+function _testPrintCover(title, subtitle, orgId, testDateStr){
+  const _cNow=new Date();
+  const _tdp=(testDateStr||'').split('-');
+  const _cy=_tdp[0]?+_tdp[0]:_cNow.getFullYear(), _cm=_tdp[1]?+_tdp[1]:_cNow.getMonth()+1;
+  const _df=_cy+'.'+String(_cm).padStart(2,'0')+'.01';
+  const _ld=new Date(_cy,_cm,0).getDate();
+  const _dt=_cy+'.'+String(_cm).padStart(2,'0')+'.'+String(_ld).padStart(2,'0');
+  const _dr=_df+' - '+_dt;
+  let _orgN=ST.currentOrg?.name||'';
+  const _resolveId=orgId||ST.sel?.orgId||ST.adminSel?.orgId;
+  if(!_orgN&&_resolveId){try{const _os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');_orgN=_os.find(o=>String(o.id)===String(_resolveId))?.name||'';}catch(e){}}
+  const _logoSvg='<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="10" fill="#6b1d1d"/><polygon points="24,10 42,20 24,26 6,20" fill="#fff" opacity="0.95"/><rect x="20" y="26" width="8" height="10" rx="2" fill="#fff" opacity="0.85"/><rect x="38" y="20" width="3" height="10" rx="1.5" fill="#fff" opacity="0.7"/><circle cx="39.5" cy="31" r="2" fill="#fff" opacity="0.7"/></svg>';
+  return '<div class="print-cover">'
+    +'<div class="cover-top-bar"><div class="cover-date-range">'+_dr+'</div></div>'
+    +'<div class="cover-body">'
+    +'<div class="cover-title-area">'
+    +'<div class="cover-year-month">'+_cy+'.'+String(_cm).padStart(2,'0')+'</div>'
+    +'<div class="cover-report-en">Test Report</div>'
+    +'<div class="cover-report-detail">'+_cy+'년 '+_cm+'월 보고서<br>'+esc(title)+(subtitle?'<br>'+esc(subtitle):'')+'</div>'
+    +'</div>'
+    +'<div class="cover-logo"><div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px">'
+    +_logoSvg
+    +'<div style="font-size:13px;font-weight:800;color:#6b1d1d;letter-spacing:1px">'+(_orgN?esc(_orgN):'SG상담플랫폼')+'</div>'
+    +'<div style="font-size:9px;color:#999;letter-spacing:0.5px">SG 상담플랫폼</div>'
+    +'</div></div>'
+    +'</div>'
+    +'</div>';
+}
+// 테스트 인쇄용 페이지 헤더
+function _testPrintPageHeader(title, orgId){
+  let _orgN=ST.currentOrg?.name||'';
+  const _resolveId=orgId||ST.sel?.orgId||ST.adminSel?.orgId;
+  if(!_orgN&&_resolveId){try{const _os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');_orgN=_os.find(o=>String(o.id)===String(_resolveId))?.name||'';}catch(e){}}
+  const _n=new Date();
+  const _dr=_n.getFullYear()+'.'+String(_n.getMonth()+1).padStart(2,'0')+'.'+String(_n.getDate()).padStart(2,'0');
+  return '<div class="print-page-header">'
+    +'<span class="pph-left">'+(_orgN?esc(_orgN)+' · ':'')+esc(title)+'</span>'
+    +'<span class="pph-right">'+_dr+'</span>'
     +'</div>';
 }
 
@@ -7489,10 +7841,12 @@ ${_testPrintCSS()}
 </head><body>
 ${_testPrintNavBar(esc(t.title)+' 집계', (ST.sel||ST.adminSel)?.orgId)}
 <div class="np-spacer"></div>
-<div class="hdr" style="background:linear-gradient(135deg,#e53935,#c62828)">
-  <div style="font-size:8px;color:#ffcdd2;margin-bottom:2px">${(()=>{const _sid=(ST.sel||ST.adminSel)?.orgId;if(!_sid)return '';let n=ST.currentOrg?.name||'';if(!n){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');n=os.find(o=>String(o.id)===String(_sid))?.name||'';}catch(e){}}return n?'<span style="background:rgba(255,255,255,.2);border-radius:5px;padding:1px 8px;font-size:9px;font-weight:700;margin-right:6px">🏫 '+n+'</span>':'';})()}}테스트 집계 · SG상담플랫폼 · ${td()}</div>
-  <div style="font-size:15px;font-weight:900;margin-bottom:1px">${esc(t.title)}</div>
-  <div style="font-size:10px;color:#ffcdd2">${esc(t.subject)} · ${esc(t.date)}${t.timeSlot?' '+t.timeSlot:''} · ${t.questions.length}문항 · 만점 ${totalScore}점 · ${results.length}명 응시</div>
+${_testPrintCover(esc(t.title)+' 집계', esc(t.subject||'')+' · '+esc(t.date||'')+' · '+results.length+'명 응시', (ST.sel||ST.adminSel)?.orgId, t.date)}
+<div class="print-wrap">
+${_testPrintPageHeader(esc(t.title)+' 집계', (ST.sel||ST.adminSel)?.orgId)}
+<div class="info-box">
+  <div class="info-box-name">${esc(t.title)}</div>
+  <div class="info-box-sub">${esc(t.subject)} · ${esc(t.date)}${t.timeSlot?' '+t.timeSlot:''} · ${t.questions.length}문항 · 만점 ${totalScore}점 · ${results.length}명 응시</div>
 </div>
 <div class="stat-grid">
   <div class="stat-box"><div class="stat-v" style="color:#e53935">${results.length}명</div><div class="stat-l">응시</div></div>
@@ -7552,6 +7906,7 @@ ${t.questions.map(q=>{
   if(document.readyState==='complete'){setTimeout(go,300);}else{window.addEventListener('load',function(){setTimeout(go,300);});}
 })();
 <\/script>
+</div><!-- /print-wrap -->
 </body></html>`);
   pop.document.close();
 }
@@ -7592,15 +7947,17 @@ ${_testPrintCSS()}
 </head><body>
 ${_testPrintNavBar('테스트 전체 현황', (ST.sel||ST.adminSel)?.orgId)}
 <div class="np-spacer"></div>
-<div class="hdr" style="background:linear-gradient(135deg,#e53935,#c62828)">
-  <div style="font-size:8px;color:#ffcdd2;margin-bottom:2px">${(()=>{const _sid=(ST.sel||ST.adminSel)?.orgId;if(!_sid)return '';let n=ST.currentOrg?.name||'';if(!n){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');n=os.find(o=>String(o.id)===String(_sid))?.name||'';}catch(e){}}return n?'<span style="background:rgba(255,255,255,.2);border-radius:5px;padding:1px 8px;font-size:9px;font-weight:700;margin-right:6px">🏫 '+n+'</span>':'';})()}}전체 테스트 현황 · SG상담플랫폼 · ${td()}</div>
-  <div style="font-size:15px;font-weight:900;margin-bottom:1px">테스트 현황${filterM?' · '+filterM.replace('-','년 ')+'월':''}${filterCls?' · '+filterCls:''}</div>
-  <div style="font-size:10px;color:#ffcdd2">총 ${tests.length}개 테스트</div>
+${_testPrintCover('테스트 전체 현황', '총 '+tests.length+'개 테스트'+(filterM?' · '+filterM.replace('-','년 ')+'월':'')+(filterCls?' · '+filterCls:''), (ST.sel||ST.adminSel)?.orgId)}
+<div class="print-wrap">
+${_testPrintPageHeader('테스트 전체 현황', (ST.sel||ST.adminSel)?.orgId)}
+<div class="info-box">
+  <div class="info-box-name">테스트 현황${filterM?' · '+filterM.replace('-','년 ')+'월':''}${filterCls?' · '+filterCls:''}</div>
+  <div class="info-box-sub">총 ${tests.length}개 테스트</div>
 </div>
 ${testStats.map(({t,mx,rList,avg})=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden;page-break-inside:avoid">
-  <div style="background:linear-gradient(90deg,#e53935,#ef5350);color:#fff;padding:7px 12px;display:flex;align-items:center;justify-content:space-between">
-    <div><span style="font-size:13px;font-weight:800">${esc(t.title)}</span><span style="font-size:9px;color:#ffcdd2;margin-left:8px">${esc(t.subject)} · ${esc(t.date)}</span></div>
-    <div style="font-size:10px;color:#ffcdd2">${t.questions.length}문항 · 만점 ${mx}점 · 평균 ${avg}점 · ${rList.length}명</div>
+  <div style="background:#f5f5f5;border-bottom:1px solid #e0e0e0;padding:7px 12px;display:flex;align-items:center;justify-content:space-between">
+    <div><span style="font-size:13px;font-weight:800;color:#1a1a1a">${esc(t.title)}</span><span style="font-size:9px;color:#888;margin-left:8px">${esc(t.subject)} · ${esc(t.date)}</span></div>
+    <div style="font-size:10px;color:#888">${t.questions.length}문항 · 만점 ${mx}점 · 평균 ${avg}점 · ${rList.length}명</div>
   </div>
   <div style="padding:8px 10px">${rList.length?`<table style="margin-bottom:0"><tr><th style="width:28px">순위</th><th>이름</th><th>반</th><th style="width:50px">점수</th><th style="width:44px">정답률</th></tr>${rList.map((r,i)=>`<tr><td style="font-weight:700;color:${i===0?'#f59e0b':i===1?'#888':'#555'}">${i+1}</td><td style="font-weight:600">${esc(r.name)}</td><td style="font-size:10px">${esc(r.cls)}</td><td style="font-weight:700;color:${r.pct>=80?'#0f9d58':r.pct>=60?'#f59e0b':'#e53935'}">${r.sc}점</td><td>${r.pct}%</td></tr>`).join('')}</table>`:'<div style="font-size:10px;color:#aaa;padding:4px 0">답안 미입력</div>'}</div>
 </div>`).join('')}
@@ -7634,6 +7991,7 @@ ${testStats.map(({t,mx,rList,avg})=>`<div style="background:#f8fafc;border:1px s
   if(document.readyState==='complete'){setTimeout(go,300);}else{window.addEventListener('load',function(){setTimeout(go,300);});}
 })();
 <\/script>
+</div><!-- /print-wrap -->
 </body></html>`);
   pop.document.close();
 }
