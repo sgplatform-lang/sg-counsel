@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-   <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2569,15 +2542,15 @@ function printSusiReport(sid){
 // 2025학년도 수능 기준 변환 파라미터 (과목별 평균·표준편차)
 const CSAT_PARAMS = {
   '국어': {
-    '화법과작문': {mean:64.34, sd:18.7, maxRaw:100, maxStd:150},
-    '언어와매체': {mean:67.89, sd:17.2, maxRaw:100, maxStd:150},
-    '_default':  {mean:65.0,  sd:18.0, maxRaw:100, maxStd:150},
+    '화법과작문': {mean:63.06, sd:19.10, maxRaw:100, maxStd:150},
+    '언어와매체':  {mean:67.95, sd:16.32, maxRaw:100, maxStd:150},
+    '_default':   {mean:64.0,  sd:18.5,  maxRaw:100, maxStd:150},
   },
   '수학': {
-    '확률과통계': {mean:54.20, sd:19.3, maxRaw:100, maxStd:150},
-    '미적분':     {mean:58.40, sd:21.0, maxRaw:100, maxStd:150},
-    '기하':       {mean:55.80, sd:20.2, maxRaw:100, maxStd:150},
-    '_default':   {mean:56.0,  sd:20.0, maxRaw:100, maxStd:150},
+    '확률과통계': {mean:53.37, sd:19.35, maxRaw:100, maxStd:150},
+    '미적분':     {mean:61.18, sd:21.30, maxRaw:100, maxStd:150},
+    '기하':       {mean:55.93, sd:20.44, maxRaw:100, maxStd:150},
+    '_default':   {mean:56.0,  sd:20.0,  maxRaw:100, maxStd:150},
   },
   '탐구': {
     '생활과윤리':   {mean:28.10, sd:8.9,  maxRaw:50, maxStd:100},
@@ -2603,6 +2576,133 @@ const CSAT_PARAMS = {
     '_default': {mean:35.0, sd:8.0, maxRaw:50, maxStd:null},
   },
 };
+
+
+// ── 2025학년도 수능 탐구 원점수→표준점수 실제 변환표 (평가원 공식 데이터) ──
+const TANKU_STD_2025 = {
+  '생활과윤리': {50:68,49:67,48:66,47:64,46:63,45:62,44:61,43:59,42:58,41:57,40:55,39:54,38:53,37:51,36:50,35:49,34:47,33:46,32:45,31:43,30:42,29:41,28:39,27:38,26:37,25:35,24:34,23:32,22:31,21:30,20:28},
+  '윤리와사상': {50:69,49:67,48:66,47:65,46:63,45:62,44:61,43:59,42:58,41:57,40:55,39:54,38:53,37:51,36:50,35:49,34:47,33:46,32:45,31:43,30:42,29:41,28:39,27:38,26:37,25:35,24:34,23:32,22:31,21:30,20:28},
+  '한국지리':   {50:70,49:68,48:67,47:65,46:64,45:63,44:61,43:60,42:58,41:57,40:56,39:54,38:53,37:51,36:50,35:49,34:47,33:46,32:44,31:43,30:42,29:40,28:39,27:37,26:36,25:35,24:33,23:32,22:30,21:29,20:27},
+  '세계지리':   {50:70,49:68,48:67,47:66,46:64,45:63,44:62,43:60,42:59,41:57,40:56,39:55,38:53,37:52,36:50,35:49,34:48,33:46,32:45,31:43,30:42,29:41,28:39,27:38,26:36,25:35,24:33,23:32,22:30,21:29,20:27},
+  '동아시아사': {50:69,49:67,48:66,47:65,46:63,45:62,44:61,43:59,42:58,41:56,40:55,39:54,38:52,37:51,36:49,35:48,34:47,33:45,32:44,31:42,30:41,29:40,28:38,27:37,26:35,25:34,24:32,23:31,22:29,21:28,20:26},
+  '세계사':     {50:70,49:68,48:67,47:65,46:64,45:63,44:61,43:60,42:58,41:57,40:56,39:54,38:53,37:51,36:50,35:49,34:47,33:46,32:44,31:43,30:42,29:40,28:39,27:37,26:36,25:35,24:33,23:32,22:30,21:29,20:27},
+  '경제':       {50:74,49:72,48:70,47:68,46:66,45:64,44:62,43:61,42:59,41:57,40:55,39:53,38:51,37:49,36:47,35:46,34:44,33:42,32:40,31:38,30:36,29:35,28:33,27:31,26:29,25:27,24:25,23:23,22:21,21:20,20:18},
+  '정치와법':   {50:71,49:69,48:68,47:66,46:65,45:63,44:62,43:60,42:59,41:57,40:56,39:54,38:53,37:51,36:50,35:48,34:47,33:45,32:44,31:42,30:41,29:39,28:38,27:36,26:35,25:33,24:32,23:30,22:29,21:27,20:26},
+  '사회문화':   {50:71,49:69,48:68,47:66,46:65,45:63,44:62,43:60,42:59,41:57,40:55,39:54,38:52,37:51,36:49,35:48,34:46,33:45,32:43,31:41,30:40,29:38,28:37,27:35,26:34,25:32,24:31,23:29,22:28,21:26,20:24},
+  '물리학Ⅰ':   {50:71,49:69,48:66,47:64,46:62,45:60,44:58,43:56,42:54,41:52,40:50,39:48,38:46,37:44,36:42,35:40,34:38,33:36,32:35,31:33,30:31,29:29,28:27,27:25,26:23,25:21,24:19,23:17,22:15,21:13,20:11},
+  '화학Ⅰ':     {50:75,49:72,48:70,47:67,46:65,45:63,44:60,43:58,42:56,41:53,40:51,39:49,38:46,37:44,36:41,35:39,34:37,33:34,32:32,31:30,30:27,29:25,28:23,27:20,26:18,25:16,24:13,23:11,22:8,21:6,20:4},
+  '생명과학Ⅰ': {50:68,49:66,48:64,47:62,46:60,45:59,44:57,43:55,42:53,41:51,40:50,39:48,38:46,37:44,36:42,35:41,34:39,33:37,32:35,31:33,30:32,29:30,28:28,27:26,26:24,25:23,24:21,23:19,22:17,21:15,20:14},
+  '지구과학Ⅰ': {50:70,49:68,48:66,47:64,46:62,45:61,44:59,43:57,42:55,41:53,40:52,39:50,38:48,37:46,36:45,35:43,34:41,33:39,32:37,31:36,30:34,29:32,28:30,27:28,26:27,25:25,24:23,23:21,22:19,21:18,20:16},
+  '물리학Ⅱ':   {50:75,49:72,48:70,47:67,46:65,45:62,44:60,43:57,42:55,41:52,40:50,39:47,38:45,37:42,36:40,35:37,34:35,33:32,32:30,31:27,30:25,29:22,28:20,27:17,26:15,25:12,24:10,23:7,22:5,21:4,20:2},
+  '화학Ⅱ':     {50:76,49:73,48:71,47:68,46:65,45:63,44:60,43:57,42:55,41:52,40:49,39:47,38:44,37:42,36:39,35:36,34:34,33:31,32:28,31:26,30:23,29:21,28:18,27:15,26:13,25:10,24:8,23:5,22:3,21:2,20:1},
+  '생명과학Ⅱ': {50:74,49:71,48:69,47:66,46:64,45:61,44:59,43:56,42:54,41:51,40:49,39:46,38:44,37:41,36:39,35:36,34:34,33:31,32:29,31:26,30:24,29:21,28:19,27:16,26:14,25:11,24:9,23:6,22:4,21:3,20:1},
+  '지구과학Ⅱ': {50:75,49:72,48:70,47:67,46:65,45:62,44:60,43:57,42:55,41:52,40:50,39:47,38:45,37:42,36:40,35:37,34:35,33:32,32:30,31:27,30:25,29:22,28:20,27:17,26:15,25:12,24:10,23:7,22:5,21:4,20:2},
+};
+
+// 탐구 표준점수→백분위 변환표 (2025학년도 수능 평가원 공식)
+const TANKU_PCT_2025 = {
+  '생활과윤리': {68:99,67:98,66:97,65:96,64:95,63:94,62:93,61:91,60:88,59:86,58:83,57:80,56:76,55:72,54:68,53:64,52:60,51:56,50:51,49:47,48:43,47:39,46:35,45:31,44:27,43:23,42:19,41:16,40:13,39:10,38:8,37:6,36:5,35:4},
+  '윤리와사상': {69:99,68:98,67:97,66:96,65:95,64:93,63:91,62:88,61:85,60:82,59:79,58:75,57:71,56:67,55:63,54:58,53:54,52:50,51:46,50:42,49:38,48:34,47:30,46:26,45:23,44:19,43:16,42:13,41:10,40:8,39:6,38:5,37:4},
+  '한국지리':   {70:99,69:99,68:98,67:96,66:95,65:93,64:91,63:89,62:86,61:84,60:81,59:78,58:74,57:70,56:66,55:62,54:58,53:54,52:50,51:46,50:42,49:38,48:34,47:30,46:26,45:23,44:19,43:16,42:13,41:10,40:8,39:6,38:5},
+  '세계지리':   {70:99,69:99,68:98,67:97,66:95,65:93,64:91,63:89,62:86,61:83,60:80,59:77,58:73,57:69,56:65,55:61,54:57,53:53,52:48,51:44,50:40,49:36,48:32,47:28,46:24,45:21,44:17,43:14,42:11,41:9,40:7,39:5},
+  '동아시아사': {69:99,68:98,67:97,66:96,65:94,64:92,63:90,62:87,61:84,60:80,59:77,58:73,57:69,56:65,55:61,54:56,53:52,52:48,51:44,50:40,49:36,48:32,47:28,46:24,45:21,44:17,43:14,42:11,41:9,40:7,39:5},
+  '세계사':     {70:99,69:99,68:98,67:97,66:95,65:93,64:91,63:89,62:86,61:83,60:80,59:76,58:72,57:68,56:64,55:60,54:56,53:52,52:47,51:43,50:39,49:35,48:31,47:27,46:23,45:20,44:16,43:13,42:10,41:8,40:6,39:5},
+  '경제':       {74:99,73:99,72:99,71:98,70:97,69:96,68:95,67:94,66:92,65:90,64:88,63:85,62:82,61:79,60:76,59:72,58:68,57:64,56:59,55:55,54:51,53:47,52:42,51:38,50:34,49:30,48:26,47:23,46:19,45:16,44:13,43:10,42:8,41:6,40:5},
+  '정치와법':   {71:99,70:99,69:98,68:97,67:96,66:95,65:93,64:91,63:89,62:86,61:83,60:80,59:77,58:73,57:69,56:65,55:61,54:57,53:52,52:48,51:44,50:40,49:36,48:32,47:28,46:24,45:20,44:17,43:14,42:11,41:9,40:7,39:5},
+  '사회문화':   {71:99,70:99,69:98,68:97,67:96,66:95,65:93,64:92,63:90,62:88,61:85,60:82,59:78,58:74,57:70,56:66,55:62,54:57,53:52,52:48,51:44,50:40,49:35,48:31,47:27,46:23,45:20,44:16,43:13,42:10,41:8,40:6,39:5},
+  '물리학Ⅰ':   {71:99,70:99,69:99,68:98,67:97,66:96,65:95,64:93,63:91,62:89,61:87,60:84,59:81,58:77,57:73,56:68,55:64,54:59,53:54,52:50,51:45,50:41,49:36,48:32,47:28,46:24,45:20,44:17,43:14,42:11,41:8,40:6,39:5},
+  '화학Ⅰ':     {75:99,74:99,73:99,72:99,71:98,70:97,69:96,68:95,67:93,66:92,65:90,64:89,63:87,62:85,61:82,60:79,59:75,58:71,57:67,56:62,55:58,54:53,53:48,52:43,51:38,50:33,49:29,48:25,47:21,46:17,45:14,44:11,43:8,42:6},
+  '생명과학Ⅰ': {68:99,67:98,66:97,65:96,64:95,63:93,62:91,61:88,60:86,59:83,58:79,57:76,56:72,55:68,54:63,53:59,52:55,51:50,50:46,49:42,48:38,47:33,46:29,45:25,44:22,43:18,42:15,41:12,40:9,39:7,38:5},
+  '지구과학Ⅰ': {70:99,69:99,68:98,67:97,66:96,65:94,64:92,63:90,62:87,61:84,60:81,59:78,58:74,57:70,56:66,55:62,54:57,53:53,52:49,51:45,50:40,49:36,48:32,47:28,46:24,45:20,44:17,43:13,42:10,41:8,40:6,39:5},
+  '물리학Ⅱ':   {75:99,74:99,73:99,72:99,71:98,70:97,69:96,68:95,67:93,66:91,65:88,64:86,63:83,62:79,61:75,60:71,59:67,58:62,57:57,56:52,55:47,54:42,53:37,52:32,51:28,50:23,49:19,48:15,47:12,46:9,45:7},
+  '화학Ⅱ':     {76:99,75:99,74:99,73:99,72:98,71:97,70:96,69:95,68:93,67:91,66:89,65:86,64:83,63:80,62:76,61:72,60:68,59:63,58:59,57:54,56:49,55:44,54:39,53:35,52:30,51:26,50:21,49:17,48:13,47:10,46:7},
+  '생명과학Ⅱ': {74:99,73:99,72:99,71:98,70:97,69:96,68:94,67:92,66:90,65:87,64:84,63:80,62:77,61:73,60:68,59:64,58:59,57:54,56:49,55:44,54:39,53:34,52:29,51:24,50:20,49:16,48:12,47:9,46:6},
+  '지구과학Ⅱ': {75:99,74:99,73:99,72:98,71:97,70:96,69:95,68:93,67:91,66:88,65:85,64:82,63:78,62:74,61:70,60:65,59:61,58:56,57:51,56:46,55:41,54:36,53:31,52:27,51:22,50:18,49:14,48:10,47:7},
+};
+
+// 탐구 원점수→표준점수 조회 (범위 보간 포함)
+function getTankuStd(subj, raw){
+  const tbl = TANKU_STD_2025[subj];
+  if(!tbl) return null;
+  const r = Math.round(+raw);
+  if(tbl[r] !== undefined) return tbl[r];
+  // 범위 외 보간
+  const keys = Object.keys(tbl).map(Number).sort((a,b)=>a-b);
+  if(r >= keys[keys.length-1]) return tbl[keys[keys.length-1]];
+  if(r <= keys[0]) return tbl[keys[0]];
+  // 선형 보간
+  for(let i=0;i<keys.length-1;i++){
+    if(r>=keys[i]&&r<=keys[i+1]){
+      const lo=tbl[keys[i]], hi=tbl[keys[i+1]];
+      return Math.round(lo+(hi-lo)*(r-keys[i])/(keys[i+1]-keys[i]));
+    }
+  }
+  return null;
+}
+
+// 탐구 표준점수→백분위 조회
+function getTankuPct(subj, std){
+  const tbl = TANKU_PCT_2025[subj];
+  if(!tbl) return null;
+  const s = Math.round(+std);
+  if(tbl[s] !== undefined) return tbl[s];
+  const keys = Object.keys(tbl).map(Number).sort((a,b)=>a-b);
+  if(s >= keys[keys.length-1]) return 99;
+  if(s <= keys[0]) return 1;
+  for(let i=0;i<keys.length-1;i++){
+    if(s>=keys[i]&&s<=keys[i+1]){
+      const lo=tbl[keys[i]], hi=tbl[keys[i+1]];
+      return Math.round(lo+(hi-lo)*(s-keys[i])/(keys[i+1]-keys[i]));
+    }
+  }
+  return null;
+}
+
+// ── 2025학년도 수능 등급구분 표준점수 (평가원 공식) ──
+// [1등급컷, 2등급컷, ..., 8등급컷] - 이 점수 이상이면 해당 등급
+const KO_GRADE_CUTS = {
+  '화법과작문': [131,125,117,107,96,84,72,63],
+  '언어와매체': [131,125,117,107,96,84,72,63],
+  '_default':   [131,125,117,107,96,84,72,63],
+};
+const MA_GRADE_CUTS = {
+  '확률과통계': [131,123,117,110,96,78,72,69],
+  '미적분':     [131,123,117,110,96,78,72,69],
+  '기하':       [131,123,117,110,96,78,72,69],
+  '_default':   [131,123,117,110,96,78,72,69],
+};
+const TK_GRADE_CUTS = {
+  // 2025학년도 수능 등급구분 표준점수 (한국교육과정평가원 공식 발표)
+  '생활과윤리': [68,64,59,52,46,42,38,34],
+  '윤리와사상': [66,63,59,53,46,41,37,35],
+  '한국지리':   [67,64,60,53,44,41,38,37],
+  '세계지리':   [66,63,60,54,46,40,37,34],
+  '동아시아사': [66,64,60,54,45,40,38,35],
+  '세계사':     [66,64,60,53,45,41,38,36],
+  '경제':       [69,65,59,52,45,41,39,36],
+  '정치와법':   [65,62,59,55,47,40,37,34],
+  '사회문화':   [65,62,59,54,48,41,36,32],
+  '물리학Ⅰ':   [65,63,59,54,47,40,37,34],
+  '화학Ⅰ':     [65,63,59,54,46,40,37,34],
+  '생명과학Ⅰ': [65,62,58,55,48,41,36,32],
+  '지구과학Ⅰ': [67,63,59,53,46,41,37,35],
+  '물리학Ⅱ':   [69,66,59,51,44,41,40,37],
+  '화학Ⅱ':     [69,64,59,52,46,41,38,36],
+  '생명과학Ⅱ': [67,63,59,53,46,41,38,35],
+  '지구과학Ⅱ': [70,65,60,50,44,41,40,37],
+  '_default':   [67,63,59,53,46,41,37,34],
+};
+
+// 표준점수→등급 변환 (등급구분 표준점수 기준)
+function stdToGrade(std, cuts){
+  if(!std || isNaN(+std)) return 9;
+  const s = +std;
+  for(let i=0; i<cuts.length; i++){
+    if(s >= cuts[i]) return i+1;
+  }
+  return 9;
+}
+
 
 // 수능 영어 절대평가 등급→백분위 매핑 (2025학년도)
 const ENG_GRADE_PCT = {1:96,2:88,3:75,4:58,5:40,6:23,7:11,8:4,9:1};
@@ -2644,12 +2744,6 @@ function pctToGrade(pct){
 }
 
 // 표준점수→등급 (국·수)
-function stdToGrade(std, subj){
-  // 2025학년도 기준 등급컷 (표준점수)
-  const cuts = subj==='수학'?[134,123,113,103,91,80,70,50]:[138,126,114,103,91,80,70,50];
-  for(let i=0;i<cuts.length;i++) if(std>=cuts[i]) return i+1;
-  return 9;
-}
 
 // 전체 환산 점수 계산 (대학별 반영비율 적용)
 function calcTotalScore(scores, ratio, calc){
@@ -2689,7 +2783,7 @@ const JEONGSI_DB = [
   {univ:'고려대',dept:'공학',area:'서울',tier:'SKY',계열:'공학',ratio:{국어:35,수학:25,탐구:25,영어:15},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:377,cut70std:362,수능최저:'없음',비고:'컴퓨터·전자·기계·건축'},
   {univ:'고려대',dept:'의과대학',area:'서울',tier:'SKY',계열:'의학',ratio:{국어:25,수학:35,탐구:25,영어:15},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:395,cut70std:384,수능최저:'없음',비고:''},
   {univ:'고려대',dept:'간호학과',area:'서울',tier:'SKY',계열:'의학',ratio:{국어:25,수학:35,탐구:25,영어:15},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:355,cut70std:342,수능최저:'없음',비고:'간호'},
-  {univ:'서울대',dept:'인문사회',area:'서울',tier:'SKY',계열:'인문',ratio:{국어:33.3,수학:16.7,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:386,cut70std:370,수능최저:'없음',비고:'수능100%'},
+  {univ:'서울대',dept:'인문사회',area:'서울',tier:'SKY',계열:'인문',ratio:{국어:33.3,수학:16.7,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:388,cut70std:374,수능최저:'없음',비고:'수능100%'},
   {univ:'서울대',dept:'경영',area:'서울',tier:'SKY',계열:'인문',ratio:{국어:33.3,수학:16.7,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:390,cut70std:376,수능최저:'없음',비고:''},
   {univ:'서울대',dept:'경영·상경',area:'서울',tier:'SKY',계열:'상경',ratio:{국어:33.3,수학:16.7,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:393,cut70std:379,수능최저:'없음',비고:'경영·경제·회계·무역'},
   {univ:'서울대',dept:'자연과학',area:'서울',tier:'SKY',계열:'자연',ratio:{국어:16.7,수학:33.3,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:388,cut70std:372,수능최저:'없음',비고:'미적분·기하 필수'},
@@ -2697,7 +2791,7 @@ const JEONGSI_DB = [
   {univ:'서울대',dept:'공학',area:'서울',tier:'SKY',계열:'공학',ratio:{국어:33.3,수학:16.7,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:392,cut70std:378,수능최저:'없음',비고:'컴퓨터·전자·기계·건축'},
   {univ:'서울대',dept:'의예과',area:'서울',tier:'SKY',계열:'의학',ratio:{국어:16.7,수학:33.3,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:400,cut70std:392,수능최저:'없음',비고:'최상위'},
   {univ:'서울대',dept:'수의예과',area:'서울',tier:'SKY',계열:'의학',ratio:{국어:16.7,수학:33.3,탐구:33.3,영어:0},활용:{국어:'표준',수학:'표준',탐구:'표준'},cut50std:392,cut70std:381,수능최저:'없음',비고:'수의예'},
-  {univ:'연세대',dept:'인문사회',area:'서울',tier:'SKY',계열:'인문',ratio:{국어:37.5,수학:12.5,탐구:25,영어:0},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:375,cut70std:358,수능최저:'없음',비고:'국어 비중 높음'},
+  {univ:'연세대',dept:'인문사회',area:'서울',tier:'SKY',계열:'인문',ratio:{국어:37.5,수학:12.5,탐구:25,영어:0},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:377,cut70std:362,수능최저:'없음',비고:'국어 비중 높음'},
   {univ:'연세대',dept:'경영·경제',area:'서울',tier:'SKY',계열:'인문',ratio:{국어:37.5,수학:12.5,탐구:25,영어:0},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:380,cut70std:364,수능최저:'없음',비고:''},
   {univ:'연세대',dept:'경영·상경',area:'서울',tier:'SKY',계열:'상경',ratio:{국어:37.5,수학:12.5,탐구:25,영어:0},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:383,cut70std:367,수능최저:'없음',비고:'경영·경제·회계·무역'},
   {univ:'연세대',dept:'자연과학·공학',area:'서울',tier:'SKY',계열:'자연',ratio:{국어:12.5,수학:37.5,탐구:25,영어:0},활용:{국어:'표준',수학:'표준',탐구:'백분위'},cut50std:378,cut70std:362,수능최저:'없음',비고:'미적분·기하 가산'},
@@ -3246,7 +3340,7 @@ function calcCsatScores(jst, s){
     const p = CSAT_PARAMS['국어'][sel]||CSAT_PARAMS['국어']['_default'];
     const std = ko.std ? +ko.std : rawToStd(+ko.raw, p.mean, p.sd, p.maxStd);
     const pct = ko.pct ? +ko.pct : rawToPct(+ko.raw, p.mean, p.sd);
-    calc['국어'] = {raw:ko.raw, std, pct, grade: pctToGrade(pct||50), 선택:sel};
+    calc['국어'] = {raw:ko.raw, std, pct, grade: stdToGrade(std, (KO_GRADE_CUTS[sel]||KO_GRADE_CUTS['_default'])), 선택:sel};
   }
 
   // 수학
@@ -3258,18 +3352,31 @@ function calcCsatScores(jst, s){
     const pct = ma.pct ? +ma.pct : rawToPct(+ma.raw, p.mean, p.sd);
     // 미적분·기하 가산점 (대학별로 다르나 기본 3~5%)
     const 가산 = (sel==='미적분'||sel==='기하')?3:0;
-    calc['수학'] = {raw:ma.raw, std, pct, grade: pctToGrade(pct||50), 선택:sel, 선택가산:가산};
+    calc['수학'] = {raw:ma.raw, std, pct, grade: stdToGrade(std, (MA_GRADE_CUTS[sel]||MA_GRADE_CUTS['_default'])), 선택:sel, 선택가산:가산};
   }
 
-  // 탐구1/2
-  ['탐구1','탐구2'].forEach(sb=>{
+  // 탐구1/2 (2025학년도 실제 변환표 사용)
+  ['탐구1','탐구2'].forEach(function(sb){
     const tk = src[sb]||{};
     if(tk.raw||tk.std){
       const subjName = (sb==='탐구1'?jst.탐구1과목:jst.탐구2과목)||tk.subjName||'생활과윤리';
-      const p = CSAT_PARAMS['탐구'][subjName]||CSAT_PARAMS['탐구']['_default'];
-      const std = tk.std ? +tk.std : rawToStd(+tk.raw, p.mean, p.sd, p.maxStd);
-      const pct = tk.pct ? +tk.pct : rawToPct(+tk.raw, p.mean, p.sd);
-      calc[sb] = {raw:tk.raw, std, pct, grade: pctToGrade(pct||50), subjName};
+      let std, pct;
+      if(tk.std){
+        // 이미 표준점수가 있으면 그대로 사용, 백분위만 테이블로 조회
+        std = +tk.std;
+        pct = tk.pct ? +tk.pct : (getTankuPct(subjName, std) || rawToPct(std, 50, 15));
+      } else if(tk.raw) {
+        // 원점수→표준점수: 실제 변환표 우선, 없으면 공식 근사
+        std = getTankuStd(subjName, +tk.raw);
+        if(std === null){
+          const p = CSAT_PARAMS['탐구']['_default'];
+          std = rawToStd(+tk.raw, p.mean, p.sd, p.maxStd);
+        }
+        // 표준점수→백분위: 실제 변환표 우선
+        pct = getTankuPct(subjName, std);
+        if(pct === null) pct = rawToPct(+tk.raw, 50, 15);
+      }
+      calc[sb] = {raw:tk.raw, std, pct, grade: stdToGrade(std, (TK_GRADE_CUTS[subjName]||TK_GRADE_CUTS['_default'])), subjName};
     }
   });
 
@@ -3900,6 +4007,16 @@ function renderJeongsi(s){
 
   // ── 환산 성적표 ──
   if(calc){
+    // 탐구 과목 미선택 경고
+    const _hasTk1Raw = jst.mockSrc==='manual' ? !!(jst.manualScores?.탐구1?.raw) : !!(latestSrc?.탐구1?.raw||latestSrc?.탐구1?.std);
+    const _hasTk2Raw = jst.mockSrc==='manual' ? !!(jst.manualScores?.탐구2?.raw) : !!(latestSrc?.탐구2?.raw||latestSrc?.탐구2?.std);
+    const _noTk1Subj = _hasTk1Raw && !t1subj;
+    const _noTk2Subj = _hasTk2Raw && !t2subj;
+    if(_noTk1Subj || _noTk2Subj){
+      html += '<div style="background:#fff8e1;border:1.5px solid #f59e0b;border-radius:8px;padding:8px 14px;margin-bottom:8px;font-size:11px;color:#b45309;font-weight:600">';
+      html += '⚠️ 탐구 과목을 선택해야 정확한 표준점수와 등급을 계산할 수 있습니다. 위 <b>⚙️ 과목 선택</b>에서 탐구1/탐구2 과목을 선택해주세요.';
+      html += '</div>';
+    }
     html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e8eaf6;padding:14px 16px;margin-bottom:12px">';
     html += '<div style="font-size:12px;font-weight:800;color:#333;margin-bottom:10px">📈 수능 환산 성적 <span style="font-size:10px;font-weight:500;color:#888">※ 2025학년도 기준 근사값</span></div>';
     html += '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:11px;min-width:400px">';
@@ -4867,7 +4984,9 @@ function ttCellClick(dayIdx, hour, wy, wm, ww){
       var entry = hi2>=0 ? Object.assign({},hist2[hi2]) : {year:wy,month:wm,weekNum:ww,date:wy+'-'+String(wm).padStart(2,'0'),plan:{},bookMap:{}};
       var p4 = Object.assign({}, entry.plan||{});
       var b4 = Object.assign({}, entry.bookMap||{});
-      hrs.forEach(function(hh){ p4[day+'-'+hh]=ST.weekSubj; });
+      var sp4 = ((s.weeklySubjPlans||{})[ST.weekSubj]||{});
+      var bk4 = ((sp4.books||[]).filter(function(x){return !!x;}))[0]||'';
+      hrs.forEach(function(hh){ p4[day+'-'+hh]=ST.weekSubj; if(bk4)b4[day+'-'+hh]=bk4; });
       entry.plan=p4; entry.bookMap=b4;
       if(hi2>=0) hist2[hi2]=entry; else hist2.push(entry);
       upd(Object.assign({}, s, {weeklyHistory:hist2}));
@@ -4929,7 +5048,7 @@ function renderWeekly(s){
       const k=d+'-'+h;
       const subj=plan[k];
       const col=subj?(SC[subj]||'#3b5bdb'):null;
-      const cellBook=(bm||{})[k]||'';
+      const cellBook=(bm||{})[k]||(subj&&((subjPlans[subj]?.books||[]).filter(Boolean)[0])||'')||'';
       const di=DAYS.indexOf(d); const oc='ttCellClick('+di+','+h+','+wy+','+wm+','+ww+')';
       if(!subj){
         const bg=ST._eraseMode?'#fff5f5':'#fff';
@@ -5624,7 +5743,9 @@ function renderWeeklyHistory(s){
                 <td style="background:#f4f6fb;border:1px solid #e8eaf6;padding:3px;text-align:center;color:#888;font-size:8px;font-weight:600">${hh}시</td>
                 ${DAYS.map(d=>{
                   const subj=(h.plan||{})[`${d}-${hh}`];
-                  const bk=(h.bookMap||{})[`${d}-${hh}`]||'';
+                  const _plan_subj_pwh=(h.plan||{})[`${d}-${hh}`];
+              const bk=(h.bookMap||{})[`${d}-${hh}`]||
+                ((h.subjPlans||{})[_plan_subj_pwh]?.books||[]).filter(Boolean)[0]||'';
                   const col=subj?(SC[subj]||'#3b5bdb'):null;
                   return subj?`<td style="background:${col}22;border:1px solid ${col}44;text-align:center;padding:2px 1px">
                     <div style="color:${col};font-weight:700;font-size:8px;line-height:1.4">${esc(subj)}</div>
@@ -6259,7 +6380,9 @@ function printWeeklyHistory(sid){
             <td class="th-time">${hh}시</td>
             ${DAYS.map(d=>{
               const subj=(h.plan||{})[`${d}-${hh}`];
-              const bk=(h.bookMap||{})[`${d}-${hh}`]||'';
+              const _plan_subj_pwh=(h.plan||{})[`${d}-${hh}`];
+              const bk=(h.bookMap||{})[`${d}-${hh}`]||
+                ((h.subjPlans||{})[_plan_subj_pwh]?.books||[]).filter(Boolean)[0]||'';
               const col=subj?(SC[subj]||'#3b5bdb'):null;
               return subj
                 ?`<td style="background:${col}20;color:${col};font-weight:700;font-size:8px;border:1px solid ${col}44;padding:2px 1px"><div>${esc(subj)}</div>${bk?`<div style="opacity:.7;font-size:7px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(bk)}</div>`:''}</td>`
@@ -6267,7 +6390,28 @@ function printWeeklyHistory(sid){
             }).join('')}
           </tr>`).join('')}
         </table>`:''}
-        <!-- 과목별 학습조건 -->
+        <!-- 과목별 사용 교재 -->
+      ${(()=>{
+        const _sp3=h.subjPlans||{};
+        const _bm3=h.bookMap||{};
+        const _planSubjs3=[...new Set(Object.values(h.plan||{}).filter(v=>v&&v!=='휴식'&&v!=='자습'))];
+        const _cellBm3={};
+        Object.entries(_bm3).forEach(([k,b])=>{const sv=(h.plan||{})[k];if(sv&&b){if(!_cellBm3[sv])_cellBm3[sv]=new Set();_cellBm3[sv].add(b);}});
+        const _bookSubjs3=_planSubjs3.filter(sv=>((_sp3[sv]?.books||[]).filter(Boolean).length>0)||(_cellBm3[sv]?.size>0));
+        if(!_bookSubjs3.length) return '';
+        return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:800;color:#1a1a1a;margin-bottom:8px">📚 과목별 사용 교재</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'+
+        _bookSubjs3.map(sv=>{
+          const _c3=SC[sv]||'#3b5bdb';
+          const _rb3=(_sp3[sv]?.books||[]).filter(Boolean);
+          const _cb3=[...(_cellBm3[sv]||[])].filter(b=>!_rb3.includes(b));
+          return '<div style="background:#f8fafc;border-radius:6px;padding:8px 10px;border:1px solid #e2e8f0;border-top:2px solid '+_c3+'">'+
+            '<div style="font-size:11px;font-weight:800;color:'+_c3+';margin-bottom:5px">'+esc(sv)+'</div>'+
+            _rb3.map(b=>'<div style="font-size:10px;color:#333;padding:1px 0">📖 '+esc(b)+'</div>').join('')+
+            _cb3.map(b=>'<div style="font-size:9px;color:#777;padding:1px 0">· '+esc(b)+'</div>').join('')+
+            '</div>';
+        }).join('')+'</div></div>';
+      })()}
+      <!-- 과목별 학습조건 -->
         ${(()=>{
           const sp2=h.subjPlans||{};
           const entries=Object.entries(sp2).map(([k,v])=>[k,{...(v||{}),subj:(v?.subj||k)}]).filter(([,p])=>p.subj&&((p.books||[]).filter(Boolean).length||p.weeklyHours||p.dailyHours||p.type||(p.units||[]).filter(Boolean).length));
@@ -6637,7 +6781,13 @@ function openSubjModal(subj){
         const memo=document.getElementById('sp_memo').value;
         const newSp={subj:'${esc(subj)}',weeklyHours:wh,dailyHours:dh,books,units,type:selType,typeDetail,difficultyMap,amountType:isPage?'페이지':'문제수',amountVal:av,memo};
         const stu=ST.sel||ST.adminSel;
-        upd({...stu,weeklySubjPlans:{...(stu.weeklySubjPlans||{}),'${esc(subj)}':newSp}});
+        // 교재 첫 번째 항목으로 weeklyBookMap 동기화
+        const _newBm = Object.assign({}, stu.weeklyBookMap||{});
+        const _planNow = stu.weeklyPlan||{};
+        const _firstBook = books[0]||'';
+        // 현재 플랜에서 이 과목이 배정된 모든 셀에 교재 적용
+        Object.keys(_planNow).forEach(function(k){ if(_planNow[k]==='${esc(subj)}'){ if(_firstBook)_newBm[k]=_firstBook; else delete _newBm[k]; } });
+        upd({...stu, weeklySubjPlans:{...(stu.weeklySubjPlans||{}),'${esc(subj)}':newSp}, weeklyBookMap:_newBm});
         this.closest('.overlay').remove();
       ">💾 저장</button>
     </div>
