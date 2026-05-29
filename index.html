@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2569,17 +2542,17 @@ function printSusiReport(sid){
 // 2025학년도 수능 기준 변환 파라미터 (과목별 평균·표준편차)
 const CSAT_PARAMS = {
   '국어': {
-    // 조정 T점수 방식 평균 (이미지 검증: 78점→112점)
-    '화법과작문': {mean:42.1, sd:19.10, maxRaw:100, maxStd:150},
-    '언어와매체':  {mean:42.1, sd:19.10, maxRaw:100, maxStd:150},
-    '_default':   {mean:42.1, sd:19.10, maxRaw:100, maxStd:150},
+    // 2025학년도 수능 실제 만점표준점수 139, 검증: 78점→112점
+    '화법과작문': {mean:27.48, sd:19.10, maxRaw:100, maxStd:139},
+    '언어와매체':  {mean:27.48, sd:19.10, maxRaw:100, maxStd:139},
+    '_default':   {mean:27.48, sd:19.10, maxRaw:100, maxStd:139},
   },
   '수학': {
-    // 조정 T점수 방식 평균 (이미지 검증: 81점→119점)
-    '확률과통계': {mean:38.7, sd:19.35, maxRaw:100, maxStd:150},
-    '미적분':     {mean:38.7, sd:19.35, maxRaw:100, maxStd:150},
-    '기하':       {mean:38.7, sd:19.35, maxRaw:100, maxStd:150},
-    '_default':   {mean:38.7, sd:19.35, maxRaw:100, maxStd:150},
+    // 2025학년도 수능 실제 만점표준점수 140, 검증: 81점→119점
+    '확률과통계': {mean:18.57, sd:19.35, maxRaw:100, maxStd:140},
+    '미적분':     {mean:18.57, sd:19.35, maxRaw:100, maxStd:140},
+    '기하':       {mean:18.57, sd:19.35, maxRaw:100, maxStd:140},
+    '_default':   {mean:18.57, sd:19.35, maxRaw:100, maxStd:140},
   },
   '탐구': {
     '생활과윤리':   {mean:28.10, sd:8.9,  maxRaw:50, maxStd:100},
@@ -2675,7 +2648,10 @@ function getTankuStd(subj, raw){
 function getTankuPct(subj, std){
   if(!std || isNaN(+std)) return null;
   const sdStd = TANKU_SD_STD[subj] || TANKU_SD_STD['_default'];
-  return stdToPct(+std, 50, sdStd);
+  // 탐구 만점 표준점수 (TANKU_STD_2025에서 50점의 값)
+  const tbl = TANKU_STD_2025[subj];
+  const maxStd = tbl ? tbl[50] : undefined;
+  return stdToPct(+std, 50, sdStd, maxStd);
 }
 
 // ── 2025학년도 수능 등급구분 표준점수 (평가원 공식) ──
@@ -2752,9 +2728,12 @@ function rawToPct(raw, mean, sd, maxRaw){
 
 // 백분위→등급
 // ── 표준점수→백분위 변환 함수 ──
-function stdToPct(std, meanStd, sdStd){
+function stdToPct(std, meanStd, sdStd, maxStd){
   if(!std || isNaN(+std)) return null;
-  const z = (+std - meanStd) / sdStd;
+  const s = +std;
+  // 만점(maxStd) 이상이면 99%, 최저 기준 미만이면 1%
+  if(maxStd !== undefined && s >= maxStd) return 99;
+  const z = (s - meanStd) / sdStd;
   const normCDF2 = function(z2){
     const t = 1/(1+0.2316419*Math.abs(z2));
     const d = 0.3989423*Math.exp(-z2*z2/2);
@@ -3381,7 +3360,7 @@ function calcCsatScores(jst, s){
     const sel = jst.국어선택||ko.subjName||'화법과작문';
     const p = CSAT_PARAMS['국어'][sel]||CSAT_PARAMS['국어']['_default'];
     const std = ko.std ? +ko.std : (ko.raw ? Math.max(1,Math.round((+ko.raw-p.mean)/(p.maxRaw-p.mean)*(p.maxStd-50)+50)) : null);
-    const pct = ko.pct ? +ko.pct : stdToPct(std, 100, 20);
+    const pct = ko.pct ? +ko.pct : stdToPct(std, 100, 20, p.maxStd);
     calc['국어'] = {raw:ko.raw, std, pct, grade: stdToGrade(std, (KO_GRADE_CUTS[sel]||KO_GRADE_CUTS['_default'])), 선택:sel};
   }
 
@@ -3391,7 +3370,7 @@ function calcCsatScores(jst, s){
     const sel = jst.수학선택||ma.subjName||'확률과통계';
     const p = CSAT_PARAMS['수학'][sel]||CSAT_PARAMS['수학']['_default'];
     const std = ma.std ? +ma.std : (ma.raw ? Math.max(1,Math.round((+ma.raw-p.mean)/(p.maxRaw-p.mean)*(p.maxStd-50)+50)) : null);
-    const pct = ma.pct ? +ma.pct : stdToPct(std, 100, 20);
+    const pct = ma.pct ? +ma.pct : stdToPct(std, 100, 20, p.maxStd);
     // 미적분·기하 가산점 (대학별로 다르나 기본 3~5%)
     const 가산 = (sel==='미적분'||sel==='기하')?3:0;
     calc['수학'] = {raw:ma.raw, std, pct, grade: stdToGrade(std, (MA_GRADE_CUTS[sel]||MA_GRADE_CUTS['_default'])), 선택:sel, 선택가산:가산};
@@ -3414,9 +3393,10 @@ function calcCsatScores(jst, s){
           const p = CSAT_PARAMS['탐구']['_default'];
           std = rawToStd(+tk.raw, p.mean, p.sd, p.maxStd);
         }
-        // 표준점수→백분위: 과목별 표준편차 기반 정규분포 근사
+        // 표준점수→백분위: 과목별 표준편차 기반 정규분포 근사 (만점=99%)
         const _tkSdStd = TANKU_SD_STD[subjName] || 8.5;
-        pct = stdToPct(std, 50, _tkSdStd);
+        const _tkMaxStd = (TANKU_STD_2025[subjName]||{})[50];
+        pct = stdToPct(std, 50, _tkSdStd, _tkMaxStd);
       }
       calc[sb] = {raw:tk.raw, std, pct, grade: stdToGrade(std, (TK_GRADE_CUTS[subjName]||TK_GRADE_CUTS['_default'])), subjName};
     }
