@@ -1,34 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-   <link rel="manifest" href="manifest.json">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 학생용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (학생용) -->
-    <link rel="icon" href="logo_student.png" type="image/png">
-    <link rel="shortcut icon" href="logo_student.png">
-    <link rel="apple-touch-icon" href="logo_student.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG학생용">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/SG상담플랫폼_학생용.html">
-    <meta property="og:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta property="og:image" content="og-student.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-student.png"> </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -586,7 +558,14 @@ let selSubj='수학';
 let selBook='';
 
 function getSubjColor(subj){
-  return SUBJ_COLORS[subj]||(CU._subjColors||{})[subj]||'#3b5bdb';
+  if(SUBJ_COLORS[subj]) return SUBJ_COLORS[subj];
+  if((CU._subjColors||{})[subj]) return CU._subjColors[subj];
+  // weeklySubjPlans 또는 extraSubjs에서 온 과목: 인덱스 기반 색상 자동 배정
+  const EXTRA_COLORS=['#3b5bdb','#7c3aed','#0891b2','#059669','#d97706','#dc2626','#db2777','#65a30d','#0284c7','#7c3aed'];
+  const allExtra = [...(CU._customSubjs||[]),...(CU.extraSubjs||[]),...Object.keys(CU.weeklySubjPlans||{})];
+  const uniq=[]; allExtra.forEach(function(s){if(s&&!uniq.includes(s))uniq.push(s);});
+  const idx=uniq.indexOf(subj);
+  return idx>=0 ? EXTRA_COLORS[idx%EXTRA_COLORS.length] : '#3b5bdb';
 }
 function getSubjDisplay(subj){
   // 커스텀 이름 반환
@@ -594,7 +573,16 @@ function getSubjDisplay(subj){
 }
 function getMySubjs(){
   const custom = CU._customSubjs||[];
-  return [...DEFAULT_SUBJS,...custom.filter(s=>!DEFAULT_SUBJS.includes(s))];
+  // 관리자가 extraSubjs로 추가한 과목 (관리자 학습전략에서 추가된 과목 포함)
+  const extraFromAdmin = (CU.extraSubjs||[]).filter(Boolean);
+  // 관리자가 weeklySubjPlans에 등록한 과목
+  const fromSubjPlans = Object.keys(CU.weeklySubjPlans||{}).filter(Boolean);
+  const all = [...DEFAULT_SUBJS];
+  // custom, extraFromAdmin, fromSubjPlans 중 중복 없이 추가
+  [...custom, ...extraFromAdmin, ...fromSubjPlans].forEach(function(s){
+    if(s && !all.includes(s)) all.push(s);
+  });
+  return all;
 }
 function getMyBooks(subj){
   return (CU._books||{})[subj]||[];
@@ -1520,7 +1508,7 @@ function startStudentRealtimeSync(studentId){
         // [학생용 onSnapshot] 데이터 수신
         // 타임테이블 관련 필드만 업데이트 (UI 상태 보존)
         const planFields = ['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
-          'weeklyHistory','weeklySubjPlans','weeklyAchieve'];
+          'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs'];
         planFields.forEach(function(field){
           if(incoming[field] !== undefined) CU[field] = incoming[field];
         });
@@ -1558,7 +1546,14 @@ async function refreshData(){
   try{
     const [students,tests]=await Promise.all([fbAll('students'),fbAll('tests')]);
     const student=students.find(s=>String(s.id)===String(CU.id));
-    if(student){CU={...CU,...student};DATA={student:CU,tests:tests.filter(t=>!t.classNames?.length||t.classNames.includes(student.className)),students};render();toast('✅ 최신 데이터로 업데이트됨');}
+    if(student){
+      // 관리자가 관리하는 필드(플랜/과목) 업데이트
+      const adminFields=['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
+        'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs'];
+      adminFields.forEach(function(f){if(student[f]!==undefined) CU[f]=student[f];});
+      DATA={student:CU,tests:tests.filter(t=>!t.classNames?.length||t.classNames.includes(student.className)),students};
+      render();toast('✅ 최신 데이터로 업데이트됨');
+    }
   }catch(e){toast('오류: '+e.message);}
 }
 
@@ -1586,11 +1581,6 @@ async function refreshData(){
   }catch(e){}
   render(); // 세션 없으면 로그인 화면
 })();
-</script>
-  <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
-  }
 </script>
 </body>
 </html>
