@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
- <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -349,7 +322,7 @@ try{
     <div id="login_err" style="text-align:center;color:#e53935;font-size:12px;margin-top:10px;min-height:18px"></div>
     <div style="text-align:center;margin-top:8px;font-size:10px;color:#ccc">파일버전: 2026-05-04 08:19</div>
     <div id="emergency_reset_box" style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:10px;border:1px solid #fde68a;display:none">
-      <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:600">⚠ 로그인이 안 되시나요?</div>
+      <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:600">⚠️ 로그인이 안 되시나요?</div>
       <button onclick="localStorage.clear();sessionStorage.clear();alert('초기화 완료. 다시 로그인하세요.');location.reload();"
         style="width:100%;background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
         🔄 브라우저 데이터 초기화 후 재시작
@@ -1049,7 +1022,7 @@ function popPrint(title, body, opts){
     +'</head><body>'
     +'<div class="np" style="position:fixed;top:0;left:0;right:0;background:#fff;padding:8px 20px;display:flex;gap:8px;align-items:center;border-bottom:1.5px solid #e0e0e0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06)">'
     +'<span style="font-size:13px;font-weight:700;color:#1a1a1a;flex:1">'+esc(title)+'</span>'
-    +'<button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨 인쇄 / PDF</button>'
+    +'<button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄 / PDF</button>'
     +'<button onclick="window.close()" style="padding:7px 14px;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕ 닫기</button>'
     +'</div>'
     +'<div class="np-spacer" style="height:46px"></div>'
@@ -1303,7 +1276,7 @@ function render(){
     app.innerHTML=ST.page==='admin'?renderAdmin():renderMain();
   }catch(e){
     console.error('[render 에러]', e.message, e.stack);
-    app.innerHTML='<div style="padding:40px;text-align:center;color:#e53935"><h3>⚠ 화면 오류</h3><p style="margin:10px 0">'+e.message+'</p><button onclick="location.reload()" style="background:#3b5bdb;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px">🔄 새로고침</button></div>';
+    app.innerHTML='<div style="padding:40px;text-align:center;color:#e53935"><h3>⚠️ 화면 오류</h3><p style="margin:10px 0">'+e.message+'</p><button onclick="location.reload()" style="background:#3b5bdb;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px">🔄 새로고침</button></div>';
   }
   bindEvents();
   // 스크롤 복원 + 검색창 포커스 복원
@@ -1364,7 +1337,7 @@ function renderLogin(){
       </button>
       <div id="login_err" style="text-align:center;color:#e53935;font-size:12px;margin-top:10px;min-height:18px"></div>
     <div id="emergency_reset_box" style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:10px;border:1px solid #fde68a;display:none">
-      <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:600">⚠ 로그인이 안 되시나요?</div>
+      <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:600">⚠️ 로그인이 안 되시나요?</div>
       <button onclick="localStorage.clear();sessionStorage.clear();alert('초기화 완료. 다시 로그인하세요.');location.reload();"
         style="width:100%;background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
         🔄 브라우저 데이터 초기화 후 재시작
@@ -1592,7 +1565,7 @@ function renderMain(){
       })()}
 
       </div>
-      ${isAdmin?`<button style="background:#fff3e0;color:#f59e0b;border:1.5px solid #ffe0b2;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700" onclick="openApiModal()">⚙ API</button>`:''}
+      ${isAdmin?`<button style="background:#fff3e0;color:#f59e0b;border:1.5px solid #ffe0b2;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700" onclick="openApiModal()">⚙️ API</button>`:''}
       ${(()=>{
         const teacher2=ST.currentUser?.role==='teacher'?ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId)):null;
         const perms=teacher2?.permissions||[];
@@ -1678,27 +1651,27 @@ function renderDetail(s){
 
   const printBtns = {
     overview:   '',
-    grade:      `<button onclick="printGrade(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 성적 인쇄/PDF</button>
+    grade:      `<button onclick="printGrade(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 성적 인쇄/PDF</button>
                  <button onclick="exportGradeXls(${s.id})" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀 저장</button>`,
-    susi:       `<button onclick="printSusiReport(${s.id})" style="background:#f59e0b18;color:#f59e0b;border:1.5px solid #f59e0b40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 수시 인쇄/PDF</button>`,
-    susi_print: `<button onclick="printSusiReport(${s.id})" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:6px 16px;font-size:11px;font-weight:700">🖨 상담자료 인쇄/PDF</button>`,
-    weekly:     `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 학습플랜 인쇄/PDF</button>`,
-    achieve:    `<button onclick="printAchieve(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 점검표 인쇄/PDF</button>
+    susi:       `<button onclick="printSusiReport(${s.id})" style="background:#f59e0b18;color:#f59e0b;border:1.5px solid #f59e0b40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 수시 인쇄/PDF</button>`,
+    susi_print: `<button onclick="printSusiReport(${s.id})" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:6px 16px;font-size:11px;font-weight:700">🖨️ 상담자료 인쇄/PDF</button>`,
+    weekly:     `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습플랜 인쇄/PDF</button>`,
+    achieve:    `<button onclick="printAchieve(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 점검표 인쇄/PDF</button>
                  <button onclick="exportAchieveXls(${s.id})" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀</button>`,
-    consult:    `<button onclick="printTab(${s.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 상담이력 인쇄/PDF</button>`,
+    consult:    `<button onclick="printTab(${s.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 상담이력 인쇄/PDF</button>`,
     jeongsi:    `<button onclick="saveJeongsiSnapshot('${s.id}')" style="background:#3b5bdb18;color:#3b5bdb;border:1.5px solid #3b5bdb40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">💾 분석결과 저장</button>
-                 <button onclick="printJeongsi('${s.id}')" style="background:#ef444418;color:#ef4444;border:1.5px solid #ef444440;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 정시 인쇄/PDF</button>
+                 <button onclick="printJeongsi('${s.id}')" style="background:#ef444418;color:#ef4444;border:1.5px solid #ef444440;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 정시 인쇄/PDF</button>
                  <button onclick="exportJeongsiXls('${s.id}')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀</button>`,
-    apex:       `<button onclick="printApexResult('${s.id}')" style="background:#1A237E18;color:#1A237E;border:1.5px solid #1A237E40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 APEX 리포트 인쇄</button>`,
-    gyogwa:     `<button onclick="gyogwaPrint('${s.id}')" style="background:#2563eb18;color:#2563eb;border:1.5px solid #2563eb40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 교과분석 인쇄/PDF</button>
+    apex:       `<button onclick="printApexResult('${s.id}')" style="background:#1A237E18;color:#1A237E;border:1.5px solid #1A237E40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ APEX 리포트 인쇄</button>`,
+    gyogwa:     `<button onclick="gyogwaPrint('${s.id}')" style="background:#2563eb18;color:#2563eb;border:1.5px solid #2563eb40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 교과분석 인쇄/PDF</button>
                  <button onclick="gyogwaExportXls('${s.id}')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀 저장</button>`,
-    jonghap:    `<button onclick="jh_print('${s.id}')" style="background:#7c3aed18;color:#7c3aed;border:1.5px solid #7c3aed40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 종합분석 인쇄/PDF</button>
+    jonghap:    `<button onclick="jh_print('${s.id}')" style="background:#7c3aed18;color:#7c3aed;border:1.5px solid #7c3aed40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 종합분석 인쇄/PDF</button>
                  <button onclick="jh_exportXls('${s.id}')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀 저장</button>`,
-    tt:         `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 학습플랜 인쇄/PDF</button>`,
-    hist:       `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 학습플랜 인쇄/PDF</button>`,
-    check:      `<button onclick="printAchieve(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 점검표 인쇄/PDF</button>`,
-    ai:         `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 학습플랜 인쇄/PDF</button>`,
-    cond:       `<button onclick="printSubjCond('${s.id}')" style="background:#f59e0b18;color:#f59e0b;border:1.5px solid #f59e0b40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨 학습전략 인쇄/PDF</button>`,
+    tt:         `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습플랜 인쇄/PDF</button>`,
+    hist:       `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습플랜 인쇄/PDF</button>`,
+    check:      `<button onclick="printAchieve(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 점검표 인쇄/PDF</button>`,
+    ai:         `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습플랜 인쇄/PDF</button>`,
+    cond:       `<button onclick="printSubjCond('${s.id}')" style="background:#f59e0b18;color:#f59e0b;border:1.5px solid #f59e0b40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습전략 인쇄/PDF</button>`,
   };
   // weekly 탭은 서브탭(ST.weekTab)에 따라 버튼 결정
   const _weekBtnKey = ST.tab==='weekly' ? (ST.weekTab||'tt') : ST.tab;
@@ -1713,7 +1686,7 @@ function renderDetail(s){
         <div style="font-size:11px;color:#777;margin-top:1px">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0">
-        <button class="btn-g" style="font-size:10px;padding:5px 11px" onclick="openSForm(ST.students.find(x=>String(x.id)==='${s.id}'))">✏ 수정</button>
+        <button class="btn-g" style="font-size:10px;padding:5px 11px" onclick="openSForm(ST.students.find(x=>String(x.id)==='${s.id}'))">✏️ 수정</button>
         <button class="btn-r" style="font-size:10px;padding:5px 9px" onclick="deleteStudent('${s.id}')">🗑 삭제</button>
       </div>
     </div>
@@ -1837,8 +1810,8 @@ function renderGrade(s){
   return`
   <!-- 액션 버튼 바 -->
   <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-    <button onclick="openGradeForm(${s.id})" style="background:#3b82f618;color:#3b5bdb;border:1px solid #3b82f640;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700">✏ 내신 입력/수정</button>
-    <button onclick="openMockForm(${s.id})" style="background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700">✏ 모의고사 입력/수정</button>
+    <button onclick="openGradeForm(${s.id})" style="background:#3b82f618;color:#3b5bdb;border:1px solid #3b82f640;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700">✏️ 내신 입력/수정</button>
+    <button onclick="openMockForm(${s.id})" style="background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700">✏️ 모의고사 입력/수정</button>
   </div>
 
   <!-- 내신 성적 -->
@@ -2364,7 +2337,7 @@ function renderSusiPrint(s){
               return`<div style="background:#f8f9ff;border-radius:8px;padding:9px 10px;border:1.5px solid ${edited?'#3b5bdb':'#e8eaf6'}">
                 <div style="font-size:9px;color:#888;margin-bottom:4px;display:flex;justify-content:space-between">
                   <span style="font-weight:600">${f.label}</span>
-                  <span style="${edited?'color:#3b5bdb':'color:#bbb'};font-size:8px">${edited?'✏수정됨':'AI추정'}</span>
+                  <span style="${edited?'color:#3b5bdb':'color:#bbb'};font-size:8px">${edited?'✏️수정됨':'AI추정'}</span>
                 </div>
                 <input value="${esc(curVal)}" placeholder="${f.ph}"
                   oninput="if(!window._susiPrintEdits[${sid}]['${cid}'])window._susiPrintEdits[${sid}]['${cid}']={};if(!window._susiPrintEdits[${sid}]['${cid}']['${rKey}'])window._susiPrintEdits[${sid}]['${cid}']['${rKey}']={};window._susiPrintEdits[${sid}]['${cid}']['${rKey}']['${f.key}']=this.value"
@@ -2412,7 +2385,7 @@ function renderSusiPrint(s){
         <div style="font-size:12px;color:#1e40af;line-height:1.8">
           <strong>📋 수시 출력용 상담 자료</strong><br>
           ✅ <strong>고정</strong>: 대학·학과·전형명 (수시 탭 연동)&nbsp;
-          ✏ <strong>편집</strong>: 모집인원·입결·전략 등 직접 수정<br>
+          ✏️ <strong>편집</strong>: 모집인원·입결·전략 등 직접 수정<br>
           ➕ <strong>직접 추가</strong>: 수시 탭에 없는 대학도 아래 버튼으로 추가 가능
         </div>
       </div>
@@ -2616,7 +2589,7 @@ function printSusiReport(sid){
     </div>`;
   }
   body += `<div style="margin-top:20px;padding:10px 14px;background:#fff8e1;border:1px solid #fde68a;border-radius:8px;font-size:10px;color:#92400e;line-height:1.6">
-    ⚠ 본 자료의 모집인원·경쟁률·수능최저·입결 데이터는 참고용이며, 실제 수치는 각 대학 입학처 공식 모집요강 및 대학어디가(adiga.kr)에서 반드시 확인하시기 바랍니다.
+    ⚠️ 본 자료의 모집인원·경쟁률·수능최저·입결 데이터는 참고용이며, 실제 수치는 각 대학 입학처 공식 모집요강 및 대학어디가(adiga.kr)에서 반드시 확인하시기 바랍니다.
   </div>`;
   popPrint(`${s.name} - 수시 상담 자료`, body);
 }
@@ -3899,7 +3872,7 @@ function printJeongsiSnapshot(sid, idx){
   </div>
   ${calcHtml}
   ${univHtml}
-  <p style="font-size:10px;color:#aaa;margin-top:16px">⚠ 2026학년도 기준 참고용 · 실제 입결은 adiga.kr 확인 필수</p>`;
+  <p style="font-size:10px;color:#aaa;margin-top:16px">⚠️ 2026학년도 기준 참고용 · 실제 입결은 adiga.kr 확인 필수</p>`;
 
   const now = new Date();
   popPrint(`${s.name} - 정시 분석 (${snap.label})`, body, {
@@ -3954,7 +3927,7 @@ function renderJeongsiHistory(s){
       +'</div>'
       +'<div style="display:flex;gap:5px;flex-shrink:0">'
       +'<button onclick="loadJeongsiSnapshot(\''+s.id+'\','+origIdx+')" style="padding:4px 10px;background:#3b5bdb;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">📂 불러오기</button>'
-      +'<button onclick="printJeongsiSnapshot(\''+s.id+'\','+origIdx+')" style="padding:4px 10px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🖨 인쇄</button>'
+      +'<button onclick="printJeongsiSnapshot(\''+s.id+'\','+origIdx+')" style="padding:4px 10px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">🖨️ 인쇄</button>'
       +'<button onclick="deleteJeongsiSnapshot(\''+s.id+'\','+origIdx+')" style="padding:4px 8px;background:#fff;color:#e53935;border:1px solid #e53935;border-radius:6px;font-size:10px;cursor:pointer">삭제</button>'
       +'</div></div>'
       +'<div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">'+badges+'</div>'
@@ -4003,7 +3976,7 @@ function renderJeongsiMockSelector(jst, mg){
   } else if(latestSrc2){
     lines.push('<div style="font-size:10px;color:#888;margin-top:4px">✅ 최근 데이터: '+esc(latestSrc2.testName)+'</div>');
   } else {
-    lines.push('<div style="font-size:10px;color:#e53935;margin-top:4px">⚠ 모의고사 성적 미입력</div>');
+    lines.push('<div style="font-size:10px;color:#e53935;margin-top:4px">⚠️ 모의고사 성적 미입력</div>');
   }
   lines.push('</div>');
   return lines.join('');
@@ -4092,7 +4065,7 @@ function renderJeongsi(s){
 
   // ── 과목 선택 ──
   html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e8eaf6;padding:14px 16px;margin-bottom:12px">';
-  html += '<div style="font-size:12px;font-weight:800;color:#333;margin-bottom:10px">⚙ 과목 선택</div>';
+  html += '<div style="font-size:12px;font-weight:800;color:#333;margin-bottom:10px">⚙️ 과목 선택</div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
   // 국어
   html += '<div><div style="font-size:10px;color:#888;margin-bottom:3px">국어 선택과목</div><select style="border:1px solid #e0e3ef;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600" onchange="ST.jeongsi.국어선택=this.value;render()">';
@@ -4123,7 +4096,7 @@ function renderJeongsi(s){
     const _noTk2Subj = _hasTk2Raw && !t2subj;
     if(_noTk1Subj || _noTk2Subj){
       html += '<div style="background:#fff8e1;border:1.5px solid #f59e0b;border-radius:8px;padding:8px 14px;margin-bottom:8px;font-size:11px;color:#b45309;font-weight:600">';
-      html += '⚠ 탐구 과목을 선택해야 정확한 표준점수와 등급을 계산할 수 있습니다. 위 <b>⚙ 과목 선택</b>에서 탐구1/탐구2 과목을 선택해주세요.';
+      html += '⚠️ 탐구 과목을 선택해야 정확한 표준점수와 등급을 계산할 수 있습니다. 위 <b>⚙️ 과목 선택</b>에서 탐구1/탐구2 과목을 선택해주세요.';
       html += '</div>';
     }
     html += '<div style="background:#fff;border-radius:12px;border:1.5px solid #e8eaf6;padding:14px 16px;margin-bottom:12px">';
@@ -4217,7 +4190,7 @@ function renderJeongsi(s){
       html += '</table></div></div>';
     });
   }
-  html += '<div style="font-size:10px;color:#aaa;margin-top:6px;padding-top:8px;border-top:1px solid #f0f0f0">⚠ 본 데이터는 2026학년도 수능 기준 참고용이며, 실제 입결은 adiga.kr에서 반드시 확인하세요.</div>';
+  html += '<div style="font-size:10px;color:#aaa;margin-top:6px;padding-top:8px;border-top:1px solid #f0f0f0">⚠️ 본 데이터는 2026학년도 수능 기준 참고용이며, 실제 입결은 adiga.kr에서 반드시 확인하세요.</div>';
   html += '</div>';
   html += '</div>';
   return html;
@@ -4314,7 +4287,7 @@ function printJeongsi(sid){
     }).join('');
 
   const body = calcTableHtml + univTableHtml
-    + '<p style="font-size:10px;color:#aaa;margin-top:16px">⚠ 2026학년도 기준 참고용 · 실제 입결은 adiga.kr 확인 필수</p>';
+    + '<p style="font-size:10px;color:#aaa;margin-top:16px">⚠️ 2026학년도 기준 참고용 · 실제 입결은 adiga.kr 확인 필수</p>';
 
   const now = new Date();
   popPrint(`${s.name} - 정시 지원 분석`, body, {
@@ -4373,7 +4346,7 @@ function exportJeongsiXls(sid){
     csv += `${u.ratio.국어||0},${u.ratio.수학||0},${u.ratio.탐구||0},${u.ratio.영어||0},`;
     csv += `${Object.entries(u.활용||{}).map(([k,v])=>k+':'+v).join('/')},${u.비고||''}\r\n`;
   });
-  csv += `\r\n⚠ 2026학년도 기준 참고용 - 실제 입결은 adiga.kr 확인 필수\r\n`;
+  csv += `\r\n⚠️ 2026학년도 기준 참고용 - 실제 입결은 adiga.kr 확인 필수\r\n`;
 
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
@@ -4505,7 +4478,7 @@ function renderTargetCard(t,i){
         </div>`;
       }).join('')}
       <div style="display:flex;align-items:flex-start;gap:6px;padding:7px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-        <span style="font-size:12px;flex-shrink:0">⚠</span>
+        <span style="font-size:12px;flex-shrink:0">⚠️</span>
         <div style="font-size:10px;color:#92400e;line-height:1.6">AI 추정치 안내 · 반드시 <a href="https://www.adiga.kr" target="_blank" style="color:#b45309;font-weight:700">대학어디가</a> 및 각 대학 입학처 공식 모집요강에서 최종 확인하세요.</div>
       </div>
     </div>`
@@ -5092,7 +5065,7 @@ ${t.rg==='지역인재'?'지역인재 전형도 반드시 포함해주세요.':'
 ${isGwagyo?'학생부교과전형의 경우 일반전형, 지역균형, 지역인재 등 모든 교과 전형을 포함해주세요.':''}
 ${isJongHap?'학생부종합전형의 경우 서류형, 면접형, 활동우수형 등 모든 종합 전형을 포함해주세요.':''}
 
-⚠ 중요: 정확한 정보를 모르더라도 반드시 JSON 형식으로 응답하세요.
+⚠️ 중요: 정확한 정보를 모르더라도 반드시 JSON 형식으로 응답하세요.
 
 반드시 아래 JSON 형식으로만 응답 (마크다운 없이 순수 JSON):
 {"jeons":[{"name":"전형명","type":"일반","mozip":0,"suneungChoi":"없음"}]}
@@ -5132,13 +5105,13 @@ ${j.methodNote&&j.methodNote!=='-'?`  - 선발방법: ${j.methodNote}`:''}
 ${j.evalFocus&&j.evalFocus!=='-'?`  - 서류핵심요소: ${j.evalFocus}`:''}
 ${j.method&&j.method!=='-'?`  - 내신반영방법: ${j.method}`:''}`).join('\n')}
 
-⚠ 위 DB 수치(모집인원·경쟁률·컷·수능최저)는 실제 입결 데이터입니다.
+⚠️ 위 DB 수치(모집인원·경쟁률·컷·수능최저)는 실제 입결 데이터입니다.
    - 절대로 AI 추정값으로 대체하지 마세요.
    - 수능최저가 "없음"이면 없다고 명시하고, 있으면 정확히 기재하세요.
    - "추정", "확인 필요" 표현 사용 금지.` : '';
 
       const detailPrompt = `당신은 대한민국 4년제 대학 입시 전문 컨설턴트입니다.
-⚠ 중요 지침:
+⚠️ 중요 지침:
 1. 현재 시점 기준 최신 입시년도는 2027학년도입니다.
 2. 반드시 아래 JSON 형식으로만 응답하세요. 마크다운(\`\`\`, ##)을 절대 사용하지 마세요.
 ${dbUsed?'3. [★ 교과분석 DB 실제 데이터]의 수치를 그대로 사용하고, comment/tip에도 정확히 반영하세요.':'3. 정보가 불확실하면 최선의 추정치와 함께 "(추정)" 표기를 사용하세요.'}
@@ -5388,20 +5361,20 @@ function _showAiError(e, tid){
   const msg = e.message||'';
   let errHtml = '';
   if(msg==='API_KEY_MISSING'){
-    errHtml = `<div style="font-size:13px;font-weight:700;color:#b45309;margin-bottom:8px">⚠ API 키 미입력</div>
-      <div style="font-size:12px;color:#92400e;line-height:1.8;margin-bottom:10px">우측 상단 <strong>[⚙ API 설정]</strong> 버튼을 눌러 API 키를 입력해주세요.</div>
-      <button onclick="openApiModal()" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">⚙ API 키 설정하기</button>`;
+    errHtml = `<div style="font-size:13px;font-weight:700;color:#b45309;margin-bottom:8px">⚠️ API 키 미입력</div>
+      <div style="font-size:12px;color:#92400e;line-height:1.8;margin-bottom:10px">우측 상단 <strong>[⚙️ API 설정]</strong> 버튼을 눌러 API 키를 입력해주세요.</div>
+      <button onclick="openApiModal()" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">⚙️ API 키 설정하기</button>`;
   } else if(msg.includes('AUTH:')||msg.includes('authentication')){
-    errHtml = `<div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:8px">⚠ API 키 오류</div>
+    errHtml = `<div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:8px">⚠️ API 키 오류</div>
       <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px">API 키를 다시 확인해주세요.</div>
-      <button onclick="openApiModal()" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">⚙ API 키 재입력</button>`;
+      <button onclick="openApiModal()" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">⚙️ API 키 재입력</button>`;
   } else if(msg.includes('Failed to fetch')||msg.includes('CORS')){
-    errHtml = `<div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:8px">⚠ CORS 차단</div>
+    errHtml = `<div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:8px">⚠️ CORS 차단</div>
       <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px">Chrome 확장프로그램 설치 필요:<br>
       <a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf" target="_blank" style="color:#3b5bdb">Allow CORS 설치</a></div>
       <button onclick="aiAnalysis(${tid})" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">🔄 다시 시도</button>`;
   } else {
-    errHtml = `<div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:8px">⚠ 오류</div>
+    errHtml = `<div style="font-size:13px;font-weight:700;color:#b91c1c;margin-bottom:8px">⚠️ 오류</div>
       <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px;word-break:break-all">${esc(msg)}</div>
       <button onclick="aiAnalysis(${tid})" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">🔄 다시 시도</button>`;
   }
@@ -5437,9 +5410,9 @@ ${list}
     catch{const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('JSON 파싱 실패');p=JSON.parse(m[0]);}
     if(el)el.innerHTML=`<div style="background:#eef1ff;border:1.5px solid #c5cae9;border-radius:12px;padding:14px;margin-top:10px">
       <div style="font-size:12px;font-weight:800;color:#3b5bdb;margin-bottom:12px">🤖 AI 종합 라인업 분석</div>
-      ${[['🎯 전략 평가',p.summary,'#3b5bdb'],['⚖ 라인업 균형',p.balance,'#0f9d58'],['⚠ 위험 요소',p.risk,'#e53935'],['💡 보완 제안',p.recommendation,'#f59e0b'],['📌 최종 조언',p.finalAdvice,'#8b5cf6']].map(([t2,v,c])=>v?`<div style="margin-bottom:10px"><div style="font-size:10px;color:${c};font-weight:700;margin-bottom:3px">${t2}</div><div style="font-size:12px;color:#444;line-height:1.7">${esc(v)}</div></div>`:'').join('')}
+      ${[['🎯 전략 평가',p.summary,'#3b5bdb'],['⚖️ 라인업 균형',p.balance,'#0f9d58'],['⚠️ 위험 요소',p.risk,'#e53935'],['💡 보완 제안',p.recommendation,'#f59e0b'],['📌 최종 조언',p.finalAdvice,'#8b5cf6']].map(([t2,v,c])=>v?`<div style="margin-bottom:10px"><div style="font-size:10px;color:${c};font-weight:700;margin-bottom:3px">${t2}</div><div style="font-size:12px;color:#444;line-height:1.7">${esc(v)}</div></div>`:'').join('')}
       <div style="display:flex;align-items:flex-start;gap:6px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-top:4px">
-        <span style="font-size:13px;flex-shrink:0">⚠</span>
+        <span style="font-size:13px;flex-shrink:0">⚠️</span>
         <div style="font-size:10px;color:#92400e;line-height:1.6">
           <strong>AI 추정치 안내</strong> · 위 분석은 AI 학습 데이터 기반 참고 자료입니다. 개별 대학 분석 결과도 마찬가지로, 실제 모집인원·경쟁률·수능최저·입결은 매년 변동됩니다.<br>
           반드시 <a href="https://www.adiga.kr" target="_blank" style="color:#b45309;font-weight:700">대학어디가(adiga.kr)</a> 및 <strong>각 대학 입학처 공식 모집요강</strong>에서 최종 확인 후 활용하세요.
@@ -5447,7 +5420,7 @@ ${list}
       </div>
     </div>`;
   }catch(e){
-    if(el)el.innerHTML=`<div style="padding:10px;background:#ef444415;border-radius:8px;border:1px solid #ef444430;font-size:12px;color:#ef4444;margin-top:8px">⚠ 분석 오류: ${esc(e.message)}</div>`;
+    if(el)el.innerHTML=`<div style="padding:10px;background:#ef444415;border-radius:8px;border:1px solid #ef444430;font-size:12px;color:#ef4444;margin-top:8px">⚠️ 분석 오류: ${esc(e.message)}</div>`;
   }
 }
 
@@ -5694,7 +5667,7 @@ function renderWeekly(s){
   const curWT=ST.weekTab||'tt';
   const weekTabs=[
     {id:'tt',label:'📅 학습플랜'},
-    {id:'cond',label:'⚙ 학습전략'},
+    {id:'cond',label:'⚙️ 학습전략'},
     {id:'ai',label:'🤖 AI추천'},
     {id:'hist',label:'📚 주간이력'},
     {id:'check',label:'🔍 플랜점검'}
@@ -5753,7 +5726,7 @@ function renderAiPlanTab(s){
 
     <!-- 설정 입력 폼 -->
     <div class="box" style="margin-bottom:14px">
-      <div style="font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:14px">⚙ AI 추천 설정</div>
+      <div style="font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:14px">⚙️ AI 추천 설정</div>
 
       <div class="g2" style="margin-bottom:12px">
         <div>
@@ -5800,8 +5773,8 @@ function renderAiPlanTab(s){
       </div>
 
       ${!apiReady?`<div style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#92400e">
-        ⚠ AI 추천을 사용하려면 <strong>우측 상단 ⚙ API 설정</strong>에서 API 키를 먼저 입력해주세요.
-        <button onclick="openApiModal()" style="display:block;margin-top:6px;background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer">⚙ API 키 설정</button>
+        ⚠️ AI 추천을 사용하려면 <strong>우측 상단 ⚙️ API 설정</strong>에서 API 키를 먼저 입력해주세요.
+        <button onclick="openApiModal()" style="display:block;margin-top:6px;background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer">⚙️ API 키 설정</button>
       </div>`:''}
 
       <div style="display:flex;gap:8px">
@@ -6002,7 +5975,7 @@ plan의 각 요일 배열은 "시간:과목명" 형태로, 해당 시간대에 �
 
   }catch(e){
     if(el) el.innerHTML=`<div style="padding:14px;background:#fff5f5;border-radius:10px;border:1.5px solid #fecaca">
-      <div style="font-size:13px;font-weight:700;color:#c5221f;margin-bottom:6px">⚠ AI 생성 오류</div>
+      <div style="font-size:13px;font-weight:700;color:#c5221f;margin-bottom:6px">⚠️ AI 생성 오류</div>
       <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px">${esc(e.message)}</div>
       <button onclick="generateAiPlan(${sid})" style="background:#3b5bdb;color:#fff;border:none;border-radius:7px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">🔄 다시 시도</button>
     </div>`;
@@ -6067,7 +6040,7 @@ function renderAiPlanResult(s, p, aiPlanMap){
         ✅ 이 플랜을 시간표에 적용
       </button>
       <button onclick="printAiPlan(${s.id})" style="flex:1;background:#0f9d58;color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">
-        🖨 인쇄 / PDF
+        🖨️ 인쇄 / PDF
       </button>
     </div>
   </div>`;
@@ -6184,7 +6157,7 @@ function renderWeeklyHistory(s){
         <div style="font-size:12px;font-weight:700;color:#1a1a2e">📆 이력 필터</div>
         <div style="display:flex;gap:6px;align-items:center">
           <button onclick="printWeeklyHistory(${s.id})"
-            style="background:#0f9d58;color:#fff;border:none;border-radius:8px;padding:5px 13px;font-size:11px;font-weight:700;cursor:pointer">🖨 전체 인쇄</button>
+            style="background:#0f9d58;color:#fff;border:none;border-radius:8px;padding:5px 13px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 전체 인쇄</button>
           <button onclick="exportHistoryXls(${s.id})"
             style="background:#10b98118;color:#0f9d58;border:1.5px solid #10b98140;border-radius:8px;padding:5px 13px;font-size:11px;font-weight:700;cursor:pointer">📊 엑셀</button>
         </div>
@@ -6241,7 +6214,7 @@ function renderWeeklyHistory(s){
         <div style="display:flex;gap:6px;align-items:center">
           <span style="font-size:11px;color:#888">${mData.entries.length}주차 기록</span>
           <button onclick="printWeeklyHistoryMonth(${s.id},'${mKey}')"
-            style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer">🖨 이달 인쇄</button>
+            style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer">🖨️ 이달 인쇄</button>
         </div>
       </div>
 
@@ -6284,7 +6257,7 @@ function renderWeeklyHistory(s){
               <button onclick="event.stopPropagation();if(confirm('이 이력을 현재 학습플랜으로 불러올까요?')){upd({...ST.sel,weeklyPlan:{...h.plan},weeklyBookMap:{...h.bookMap},weeklySubjPlans:JSON.parse(JSON.stringify(h.subjPlans||{}))});ST.weekTab='tt';render();alert('불러오기 완료!')};"
                 style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">📥 불러오기</button>
               <button onclick="event.stopPropagation();printWeeklyHistoryOne(${s.id},${h.id})"
-                style="background:#f0fdf4;color:#0f9d58;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">🖨 인쇄</button>
+                style="background:#f0fdf4;color:#0f9d58;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">🖨️ 인쇄</button>
               <button onclick="event.stopPropagation();deleteWeeklyHistory('${s.id}','${h.id}')"
                 style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">삭제</button>
               <span style="color:#aaa;font-size:14px">${ST._historyOpen===h.id?'▲':'▼'}</span>
@@ -6328,7 +6301,7 @@ function renderWeeklyHistory(s){
     <div style="text-align:center;margin-top:10px">
       <button onclick="printWeeklyHistory(${s.id})"
         style="background:#3b5bdb;color:#fff;border:none;border-radius:10px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">
-        🖨 전체 주간 이력 인쇄/PDF
+        🖨️ 전체 주간 이력 인쇄/PDF
       </button>
     </div>
   </div>`;
@@ -6422,7 +6395,7 @@ function renderAchieve(s){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
       <div style="font-size:14px;font-weight:900;color:#8b5cf6">🔍 ${wLabel} 플랜점검</div>
       <div style="display:flex;gap:5px">
-        <button onclick="printAchieve(${s.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">🖨 인쇄/PDF</button>
+        <button onclick="printAchieve(${s.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 인쇄/PDF</button>
         <button onclick="exportAchieveXls(${s.id})" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">📊 엑셀</button>
       </div>
     </div>
@@ -7164,7 +7137,7 @@ function renderWeeklyDetail(s){
       var col=SC[subj]||'#3b5bdb';
       return '<button onclick="openSubjModal(\''+subj.replace(/'/g,"\\'")+'\')" style="background:'+col+'18;color:'+col+';border:1.5px solid '+col+'44;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;cursor:pointer">'+subj+'</button>';
     }).join('')
-    +'<button onclick="window._openCustomSubjAdd()" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;cursor:pointer">✏ 직접입력</button>'
+    +'<button onclick="window._openCustomSubjAdd()" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;cursor:pointer">✏️ 직접입력</button>'
     +'</div>';
 
   if(!used.length)return addSubjBar
@@ -7235,7 +7208,7 @@ function renderWeeklyDetail(s){
       +'<div style="font-size:10px;color:#777">주간 '+hrs+'h 배정'+(sp.weeklyHours?' / 목표 '+sp.weeklyHours+'h':'')+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:6px;align-items:center">'+delBtn
-      +'<button onclick="openSubjModal(\''+subj.replace(/'/g,"\\'")+'\''+')" style="background:'+col+';color:#fff;border:none;border-radius:7px;padding:6px 13px;font-size:11px;font-weight:700">'+(sp.weeklyHours||books.length?'✏ 수정':'+ 조건 입력')+'</button>'
+      +'<button onclick="openSubjModal(\''+subj.replace(/'/g,"\\'")+'\''+')" style="background:'+col+';color:#fff;border:none;border-radius:7px;padding:6px 13px;font-size:11px;font-weight:700">'+(sp.weeklyHours||books.length?'✏️ 수정':'+ 조건 입력')+'</button>'
       +'</div></div>'
       +booksHtml+cellBooksHtml+statsHtml+memoHtml
       +'</div>';
@@ -7520,7 +7493,7 @@ function openSubjModal(subj){
   };
 
   const TYPE_OPTS=['과제학습','셀프학습','인터넷강의','직접입력'];
-  const TYPE_ICONS=['📝','🙋','🎧','✍'];
+  const TYPE_ICONS=['📝','🙋','🎧','✍️'];
   const DIFF_LEVELS=[['최상','#8b5cf6'],['상','#ef4444'],['중','#f59e0b'],['하','#10b981']];
 
   window._renderBookItems=function(){
@@ -7800,7 +7773,7 @@ function renderConsult(s){
       return `
       <div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:10px;border:1px solid #e8eaf6;border-left:4px solid ${ctypeCol}">
         ${isEdit?`
-        <div style="font-size:12px;font-weight:800;color:#3b82f6;margin-bottom:12px">✏ 상담 기록 수정</div>
+        <div style="font-size:12px;font-weight:800;color:#3b82f6;margin-bottom:12px">✏️ 상담 기록 수정</div>
         <div style="margin-bottom:10px">
           <div style="font-size:11px;color:#777;margin-bottom:5px">상담 유형</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="cedit_btns_${i}">
@@ -7844,8 +7817,8 @@ function renderConsult(s){
             <div style="font-size:11px;color:#777">👤 담당: ${esc(c.counselor)}</div>
           </div>
           <div style="display:flex;gap:5px;flex-shrink:0;margin-left:10px">
-            <button onclick="printConsultOne(${s.id},${i})" style="background:#3b5bdb18;color:#3b5bdb;border:1px solid #3b5bdb30;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">🖨 인쇄</button>
-            <button onclick="ST.consultEditId=${i};ST.consultAdding=null;render()" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">✏ 수정</button>
+            <button onclick="printConsultOne(${s.id},${i})" style="background:#3b5bdb18;color:#3b5bdb;border:1px solid #3b5bdb30;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">🖨️ 인쇄</button>
+            <button onclick="ST.consultEditId=${i};ST.consultAdding=null;render()" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">✏️ 수정</button>
             <button onclick="if(confirm('삭제?')){const s2=ST.students.find(x=>String(x.id)===String(${s.id}));upd({...s2,consultations:s2.consultations.filter((_,idx)=>idx!==${i})});}" style="background:#ef444418;color:#ef4444;border:1px solid #ef444430;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">🗑</button>
           </div>
         </div>
@@ -8761,7 +8734,7 @@ function renderTestMain(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="font-size:15px;font-weight:900;color:#e53935">📝 테스트 관리</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button onclick="printTestAllSummary()" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">🖨 전체 현황</button>
+        <button onclick="printTestAllSummary()" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 전체 현황</button>
         <button onclick="exportAllTestXls()" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:7px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer">📊 전체 엑셀</button>
         <button onclick="openTestForm(null)" style="background:#e53935;color:#fff;border:none;border-radius:7px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer">+ 새 테스트</button>
       </div>
@@ -8843,10 +8816,10 @@ function renderTestMain(){
                 <button onclick="openAnswerInput(${t.id})" style="background:#3b5bdb;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">📋 답안</button>
                 <button onclick="openBulkAnswerUpload(${t.id})" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">📊 일괄</button>
                 <button onclick="openTestScoreChart(${t.id})" style="background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">📊 현황</button>
-                <button onclick="printTestSummary(${t.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">🖨 집계</button>
+                <button onclick="printTestSummary(${t.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 집계</button>
                 <button onclick="printItemAnalysis(${t.id})" style="background:#0891b2;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">📊 문항분석</button>
                 <button onclick="exportTestXls(${t.id})" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:7px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer">📊</button>
-                <button onclick="openTestForm(${t.id})" style="background:#f4f6fb;color:#555;border:1px solid #e8eaf6;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer">✏</button>
+                <button onclick="openTestForm(${t.id})" style="background:#f4f6fb;color:#555;border:1px solid #e8eaf6;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer">✏️</button>
                 <button onclick="if(confirm('삭제?')){ST.tests=ST.tests.filter(x=>String(x.id)!==String(${t.id}));if(FB_USE())fbDelete('tests',String(${t.id}));save();render();}" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:7px;padding:6px 8px;font-size:11px;cursor:pointer">🗑</button>
               </div>
             </div>
@@ -8894,7 +8867,7 @@ function openTestScoreChart(testId){
     <div class="mhd">
       <span style="font-size:14px;font-weight:800">📊 ${esc(t.title)} 현황</span>
       <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="printTestSummary(${t.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">🖨 인쇄</button>
+        <button onclick="printTestSummary(${t.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 인쇄</button>
         <button onclick="exportTestXls(${t.id})" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📊 엑셀</button>
         <button onclick="this.closest('.overlay').remove()" style="background:transparent;border:none;color:#777;font-size:22px;cursor:pointer">×</button>
       </div>
@@ -9821,7 +9794,7 @@ function openAnswerInput(testId){
       <div style="display:flex;gap:6px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap">
         <button onclick="aiScoreEssays(${tid},${sid})" style="background:#7c3aed;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">🤖 서술형 AI채점</button>
         <button onclick="generateAiComment(${tid},${sid})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer">🤖 AI 총평</button>
-        <button onclick="printTestResult(${tid},${sid})" style="background:#3b5bdb;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer">🖨 결과지</button>
+        <button onclick="printTestResult(${tid},${sid})" style="background:#3b5bdb;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 결과지</button>
         <button style="background:#e53935;color:#fff;border:none;border-radius:7px;padding:7px 20px;font-size:12px;font-weight:700;cursor:pointer" onclick="window._saveStudentAnswer('${tid}','${sid}')">💾 저장</button>
       </div>
     </div>`;
@@ -9894,7 +9867,7 @@ ${essayData.map(q=>`${q.no}번: [점수]점 | [채점이유 한줄]`).join('\n')
       msgEl.innerHTML=`<div style="background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #ddd6fe;margin-top:8px">
         <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:5px">🤖 AI 채점 결과 (${applied}/${essayData.length}문항 적용)</div>
         <div style="font-size:11px;color:#555;white-space:pre-line;line-height:1.7">${esc(resultText)}</div>
-        <div style="font-size:10px;color:#aaa;margin-top:6px">⚠ AI 채점은 참고용입니다. 획득점수를 직접 수정할 수 있습니다.</div>
+        <div style="font-size:10px;color:#aaa;margin-top:6px">⚠️ AI 채점은 참고용입니다. 획득점수를 직접 수정할 수 있습니다.</div>
       </div>`;
     } else {
       alert('✅ AI 채점 완료 ('+applied+'문항 적용)\n\n'+resultText);
@@ -9929,7 +9902,7 @@ async function generateAiComment(testId,studentId){
       ld = document.createElement('div');
       ld.id = 'ai-loading-toast';
       ld.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;padding:12px 24px;border-radius:30px;font-size:13px;font-weight:700;z-index:99999;box-shadow:0 4px 20px rgba(139,92,246,.4);display:flex;align-items:center;gap:10px;min-width:240px;justify-content:center;';
-      ld.innerHTML = '<span style="font-size:18px;animation:spin 1s linear infinite;display:inline-block">⚙</span><span>🤖 AI 총평 생성 중...</span>';
+      ld.innerHTML = '<span style="font-size:18px;animation:spin 1s linear infinite;display:inline-block">⚙️</span><span>🤖 AI 총평 생성 중...</span>';
       const style = document.createElement('style');
       style.textContent = '@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
       document.head.appendChild(style);
@@ -10114,7 +10087,7 @@ h3{font-size:12px;font-weight:800;border-bottom:1.5px solid #e0e0e0;padding-bott
 </style></head><body>
 <div class="np">
   <span style="font-size:12px;font-weight:700;flex:1;color:#1a1a1a">${(()=>{let oN=ST.currentOrg?.name||'';if(!oN&&s?.orgId){try{const os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');oN=os.find(o=>String(o.id)===String(s.orgId))?.name||'';}catch(e){}}return oN?'<span style="font-size:10px;background:#f0f0f0;color:#333;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">'+esc(oN)+'</span>':'';})()} ${esc(s.name)} · ${esc(t.title)} 결과지</span>
-  <button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨 인쇄/PDF</button>
+  <button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>
   <button onclick="window.close()" style="padding:7px 14px;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>
 </div>
 <div class="np-spacer" style="height:46px"></div>
@@ -10190,7 +10163,7 @@ ${(()=>{
     ${strong.length?strong.slice(0,4).map(u=>`<div style="font-size:10px;color:#444">✅ ${esc(u)}</div>`).join(''):'<div style="font-size:10px;color:#aaa">–</div>'}
   </div>
   <div class="unit-box" style="background:#fff5f5;border-color:#e53935">
-    <div style="font-size:10px;font-weight:700;color:#c62828;margin-bottom:3px">⚠ 취약 단원</div>
+    <div style="font-size:10px;font-weight:700;color:#c62828;margin-bottom:3px">⚠️ 취약 단원</div>
     ${weak.length?weak.slice(0,4).map(u=>`<div style="font-size:10px;color:#444">❌ ${esc(u)}</div>`).join(''):'<div style="font-size:10px;color:#aaa">없음</div>'}
   </div>
 </div>
@@ -10271,7 +10244,7 @@ ${res?.aiComment?`<div style="background:#f5f3ff;border-radius:8px;padding:10px 
 
   <!-- [2,1] 단원별 방사형 -->
   <div class="dash-card">
-    <div class="dash-title">🕸 단원별 취약점 분석</div>
+    <div class="dash-title">🕸️ 단원별 취약점 분석</div>
     <div class="dash-canvas-wrap">
       ${radarLabels.length>=3?'<canvas id="radarChart"></canvas>':'<div style="font-size:9px;color:#aaa;text-align:center;margin-top:16px">단원 3개 이상 필요</div>'}
     </div>
@@ -10614,7 +10587,7 @@ function _testPrintNavBar(title, orgId){
   const orgBadge=orgN?'<span style="font-size:10px;background:#f0f0f0;color:#333;border-radius:5px;padding:2px 8px;font-weight:700;margin-right:6px">'+esc(orgN)+'</span>':'';
   return '<div class="np">'
     +'<span style="font-size:12px;font-weight:700;flex:1;color:#1a1a1a">'+orgBadge+title+'</span>'
-    +'<button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨 인쇄/PDF</button>'
+    +'<button onclick="window.print()" style="padding:7px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">🖨️ 인쇄/PDF</button>'
     +'<button onclick="window.close()" style="padding:7px 14px;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-size:12px">✕</button>'
     +'</div>';
 }
@@ -10732,7 +10705,7 @@ ${t.questions.map(q=>{
 <div class="dash-grid">
   <div class="dash-card"><div class="dash-title">📊 점수 분포</div><div class="dash-canvas-wrap"><canvas id="ch1"></canvas></div></div>
   <div class="dash-card"><div class="dash-title">📋 문항별 정답률</div><div class="dash-canvas-wrap"><canvas id="ch2"></canvas></div></div>
-  <div class="dash-card"><div class="dash-title">🕸 단원별 성취도</div><div class="dash-canvas-wrap">${rLabels.length>=3?'<canvas id="ch3"></canvas>':'<div style="padding:20px;text-align:center;font-size:9px;color:#aaa">단원 3개 이상 필요</div>'}</div></div>
+  <div class="dash-card"><div class="dash-title">🕸️ 단원별 성취도</div><div class="dash-canvas-wrap">${rLabels.length>=3?'<canvas id="ch3"></canvas>':'<div style="padding:20px;text-align:center;font-size:9px;color:#aaa">단원 3개 이상 필요</div>'}</div></div>
   <div class="dash-card"><div class="dash-title">🏆 학생별 순위</div><div class="dash-canvas-wrap"><canvas id="ch4"></canvas></div></div>
 </div>
 </div>
@@ -10893,7 +10866,7 @@ function exportAllTestXls(){
 function renderSubjConfig(){
   const keys=['korean','math','english','science','social'];
   return`<div>
-    <div style="font-size:15px;font-weight:900;color:#3b5bdb;margin-bottom:4px">⚙ 내신 기본 과목 설정</div>
+    <div style="font-size:15px;font-weight:900;color:#3b5bdb;margin-bottom:4px">⚙️ 내신 기본 과목 설정</div>
     <div style="font-size:12px;color:#888;margin-bottom:16px">학생 등록/성적 입력 화면에 표시되는 기본 5개 과목 이름을 변경할 수 있습니다</div>
 
     <div class="box" style="margin-bottom:14px;border-left:4px solid #3b5bdb">
@@ -10993,7 +10966,7 @@ function renderSubjConfig(){
 
     <!-- 현재 과목 미리보기 -->
     <div class="box" style="border-left:4px solid #0f9d58">
-      <div style="font-size:12px;font-weight:700;color:#0f9d58;margin-bottom:12px">👁 현재 적용 중인 과목명</div>
+      <div style="font-size:12px;font-weight:700;color:#0f9d58;margin-bottom:12px">👁️ 현재 적용 중인 과목명</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${GRADE_SUBJS.map(([k,lb])=>`<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:8px 18px;text-align:center">
           <div style="font-size:14px;font-weight:800;color:#0f9d58">${esc(lb)}</div>
@@ -11023,7 +10996,7 @@ function renderAdmin(){
       ${(()=>{
         const isAdmin_=ST.currentUser?.role==='admin';
         const isOrgAdmin_=ST.currentUser?.role==='orgAdmin';
-        const tabs=[['report','📋 리포트'],['grade_stat','📊 성적 현황'],['test','📝 테스트'],['subj_config','⚙ 과목설정']];
+        const tabs=[['report','📋 리포트'],['grade_stat','📊 성적 현황'],['test','📝 테스트'],['subj_config','⚙️ 과목설정']];
         if(isAdmin_||isOrgAdmin_) tabs.push(['teacher','👨‍🏫 선생님']);
         if(isAdmin_||isOrgAdmin_) tabs.push(['student_mgmt','🎓 학생관리']);
         if(isAdmin_) tabs.push(['orgs','🏫 기관관리']);
@@ -11088,10 +11061,10 @@ function renderAdminReport(){
             if(_oid){try{const _os=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');const _fo=_os.find(o=>String(o.id)===String(_oid));_orgP=_fo?.permissions||null;}catch(e){}}
             const _hp=(key)=>{if(ST.currentUser?.role==='admin')return true;if(_orgP&&!_orgP.includes(key))return false;return true;};
             const btns=[];
-            btns.push(`<button onclick="printGrade(${ST.adminSel.id})" style="background:#3b82f618;color:#3b82f6;border:1px solid #3b82f640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📊 성적 리포트 🖨</button>`);
-            if(_hp('susi')) btns.push(`<button onclick="printSusiReport(${ST.adminSel.id})" style="background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">🏫 수시 리포트 🖨</button>`);
-            if(_hp('weekly')) btns.push(`<button onclick="printTab(${ST.adminSel.id},'weekly')" style="background:#10b98118;color:#10b981;border:1px solid #10b98140;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📅 주간 리포트 🖨</button>`);
-            if(_hp('consult')) btns.push(`<button onclick="printTab(${ST.adminSel.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">💬 상담 리포트 🖨</button>`);
+            btns.push(`<button onclick="printGrade(${ST.adminSel.id})" style="background:#3b82f618;color:#3b82f6;border:1px solid #3b82f640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📊 성적 리포트 🖨️</button>`);
+            if(_hp('susi')) btns.push(`<button onclick="printSusiReport(${ST.adminSel.id})" style="background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">🏫 수시 리포트 🖨️</button>`);
+            if(_hp('weekly')) btns.push(`<button onclick="printTab(${ST.adminSel.id},'weekly')" style="background:#10b98118;color:#10b981;border:1px solid #10b98140;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📅 주간 리포트 🖨️</button>`);
+            if(_hp('consult')) btns.push(`<button onclick="printTab(${ST.adminSel.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">💬 상담 리포트 🖨️</button>`);
             if(_hp('grade')) btns.push(`<button onclick="exportGradeXls(${ST.adminSel.id})" class="btn-gr" style="padding:6px 11px;font-size:11px">📊 성적 엑셀</button>`);
             btns.push(`<button onclick="exportStudentXls(${ST.adminSel.id})" style="background:#8b5cf618;color:#8b5cf6;border:1px solid #8b5cf640;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700">📋 전체 엑셀</button>`);
             return btns.join('');
@@ -11168,7 +11141,7 @@ function renderAdminGradeStat(){
             <td style="color:#555">${esc(s.counselor)}</td>
             <td style="font-weight:900;color:${gc(a)}">${a.toFixed(2)}</td>
             ${GRADE_SUBJS.map(([k])=>{const v=s.subjects[k];return`<td style="font-weight:700;color:${gc(v)}">${v}</td>`;}).join('')}
-            <td><button onclick="printGrade(${s.id})" style="background:#3b82f618;color:#3b82f6;border:1px solid #3b82f640;border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700">🖨</button></td>
+            <td><button onclick="printGrade(${s.id})" style="background:#3b82f618;color:#3b82f6;border:1px solid #3b82f640;border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700">🖨️</button></td>
           </tr>`;}).join('')}
         </table>
       </div>
@@ -11322,7 +11295,7 @@ function renderOrgMgmt(){
             <div style="font-size:11px;color:#888;margin-top:2px">ID: ${esc(org.loginId)}</div>
           </div>
           <div style="display:flex;gap:5px">
-            <button onclick="openOrgFormById('${org.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">✏ 수정</button>
+            <button onclick="openOrgFormById('${org.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">✏️ 수정</button>
             <button onclick="deleteOrg('${org.id}')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑</button>
           </div>
         </div>
@@ -11331,7 +11304,7 @@ function renderOrgMgmt(){
           ${org.ceo?`👤 대표: ${esc(org.ceo)}<br>`:''}
           ${org.phone?`📞 ${esc(org.phone)}<br>`:''}
           ${org.mobile?`📱 ${esc(org.mobile)}<br>`:''}
-          ${org.email?`✉ ${esc(org.email)}`:''}
+          ${org.email?`✉️ ${esc(org.email)}`:''}
         </div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e8eaf6;display:flex;gap:8px;flex-wrap:wrap">
           <span style="background:#f0fdf4;color:#0f9d58;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700">
@@ -11584,13 +11557,13 @@ function renderStudentMgmt(){
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
   html+='<div style="font-size:15px;font-weight:800;color:#1a1a2e">🎓 학생관리 · 승급처리</div>';
   html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-  html+='<button onclick="bulkGradeUp()" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">⬆ 선택 학생 일괄 승급</button>';
+  html+='<button onclick="bulkGradeUp()" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">⬆️ 선택 학생 일괄 승급</button>';
   html+='<button onclick="bulkGraduate()" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">🎓 졸업/수료 처리</button>';
   html+='<button onclick="selectAllStudents()" style="background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer">전체선택</button>';
   html+='<button onclick="clearAllStudents()" style="background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer">선택해제</button>';
   html+='</div></div>';
   html+='<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:#92400e;line-height:1.8">';
-  html+='⚠ <strong>승급 안내</strong>: 체크박스로 학생을 선택 후 [선택 학생 일괄 승급] 버튼을 누르면 다음 학년으로 자동 변경됩니다.<br>';
+  html+='⚠️ <strong>승급 안내</strong>: 체크박스로 학생을 선택 후 [선택 학생 일괄 승급] 버튼을 누르면 다음 학년으로 자동 변경됩니다.<br>';
   html+='졸업/수료 처리 시 [졸업/수료]로 변경됩니다. 삭제는 각 학생 카드에서 진행하세요.</div>';
 
   if(!allStu.length){
@@ -11744,11 +11717,11 @@ function renderAdminTeacher(){
                     🔐 아이디: <strong>${esc(t.loginId)}</strong>
                   </div>`
                 :`<div style="font-size:10px;background:#fff5f5;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;margin-top:4px;display:inline-block;color:#e53935">
-                    ⚠ 로그인 계정 미설정
+                    ⚠️ 로그인 계정 미설정
                   </div>`}
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0">
-              <button onclick="openTForm(ST.teachers.find(x=>String(x.id)===String(${t.id})))" style="background:#fff;color:#555;border:1px solid #e8eaf6;border-radius:6px;padding:4px 9px;font-size:10px">✏</button>
+              <button onclick="openTForm(ST.teachers.find(x=>String(x.id)===String(${t.id})))" style="background:#fff;color:#555;border:1px solid #e8eaf6;border-radius:6px;padding:4px 9px;font-size:10px">✏️</button>
               <button onclick="openAssignStudents(${t.id})" style="background:#f5f3ff;color:#8b5cf6;border:1px solid #ddd6fe;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:700">👥 배정</button>
               <button onclick="if(confirm('삭제?')){const ms=ST.students.filter(s=>s.counselor==='${esc(t.name)}').length;if(ms&&!confirm(ms+'명 담당자 해제됩니다. 계속?'))return;ST.students=ST.students.map(s=>s.counselor==='${esc(t.name)}'?{...s,counselor:''}:s);ST.teachers=ST.teachers.filter(x=>x.id!==${t.id});if(FB_USE())fbDelete('teachers',String(${t.id}));saveAccounts();save();render();}" class="btn-r" style="padding:4px 9px;font-size:10px">🗑</button>
             </div>
@@ -12436,14 +12409,14 @@ function openApiModal(){
   const ov=document.createElement('div');ov.className='overlay';
   ov.innerHTML=`<div class="modal" style="max-width:500px">
     <div class="mhd">
-      <span style="font-size:15px;font-weight:800;color:#1a1a2e">⚙ AI 분석 API 설정</span>
+      <span style="font-size:15px;font-weight:800;color:#1a1a2e">⚙️ AI 분석 API 설정</span>
       <button onclick="this.closest('.overlay').remove()" style="background:transparent;border:none;color:#aaa;font-size:22px;cursor:pointer">×</button>
     </div>
     <div style="padding:20px 22px 28px">
 
       <!-- 현재 상태 표시 -->
       <div style="background:${isSet?'#f0fdf4':'#fef9c3'};border:1.5px solid ${isSet?'#86efac':'#fde047'};border-radius:10px;padding:11px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
-        <div style="font-size:20px">${isSet?'✅':'⚠'}</div>
+        <div style="font-size:20px">${isSet?'✅':'⚠️'}</div>
         <div style="font-size:13px;font-weight:700;color:${isSet?'#166534':'#854d0e'}">${isSet?'API 키가 설정되어 있습니다':'API 키가 설정되지 않았습니다'}</div>
       </div>
 
@@ -12673,7 +12646,7 @@ function openShareModal(){
 
       <!-- QR 인쇄 버튼 -->
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button onclick="printQRPage()" style="flex:1;background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">🖨 QR코드 인쇄</button>
+        <button onclick="printQRPage()" style="flex:1;background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">🖨️ QR코드 인쇄</button>
         <button onclick="copyAllUrls()" style="flex:1;background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">📋 URL 복사</button>
       </div>
     </div>
@@ -12933,7 +12906,7 @@ function openStudentStatusModal(){
       </div>
             <!-- 반별 -->
       ${Object.keys(byClass).length?`<div style="background:#f8f9ff;border-radius:10px;padding:14px;margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px">🏷 반별 현황</div>
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px">🏷️ 반별 현황</div>
         ${Object.entries(byClass).sort().map(([c,n])=>`
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <span style="font-size:13px;color:#333">${esc(c)}</span>
@@ -13053,7 +13026,7 @@ function openStudentAccountModal(){
               <td style="padding:7px 8px">
                 ${hasAcc
                   ?`<code style="background:#f0fdf4;color:#0f9d58;border:1px solid #86efac;border-radius:4px;padding:2px 8px;font-size:12px">${esc(s.studentLoginId)}</code>`
-                  :`<span style="color:#e53935;font-size:11px">⚠ 미설정</span>`}
+                  :`<span style="color:#e53935;font-size:11px">⚠️ 미설정</span>`}
               </td>
               <td style="padding:7px 8px">
                 ${hasAcc&&s.studentPassword
@@ -13069,7 +13042,7 @@ function openStudentAccountModal(){
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
         ${noCred.length?`<div style="background:#fff8e1;border-radius:8px;padding:10px 14px;font-size:11px;color:#d97706;flex:1">
-          ⚠ ${noCred.length}명의 학생이 로그인 계정이 없습니다. 학생 수정에서 아이디/비밀번호를 설정해주세요.
+          ⚠️ ${noCred.length}명의 학생이 로그인 계정이 없습니다. 학생 수정에서 아이디/비밀번호를 설정해주세요.
         </div>`:''}
         ${notConsented.length?`<div style="background:#fef3c7;border-radius:8px;padding:10px 14px;font-size:11px;color:#b45309;flex:1">
           📋 ${notConsented.length}명이 아직 개인정보·약관에 동의하지 않았습니다. 학생용 페이지 로그인 시 동의 팝업이 표시됩니다.
@@ -18088,7 +18061,7 @@ function renderJonghap(s){
   +'</div>'
   +'<div id="jh-db-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)jh_closeDbModal()">'
     +'<div style="background:#fff;border-radius:14px;width:min(840px,95vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden">'
-      +'<div style="padding:13px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span style="font-size:14px;font-weight:800">⚙ 종합전형 대학 DB 관리</span><div style="display:flex;gap:6px"><label style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;color:#059669">📂 CSV 업로드<input type="file" accept=".csv" style="display:none" onchange="jh_importCsv(this)"></label><button onclick="jh_exportCsv()" style="padding:5px 10px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer">💾 CSV 내보내기</button></div><button onclick="jh_closeDbModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#94a3b8">✕</button></div>'
+      +'<div style="padding:13px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span style="font-size:14px;font-weight:800">⚙️ 종합전형 대학 DB 관리</span><div style="display:flex;gap:6px"><label style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;color:#059669">📂 CSV 업로드<input type="file" accept=".csv" style="display:none" onchange="jh_importCsv(this)"></label><button onclick="jh_exportCsv()" style="padding:5px 10px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer">💾 CSV 내보내기</button></div><button onclick="jh_closeDbModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#94a3b8">✕</button></div>'
       +'<div style="padding:14px 16px;overflow-y:auto;flex:1">'
         +'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:9px 11px;margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:3px">📂 CSV로 대학 DB 업데이트</div><div style="font-size:10px;color:#78350f;line-height:1.7">1단계 → <b>CSV 내보내기</b>로 현재 DB 다운로드 → 엑셀에서 수정/추가<br>2단계 → <b>CSV 업로드</b>로 일괄 반영<br><b>필수:</b> 대학명, 학과, 전형명, 입결50, 입결70 / <b>선택:</b> 모집인원, 경쟁률, 충원율, 면접유무, 면접비중, 서류비중, 수능최저, 서류핵심요소, 선발방법, 전형특징, 계열</div></div>'
         +'<div style="background:#f8fafc;border-radius:10px;padding:11px;margin-bottom:12px;border:1px solid #e2e8f0"><div style="font-size:12px;font-weight:700;margin-bottom:9px">새 대학 추가 (단건)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">대학명 *</div><input id="jh-f-univ" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="서울대학교"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">모집단위(학과) *</div><input id="jh-f-dept" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="경영학과"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">전형명</div><select id="jh-f-type" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px"><option>일반전형</option><option>지역균형</option><option>활동우수형</option><option>학업우수형</option><option>계열적합형</option><option>기회균형</option><option>고른기회</option><option>SW특기자</option><option>기타</option></select></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">모집인원</div><input id="jh-f-recruit" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="30명"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">경쟁률</div><input id="jh-f-comp26" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="8.5:1"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">충원 인원</div><input id="jh-f-fill" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="12"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">면접 유무</div><select id="jh-f-interview" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px"><option value="없음">없음 (서류100%)</option><option value="있음">있음 (서류+면접)</option></select></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">면접 비중(%)</div><input id="jh-f-intpct" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="0 또는 30"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">서류 비중(%)</div><input id="jh-f-docpct" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="100 또는 70"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">수능최저</div><input id="jh-f-csat" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="없음 또는 3합7"></div><div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">서류 핵심 평가요소</div><input id="jh-f-evalfocus" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="학업역량, 전공적합성, 인성 (콤마 구분)"></div><div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">선발방법 메모</div><input id="jh-f-method" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="예: 1단계 서류3배수, 2단계 서류70+면접30"></div><div style="grid-column:1/-1"><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">전형 특징</div><input id="jh-f-note" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="예: 고교 추천 필수"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">합격자 내신 50% *</div><input id="jh-f-cut50" type="number" step="0.01" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="2.45"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">합격자 내신 70% *</div><input id="jh-f-cut70" type="number" step="0.01" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" placeholder="2.90"></div><div><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:2px">계열</div><select id="jh-f-major" style="width:100%;padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px"><option value="">전체</option><option value="인문·사회">인문·사회</option><option value="자연·공학">자연·공학</option><option value="상경">상경</option><option value="의약학">의약학</option><option value="교육">교육</option><option value="예체능">예체능</option></select></div></div><button onclick="jh_addUniv()" style="width:100%;margin-top:9px;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 추가</button></div>'
@@ -18137,7 +18110,7 @@ function jh_print(sid){
     +'table{width:100%;border-collapse:collapse}th{background:#4c1d95;color:#fff;font-size:10px;font-weight:600;padding:7px 6px;text-align:center}'
     +'tr:nth-child(even){background:#fafbff}</style></head><body>'
     +'<div style="padding:20px 24px">'
-    +'<div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="padding:8px 18px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨 인쇄 / PDF 저장</button></div>'
+    +'<div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="padding:8px 18px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ 인쇄 / PDF 저장</button></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;border-bottom:2px solid #7c3aed;padding-bottom:10px">'
       +'<div><div style="font-size:18px;font-weight:900;color:#4c1d95">📚 수시 종합전형 분석</div>'
       +'<div style="font-size:13px;color:#64748b;margin-top:3px">'+(s?s.name+' · '+s.school+' · '+s.grade+'학년':'')+'</div></div>'
@@ -18762,7 +18735,7 @@ init();
         <div style="background:#f4f7f9; padding:15px 20px; border-radius:10px; line-height: 1.5; font-size:0.88em;">
             <div style="margin-bottom: 6px;"><b>💎 전문가 (Master / 9~10점):</b> 해당 역량을 증명할 구체적 사례와 탐구 보고서 등의 결과물이 실재합니다. 현상의 원리에 대해 스스로 '왜?'라고 질문하며 난제 해결을 즐기는 단계로, 어떤 경쟁 환경에서도 최상위권을 유지할 DNA를 보유하고 있습니다.</div>
             <div style="margin-bottom: 6px;"><b>✅ 숙련 (Proficient / 7~8점):</b> 성실하게 수행 중이나 사례가 평범하며 특목고 입학 후 내신 경쟁을 견딜 안정적 기초 체력 단계입니다.</div>
-            <div style="margin-bottom: 6px;"><b>⚠ 발전 (Developing / 5~6점):</b> 필요성은 인지하나 기복이 심하며 특정 흥미 분야 외에는 학습 습관이 부족한 단계입니다.</div>
+            <div style="margin-bottom: 6px;"><b>⚠️ 발전 (Developing / 5~6점):</b> 필요성은 인지하나 기복이 심하며 특정 흥미 분야 외에는 학습 습관이 부족한 단계입니다.</div>
             <div style="margin-bottom: 0;"><b>❌ 결손 주의 (Critical / 4점 이하):</b> 메타인지가 부족하고 환경 통제가 불가능한 상태로, 특목고 입학 시 중도 탈락 위험이 높은 위험군입니다.</div>
         </div>
         <div class="footer">Page 6 | APEX Academic Intelligence System by Sparta</div>
@@ -19225,7 +19198,7 @@ function generateReport() {
     document.getElementById('resSummary').innerHTML = summaryText;
 
     if(info.style === 'master' && (avgs.B < 6 || avgs.D < 6)) {
-        document.getElementById('mismatchArea').innerHTML = `<div class="mismatch-box"><b>⚠ [The Illusionist] 메타인지 결핍 경고:</b> 학생은 스스로를 '마스터형'으로 인식하고 있으나 실제 주도성(B) 및 습관(D) 지표는 평균 이하입니다. 이는 본인의 학습 통제력을 과대평가하고 있음을 의미하며, 입학 후 자기주도 시간 확보 실패 시 성적이 급락할 위험이 매우 큽니다.</div>`;
+        document.getElementById('mismatchArea').innerHTML = `<div class="mismatch-box"><b>⚠️ [The Illusionist] 메타인지 결핍 경고:</b> 학생은 스스로를 '마스터형'으로 인식하고 있으나 실제 주도성(B) 및 습관(D) 지표는 평균 이하입니다. 이는 본인의 학습 통제력을 과대평가하고 있음을 의미하며, 입학 후 자기주도 시간 확보 실패 시 성적이 급락할 위험이 매우 큽니다.</div>`;
     } else { document.getElementById('mismatchArea').innerHTML = ""; }
 
     const domainNames = {A:"탐구(Inquiry)", B:"주도(Self-Directed)", C:"정서(Resilience)", D:"습관(Habit)"};
@@ -19286,7 +19259,7 @@ function generateReport() {
                     </div>
                 </div>
                 <div>
-                    <h3>🛡 실전 입시 생존 지수</h3>
+                    <h3>🛡️ 실전 입시 생존 지수</h3>
                     <div class="analysis-box" style="height: 140px; border-left: 5px solid ${survivalColor}; padding:15px;">
                         <div style="text-align:center; margin-top:0;">
                             <span style="font-size:2em; font-weight:900; color:var(--primary);">${survivalRawCalib}점</span> 
@@ -19313,7 +19286,7 @@ function generateReport() {
                     </div>
                 </div>
                 <div>
-                    <h3 style="margin-top:15px;">🛡 실전 입시 생존 지수 (Survival Index)</h3>
+                    <h3 style="margin-top:15px;">🛡️ 실전 입시 생존 지수 (Survival Index)</h3>
                     <div class="analysis-box" style="height: 130px; border-left: 5px solid ${survivalColor}; padding:15px;">
                         <div style="text-align:center; margin-top:0;">
                             <span style="font-size:1.8em; font-weight:900; color:var(--primary);">${survivalRawCalib}점</span> 
@@ -19326,7 +19299,7 @@ function generateReport() {
         `;
     } else {
         indexHtml = `
-            <h3>🛡 실전 입시 생존 지수 (Survival Index)</h3>
+            <h3>🛡️ 실전 입시 생존 지수 (Survival Index)</h3>
             <div class="analysis-box" style="border-left: 5px solid ${survivalColor}; padding:15px 20px;">
                 <div style="display:flex; align-items:center; margin-bottom:5px;">
                     <span style="font-size:2em; font-weight:900; color:var(--primary);">${survivalRawCalib}점</span> 
