@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6367,7 +6340,13 @@ function renderAchieve(s){
     ST.students=ST.students.map(x=>x.id===s2.id?u:x);
     if(String(ST.sel?.id)===String(s2.id))ST.sel=u;
     if(ST.adminSel?.id===s2.id)ST.adminSel=u;
+    // Firebase 즉시 저장 + onSnapshot 차단 (upd()과 동일 패턴, render() 미호출로 입력 포커스 유지)
+    if(!ST._savingIds) ST._savingIds=new Set();
+    ST._savingIds.add(String(u.id));
+    if(FB_USE()) fbSave('students', u.id, u);
     save();
+    const sid2=String(u.id);
+    setTimeout(()=>{if(ST._savingIds) ST._savingIds.delete(sid2);},2000);
   };
 
   // 작은 방향 버튼 (상향/유지/하향)
@@ -18540,6 +18519,49 @@ var JH_UNIV_DB=[
   {id:97119,univ:'고려대학교',dept:'반도체공학과',type:'학업우수형(계약학과)',recruit:'14명',comp26:'11.57:1',fill:'16',interview:'없음',intPct:0,docPct:100,csat:'없음',evalFocus:'학업역량,진로역량,공동체역량',methodNote:'서류 100%',note:'계약학과 / 수능최저 없음',cut50:1.38,cut70:1.73,major:'자연·공학',region:'서울'},
   {id:97120,univ:'고려대학교',dept:'반도체공학과',type:'계열적합형(계약학과)',recruit:'14명',comp26:'12.5:1',fill:'52',interview:'있음',intPct:40,docPct:60,csat:'없음',evalFocus:'진로역량,공동체역량,학업역량',methodNote:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'계약학과 / 수능최저 없음',cut50:3.98,cut70:4.02,major:'자연·공학',region:'서울'},
   {id:97121,univ:'고려대학교',dept:'사이버국방학과',type:'사이버국방전형',recruit:'10명',comp26:'9.4:1',fill:'3',interview:'있음',intPct:40,docPct:60,csat:'없음',evalFocus:'학업역량,진로역량,공동체역량',methodNote:'1단계 서류100%(5배수)→2단계 서류60%+면접40% / 전원 군장학생 선발',note:'수능최저 없음 / 졸업후 임관의무',cut50:3.68,cut70:4.2,major:'자연·공학',region:'서울'},
+  {id:98000,univ:'국민대학교',dept:'한국어문학부 국어국문학전공',type:'국민프런티어전형',recruit:'11명',comp26:'14.44:1',fill:'10',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.92,cut70:3.07,major:'인문·사회',region:'서울'},
+  {id:98001,univ:'국민대학교',dept:'한국어문학부 글로벌한국어전공',type:'국민프런티어전형',recruit:'3명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2027신설/명칭변경 등으로 2026 입결 매칭 불가, 입결없음',cut50:0,cut70:0,major:'인문·사회',region:'서울'},
+  {id:98002,univ:'국민대학교',dept:'영어영문학부',type:'국민프런티어전형',recruit:'23명',comp26:'13.75:1',fill:'19',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:3.07,cut70:4.41,major:'인문·사회',region:'서울'},
+  {id:98003,univ:'국민대학교',dept:'중어중문학과',type:'국민프런티어전형',recruit:'19명',comp26:'10.26:1',fill:'10',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:3.85,cut70:3.96,major:'인문·사회',region:'서울'},
+  {id:98004,univ:'국민대학교',dept:'한국역사학과',type:'국민프런티어전형',recruit:'23명',comp26:'10.93:1',fill:'14',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.74,cut70:2.83,major:'인문·사회',region:'서울'},
+  {id:98005,univ:'국민대학교',dept:'행정학과',type:'국민프런티어전형',recruit:'15명',comp26:'10.93:1',fill:'2',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.68,cut70:2.71,major:'인문·사회',region:'서울'},
+  {id:98006,univ:'국민대학교',dept:'정치외교학과',type:'국민프런티어전형',recruit:'13명',comp26:'11.62:1',fill:'10',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.55,cut70:2.64,major:'인문·사회',region:'서울'},
+  {id:98007,univ:'국민대학교',dept:'사회학과',type:'국민프런티어전형',recruit:'10명',comp26:'14.92:1',fill:'3',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.64,cut70:2.69,major:'인문·사회',region:'서울'},
+  {id:98008,univ:'국민대학교',dept:'미디어·광고학부 미디어전공',type:'국민프런티어전형',recruit:'6명',comp26:'23.75:1',fill:'9',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.53,cut70:2.58,major:'인문·사회',region:'서울'},
+  {id:98009,univ:'국민대학교',dept:'미디어·광고학부 광고홍보학전공',type:'국민프런티어전형',recruit:'12명',comp26:'24.91:1',fill:'5',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.51,cut70:2.65,major:'인문·사회',region:'서울'},
+  {id:98010,univ:'국민대학교',dept:'교육학과',type:'국민프런티어전형',recruit:'10명',comp26:'16.5:1',fill:'18',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.55,cut70:2.84,major:'인문·사회',region:'서울'},
+  {id:98011,univ:'국민대학교',dept:'러시아유라시아학과',type:'국민프런티어전형',recruit:'7명',comp26:'13.71:1',fill:'4',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.74,cut70:2.91,major:'인문·사회',region:'서울'},
+  {id:98012,univ:'국민대학교',dept:'동아시아국제학부',type:'국민프런티어전형',recruit:'25명',comp26:'13.56:1',fill:'24',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.86,cut70:4.21,major:'인문·사회',region:'서울'},
+  {id:98013,univ:'국민대학교',dept:'법학부',type:'국민프런티어전형',recruit:'33명',comp26:'22.64:1',fill:'14',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.58,cut70:4.66,major:'인문·사회',region:'서울'},
+  {id:98014,univ:'국민대학교',dept:'경제학과',type:'국민프런티어전형',recruit:'10명',comp26:'14.33:1',fill:'11',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.64,cut70:2.72,major:'상경',region:'서울'},
+  {id:98015,univ:'국민대학교',dept:'국제통상금융학과',type:'국민프런티어전형',recruit:'10명',comp26:'14.3:1',fill:'8',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.74,cut70:2.82,major:'상경',region:'서울'},
+  {id:98016,univ:'국민대학교',dept:'경영학부 경영학전공',type:'국민프런티어전형',recruit:'48명',comp26:'13.71:1',fill:'36',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.64,cut70:2.74,major:'상경',region:'서울'},
+  {id:98017,univ:'국민대학교',dept:'경영정보학부',type:'국민프런티어전형',recruit:'15명',comp26:'11.69:1',fill:'3',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.8,cut70:2.9,major:'상경',region:'서울'},
+  {id:98018,univ:'국민대학교',dept:'AI빅데이터융합경영학과',type:'국민프런티어전형',recruit:'15명',comp26:'11.33:1',fill:'8',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.67,cut70:2.84,major:'상경',region:'서울'},
+  {id:98019,univ:'국민대학교',dept:'경영정보학부(자연)',type:'국민프런티어전형',recruit:'5명',comp26:'10.4:1',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.63,cut70:2.69,major:'상경',region:'서울'},
+  {id:98020,univ:'국민대학교',dept:'AI빅데이터융합경영학과(자연)',type:'국민프런티어전형',recruit:'6명',comp26:'9.67:1',fill:'5',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.7,cut70:2.79,major:'상경',region:'서울'},
+  {id:98021,univ:'국민대학교',dept:'신소재공학부 에너지·모빌리티재료전공',type:'국민프런티어전형',recruit:'15명',comp26:'9.73:1',fill:'5',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.54,cut70:2.6,major:'자연·공학',region:'서울'},
+  {id:98022,univ:'국민대학교',dept:'신소재공학부 전지화학재료전공',type:'국민프런티어전형',recruit:'15명',comp26:'9.93:1',fill:'4',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.55,cut70:2.75,major:'자연·공학',region:'서울'},
+  {id:98023,univ:'국민대학교',dept:'기계공학부',type:'국민프런티어전형',recruit:'47명',comp26:'13.22:1',fill:'21',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.92,cut70:2.99,major:'자연·공학',region:'서울'},
+  {id:98024,univ:'국민대학교',dept:'건설시스템공학부',type:'국민프런티어전형',recruit:'34명',comp26:'10.71:1',fill:'16',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:3.05,cut70:3.26,major:'자연·공학',region:'서울'},
+  {id:98025,univ:'국민대학교',dept:'전자공학부 지능형반도체융합전자전공',type:'국민프런티어전형',recruit:'26명',comp26:'8.5:1',fill:'21',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.64,cut70:2.76,major:'자연·공학',region:'서울'},
+  {id:98026,univ:'국민대학교',dept:'전자공학부 지능형ICT융합전공',type:'국민프런티어전형',recruit:'26명',comp26:'10.23:1',fill:'24',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.77,cut70:2.83,major:'자연·공학',region:'서울'},
+  {id:98027,univ:'국민대학교',dept:'전자공학부 모빌리티전력전자융합전공',type:'국민프런티어전형',recruit:'13명',comp26:'8.62:1',fill:'10',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.64,cut70:2.74,major:'자연·공학',region:'서울'},
+  {id:98028,univ:'국민대학교',dept:'산림환경시스템학과',type:'국민프런티어전형',recruit:'15명',comp26:'19.73:1',fill:'11',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.63,cut70:2.76,major:'자연·공학',region:'서울'},
+  {id:98029,univ:'국민대학교',dept:'바이오소재응용학과',type:'국민프런티어전형',recruit:'15명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2027신설/명칭변경 등으로 2026 입결 매칭 불가, 입결없음',cut50:0,cut70:0,major:'자연·공학',region:'서울'},
+  {id:98030,univ:'국민대학교',dept:'바이오의과학과',type:'국민프런티어전형',recruit:'14명',comp26:'16.13:1',fill:'6',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.11,cut70:2.14,major:'자연·공학',region:'서울'},
+  {id:98031,univ:'국민대학교',dept:'식품영양학과',type:'국민프런티어전형',recruit:'13명',comp26:'31.93:1',fill:'6',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.67,cut70:2.82,major:'자연·공학',region:'서울'},
+  {id:98032,univ:'국민대학교',dept:'융합바이오공학과',type:'국민프런티어전형',recruit:'10명',comp26:'36.1:1',fill:'3',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.51,cut70:2.59,major:'자연·공학',region:'서울'},
+  {id:98033,univ:'국민대학교',dept:'제약공학과',type:'국민프런티어전형',recruit:'7명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2027신설/명칭변경 등으로 2026 입결 매칭 불가, 입결없음',cut50:0,cut70:0,major:'자연·공학',region:'서울'},
+  {id:98034,univ:'국민대학교',dept:'양자융합공학과',type:'국민프런티어전형',recruit:'8명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2027신설/명칭변경 등으로 2026 입결 매칭 불가, 입결없음',cut50:0,cut70:0,major:'자연·공학',region:'서울'},
+  {id:98035,univ:'국민대학교',dept:'정보보안암호수학과',type:'국민프런티어전형',recruit:'8명',comp26:'11.88:1',fill:'5',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.78,cut70:2.89,major:'자연·공학',region:'서울'},
+  {id:98036,univ:'국민대학교',dept:'에너지반도체화학공학과',type:'국민프런티어전형',recruit:'15명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2027신설/명칭변경 등으로 2026 입결 매칭 불가, 입결없음',cut50:0,cut70:0,major:'자연·공학',region:'서울'},
+  {id:98037,univ:'국민대학교',dept:'소프트웨어학부',type:'국민프런티어전형',recruit:'19명',comp26:'12.05:1',fill:'15',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.44,cut70:2.55,major:'자연·공학',region:'서울'},
+  {id:98038,univ:'국민대학교',dept:'인공지능학부',type:'국민프런티어전형',recruit:'11명',comp26:'13:1',fill:'6',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.86,cut70:2.92,major:'자연·공학',region:'서울'},
+  {id:98039,univ:'국민대학교',dept:'건축학부',type:'국민프런티어전형',recruit:'18명',comp26:'10.56:1',fill:'8',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.59,cut70:2.77,major:'자연·공학',region:'서울'},
+  {id:98040,univ:'국민대학교',dept:'자동차·모빌리티대학',type:'국민프런티어전형',recruit:'20명',comp26:'7.15:1',fill:'3',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.48,cut70:2.5,major:'자연·공학',region:'서울'},
+  {id:98041,univ:'국민대학교',dept:'미래모빌리티학과',type:'국민프런티어전형',recruit:'9명',comp26:'11:1',fill:'5',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:3.0,cut70:3.05,major:'자연·공학',region:'서울'},
+  {id:98042,univ:'국민대학교',dept:'KMU International Business School',type:'국제인재전형',recruit:'15명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'정원외 / 2026 입결없음',cut50:0,cut70:0,major:'인문·사회',region:'서울'},
 ];
 
 function jh_getRegion(u){var s=['서울대','연세대','고려대','서강대','성균관대','한양대','중앙대','경희대','이화여대','숙명여대','홍익대','건국대','동국대','국민대','숭실대','세종대','광운대','한국외국어대'];var m=['인하대','아주대','가천대','단국대','경기대','인천대','가톨릭대'];var g=['경북대','부산대','전남대','전북대','충남대','충북대','강원대','제주대','경상국립대'];if(s.some(function(k){return u.includes(k.replace('대학교','').replace('대',''));}))return '서울';if(m.some(function(k){return u.includes(k.replace('대학교','').replace('대','').split('(')[0]);}))return '수도권';if(g.some(function(k){return u.includes(k.replace('대학교','').replace('대','').split('(')[0]);}))return '지방국립';return '지방사립';}
