@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -695,6 +668,17 @@ function dbL(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;
 function dbS(k,d){try{localStorage.setItem(k,JSON.stringify(d));}catch{}}
 function td(){return new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});}
 function csv_dl(data,name){const b=new Blob(['\uFEFF'+data],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name+'.csv';a.click();}
+// 모달 오버레이 바깥 클릭 시 닫기 - 단, 모달 내부(슬라이더 등)에서 드래그를 시작해
+// 마우스가 오버레이 영역으로 빠져나간 뒤 놓인 경우(click target===ov)는 닫지 않음.
+// (mousedown과 click이 모두 오버레이 자체일 때만 닫음)
+function bindOverlayClose(ov){
+  let _downOnOverlay=false;
+  ov.addEventListener('mousedown',function(e){ _downOnOverlay=(e.target===ov); });
+  ov.addEventListener('click',function(e){
+    if(e.target===ov && _downOnOverlay) ov.remove();
+    _downOnOverlay=false;
+  });
+}
 function popPrint(title, body, opts){
   opts = opts || {};
   // ── 기관명 결정 ──
@@ -717,8 +701,8 @@ function popPrint(title, body, opts){
   const m = opts.month || (now.getMonth()+1);
   let dateRange;
   if(opts.dateFrom && opts.dateTo){
-    // 명시적 날짜 범위
-    dateRange = opts.dateFrom + ' - ' + opts.dateTo;
+    // 명시적 날짜 범위 (시작==끝이면 단일 날짜로 표시)
+    dateRange = opts.dateFrom===opts.dateTo ? opts.dateFrom : (opts.dateFrom + ' - ' + opts.dateTo);
   } else if(opts.weekLabel && opts.weekLabel.match(/\d+년 \d+월 \d+주차/)){
     // 주차 레이블에서 날짜 범위 계산 (opts.week 우선 사용)
     const _wMatch = opts.weekLabel.match(/(\d+)년 (\d+)월 (\d+)주차/);
@@ -2019,7 +2003,7 @@ function _renderGradeModal(sid){
     </div>
   </div>`;
 
-  ov.addEventListener('click', e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -4951,7 +4935,7 @@ function openBookModal(sid){
       <button class="btn-b" onclick="upd({...ST.sel,bookScore:+document.getElementById('bs-sl').value});this.closest('.overlay').remove()">저장</button>
     </div>
   </div></div>`;
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -6382,6 +6366,14 @@ function renderAchieve(s){
     save();
   };
 
+  // ── 플랜점검일(관리자가 직접 입력) 저장: 인쇄물 상단 날짜 표시에 사용 ──
+  window._saveInspectDate=function(val){
+    const stu=ST.sel||ST.adminSel;
+    const idm={...(stu.weeklyInspectDate||{})};
+    idm[wKey]=val;
+    upd({...stu,weeklyInspectDate:idm});
+  };
+
 
   // 작은 방향 버튼 (상향/유지/하향)
   const dirBtns=(field,cur,colors)=>['상향','유지','하향'].map(opt=>{
@@ -6438,6 +6430,13 @@ function renderAchieve(s){
         <button onclick="printAchieve(${s.id})" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">🖨️ 인쇄/PDF</button>
         <button onclick="exportAchieveXls(${s.id})" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">📊 엑셀</button>
       </div>
+    </div>
+
+    <!-- 플랜점검일 입력 -->
+    <div style="background:#fff;border-radius:13px;padding:11px 14px;margin-bottom:12px;border:1.5px solid #e8eaf6;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:11px;color:#888;font-weight:600;white-space:nowrap">🗓️ 플랜점검일</span>
+      <input type="date" value="${(s.weeklyInspectDate||{})[wKey]||''}" onchange="window._saveInspectDate(this.value)" style="border:1.5px solid #e0e3ef;border-radius:7px;padding:6px 8px;font-size:12px;outline:none;color:#1a1a2e">
+      <span style="font-size:10px;color:#aaa">(인쇄/PDF 상단에 표시됩니다)</span>
     </div>
 
     ${studySubjs.length===0?`<div style="background:#f8f9ff;border-radius:12px;border:2px dashed #dde1f0;padding:32px;text-align:center;color:#aaa">
@@ -6529,7 +6528,6 @@ function renderAchieve(s){
           (typeStr?' · 🎯 '+esc(typeStr):'')+
           (unitStr?' · '+esc(unitStr.slice(0,20)):'')+'</div>'
           +'</div></div>'
-          +(pct!==null?'<div style="background:'+(pct>=90?'#f0fdf4':pct>=70?'#fffbeb':'#fff5f5')+';border:1.5px solid '+(pct>=90?'#86efac':pct>=70?'#fde68a':'#fecaca')+';border-radius:10px;padding:7px 14px;text-align:center"><div style="font-size:18px;font-weight:900;color:'+pctCol+'">'+pct+'% '+(pct>=90?'🔥':pct>=70?'👍':'💪')+'</div><div style="font-size:9px;color:#999;margin-top:1px">달성률</div></div>':'')
           +'</div>'
 
           // 본문 그리드
@@ -6563,7 +6561,6 @@ function renderAchieve(s){
           +' style="width:55px;background:#fff;border:1.5px solid #ddd6fe;color:#1a1a2e;border-radius:7px;padding:5px 6px;font-size:15px;font-weight:700;outline:none;text-align:center">'
           +'<span style="font-size:12px;color:#555;font-weight:600">h</span>'
           +'</div></div></div>'
-          +(pct!==null?'<div style="margin-top:6px;background:#e8eaf6;border-radius:3px;height:4px"><div style="height:100%;border-radius:3px;background:'+pctCol+';width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:10px;font-weight:700;color:'+pctCol+';margin-top:3px">'+(pct>=90?'🔥':pct>=70?'👍':'💪')+' '+pct+'%</div>':'')
           +'</div>'
 
           // ③ 다음주 학습시간
@@ -6591,11 +6588,12 @@ function renderAchieve(s){
           +'<div style="display:flex;gap:4px;margin-bottom:6px">'
           +['상향','유지','하향'].map(function(opt){const nc=opt==='상향'?'#ef4444':opt==='하향'?'#10b981':'#3b5bdb';const icon=opt==='상향'?'▲':opt==='하향'?'▼':'━';const isAct=ins.nextDiffDir===opt;return'<button onclick="'+sv2('nextDiffDir',opt)+'" style="flex:1;background:'+(isAct?nc:'#fff')+';color:'+(isAct?'#fff':nc)+';border:1.5px solid '+(isAct?nc:nc+'44')+';border-radius:6px;padding:5px 2px;font-size:10px;font-weight:700;cursor:pointer;text-align:center">'+icon+' '+opt+'</button>';}).join('')
           +'</div>'
-          +(ins.nextDiffDir&&ins.nextDiffDir!=='유지'
-            ?'<textarea placeholder="'+(ins.nextDiffDir==='상향'?'높일 내용...':'낮출 내용...')+'" rows="2"'
+          +(()=>{
+            const _ph=ins.nextDiffDir==='상향'?'높일 내용...':ins.nextDiffDir==='하향'?'낮출 내용...':'변경/유지 내용...';
+            return '<textarea placeholder="'+_ph+'" rows="2"'
               +' oninput="event.stopPropagation();window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextDiffNote\',this.value)"'
-              +' style="width:100%;background:#fff;border:1.5px solid #e0e3ef;color:#333;border-radius:7px;padding:6px 8px;font-size:11px;outline:none;resize:none;font-family:inherit;line-height:1.5;box-sizing:border-box">'+esc(ins.nextDiffNote||'')+'</textarea>'
-            :'<div style="font-size:10px;color:#bbb">상향/하향 선택 시 입력</div>')
+              +' style="width:100%;background:#fff;border:1.5px solid #e0e3ef;color:#333;border-radius:7px;padding:6px 8px;font-size:11px;outline:none;resize:none;font-family:inherit;line-height:1.5;box-sizing:border-box">'+esc(ins.nextDiffNote||'')+'</textarea>';
+          })()
           +'</div>'
 
           // ⑥ 이번주 분량
@@ -6605,38 +6603,18 @@ function renderAchieve(s){
           +[['매우 많음','#ef4444'],['많음','#f59e0b'],['적절','#0f9d58'],['적음','#3b5bdb'],['매우 적음','#8b5cf6']].map(function(pair){const opt=pair[0],ac=pair[1];const isAct=ins.amount===opt;return'<button onclick="'+sv2('amount',opt)+'" style="background:'+(isAct?ac:'#fff')+';color:'+(isAct?'#fff':ac)+';border:1.5px solid '+(isAct?ac:ac+'44')+';border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer">'+opt+'</button>';}).join('')
           +'</div></div>'
 
-          // ⑦ 다음주 분량 (페이지 선택 시 시작~끝)
+          // ⑦ 다음주 분량 (직접 입력)
           +'<div style="background:#f4f6fb;border-radius:8px;padding:10px 12px">'
           +'<div style="font-size:10px;font-weight:700;color:#555;margin-bottom:8px">📌 다음 주 분량</div>'
           +'<div style="display:flex;gap:4px;margin-bottom:6px">'
           +['상향','유지','하향'].map(function(opt){const nc=opt==='상향'?'#0f9d58':opt==='하향'?'#e53935':'#3b5bdb';const icon=opt==='상향'?'▲':opt==='하향'?'▼':'━';const isAct=ins.nextAmountDir===opt;return'<button onclick="'+sv2('nextAmountDir',opt)+'" style="flex:1;background:'+(isAct?nc:'#fff')+';color:'+(isAct?'#fff':nc)+';border:1.5px solid '+(isAct?nc:nc+'44')+';border-radius:6px;padding:5px 2px;font-size:10px;font-weight:700;cursor:pointer;text-align:center">'+icon+' '+opt+'</button>';}).join('')
           +'</div>'
-          +(ins.nextAmountDir&&ins.nextAmountDir!=='유지'
-            ?'<div style="margin-bottom:5px;display:flex;gap:4px">'
-              +'<button id="ins_naq_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'" onclick="this.style.background=\'#3b5bdb\';this.style.color=\'#fff\';document.getElementById(\'ins_nap_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\').style.background=\'#f4f6fb\';document.getElementById(\'ins_nap_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\').style.color=\'#888\';document.getElementById(\'ins_napg_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\').style.display=\'none\';window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextAmountUnit\',\'문제\')"'
-              +' style="background:'+(ins.nextAmountUnit==='페이지'?'#f4f6fb':'#3b5bdb')+';color:'+(ins.nextAmountUnit==='페이지'?'#888':'#fff')+';border:1.5px solid #c5cae9;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:600;cursor:pointer">문제수</button>'
-              +'<button id="ins_nap_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'" onclick="this.style.background=\'#3b5bdb\';this.style.color=\'#fff\';document.getElementById(\'ins_naq_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\').style.background=\'#f4f6fb\';document.getElementById(\'ins_naq_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\').style.color=\'#888\';document.getElementById(\'ins_napg_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\').style.display=\'flex\';window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextAmountUnit\',\'페이지\')"'
-              +' style="background:'+(ins.nextAmountUnit==='페이지'?'#3b5bdb':'#f4f6fb')+';color:'+(ins.nextAmountUnit==='페이지'?'#fff':'#888')+';border:1.5px solid #c5cae9;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:600;cursor:pointer">페이지</button>'
-              +'</div>'
-              +(ins.nextAmountUnit==='페이지'
-                ?'<div id="ins_napg_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'" style="display:flex;gap:4px;align-items:center">'
-                  +'<input type="number" min="0" step="1" placeholder="시작p" value="'+(ins.nextAmountVal!=null?ins.nextAmountVal:'')+'"'
-                  +' oninput="event.stopPropagation();window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextAmountVal\',this.value===\'\'?null:+this.value)"'
-                  +' style="width:50px;background:#fff;border:1.5px solid #e0e3ef;color:#1a1a2e;border-radius:7px;padding:5px 6px;font-size:13px;font-weight:700;outline:none;text-align:center">'
-                  +'<span style="color:#888;font-size:11px;font-weight:600">~</span>'
-                  +'<input type="number" min="0" step="1" placeholder="끝p" value="'+(ins.nextAmountEnd!=null?ins.nextAmountEnd:'')+'"'
-                  +' oninput="event.stopPropagation();window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextAmountEnd\',this.value===\'\'?null:+this.value)"'
-                  +' style="width:50px;background:#fff;border:1.5px solid #e0e3ef;color:#1a1a2e;border-radius:7px;padding:5px 6px;font-size:13px;font-weight:700;outline:none;text-align:center">'
-                  +'<span style="font-size:11px;color:#888;font-weight:600">p</span>'
-                  +'</div>'
-                :'<div id="ins_napg_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'" style="display:none"></div>'
-                  +'<div style="display:flex;align-items:center;gap:5px">'
-                  +'<input type="number" min="0" step="1" placeholder="0" value="'+(ins.nextAmountVal!=null?ins.nextAmountVal:'')+'"'
-                  +' oninput="event.stopPropagation();window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextAmountVal\',this.value===\'\'?null:+this.value)"'
-                  +' style="width:55px;background:#fff;border:1.5px solid #e0e3ef;color:#1a1a2e;border-radius:7px;padding:5px 6px;font-size:14px;font-weight:700;outline:none;text-align:center">'
-                  +'<span style="font-size:11px;color:#888;font-weight:600">문제</span>'
-                  +'</div>')
-            :'<div style="font-size:10px;color:#bbb">상향/하향 선택 시 입력</div>')
+          +(()=>{
+            const _ph2=ins.nextAmountDir==='상향'?'늘릴 내용...':ins.nextAmountDir==='하향'?'줄일 내용...':'변경/유지 내용...';
+            return '<textarea placeholder="'+_ph2+'" rows="2"'
+              +' oninput="event.stopPropagation();window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'nextAmountNote\',this.value)"'
+              +' style="width:100%;background:#fff;border:1.5px solid #e0e3ef;color:#333;border-radius:7px;padding:6px 8px;font-size:11px;outline:none;resize:none;font-family:inherit;line-height:1.5;box-sizing:border-box">'+esc(ins.nextAmountNote||'')+'</textarea>';
+          })()
           +'</div>'
 
           // ⑧ 특이사항
@@ -6747,11 +6725,7 @@ function printAchieve(sid){
       const achPct=ins.achievementPct!=null?ins.achievementPct:null;
       const nextDiffStr=ins.nextDiffDir||'–';
       const nextDiffNote=ins.nextDiffNote||'';
-      const nextAmtStr=ins.nextAmountVal!=null
-        ?(ins.nextAmountUnit==='페이지'
-          ?(ins.nextAmountEnd!=null?`${ins.nextAmountDir||''} ${ins.nextAmountVal}~${ins.nextAmountEnd}p`:`${ins.nextAmountDir||''} ${ins.nextAmountVal}p`)
-          :`${ins.nextAmountDir||''} ${ins.nextAmountVal}${ins.nextAmountUnit||'문제'}`)
-        :(ins.nextAmountDir||'–');
+      const nextAmtStr=[ins.nextAmountDir||'', ins.nextAmountNote||''].filter(Boolean).join(' · ')||'–';
       const nextTimeStr=ins.nextTimeVal!=null
         ?`${ins.nextTimeDir||''} ${ins.nextTimeVal}h/주`
         :(ins.nextTimeDir||'–');
@@ -6767,7 +6741,6 @@ function printAchieve(sid){
             ${unit.isBookUnit?`<div style="font-size:12px;font-weight:700;color:${col};margin-top:2px">📖 ${esc(unit.bookName)}${amtStr?' · 📏 '+amtStr:''}${typeStr?' · 🎯 '+esc(typeStr):''}</div>`:''}
             ${unitStr?`<div style="font-size:10px;color:#8b5cf6">📖 ${esc(unitStr)}</div>`:''}
           </div>
-          ${pct!==null?`<span style="font-size:13px;font-weight:900;color:${pct>=90?'#0f9d58':pct>=70?'#e37400':'#c5221f'}">${pct}% ${pct>=90?'🔥':pct>=70?'👍':'💪'}</span>`:''}
         </div>
         <table style="margin-bottom:0">
           <tr><th style="width:80px">항목</th><th>이번 주 점검</th><th>다음 주 계획</th></tr>
@@ -6807,7 +6780,19 @@ function printAchieve(sid){
       </div>`;
     }
   }
-  popPrint(`${s.name} - ${wLabel} 플랜점검`, body, {weekLabel: wLabel, year: wy, month: wm, week: ww});
+  popPrint(`${s.name} - ${wLabel} 플랜점검`, body, (()=>{
+    const _opts={weekLabel: wLabel, year: wy, month: wm, week: ww};
+    const _idate=(s.weeklyInspectDate||{})[wKey];
+    if(_idate){
+      const _d=new Date(_idate);
+      if(!isNaN(_d)){
+        const _dow=['일','월','화','수','목','금','토'][_d.getDay()];
+        const _f='플랜점검일: '+(_d.getMonth()+1)+'월 '+_d.getDate()+'일 '+_dow+'요일';
+        _opts.dateFrom=_f; _opts.dateTo=_f;
+      }
+    }
+    return _opts;
+  })());
 }
 
 // ── 플랜점검 엑셀 ──
@@ -7171,6 +7156,22 @@ function renderWeeklyDetail(s){
     }
     openSubjModal(name);
   };
+  // ── 학습전략 기간(시작일~종료일) 입력: 인쇄물 상단 날짜 표시에 사용 ──
+  const periodMap=s.weeklyStrategyPeriod||{};
+  const period=periodMap[wKey]||{};
+  window._saveStrategyPeriod=function(field,val){
+    const stu=ST.sel||ST.adminSel;
+    const pm={...(stu.weeklyStrategyPeriod||{})};
+    pm[wKey]={...(pm[wKey]||{}),[field]:val};
+    upd({...stu,weeklyStrategyPeriod:pm});
+  };
+  const periodBar='<div style="background:#fff;border-radius:13px;padding:11px 14px;margin-bottom:12px;border:1.5px solid #e8eaf6;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:11px;color:#888;font-weight:600;white-space:nowrap">🗓️ 학습전략 기간</span>'
+    +'<input type="date" value="'+(period.start||'')+'" onchange="window._saveStrategyPeriod(\'start\',this.value)" style="border:1.5px solid #e0e3ef;border-radius:7px;padding:6px 8px;font-size:12px;outline:none;color:#1a1a2e">'
+    +'<span style="color:#888;font-size:12px">~</span>'
+    +'<input type="date" value="'+(period.end||'')+'" onchange="window._saveStrategyPeriod(\'end\',this.value)" style="border:1.5px solid #e0e3ef;border-radius:7px;padding:6px 8px;font-size:12px;outline:none;color:#1a1a2e">'
+    +'<span style="font-size:10px;color:#aaa">(인쇄/PDF 상단에 표시됩니다)</span>'
+    +'</div>';
   const addSubjBar='<div style="background:#fff;border-radius:13px;padding:11px 14px;margin-bottom:12px;border:1.5px dashed #c5cae9;display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
     +'<span style="font-size:11px;color:#888;font-weight:600;white-space:nowrap">➕ 과목 추가</span>'
     +addableSubjs.map(function(subj){
@@ -7180,14 +7181,14 @@ function renderWeeklyDetail(s){
     +'<button onclick="window._openCustomSubjAdd()" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;cursor:pointer">✏️ 직접입력</button>'
     +'</div>';
 
-  if(!used.length)return addSubjBar
+  if(!used.length)return periodBar+addSubjBar
     +'<div style="text-align:center;color:#888;padding:28px 0">'
     +'<div style="font-size:28px;margin-bottom:8px">📅</div>'
     +'<div style="font-size:13px;font-weight:600">등록된 학습 전략이 없습니다</div>'
     +'<div style="font-size:11px;margin-top:6px;color:#aaa">위에서 과목을 선택하거나 학습플랜 시간표를 입력하면 자동으로 표시됩니다</div>'
     +'</div>';
 
-  return addSubjBar+used.map(function(subj){
+  return periodBar+addSubjBar+used.map(function(subj){
     var col=SC[subj]||'#3b5bdb';
     var sp=(s.weeklySubjPlans||{})[subj]||{};
     var hrs=stats[subj]||0;
@@ -7265,6 +7266,22 @@ function printSubjCond(sid){
 
   const now=new Date();
   const y=now.getFullYear(), m=now.getMonth()+1;
+
+  // ── 관리자가 입력한 학습전략 기간(시작일~종료일) ──
+  const _now0=new Date();
+  const _cy0=_now0.getFullYear(),_cm0=_now0.getMonth()+1;
+  const _cw0=getWeekOfMonth(_cy0,_cm0,_now0.getDate());
+  const _wy=ST.weekYear||_cy0,_wm=ST.weekMonth||_cm0,_ww=ST.weekWeek||_cw0;
+  const _wKey=getWeekNum(_wy,_wm,_ww);
+  const _period=(s.weeklyStrategyPeriod||{})[_wKey]||{};
+  let _periodStr='';
+  if(_period.start&&_period.end){
+    const _ds=new Date(_period.start), _de=new Date(_period.end);
+    if(!isNaN(_ds)&&!isNaN(_de)){
+      const _days=Math.round((_de-_ds)/86400000)+1;
+      _periodStr='학습전략기간: '+(_ds.getMonth()+1)+'월'+_ds.getDate()+'일~'+(_de.getMonth()+1)+'월'+_de.getDate()+'일('+_days+'일간)';
+    }
+  }
 
   // ── 요약 테이블 ──
   // ── 요약 테이블 (교재별 행) ──
@@ -7404,6 +7421,7 @@ function printSubjCond(sid){
     year: y,
     month: m,
     reportKo: '학습 전략 리포트',
+    ...(_periodStr?{dateFrom:_periodStr,dateTo:_periodStr}:{})
   });
 }
 
@@ -7726,7 +7744,7 @@ function openSubjModal(subj){
     +' onclick="window._saveSubjModal(\''+subjEsc+'\')">💾 저장</button>'
     +'</div>'
     +'</div></div>';
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 // ══ 상담 탭 ══
@@ -9000,7 +9018,7 @@ function openTestScoreChart(testId){
       })()}
     </div>
   </div>`;
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -9672,7 +9690,7 @@ function openBulkAnswerUpload(testId){
     alert('✅ '+saved+'명 답안 저장 완료!\n서술형 문항은 개별 수정이 필요합니다.');
   });
 
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
   if(typeof XLSX==='undefined'){
     const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';document.head.appendChild(s);
@@ -9846,7 +9864,7 @@ function openAnswerInput(testId){
     </div>`;
   };
 
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -12044,7 +12062,7 @@ function openTForm(t){
     alert('✅ 저장 완료!\n\n아이디: '+lid+'\n비밀번호: '+pw+'\n저장확인: '+(savedOk?'✅ 성공':'❌ 실패'));
     render();
   });
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -12118,7 +12136,7 @@ function openAssignStudents(tid){
     ov.remove(); render();
     alert('✅ 학생 배정이 완료되었습니다.'+(changedStudents.length?' ('+changedStudents.length+'명 변경)':''));
   });
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -12362,7 +12380,7 @@ function openBulkImport(){
   });
 
 
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 
   // SheetJS 로드 확인
@@ -12524,7 +12542,7 @@ function openApiModal(){
       </div>
     </div>
   </div>`;
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -12715,7 +12733,7 @@ function openShareModal(){
     </div>
   </div>`;
   document.body.appendChild(ov);
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
 
   // QR 라이브러리 동적 로드
   if(!window.QRCode){
@@ -13005,7 +13023,7 @@ function openStudentStatusModal(){
     </div>
   </div>`;
   ov.querySelector('#ss_close').addEventListener('click',()=>ov.remove());
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
@@ -13114,7 +13132,7 @@ function openStudentAccountModal(){
     </div>
   </div>`;
   ov.querySelector('#sa_close').addEventListener('click',()=>ov.remove());
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  bindOverlayClose(ov);
   document.body.appendChild(ov);
 }
 
