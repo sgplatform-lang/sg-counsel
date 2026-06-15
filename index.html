@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
- <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -369,14 +342,11 @@ async function fbSave(col, id, data){
     const ref = window._fb.db.collection(col).doc(String(id));
     const saveData = {...data, _updatedAt: Date.now()};
     // update()로 저장: 지정 필드만 교체 (weeklyPlan:{} → 내부 키 모두 삭제됨)
-    // 문서가 없으면 set()으로 생성
+    // 문서가 없으면(또는 update가 어떤 이유로든 실패하면) set()으로 생성
     try{
       await ref.update(saveData);
     }catch(e2){
-      // 문서 없으면 set으로 생성
-      if(e2.code==='not-found'||e2.message.includes('NOT_FOUND')||e2.message.includes('No document')){
-        await ref.set(saveData);
-      } else { throw e2; }
+      await ref.set(saveData);
     }
   }catch(e){ console.warn('FB save error:', e.message); }
 }
@@ -8567,7 +8537,13 @@ window._saveSForm = function(sid){
   // Firebase에 즉시 저장 (신규/수정 모두)
   if(FB_USE()){
     const targetStudent = ST.students.find(x=>String(x.id)===String(sid||ST.sel?.id));
-    if(targetStudent) fbSave('students', targetStudent.id, targetStudent);
+    if(targetStudent){
+      if(!ST._savingIds) ST._savingIds=new Set();
+      ST._savingIds.add(String(targetStudent.id));
+      fbSave('students', targetStudent.id, targetStudent)
+        .then(()=>{ setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(targetStudent.id)); }, 5000); })
+        .catch(()=>{ setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(targetStudent.id)); }, 5000); });
+    }
   }
   save();
   document.querySelector('.sform-overlay')?.remove();
@@ -12300,6 +12276,7 @@ function openBulkImport(){
   regBtn.addEventListener('click',()=>{
     if(!parsedRows.length){alert('데이터를 먼저 불러오세요.');return;}
     let added=0;
+    const newStudents=[];
     parsedRows.forEach((p,i)=>{
       const name=String(p[0]).trim(); if(!name) return;
       const ci=ST.students.length;
@@ -12313,7 +12290,7 @@ function openBulkImport(){
         const foundOrgB=allOrgsB.find(o=>o.name===csvOrgName)||null;
         if(foundOrgB){orgIdB=foundOrgB.id;orgNameB=foundOrgB.name;}
       }
-      ST.students.push({
+      const newStu={
         id:Date.now()+i,name,
         school:String(p[1]||'').trim(),
         grade:String(p[2]||'').trim(),
@@ -12332,12 +12309,31 @@ function openBulkImport(){
         avatar:name[0]||'?',
         orgId:orgIdB,
         orgName:orgNameB
-      });
+      };
+      ST.students.push(newStu);
+      newStudents.push(newStu);
       added++;
     });
+
+    // ── 새로 등록된 학생을 Firebase에 즉시 저장 (재로그인 시 사라짐 방지) ──
+    if(newStudents.length){
+      if(!ST._savingIds) ST._savingIds=new Set();
+      newStudents.forEach(u=>ST._savingIds.add(String(u.id)));
+      if(FB_USE()){
+        newStudents.forEach(u=>{
+          fbSave('students', u.id, u)
+            .then(()=>{ setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(u.id)); }, 5000); })
+            .catch(()=>{ setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(u.id)); }, 5000); });
+        });
+      } else {
+        setTimeout(()=>{ newStudents.forEach(u=>{ if(ST._savingIds) ST._savingIds.delete(String(u.id)); }); }, 3000);
+      }
+    }
+
     save();ov.remove();render();
     alert('✅ '+added+'명 등록 완료!\n각 학생 상세에서 성적을 입력해주세요.');
   });
+
 
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
