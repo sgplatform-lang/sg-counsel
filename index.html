@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
- <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4742,7 +4715,8 @@ function gg_updateDeptSuggestions(){
         seen[key] = true;
         _gg_deptCache.push({
           dept:u.dept, type:u.type,
-          cut50:u.cut50, cut70:u.cut70,
+          cut50: u.cut50>0 ? u.cut50 : (u.grade50||0),
+          cut70: u.cut70>0 ? u.cut70 : (u.grade70||0),
           recruit:u.recruit, csat:u.csat,
           interview:u.interview, intPct:u.intPct,
           methodNote:u.methodNote,
@@ -4882,8 +4856,8 @@ function gg_lookupJonghapDB(univ, dept){
       methodNote: u.methodNote||'-',
       evalFocus:  u.evalFocus||'-',
       note:       u.note||'',
-      cut50:      u.cut50>0 ? u.cut50.toFixed(2) : '-',
-      cut70:      u.cut70>0 ? u.cut70.toFixed(2) : '-',
+      cut50:      u.cut50>0 ? u.cut50.toFixed(2) : (u.grade50>0 ? u.grade50.toFixed(2) : '-'),
+      cut70:      u.cut70>0 ? u.cut70.toFixed(2) : (u.grade70>0 ? u.grade70.toFixed(2) : '-'),
     };
   });
 }
@@ -18677,6 +18651,952 @@ var JH_UNIV_DB=[
   {id:98040,univ:'국민대학교',dept:'자동차·모빌리티대학',type:'국민프런티어전형',recruit:'20명',comp26:'7.15:1',fill:'3',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:2.48,cut70:2.5,major:'자연·공학',region:'서울'},
   {id:98041,univ:'국민대학교',dept:'미래모빌리티학과',type:'국민프런티어전형',recruit:'9명',comp26:'11:1',fill:'5',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'2026 실입결 기준',cut50:3.0,cut70:3.05,major:'자연·공학',region:'서울'},
   {id:98042,univ:'국민대학교',dept:'KMU International Business School',type:'국제인재전형',recruit:'15명',comp26:'-',fill:'0',interview:'있음',intPct:30,docPct:70,csat:'없음',evalFocus:'진로역량,학업역량,공동체역량',methodNote:'1단계 서류100%(3배수)→2단계 1단계성적70%+면접30%',note:'정원외 / 2026 입결없음',cut50:0,cut70:0,major:'인문·사회',region:'서울'},
+  // ── 충북대학교 학생부종합전형 (2027모집요강+2026실입결) ──
+  // 수능최저: 없음 (SW우수인재도 없음)
+  // 전형방법: 1단계 서류100%(3~5배수) → 2단계 서류+면접
+  // 환산점수(50%/70%)=0 (충북대 자체환산, 공개안함), 환산등급만 공개
+  // ─── 학생부종합 I 전형 ───
+  {id:98100,univ:'충북대학교',dept:'반도체공학부',       type:'학생부종합I',recruit:'8명', comp26:'8.38:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:3.28,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98101,univ:'충북대학교',dept:'교육학과',          type:'학생부종합I',recruit:'6명', comp26:'9.83:1', fill:'15', csat:'없음',cut50:0,cut70:0,grade50:2.8, grade70:2.86,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98102,univ:'충북대학교',dept:'국어교육과',         type:'학생부종합I',recruit:'9명', comp26:'9.44:1', fill:'15', csat:'없음',cut50:0,cut70:0,grade50:2.8, grade70:3.05,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98103,univ:'충북대학교',dept:'영어교육과',         type:'학생부종합I',recruit:'9명', comp26:'8.44:1', fill:'10', csat:'없음',cut50:0,cut70:0,grade50:2.73,grade70:2.79,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98104,univ:'충북대학교',dept:'윤리교육과',         type:'학생부종합I',recruit:'6명', comp26:'9.0:1',  fill:'10', csat:'없음',cut50:0,cut70:0,grade50:2.27,grade70:2.53,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98105,univ:'충북대학교',dept:'사회교육과',         type:'학생부종합I',recruit:'6명', comp26:'10.0:1', fill:'13', csat:'없음',cut50:0,cut70:0,grade50:2.61,grade70:2.7, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98106,univ:'충북대학교',dept:'역사교육과',         type:'학생부종합I',recruit:'6명', comp26:'17.67:1',fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:2.16,grade70:2.35,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98107,univ:'충북대학교',dept:'지리교육과',         type:'학생부종합I',recruit:'6명', comp26:'13.17:1',fill:'11', csat:'없음',cut50:0,cut70:0,grade50:2.77,grade70:2.72,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98108,univ:'충북대학교',dept:'물리교육과',         type:'학생부종합I',recruit:'6명', comp26:'6.83:1', fill:'21', csat:'없음',cut50:0,cut70:0,grade50:3.88,grade70:3.69,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98109,univ:'충북대학교',dept:'생물교육과',         type:'학생부종합I',recruit:'6명', comp26:'8.67:1', fill:'16', csat:'없음',cut50:0,cut70:0,grade50:2.65,grade70:2.83,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98110,univ:'충북대학교',dept:'수학교육과',         type:'학생부종합I',recruit:'9명', comp26:'15.0:1', fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:2.36,grade70:2.96,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98111,univ:'충북대학교',dept:'지구과학교육과',      type:'학생부종합I',recruit:'6명', comp26:'10.83:1',fill:'17', csat:'없음',cut50:0,cut70:0,grade50:3.15,grade70:2.75,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98112,univ:'충북대학교',dept:'화학교육과',         type:'학생부종합I',recruit:'6명', comp26:'9.5:1',  fill:'16', csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.1, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98113,univ:'충북대학교',dept:'건축학과',           type:'학생부종합I',recruit:'9명', comp26:'10.22:1',fill:'21', csat:'없음',cut50:0,cut70:0,grade50:2.92,grade70:3.66,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'건축학과(5년제)',calcMode:'jh'},
+  {id:98114,univ:'충북대학교',dept:'행정학과',           type:'학생부종합I',recruit:'5명', comp26:'12.0:1', fill:'17', csat:'없음',cut50:0,cut70:0,grade50:3.02,grade70:3.12,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98115,univ:'충북대학교',dept:'환경공학과',         type:'학생부종합I',recruit:'6명', comp26:'10.33:1',fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:2.56,grade70:2.93,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98116,univ:'충북대학교',dept:'기계공학부',         type:'학생부종합I',recruit:'11명',comp26:'11.82:1',fill:'18', csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.26,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98117,univ:'충북대학교',dept:'전기공학부',         type:'학생부종합I',recruit:'8명', comp26:'8.63:1', fill:'11', csat:'없음',cut50:0,cut70:0,grade50:3.08,grade70:3.06,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98118,univ:'충북대학교',dept:'전자공학과',         type:'학생부종합I',recruit:'6명', comp26:'7.0:1',  fill:'10', csat:'없음',cut50:0,cut70:0,grade50:2.51,grade70:3.79,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98119,univ:'충북대학교',dept:'경제학과',           type:'학생부종합I',recruit:'8명', comp26:'7.88:1', fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.47,grade70:2.92,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98120,univ:'충북대학교',dept:'농업경제학과',        type:'학생부종합I',recruit:'5명', comp26:'14.8:1', fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.19,grade70:3.7, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98121,univ:'충북대학교',dept:'아동복지학과',        type:'학생부종합I',recruit:'4명', comp26:'13.25:1',fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.14,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98122,univ:'충북대학교',dept:'사회학과',           type:'학생부종합I',recruit:'5명', comp26:'29.6:1', fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.17,grade70:3.45,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98123,univ:'충북대학교',dept:'정치외교학과',        type:'학생부종합I',recruit:'5명', comp26:'9.4:1',  fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:3.16,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98124,univ:'충북대학교',dept:'건축공학과',         type:'학생부종합I',recruit:'6명', comp26:'9.0:1',  fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:2.99,grade70:2.79,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98125,univ:'충북대학교',dept:'독일언어문화학과',     type:'학생부종합I',recruit:'5명', comp26:'8.8:1',  fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.65,grade70:3.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98126,univ:'충북대학교',dept:'프랑스언어문화학과',   type:'학생부종합I',recruit:'5명', comp26:'8.8:1',  fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.68,grade70:3.69,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98127,univ:'충북대학교',dept:'고고미술사학과',       type:'학생부종합I',recruit:'4명', comp26:'8.0:1',  fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.2, grade70:3.2, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98128,univ:'충북대학교',dept:'심리학과',           type:'학생부종합I',recruit:'5명', comp26:'15.2:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:2.55,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98129,univ:'충북대학교',dept:'사학과',             type:'학생부종합I',recruit:'4명', comp26:'13.75:1',fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.44,grade70:3.44,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98130,univ:'충북대학교',dept:'국어국문학과',        type:'학생부종합I',recruit:'5명', comp26:'8.4:1',  fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:2.78,grade70:3.4, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98131,univ:'충북대학교',dept:'러시아언어문화학과',   type:'학생부종합I',recruit:'4명', comp26:'7.25:1', fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.82,grade70:3.82,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98132,univ:'충북대학교',dept:'공학자율전공학부',      type:'학생부종합I',recruit:'10명',comp26:'17.1:1', fill:'13', csat:'없음',cut50:0,cut70:0,grade50:2.82,grade70:3.42,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98133,univ:'충북대학교',dept:'전자정보자율전공학부',   type:'학생부종합I',recruit:'11명',comp26:'7.55:1', fill:'12', csat:'없음',cut50:0,cut70:0,grade50:3.65,grade70:3.27,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98134,univ:'충북대학교',dept:'영어영문학과',        type:'학생부종합I',recruit:'5명', comp26:'14.2:1', fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.67,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98135,univ:'충북대학교',dept:'토목공학부',         type:'학생부종합I',recruit:'16명',comp26:'9.38:1', fill:'14', csat:'없음',cut50:0,cut70:0,grade50:3.34,grade70:3.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98136,univ:'충북대학교',dept:'지역건설공학과',       type:'학생부종합I',recruit:'5명', comp26:'12.2:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.83,grade70:3.88,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98137,univ:'충북대학교',dept:'도시공학과',         type:'학생부종합I',recruit:'9명', comp26:'8.0:1',  fill:'14', csat:'없음',cut50:0,cut70:0,grade50:3.99,grade70:3.21,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98138,univ:'충북대학교',dept:'철학과',             type:'학생부종합I',recruit:'4명', comp26:'11.0:1', fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:4.05,grade70:4.05,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98139,univ:'충북대학교',dept:'경영정보학과',        type:'학생부종합I',recruit:'9명', comp26:'7.0:1',  fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:3.26,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98140,univ:'충북대학교',dept:'경영학부',           type:'학생부종합I',recruit:'18명',comp26:'8.78:1', fill:'24', csat:'없음',cut50:0,cut70:0,grade50:3.03,grade70:3.48,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98141,univ:'충북대학교',dept:'국제경영학과',        type:'학생부종합I',recruit:'11명',comp26:'6.82:1', fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.34,grade70:3.12,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98142,univ:'충북대학교',dept:'중어중문학과',        type:'학생부종합I',recruit:'5명', comp26:'9.8:1',  fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.22,grade70:3.22,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98143,univ:'충북대학교',dept:'지구환경과학과',       type:'학생부종합I',recruit:'5명', comp26:'10.2:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.75,grade70:3.75,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98144,univ:'충북대학교',dept:'주거환경학과',        type:'학생부종합I',recruit:'4명', comp26:'6.75:1', fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.35,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98145,univ:'충북대학교',dept:'식품생명공학과',       type:'학생부종합I',recruit:'5명', comp26:'10.4:1', fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:2.93,grade70:2.93,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98146,univ:'충북대학교',dept:'식품영양학과',        type:'학생부종합I',recruit:'4명', comp26:'14.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.2, grade70:2.99,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98147,univ:'충북대학교',dept:'의류학과',           type:'학생부종합I',recruit:'4명', comp26:'15.75:1',fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.43,grade70:3.43,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98148,univ:'충북대학교',dept:'수학과',             type:'학생부종합I',recruit:'6명', comp26:'15.83:1',fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.3, grade70:3.39,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98149,univ:'충북대학교',dept:'신소재공학과',        type:'학생부종합I',recruit:'6명', comp26:'7.5:1',  fill:'10', csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:2.98,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98150,univ:'충북대학교',dept:'컴퓨터공학과',        type:'학생부종합I',recruit:'5명', comp26:'7.6:1',  fill:'10', csat:'없음',cut50:0,cut70:0,grade50:3.28,grade70:3.26,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98151,univ:'충북대학교',dept:'지능로봇공학과',       type:'학생부종합I',recruit:'6명', comp26:'13.17:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:3.22,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98152,univ:'충북대학교',dept:'소프트웨어학부',       type:'학생부종합I',recruit:'11명',comp26:'7.0:1',  fill:'21', csat:'없음',cut50:0,cut70:0,grade50:3.15,grade70:2.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98153,univ:'충북대학교',dept:'소비자학과',         type:'학생부종합I',recruit:'4명', comp26:'10.75:1',fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.2, grade70:3.2, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98154,univ:'충북대학교',dept:'바이오헬스학부',       type:'학생부종합I',recruit:'11명',comp26:'8.36:1', fill:'14', csat:'없음',cut50:0,cut70:0,grade50:3.43,grade70:2.43,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98155,univ:'충북대학교',dept:'정보통계학과',        type:'학생부종합I',recruit:'6명', comp26:'12.67:1',fill:'12', csat:'없음',cut50:0,cut70:0,grade50:3.42,grade70:3.63,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98156,univ:'충북대학교',dept:'물리학과',           type:'학생부종합I',recruit:'8명', comp26:'7.63:1', fill:'13', csat:'없음',cut50:0,cut70:0,grade50:3.76,grade70:3.84,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98157,univ:'충북대학교',dept:'천문우주학과',        type:'학생부종합I',recruit:'5명', comp26:'12.8:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.32,grade70:2.82,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98158,univ:'충북대학교',dept:'의예과',             type:'학생부종합I',recruit:'3명', comp26:'32.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'미제출(최종선발3명이하)',calcMode:'jh'},
+  {id:98159,univ:'충북대학교',dept:'간호학과',           type:'학생부종합I',recruit:'7명', comp26:'12.14:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:2.83,grade70:2.37,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98160,univ:'충북대학교',dept:'약학과',             type:'학생부종합I',recruit:'3명', comp26:'20.33:1',fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'미제출(최종선발3명이하)',calcMode:'jh'},
+  {id:98161,univ:'충북대학교',dept:'제약학과',           type:'학생부종합I',recruit:'3명', comp26:'17.67:1',fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'미제출(최종선발3명이하)',calcMode:'jh'},
+  {id:98162,univ:'충북대학교',dept:'생물학과',           type:'학생부종합I',recruit:'8명', comp26:'7.63:1', fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.32,grade70:2.88,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98163,univ:'충북대학교',dept:'생화학과',           type:'학생부종합I',recruit:'6명', comp26:'8.33:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:2.66,grade70:2.99,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98164,univ:'충북대학교',dept:'식물의학과',         type:'학생부종합I',recruit:'5명', comp26:'8.6:1',  fill:'13', csat:'없음',cut50:0,cut70:0,grade50:2.99,grade70:3.66,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98165,univ:'충북대학교',dept:'수의예과',           type:'학생부종합I',recruit:'8명', comp26:'14.63:1',fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:1.16,grade70:1.26,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98166,univ:'충북대학교',dept:'식물자원학과',        type:'학생부종합I',recruit:'5명', comp26:'12.0:1', fill:'16', csat:'없음',cut50:0,cut70:0,grade50:3.03,grade70:3.49,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98167,univ:'충북대학교',dept:'특용식물학과',        type:'학생부종합I',recruit:'4명', comp26:'16.0:1', fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:3.79,grade70:3.79,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98168,univ:'충북대학교',dept:'화학과',             type:'학생부종합I',recruit:'9명', comp26:'6.44:1', fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:2.62,grade70:3.46,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98169,univ:'충북대학교',dept:'환경생명화학과',       type:'학생부종합I',recruit:'5명', comp26:'13.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.04,grade70:3.3, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98170,univ:'충북대학교',dept:'미생물학과',         type:'학생부종합I',recruit:'7명', comp26:'9.29:1', fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.04,grade70:2.96,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98171,univ:'충북대학교',dept:'정보통신공학부',       type:'학생부종합I',recruit:'15명',comp26:'7.93:1', fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.26,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98172,univ:'충북대학교',dept:'공업화학과',         type:'학생부종합I',recruit:'6명', comp26:'8.5:1',  fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.0, grade70:3.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98173,univ:'충북대학교',dept:'화학공학과',         type:'학생부종합I',recruit:'6명', comp26:'8.17:1', fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:2.24,grade70:2.85,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98174,univ:'충북대학교',dept:'안전공학과',         type:'학생부종합I',recruit:'6명', comp26:'8.33:1', fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.56,grade70:3.62,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98175,univ:'충북대학교',dept:'축산학과',           type:'학생부종합I',recruit:'7명', comp26:'14.71:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.78,grade70:3.76,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98176,univ:'충북대학교',dept:'바이오시스템공학과',   type:'학생부종합I',recruit:'5명', comp26:'10.8:1', fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.16,grade70:3.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98177,univ:'충북대학교',dept:'원예과학과',         type:'학생부종합I',recruit:'5명', comp26:'17.0:1', fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.51,grade70:3.52,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98178,univ:'충북대학교',dept:'산림학과',           type:'학생부종합I',recruit:'5명', comp26:'35.6:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.81,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98179,univ:'충북대학교',dept:'목재·종이과학과',     type:'학생부종합I',recruit:'4명', comp26:'12.25:1',fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:4.01,grade70:4.01,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  // ─── 학생부종합 II 전형 ───
+  {id:98200,univ:'충북대학교',dept:'행정학과',           type:'학생부종합II',recruit:'4명', comp26:'11.5:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.06,grade70:3.06,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98201,univ:'충북대학교',dept:'환경공학과',         type:'학생부종합II',recruit:'4명', comp26:'16.75:1',fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.25,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98202,univ:'충북대학교',dept:'기계공학부',         type:'학생부종합II',recruit:'9명', comp26:'25.56:1',fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:2.99,grade70:3.21,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98203,univ:'충북대학교',dept:'전기공학부',         type:'학생부종합II',recruit:'7명', comp26:'8.71:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:3.75,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98204,univ:'충북대학교',dept:'전자공학과',         type:'학생부종합II',recruit:'5명', comp26:'8.2:1',  fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.12,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98205,univ:'충북대학교',dept:'경제학과',           type:'학생부종합II',recruit:'6명', comp26:'16.33:1',fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.32,grade70:3.17,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98206,univ:'충북대학교',dept:'농업경제학과',        type:'학생부종합II',recruit:'4명', comp26:'15.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.64,grade70:3.64,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98207,univ:'충북대학교',dept:'아동복지학과',        type:'학생부종합II',recruit:'4명', comp26:'11.75:1',fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.4, grade70:3.4, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98208,univ:'충북대학교',dept:'사회학과',           type:'학생부종합II',recruit:'4명', comp26:'20.0:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.02,grade70:3.02,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98209,univ:'충북대학교',dept:'정치외교학과',        type:'학생부종합II',recruit:'4명', comp26:'11.5:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:2.95,grade70:2.95,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98210,univ:'충북대학교',dept:'건축공학과',         type:'학생부종합II',recruit:'6명', comp26:'13.33:1',fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:3.58,grade70:3.44,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98211,univ:'충북대학교',dept:'독일언어문화학과',     type:'학생부종합II',recruit:'4명', comp26:'8.25:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.69,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98212,univ:'충북대학교',dept:'프랑스언어문화학과',   type:'학생부종합II',recruit:'4명', comp26:'10.0:1', fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.66,grade70:3.66,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98213,univ:'충북대학교',dept:'고고미술사학과',       type:'학생부종합II',recruit:'4명', comp26:'13.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.48,grade70:3.48,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98214,univ:'충북대학교',dept:'심리학과',           type:'학생부종합II',recruit:'4명', comp26:'26.25:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.34,grade70:3.34,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98215,univ:'충북대학교',dept:'사학과',             type:'학생부종합II',recruit:'4명', comp26:'20.25:1',fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.35,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98216,univ:'충북대학교',dept:'국어국문학과',        type:'학생부종합II',recruit:'4명', comp26:'18.5:1', fill:'11', csat:'없음',cut50:0,cut70:0,grade50:3.58,grade70:3.58,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98217,univ:'충북대학교',dept:'러시아언어문화학과',   type:'학생부종합II',recruit:'4명', comp26:'8.5:1',  fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.79,grade70:3.79,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98218,univ:'충북대학교',dept:'공학자율전공학부',      type:'학생부종합II',recruit:'7명', comp26:'19.86:1',fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.31,grade70:3.21,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98219,univ:'충북대학교',dept:'전자정보자율전공학부',   type:'학생부종합II',recruit:'7명', comp26:'10.57:1',fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.52,grade70:3.18,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98220,univ:'충북대학교',dept:'영어영문학과',        type:'학생부종합II',recruit:'4명', comp26:'13.0:1', fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.51,grade70:3.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98221,univ:'충북대학교',dept:'건축학과',           type:'학생부종합II',recruit:'4명', comp26:'23.25:1',fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:2.62,grade70:2.62,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'건축학과(5년제)',calcMode:'jh'},
+  {id:98222,univ:'충북대학교',dept:'토목공학부',         type:'학생부종합II',recruit:'13명',comp26:'13.08:1',fill:'11', csat:'없음',cut50:0,cut70:0,grade50:3.92,grade70:3.56,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98223,univ:'충북대학교',dept:'지역건설공학과',       type:'학생부종합II',recruit:'4명', comp26:'24.75:1',fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.56,grade70:3.56,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98224,univ:'충북대학교',dept:'도시공학과',         type:'학생부종합II',recruit:'6명', comp26:'8.17:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.4, grade70:3.65,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98225,univ:'충북대학교',dept:'철학과',             type:'학생부종합II',recruit:'4명', comp26:'19.25:1',fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.5, grade70:3.5, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98226,univ:'충북대학교',dept:'경영정보학과',        type:'학생부종합II',recruit:'6명', comp26:'10.0:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.26,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98227,univ:'충북대학교',dept:'경영학부',           type:'학생부종합II',recruit:'14명',comp26:'12.86:1',fill:'22', csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.1, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98228,univ:'충북대학교',dept:'국제경영학과',        type:'학생부종합II',recruit:'9명', comp26:'11.89:1',fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98229,univ:'충북대학교',dept:'중어중문학과',        type:'학생부종합II',recruit:'4명', comp26:'21.5:1', fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.87,grade70:3.87,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98230,univ:'충북대학교',dept:'지구환경과학과',       type:'학생부종합II',recruit:'4명', comp26:'23.5:1', fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:3.48,grade70:3.48,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98231,univ:'충북대학교',dept:'주거환경학과',        type:'학생부종합II',recruit:'4명', comp26:'8.5:1',  fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.25,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98232,univ:'충북대학교',dept:'식품생명공학과',       type:'학생부종합II',recruit:'4명', comp26:'11.75:1',fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.31,grade70:3.31,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98233,univ:'충북대학교',dept:'식품영양학과',        type:'학생부종합II',recruit:'4명', comp26:'14.5:1', fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:3.2, grade70:3.2, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98234,univ:'충북대학교',dept:'의류학과',           type:'학생부종합II',recruit:'4명', comp26:'18.75:1',fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.25,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98235,univ:'충북대학교',dept:'수학과',             type:'학생부종합II',recruit:'4명', comp26:'17.5:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.87,grade70:3.87,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98236,univ:'충북대학교',dept:'신소재공학과',        type:'학생부종합II',recruit:'5명', comp26:'14.2:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.57,grade70:2.93,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98237,univ:'충북대학교',dept:'컴퓨터공학과',        type:'학생부종합II',recruit:'5명', comp26:'10.0:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:2.91,grade70:3.07,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98238,univ:'충북대학교',dept:'지능로봇공학과',       type:'학생부종합II',recruit:'5명', comp26:'25.8:1', fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.84,grade70:3.84,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98239,univ:'충북대학교',dept:'소비자학과',         type:'학생부종합II',recruit:'4명', comp26:'19.75:1',fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.55,grade70:3.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98240,univ:'충북대학교',dept:'반도체공학부',        type:'학생부종합II',recruit:'6명', comp26:'10.0:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.42,grade70:3.25,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98241,univ:'충북대학교',dept:'바이오헬스학부',       type:'학생부종합II',recruit:'9명', comp26:'8.78:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.55,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98242,univ:'충북대학교',dept:'정보통계학과',        type:'학생부종합II',recruit:'4명', comp26:'8.5:1',  fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.42,grade70:4.12,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98243,univ:'충북대학교',dept:'물리학과',           type:'학생부종합II',recruit:'6명', comp26:'13.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.59,grade70:4.03,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98244,univ:'충북대학교',dept:'천문우주학과',        type:'학생부종합II',recruit:'4명', comp26:'23.0:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.74,grade70:3.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98245,univ:'충북대학교',dept:'의예과',             type:'학생부종합II',recruit:'5명', comp26:'17.6:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:1.14,grade70:1.15,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98246,univ:'충북대학교',dept:'간호학과',           type:'학생부종합II',recruit:'7명', comp26:'24.57:1',fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:2.36,grade70:2.27,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98247,univ:'충북대학교',dept:'약학과',             type:'학생부종합II',recruit:'3명', comp26:'15.33:1',fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'미제출(최종선발3명이하)',calcMode:'jh'},
+  {id:98248,univ:'충북대학교',dept:'제약학과',           type:'학생부종합II',recruit:'3명', comp26:'15.0:1', fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'미제출(최종선발3명이하)',calcMode:'jh'},
+  {id:98249,univ:'충북대학교',dept:'소프트웨어학부',       type:'학생부종합II',recruit:'9명', comp26:'9.0:1',  fill:'12', csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.27,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98250,univ:'충북대학교',dept:'미생물학과',         type:'학생부종합II',recruit:'5명', comp26:'7.0:1',  fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.0, grade70:3.3, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98251,univ:'충북대학교',dept:'생물학과',           type:'학생부종합II',recruit:'6명', comp26:'8.17:1', fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.21,grade70:2.95,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98252,univ:'충북대학교',dept:'생화학과',           type:'학생부종합II',recruit:'4명', comp26:'8.75:1', fill:'3',  csat:'없음',cut50:0,cut70:0,grade50:3.21,grade70:3.21,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98253,univ:'충북대학교',dept:'식물의학과',         type:'학생부종합II',recruit:'4명', comp26:'10.25:1',fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.54,grade70:3.54,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98254,univ:'충북대학교',dept:'수의예과',           type:'학생부종합II',recruit:'7명', comp26:'11.71:1',fill:'10', csat:'없음',cut50:0,cut70:0,grade50:1.29,grade70:1.36,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98255,univ:'충북대학교',dept:'식물자원학과',        type:'학생부종합II',recruit:'4명', comp26:'11.5:1', fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.69,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98256,univ:'충북대학교',dept:'특용식물학과',        type:'학생부종합II',recruit:'4명', comp26:'13.5:1', fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:2.97,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98257,univ:'충북대학교',dept:'화학과',             type:'학생부종합II',recruit:'6명', comp26:'11.67:1',fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.73,grade70:3.4, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98258,univ:'충북대학교',dept:'환경생명화학과',       type:'학생부종합II',recruit:'4명', comp26:'28.0:1', fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:2.55,grade70:2.55,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98259,univ:'충북대학교',dept:'목재·종이과학과',     type:'학생부종합II',recruit:'4명', comp26:'13.0:1', fill:'0',  csat:'없음',cut50:0,cut70:0,grade50:3.45,grade70:3.45,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98260,univ:'충북대학교',dept:'정보통신공학부',       type:'학생부종합II',recruit:'14명',comp26:'14.0:1', fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.15,grade70:3.43,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98261,univ:'충북대학교',dept:'공업화학과',         type:'학생부종합II',recruit:'5명', comp26:'7.4:1',  fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.33,grade70:3.23,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98262,univ:'충북대학교',dept:'화학공학과',         type:'학생부종합II',recruit:'5명', comp26:'7.0:1',  fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:2.63,grade70:3.23,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98263,univ:'충북대학교',dept:'안전공학과',         type:'학생부종합II',recruit:'4명', comp26:'10.5:1', fill:'2',  csat:'없음',cut50:0,cut70:0,grade50:3.76,grade70:3.76,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98264,univ:'충북대학교',dept:'축산학과',           type:'학생부종합II',recruit:'6명', comp26:'10.17:1',fill:'4',  csat:'없음',cut50:0,cut70:0,grade50:3.95,grade70:4.17,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98265,univ:'충북대학교',dept:'바이오시스템공학과',   type:'학생부종합II',recruit:'4명', comp26:'22.5:1', fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.12,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98266,univ:'충북대학교',dept:'원예과학과',         type:'학생부종합II',recruit:'4명', comp26:'28.75:1',fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.66,grade70:3.66,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98267,univ:'충북대학교',dept:'산림학과',           type:'학생부종합II',recruit:'4명', comp26:'19.5:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:4.47,grade70:4.47,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  // ─── SW우수인재전형 ───
+  {id:98280,univ:'충북대학교',dept:'컴퓨터공학과',        type:'SW우수인재',  recruit:'4명', comp26:'6.5:1',  fill:'10', csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.29,method:'서류100%',note:'수능최저 없음',calcMode:'jh'},
+  {id:98281,univ:'충북대학교',dept:'소프트웨어학부',       type:'SW우수인재',  recruit:'5명', comp26:'8.4:1',  fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:2.84,grade70:3.06,method:'서류100%',note:'수능최저 없음',calcMode:'jh'},
+  {id:98282,univ:'충북대학교',dept:'정보통신공학부',       type:'SW우수인재',  recruit:'4명', comp26:'6.5:1',  fill:'1',  csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.69,method:'서류100%',note:'수능최저 없음',calcMode:'jh'},
+
+  // ── 단국대학교 학생부종합전형 (2027모집요강+2026실입결) ──
+  // 수능최저: 없음 (전 전형)
+  // DKU인재(서류형): 서류100% 일괄합산
+  // DKU인재(면접형)/SW인재: 1단계 서류100%(3배수)→2단계 서류70%+면접30%
+  // ─── DKU인재(서류형) ───
+  {id:98300,univ:'단국대학교',dept:'인문계열광역',         type:'DKU인재(서류형)',recruit:'30명',comp26:'16.67:1',fill:'37',csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.31,method:'서류100%(일괄합산)',note:'퇴계혁신칼리지 인문계열광역',calcMode:'jh'},
+  {id:98301,univ:'단국대학교',dept:'사회계열광역',         type:'DKU인재(서류형)',recruit:'21명',comp26:'18.52:1',fill:'17',csat:'없음',cut50:0,cut70:0,grade50:2.81,grade70:2.89,method:'서류100%(일괄합산)',note:'퇴계혁신칼리지 사회계열광역',calcMode:'jh'},
+  {id:98302,univ:'단국대학교',dept:'공학계열광역',         type:'DKU인재(서류형)',recruit:'30명',comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'퇴계혁신칼리지 공학계열광역 2027신설',calcMode:'jh'},
+  {id:98303,univ:'단국대학교',dept:'국어국문학과',         type:'DKU인재(서류형)',recruit:'4명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'2026입결미공개',calcMode:'jh'},
+  {id:98304,univ:'단국대학교',dept:'사학과',               type:'DKU인재(서류형)',recruit:'4명', comp26:'14.8:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:2.63,grade70:2.87,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98305,univ:'단국대학교',dept:'철학과',               type:'DKU인재(서류형)',recruit:'3명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'2026입결미공개',calcMode:'jh'},
+  {id:98306,univ:'단국대학교',dept:'영미인문학과',         type:'DKU인재(서류형)',recruit:'3명', comp26:'8.86:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.02,grade70:3.03,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98307,univ:'단국대학교',dept:'법학과',               type:'DKU인재(서류형)',recruit:'10명',comp26:'7.46:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:2.55,grade70:2.67,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98308,univ:'단국대학교',dept:'정치외교학과',         type:'DKU인재(서류형)',recruit:'5명', comp26:'8.17:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.74,grade70:2.77,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98309,univ:'단국대학교',dept:'행정학과',             type:'DKU인재(서류형)',recruit:'6명', comp26:'13.5:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.68,grade70:2.74,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98310,univ:'단국대학교',dept:'도시계획·부동산학부', type:'DKU인재(서류형)',recruit:'6명', comp26:'8.14:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:2.6, grade70:2.63,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98311,univ:'단국대학교',dept:'미디어커뮤니케이션학부',type:'DKU인재(서류형)',recruit:'6명',comp26:'13.86:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.28,grade70:2.53,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98312,univ:'단국대학교',dept:'상담학과',             type:'DKU인재(서류형)',recruit:'6명', comp26:'10.14:1',fill:'16',csat:'없음',cut50:0,cut70:0,grade50:2.9, grade70:3.11,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98313,univ:'단국대학교',dept:'경제학과',             type:'DKU인재(서류형)',recruit:'8명', comp26:'7.0:1',  fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.63,grade70:2.75,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98314,univ:'단국대학교',dept:'무역학과',             type:'DKU인재(서류형)',recruit:'8명', comp26:'6.9:1',  fill:'10',csat:'없음',cut50:0,cut70:0,grade50:2.77,grade70:2.92,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98315,univ:'단국대학교',dept:'경영학부',             type:'DKU인재(서류형)',recruit:'12명',comp26:'12.31:1',fill:'14',csat:'없음',cut50:0,cut70:0,grade50:2.66,grade70:2.78,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98316,univ:'단국대학교',dept:'국제경영학과',         type:'DKU인재(서류형)',recruit:'5명', comp26:'10.75:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:2.98,grade70:3.03,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98317,univ:'단국대학교',dept:'산경영학과',           type:'DKU인재(서류형)',recruit:'3명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'프리무스국제-산경영학과',calcMode:'jh'},
+  {id:98318,univ:'단국대학교',dept:'수학교육과',           type:'DKU인재(서류형)',recruit:'5명', comp26:'6.4:1',  fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.21,grade70:2.24,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98319,univ:'단국대학교',dept:'한문교육과',           type:'DKU인재(서류형)',recruit:'3명', comp26:'6.0:1',  fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.86,grade70:2.86,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98320,univ:'단국대학교',dept:'특수교육과',           type:'DKU인재(서류형)',recruit:'4명', comp26:'8.25:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.11,grade70:2.11,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98321,univ:'단국대학교',dept:'과학교육과',           type:'DKU인재(서류형)',recruit:'4명', comp26:'12.75:1',fill:'10',csat:'없음',cut50:0,cut70:0,grade50:2.47,grade70:2.78,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98322,univ:'단국대학교',dept:'모바일시스템공학과',   type:'DKU인재(서류형)',recruit:'3명', comp26:'7.5:1',  fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.46,method:'서류100%(일괄합산)',note:'프리무스국제',calcMode:'jh'},
+  {id:98323,univ:'단국대학교',dept:'전자전기공학과',       type:'DKU인재(서류형)',recruit:'6명', comp26:'19.0:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:2.6, grade70:2.84,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98324,univ:'단국대학교',dept:'융합반도체공학과',     type:'DKU인재(서류형)',recruit:'5명', comp26:'11.83:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.77,grade70:2.95,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98325,univ:'단국대학교',dept:'고분자시스템공학부 고분자공학전공',type:'DKU인재(서류형)',recruit:'6명',comp26:'14.0:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.82,grade70:2.88,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98326,univ:'단국대학교',dept:'고분자시스템공학부 고분자공학전공(고분자)',type:'DKU인재(서류형)',recruit:'8명',comp26:'10.5:1',fill:'13',csat:'없음',cut50:0,cut70:0,grade50:2.82,grade70:2.82,method:'서류100%(일괄합산)',note:'고분자공학전공',calcMode:'jh'},
+  {id:98327,univ:'단국대학교',dept:'인프라건설공학과',     type:'DKU인재(서류형)',recruit:'5명', comp26:'12.38:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:2.75,grade70:2.78,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98328,univ:'단국대학교',dept:'기계공학과',           type:'DKU인재(서류형)',recruit:'6명', comp26:'17.0:1', fill:'16',csat:'없음',cut50:0,cut70:0,grade50:2.8, grade70:2.85,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98329,univ:'단국대학교',dept:'화학공학과',           type:'DKU인재(서류형)',recruit:'6명', comp26:'20.4:1', fill:'16',csat:'없음',cut50:0,cut70:0,grade50:2.49,grade70:2.54,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98330,univ:'단국대학교',dept:'건축학전공(5년제)',     type:'DKU인재(서류형)',recruit:'8명', comp26:'10.38:1',fill:'15',csat:'없음',cut50:0,cut70:0,grade50:2.88,grade70:2.95,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98331,univ:'단국대학교',dept:'건축공학전공',         type:'DKU인재(서류형)',recruit:'5명', comp26:'8.0:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.83,grade70:2.84,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98332,univ:'단국대학교',dept:'소프트웨어학과',       type:'DKU인재(서류형)',recruit:'6명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'SW융합계열 소속',calcMode:'jh'},
+  {id:98333,univ:'단국대학교',dept:'컴퓨터공학과',         type:'DKU인재(서류형)',recruit:'6명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'SW융합계열 소속',calcMode:'jh'},
+  {id:98334,univ:'단국대학교',dept:'통계데이터사이언스학과',type:'DKU인재(서류형)',recruit:'3명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'SW융합계열 소속',calcMode:'jh'},
+  {id:98335,univ:'단국대학교',dept:'사이버보안학과',       type:'DKU인재(서류형)',recruit:'3명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'SW융합계열 소속',calcMode:'jh'},
+  {id:98336,univ:'단국대학교',dept:'인공지능학과',         type:'DKU인재(서류형)',recruit:'7명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'SW융합계열 소속',calcMode:'jh'},
+  {id:98337,univ:'단국대학교',dept:'AI건축융합학과',       type:'DKU인재(서류형)',recruit:'3명', comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%(일괄합산)',note:'SW융합계열 소속',calcMode:'jh'},
+  // ─── DKU인재(면접형) ───
+  {id:98350,univ:'단국대학교',dept:'국어국문학과',         type:'DKU인재(면접형)',recruit:'4명', comp26:'8.57:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.79,grade70:2.82,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98351,univ:'단국대학교',dept:'사학과',               type:'DKU인재(면접형)',recruit:'4명', comp26:'14.8:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:2.63,grade70:2.87,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98352,univ:'단국대학교',dept:'철학과',               type:'DKU인재(면접형)',recruit:'4명', comp26:'13.0:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.85,grade70:2.85,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98353,univ:'단국대학교',dept:'영미인문학과',         type:'DKU인재(면접형)',recruit:'3명', comp26:'8.86:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.02,grade70:3.03,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98354,univ:'단국대학교',dept:'법학과',               type:'DKU인재(면접형)',recruit:'10명',comp26:'10.27:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:2.81,grade70:2.86,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98355,univ:'단국대학교',dept:'정치외교학과',         type:'DKU인재(면접형)',recruit:'5명', comp26:'21.33:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.11,grade70:3.61,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98356,univ:'단국대학교',dept:'행정학과',             type:'DKU인재(면접형)',recruit:'6명', comp26:'19.17:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.66,grade70:3.87,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98357,univ:'단국대학교',dept:'도시계획·부동산학부', type:'DKU인재(면접형)',recruit:'6명', comp26:'10.71:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.86,grade70:3.01,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98358,univ:'단국대학교',dept:'미디어커뮤니케이션학부',type:'DKU인재(면접형)',recruit:'6명',comp26:'28.86:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.71,grade70:2.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98359,univ:'단국대학교',dept:'상담학과',             type:'DKU인재(면접형)',recruit:'5명', comp26:'14.29:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.31,grade70:3.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98360,univ:'단국대학교',dept:'경제학과',             type:'DKU인재(면접형)',recruit:'9명', comp26:'11.56:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.65,grade70:2.87,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98361,univ:'단국대학교',dept:'무역학과',             type:'DKU인재(면접형)',recruit:'10명',comp26:'16.7:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.51,grade70:4.77,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98362,univ:'단국대학교',dept:'경영학부',             type:'DKU인재(면접형)',recruit:'11명',comp26:'21.73:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.86,grade70:2.94,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98363,univ:'단국대학교',dept:'국제경영학과',         type:'DKU인재(면접형)',recruit:'5명', comp26:'16.5:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.09,grade70:3.11,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98364,univ:'단국대학교',dept:'수학교육과',           type:'DKU인재(면접형)',recruit:'5명', comp26:'11.0:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.32,grade70:2.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98365,univ:'단국대학교',dept:'과학교육과',           type:'DKU인재(면접형)',recruit:'4명', comp26:'14.25:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.72,grade70:2.72,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98366,univ:'단국대학교',dept:'한문교육과',           type:'DKU인재(면접형)',recruit:'3명', comp26:'7.25:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.19,grade70:3.19,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98367,univ:'단국대학교',dept:'특수교육과',           type:'DKU인재(면접형)',recruit:'10명',comp26:'6.9:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.26,grade70:3.37,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98368,univ:'단국대학교',dept:'모바일시스템공학과',   type:'DKU인재(면접형)',recruit:'3명', comp26:'9.75:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.07,grade70:3.07,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98369,univ:'단국대학교',dept:'전자전기공학과',       type:'DKU인재(면접형)',recruit:'6명', comp26:'27.13:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.69,grade70:2.82,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98370,univ:'단국대학교',dept:'융합반도체공학과',     type:'DKU인재(면접형)',recruit:'5명', comp26:'15.0:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.43,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98371,univ:'단국대학교',dept:'고분자시스템공학부 융합소재공학전공',type:'DKU인재(면접형)',recruit:'6명',comp26:'20.67:1',fill:'4',csat:'없음',cut50:0,cut70:0,grade50:3.01,grade70:3.09,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98372,univ:'단국대학교',dept:'고분자시스템공학부 고분자공학전공',type:'DKU인재(면접형)',recruit:'8명',comp26:'17.38:1',fill:'5',csat:'없음',cut50:0,cut70:0,grade50:2.82,grade70:2.93,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98373,univ:'단국대학교',dept:'인프라건설공학과',     type:'DKU인재(면접형)',recruit:'8명', comp26:'20.25:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.06,grade70:3.12,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98374,univ:'단국대학교',dept:'기계공학과',           type:'DKU인재(면접형)',recruit:'6명', comp26:'16.63:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:2.98,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98375,univ:'단국대학교',dept:'화학공학과',           type:'DKU인재(면접형)',recruit:'10명',comp26:'15.0:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:3.06,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98376,univ:'단국대학교',dept:'건축학전공(5년제)',     type:'DKU인재(면접형)',recruit:'8명', comp26:'15.38:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.87,grade70:2.98,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98377,univ:'단국대학교',dept:'건축공학전공',         type:'DKU인재(면접형)',recruit:'5명', comp26:'12.4:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:2.97,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh'},
+  {id:98378,univ:'단국대학교',dept:'수학교육과',           type:'DKU인재(면접형)',recruit:'6명', comp26:'11.0:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.32,grade70:2.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'사범-수학교육',calcMode:'jh'},
+  {id:98379,univ:'단국대학교',dept:'과학교육과',           type:'DKU인재(면접형)',recruit:'4명', comp26:'14.25:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.72,grade70:2.72,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'사범-과학교육',calcMode:'jh'},
+  // ─── SW인재전형 ───
+  {id:98390,univ:'단국대학교',dept:'SW융합계열광역',       type:'SW인재',          recruit:'34명',comp26:'13.21:1',fill:'27',csat:'없음',cut50:0,cut70:0,grade50:3.03,grade70:3.17,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'퇴계혁신칼리지 SW융합계열광역',calcMode:'jh'},
+
+  // ── 성신여자대학교 학생부종합(자기주도인재전형) (2027모집요강+2026실입결) ──
+  // 수능최저: 없음
+  // 전형방법: 1단계 서류100%(3배수선발) → 2단계 서류60%+면접40%
+  // 환산점수(50%/70%)=0 (성신여대 자체환산, 공개안함), 환산등급만 공개
+  {id:98400,univ:'성신여자대학교',dept:'국어국문학과',       type:'자기주도인재',recruit:'7명', comp26:'13.55:1',fill:'12',csat:'없음',cut50:0,cut70:0,grade50:2.85,grade70:2.93,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98401,univ:'성신여자대학교',dept:'영어영문학과',       type:'자기주도인재',recruit:'12명',comp26:'10.71:1',fill:'26',csat:'없음',cut50:0,cut70:0,grade50:3.28,grade70:4.57,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98402,univ:'성신여자대학교',dept:'독일어문화학과',     type:'자기주도인재',recruit:'6명', comp26:'8.5:1',  fill:'8', csat:'없음',cut50:0,cut70:0,grade50:4.58,grade70:4.64,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98403,univ:'성신여자대학교',dept:'프랑스어문화학과',   type:'자기주도인재',recruit:'5명', comp26:'8.0:1',  fill:'14',csat:'없음',cut50:0,cut70:0,grade50:3.41,grade70:3.69,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98404,univ:'성신여자대학교',dept:'일본어문화학과',     type:'자기주도인재',recruit:'12명',comp26:'8.38:1', fill:'12',csat:'없음',cut50:0,cut70:0,grade50:3.52,grade70:3.76,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98405,univ:'성신여자대학교',dept:'중국어문화학과',     type:'자기주도인재',recruit:'12명',comp26:'8.06:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:4.33,grade70:4.52,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98406,univ:'성신여자대학교',dept:'사학과',             type:'자기주도인재',recruit:'6명', comp26:'7.1:1',  fill:'13',csat:'없음',cut50:0,cut70:0,grade50:2.98,grade70:3.21,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98407,univ:'성신여자대학교',dept:'문화예술경영학과',   type:'자기주도인재',recruit:'5명', comp26:'16.55:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.98,grade70:3.38,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98408,univ:'성신여자대학교',dept:'정치외교학과',       type:'자기주도인재',recruit:'7명', comp26:'7.18:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.66,grade70:2.85,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98409,univ:'성신여자대학교',dept:'심리학과',           type:'자기주도인재',recruit:'8명', comp26:'14.75:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.86,grade70:2.93,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98410,univ:'성신여자대학교',dept:'지리학과',           type:'자기주도인재',recruit:'7명', comp26:'5.45:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.81,grade70:2.99,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98411,univ:'성신여자대학교',dept:'경제학과',           type:'자기주도인재',recruit:'14명',comp26:'5.63:1', fill:'14',csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:3.04,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98412,univ:'성신여자대학교',dept:'미디어커뮤니케이션학과',type:'자기주도인재',recruit:'12명',comp26:'10.88:1',fill:'6',csat:'없음',cut50:0,cut70:0,grade50:2.73,grade70:2.79,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98413,univ:'성신여자대학교',dept:'경영학과',           type:'자기주도인재',recruit:'27명',comp26:'7.06:1', fill:'27',csat:'없음',cut50:0,cut70:0,grade50:2.93,grade70:3.06,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98414,univ:'성신여자대학교',dept:'사회복지학과',       type:'자기주도인재',recruit:'9명', comp26:'9.62:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.25,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98415,univ:'성신여자대학교',dept:'법학부',             type:'자기주도인재',recruit:'30명',comp26:'6.3:1',  fill:'16',csat:'없음',cut50:0,cut70:0,grade50:2.98,grade70:3.12,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98416,univ:'성신여자대학교',dept:'수리통계데이터사이언스학부(수학·핀테크전공)',type:'자기주도인재',recruit:'21명',comp26:'5.16:1',fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.16,grade70:3.23,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98417,univ:'성신여자대학교',dept:'수리통계데이터사이언스학부(통계학·빅데이터사이언스전공)',type:'자기주도인재',recruit:'20명',comp26:'4.71:1',fill:'22',csat:'없음',cut50:0,cut70:0,grade50:3.38,grade70:3.48,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98418,univ:'성신여자대학교',dept:'화학·에너지융합학부',type:'자기주도인재',recruit:'22명',comp26:'7.04:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.01,grade70:3.1, method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98419,univ:'성신여자대학교',dept:'바이오헬스융합학부',  type:'자기주도인재',recruit:'24명',comp26:'8.43:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:3.17,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98420,univ:'성신여자대학교',dept:'청정신소재공학과',   type:'자기주도인재',recruit:'17명',comp26:'6.5:1',  fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.99,grade70:3.06,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98421,univ:'성신여자대학교',dept:'바이오식품공학과',   type:'자기주도인재',recruit:'12명',comp26:'8.5:1',  fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.73,grade70:2.84,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98422,univ:'성신여자대학교',dept:'바이오신약의과학부',  type:'자기주도인재',recruit:'27명',comp26:'8.61:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.65,grade70:2.77,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98423,univ:'성신여자대학교',dept:'AI융합학부',         type:'자기주도인재',recruit:'27명',comp26:'5.26:1', fill:'22',csat:'없음',cut50:0,cut70:0,grade50:3.18,grade70:3.38,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98424,univ:'성신여자대학교',dept:'융합시반도체공학과', type:'자기주도인재',recruit:'17명',comp26:'',         fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'2027신설/2026입결없음',calcMode:'jh'},
+  {id:98425,univ:'성신여자대학교',dept:'컴퓨터공학과',       type:'자기주도인재',recruit:'17명',comp26:'4.6:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.2, grade70:3.32,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98426,univ:'성신여자대학교',dept:'융합보안공학과',     type:'자기주도인재',recruit:'21명',comp26:'3.92:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.47,grade70:3.59,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98427,univ:'성신여자대학교',dept:'서비스디자인공학과', type:'자기주도인재',recruit:'20명',comp26:'4.08:1', fill:'12',csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.5, method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98428,univ:'성신여자대학교',dept:'간호학과',           type:'자기주도인재',recruit:'30명',comp26:'9.0:1',  fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.41,grade70:2.5, method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98429,univ:'성신여자대학교',dept:'의류산업학과',       type:'자기주도인재',recruit:'12명',comp26:'8.56:1', fill:'15',csat:'없음',cut50:0,cut70:0,grade50:2.93,grade70:2.98,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98430,univ:'성신여자대학교',dept:'소비자산업학과',     type:'자기주도인재',recruit:'9명', comp26:'6.92:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.04,grade70:3.16,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98431,univ:'성신여자대학교',dept:'뷰티산업학과',       type:'자기주도인재',recruit:'5명', comp26:'16.82:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.21,grade70:3.43,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98432,univ:'성신여자대학교',dept:'교육학과',           type:'자기주도인재',recruit:'10명',comp26:'8.4:1',  fill:'17',csat:'없음',cut50:0,cut70:0,grade50:2.79,grade70:2.97,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98433,univ:'성신여자대학교',dept:'사회교육과',         type:'자기주도인재',recruit:'10명',comp26:'6.8:1',  fill:'12',csat:'없음',cut50:0,cut70:0,grade50:2.88,grade70:3.11,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98434,univ:'성신여자대학교',dept:'윤리교육과',         type:'자기주도인재',recruit:'10명',comp26:'7.2:1',  fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.95,grade70:3.17,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98435,univ:'성신여자대학교',dept:'한문교육과',         type:'자기주도인재',recruit:'10명',comp26:'8.1:1',  fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:3.04,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98436,univ:'성신여자대학교',dept:'유아교육과',         type:'자기주도인재',recruit:'13명',comp26:'7.62:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.98,grade70:3.18,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+
+  // ── 덕성여자대학교 학생부종합전형 (2027모집요강+2026실입결) ──
+  // 수능최저: 없음 (전 전형)
+  // 덕성인재전형 I: 서류100% 일괄합산
+  // 덕성인재전형 II: 1단계 서류100%(4배수/일부3배수) → 2단계 서류60%+면접40%
+  // 환산점수: 1000점 만점 기준 공개 (cut50/cut70에 입력)
+  // ─── 덕성인재전형 I ───
+  {id:98440,univ:'덕성여자대학교',dept:'글로벌융합대학(인문사회)',  type:'덕성인재전형I', recruit:'65명',comp26:'8.80:1', fill:'85',csat:'없음',cut50:980.09,cut70:978.65,grade50:3.2, grade70:3.31,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98441,univ:'덕성여자대학교',dept:'과학기술대학',             type:'덕성인재전형I', recruit:'20명',comp26:'5.96:1', fill:'32',csat:'없음',cut50:980.59,cut70:979.09,grade50:3.13,grade70:3.24,method:'서류100%(일괄합산)',note:'',calcMode:'jh'},
+  {id:98442,univ:'덕성여자대학교',dept:'자유전공학부',             type:'덕성인재전형I', recruit:'30명',comp26:'8.42:1', fill:'17',csat:'없음',cut50:980.55,cut70:978.71,grade50:3.06,grade70:3.26,method:'서류100%(일괄합산)',note:'미래인재대학',calcMode:'jh'},
+  // ─── 덕성인재전형 II ───
+  {id:98450,univ:'덕성여자대학교',dept:'글로벌융합대학(인문사회)',  type:'덕성인재전형II',recruit:'74명',comp26:'13.64:1',fill:'56',csat:'없음',cut50:977.5, cut70:976.36,grade50:3.45,grade70:3.61,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98451,univ:'덕성여자대학교',dept:'유아교육과',               type:'덕성인재전형II',recruit:'12명',comp26:'8.09:1', fill:'10',csat:'없음',cut50:978.87,cut70:977.77,grade50:3.21,grade70:3.37,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'글로벌융합대학',calcMode:'jh'},
+  {id:98452,univ:'덕성여자대학교',dept:'과학기술대학',             type:'덕성인재전형II',recruit:'20명',comp26:'11.7:1', fill:'29',csat:'없음',cut50:979.38,cut70:977.6, grade50:3.29,grade70:3.49,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'',calcMode:'jh'},
+  {id:98453,univ:'덕성여자대학교',dept:'약학과(6년제)',            type:'덕성인재전형II',recruit:'25명',comp26:'12.04:1',fill:'10',csat:'없음',cut50:995.65,cut70:994.66,grade50:1.48,grade70:1.59,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'약학대학',calcMode:'jh'},
+  {id:98454,univ:'덕성여자대학교',dept:'자유전공학부',             type:'덕성인재전형II',recruit:'64명',comp26:'11.33:1',fill:'19',csat:'없음',cut50:978.1, cut70:977.31,grade50:3.42,grade70:3.47,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'미래인재대학',calcMode:'jh'},
+  {id:98455,univ:'덕성여자대학교',dept:'가상현실융합학과',          type:'덕성인재전형II',recruit:'15명',comp26:'4.22:1', fill:'9', csat:'없음',cut50:974.69,cut70:971.69,grade50:3.74,grade70:3.95,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'미래인재대학',calcMode:'jh'},
+  {id:98456,univ:'덕성여자대학교',dept:'데이터사이언스학과',        type:'덕성인재전형II',recruit:'15명',comp26:'5.11:1', fill:'17',csat:'없음',cut50:974.3, cut70:973.52,grade50:3.84,grade70:3.91,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'미래인재대학',calcMode:'jh'},
+  {id:98457,univ:'덕성여자대학교',dept:'AI신약학과',               type:'덕성인재전형II',recruit:'15명',comp26:'6.11:1', fill:'6', csat:'없음',cut50:978.7, cut70:978.44,grade50:3.3, grade70:3.37,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'미래인재대학',calcMode:'jh'},
+
+  // ── 서울여자대학교 (바롬인재서류전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 면접: 없음 / 전형방법: 서류100%
+  // ─── 인문대학 ───
+  {id:99001,univ:'서울여자대학교',dept:'국어국문학과',        type:'바롬인재서류',recruit:'6명', comp26:'12.7:1', fill:'13',csat:'없음',cut50:0,cut70:0,grade50:3.23,grade70:3.28,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99002,univ:'서울여자대학교',dept:'영어영문학과',        type:'바롬인재서류',recruit:'6명', comp26:'12.5:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.15,grade70:3.49,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99003,univ:'서울여자대학교',dept:'중어중문학과',        type:'바롬인재서류',recruit:'4명', comp26:'18.5:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.87,grade70:3.87,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99004,univ:'서울여자대학교',dept:'일어일문학과',        type:'바롬인재서류',recruit:'6명', comp26:'26.3:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.59,grade70:3.63,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99005,univ:'서울여자대학교',dept:'사학과',            type:'바롬인재서류',recruit:'4명', comp26:'19.3:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.24,grade70:3.24,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99006,univ:'서울여자대학교',dept:'AI융합콘텐츠전공',   type:'바롬인재서류',recruit:'4명', comp26:'',       fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100%',note:'신설',calcMode:'jh',major:'인문·사회'},
+  {id:99007,univ:'서울여자대학교',dept:'프랑스문화콘텐츠전공',type:'바롬인재서류',recruit:'4명', comp26:'13.8:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.14,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99008,univ:'서울여자대학교',dept:'독일문화콘텐츠전공', type:'바롬인재서류',recruit:'4명', comp26:'16.3:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:4.68,grade70:4.68,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 과학기술융합대학 ───
+  {id:99009,univ:'서울여자대학교',dept:'수학과',            type:'바롬인재서류',recruit:'4명', comp26:'8.3:1',  fill:'13',csat:'없음',cut50:0,cut70:0,grade50:3.59,grade70:3.59,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99010,univ:'서울여자대학교',dept:'화학과',            type:'바롬인재서류',recruit:'5명', comp26:'10.4:1', fill:'17',csat:'없음',cut50:0,cut70:0,grade50:2.9, grade70:2.94,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99011,univ:'서울여자대학교',dept:'생명환경공학과',     type:'바롬인재서류',recruit:'4명', comp26:'14.8:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:3.13,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99012,univ:'서울여자대학교',dept:'바이오헬스융합학과', type:'바롬인재서류',recruit:'7명', comp26:'9.9:1',  fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:2.98,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99013,univ:'서울여자대학교',dept:'원예생명조경학과',   type:'바롬인재서류',recruit:'9명', comp26:'10.7:1', fill:'15',csat:'없음',cut50:0,cut70:0,grade50:3.1, grade70:3.28,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99014,univ:'서울여자대학교',dept:'식품생명공학과',     type:'바롬인재서류',recruit:'6명', comp26:'8.7:1',  fill:'8', csat:'없음',cut50:0,cut70:0,grade50:2.91,grade70:3.01,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99015,univ:'서울여자대학교',dept:'식품영양학과',       type:'바롬인재서류',recruit:'7명', comp26:'9.6:1',  fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.07,grade70:3.3, method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  // ─── 이트랜드디자인스쿨 ───
+  {id:99016,univ:'서울여자대학교',dept:'첨단미디어디자인전공',type:'바롬인재서류',recruit:'5명', comp26:'11.4:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:3.0, method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99017,univ:'서울여자대학교',dept:'산업디자인학과',     type:'바롬인재서류',recruit:'6명', comp26:'11.3:1', fill:'16',csat:'없음',cut50:0,cut70:0,grade50:2.99,grade70:3.57,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 사회과학대학 ───
+  {id:99018,univ:'서울여자대학교',dept:'경제학과',          type:'바롬인재서류',recruit:'6명', comp26:'9.2:1',  fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.4, grade70:3.51,method:'서류100%',note:'',calcMode:'jh',major:'상경'},
+  {id:99019,univ:'서울여자대학교',dept:'문헌정보학과',       type:'바롬인재서류',recruit:'4명', comp26:'11.3:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.64,grade70:3.64,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99020,univ:'서울여자대학교',dept:'사회복지학과',       type:'바롬인재서류',recruit:'7명', comp26:'14.9:1', fill:'18',csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.46,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99021,univ:'서울여자대학교',dept:'아동학과',          type:'바롬인재서류',recruit:'13명', comp26:'9.6:1', fill:'24',csat:'없음',cut50:0,cut70:0,grade50:3.49,grade70:3.59,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99022,univ:'서울여자대학교',dept:'행정학과',          type:'바롬인재서류',recruit:'6명', comp26:'9.7:1',  fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.2, grade70:3.33,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99023,univ:'서울여자대학교',dept:'언론영상학부',       type:'바롬인재서류',recruit:'7명', comp26:'13.4:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.88,grade70:3.04,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99024,univ:'서울여자대학교',dept:'심리·인지과학학부',  type:'바롬인재서류',recruit:'5명', comp26:'15.8:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.99,grade70:3.05,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 미래산업융합대학 ───
+  {id:99025,univ:'서울여자대학교',dept:'경영학과',          type:'바롬인재서류',recruit:'11명', comp26:'13.1:1', fill:'20',csat:'없음',cut50:0,cut70:0,grade50:2.94,grade70:3.05,method:'서류100%',note:'',calcMode:'jh',major:'상경'},
+  {id:99026,univ:'서울여자대학교',dept:'패션산업학과',       type:'바롬인재서류',recruit:'4명', comp26:'14.0:1', fill:'18',csat:'없음',cut50:0,cut70:0,grade50:2.93,grade70:2.93,method:'서류100%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99027,univ:'서울여자대학교',dept:'디지털미디어학과',   type:'바롬인재서류',recruit:'9명', comp26:'22.0:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:4.38,grade70:4.5, method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99028,univ:'서울여자대학교',dept:'지능정보보호학부',   type:'바롬인재서류',recruit:'7명', comp26:'9.9:1',  fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.41,grade70:3.62,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99029,univ:'서울여자대학교',dept:'메타버스융합콘텐츠전공',type:'바롬인재서류',recruit:'4명',comp26:'13.5:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.11,grade70:3.11,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99030,univ:'서울여자대학교',dept:'소프트웨어전공',     type:'바롬인재서류',recruit:'5명', comp26:'6.8:1',  fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.64,grade70:3.68,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99031,univ:'서울여자대학교',dept:'데이터사이언스전공', type:'바롬인재서류',recruit:'8명', comp26:'8.5:1',  fill:'19',csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.35,method:'서류100%',note:'',calcMode:'jh',major:'자연·공학'},
+
+  // ── 서울여자대학교 (바롬인재면접전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 면접: O (1단계 서류100% 5배수→2단계 서류50%+면접50%)
+  {id:99051,univ:'서울여자대학교',dept:'국어국문학과',        type:'바롬인재면접',recruit:'8명', comp26:'16.3:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.18,grade70:3.25,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99052,univ:'서울여자대학교',dept:'영어영문학과',        type:'바롬인재면접',recruit:'8명', comp26:'21.0:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.4, grade70:3.42,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99053,univ:'서울여자대학교',dept:'중어중문학과',        type:'바롬인재면접',recruit:'6명', comp26:'16.2:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.98,grade70:4.1, method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99054,univ:'서울여자대학교',dept:'일어일문학과',        type:'바롬인재면접',recruit:'8명', comp26:'16.6:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.86,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99055,univ:'서울여자대학교',dept:'사학과',            type:'바롬인재면접',recruit:'4명', comp26:'18.5:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.85,grade70:3.85,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99056,univ:'서울여자대학교',dept:'AI융합콘텐츠전공',   type:'바롬인재면접',recruit:'5명', comp26:'',       fill:'',  csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'신설',calcMode:'jh',major:'인문·사회'},
+  {id:99057,univ:'서울여자대학교',dept:'프랑스문화콘텐츠전공',type:'바롬인재면접',recruit:'6명', comp26:'16.7:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.98,grade70:4.71,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99058,univ:'서울여자대학교',dept:'독일문화콘텐츠전공', type:'바롬인재면접',recruit:'8명', comp26:'13.0:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.97,grade70:4.3, method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99059,univ:'서울여자대학교',dept:'수학과',            type:'바롬인재면접',recruit:'4명', comp26:'12.0:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.44,grade70:3.52,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99060,univ:'서울여자대학교',dept:'화학과',            type:'바롬인재면접',recruit:'8명', comp26:'22.5:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.4, grade70:3.55,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99061,univ:'서울여자대학교',dept:'생명환경공학과',     type:'바롬인재면접',recruit:'6명', comp26:'25.3:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.79,grade70:3.13,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99062,univ:'서울여자대학교',dept:'바이오헬스융합학과', type:'바롬인재면접',recruit:'8명', comp26:'25.0:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.31,grade70:3.37,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99063,univ:'서울여자대학교',dept:'원예생명조경학과',   type:'바롬인재면접',recruit:'8명', comp26:'15.9:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.31,grade70:3.35,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99064,univ:'서울여자대학교',dept:'식품생명공학과',     type:'바롬인재면접',recruit:'8명', comp26:'16.0:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.08,grade70:3.17,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99065,univ:'서울여자대학교',dept:'식품영양학과',       type:'바롬인재면접',recruit:'8명', comp26:'15.3:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.22,grade70:3.28,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99066,univ:'서울여자대학교',dept:'첨단미디어디자인전공',type:'바롬인재면접',recruit:'5명', comp26:'16.6:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.02,grade70:3.33,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99067,univ:'서울여자대학교',dept:'산업디자인학과',     type:'바롬인재면접',recruit:'6명', comp26:'11.8:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.57,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99068,univ:'서울여자대학교',dept:'시각디자인전공',     type:'바롬인재면접',recruit:'8명', comp26:'15.6:1', fill:'15',csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.63,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99069,univ:'서울여자대학교',dept:'스포츠운동과학과',   type:'바롬인재면접',recruit:'4명', comp26:'32.0:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.57,grade70:3.57,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99070,univ:'서울여자대학교',dept:'경제학과',          type:'바롬인재면접',recruit:'8명', comp26:'10.3:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.56,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'상경'},
+  {id:99071,univ:'서울여자대학교',dept:'문헌정보학과',       type:'바롬인재면접',recruit:'5명', comp26:'11.8:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.67,grade70:3.79,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99072,univ:'서울여자대학교',dept:'사회복지학과',       type:'바롬인재면접',recruit:'8명', comp26:'26.4:1', fill:'14',csat:'없음',cut50:0,cut70:0,grade50:3.87,grade70:4.17,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99073,univ:'서울여자대학교',dept:'아동학과',          type:'바롬인재면접',recruit:'8명', comp26:'15.0:1', fill:'12',csat:'없음',cut50:0,cut70:0,grade50:3.6, grade70:3.62,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99074,univ:'서울여자대학교',dept:'행정학과',          type:'바롬인재면접',recruit:'8명', comp26:'12.9:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.22,grade70:3.24,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99075,univ:'서울여자대학교',dept:'언론영상학부',       type:'바롬인재면접',recruit:'14명', comp26:'20.6:1', fill:'4',csat:'없음',cut50:0,cut70:0,grade50:3.26,grade70:3.31,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99076,univ:'서울여자대학교',dept:'심리·인지과학학부',  type:'바롬인재면접',recruit:'8명', comp26:'18.9:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.18,grade70:3.31,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99077,univ:'서울여자대학교',dept:'경영학과',          type:'바롬인재면접',recruit:'14명', comp26:'22.1:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.39,grade70:3.66,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'상경'},
+  {id:99078,univ:'서울여자대학교',dept:'패션산업학과',       type:'바롬인재면접',recruit:'8명', comp26:'20.9:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.73,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99079,univ:'서울여자대학교',dept:'메타버스융합콘텐츠전공',type:'바롬인재면접',recruit:'6명',comp26:'18.2:1',fill:'1',csat:'없음',cut50:0,cut70:0,grade50:3.37,grade70:3.39,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'',calcMode:'jh',major:'자연·공학'},
+
+  // ── 서울여자대학교 (SW융합인재전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 면접: O (1단계 서류100% 5배수→2단계 서류50%+면접50%)
+  {id:99101,univ:'서울여자대학교',dept:'디지털미디어학과',   type:'SW융합인재',  recruit:'8명', comp26:'12.3:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:4.35,grade70:4.4, method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'SW융합',calcMode:'jh',major:'자연·공학'},
+  {id:99102,univ:'서울여자대학교',dept:'데이터사이언스전공', type:'SW융합인재',  recruit:'7명', comp26:'11.9:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.78,grade70:4.0, method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'SW융합',calcMode:'jh',major:'자연·공학'},
+  {id:99103,univ:'서울여자대학교',dept:'지능정보보호학부',   type:'SW융합인재',  recruit:'8명', comp26:'7.5:1',  fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.89,grade70:3.89,method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'SW융합',calcMode:'jh',major:'자연·공학'},
+  {id:99104,univ:'서울여자대학교',dept:'소프트웨어전공',     type:'SW융합인재',  recruit:'6명', comp26:'8.2:1',  fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.64,grade70:3.7, method:'1단계 서류100%(5배수)→2단계 서류50%+면접50%',note:'SW융합',calcMode:'jh',major:'자연·공학'},
+
+  // ── 서울여자대학교 (기독교지도자전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 면접: O (1단계 서류100% 3배수→2단계 서류50%+면접50%)
+  {id:99151,univ:'서울여자대학교',dept:'기독교학과',         type:'기독교지도자', recruit:'23명', comp26:'7.8:1', fill:'18',csat:'없음',cut50:0,cut70:0,grade50:4.16,grade70:4.4, method:'1단계 서류100%(3배수)→2단계 서류50%+면접50%',note:'기독교인',calcMode:'jh',major:'인문·사회'},
+
+  // ── 한성대학교 (한성인재전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 전형방법: 서류100% (학생부 서류평가)
+  // 입결: 환산점수(50%/70%) + 환산등급(50%/70%) 모두 공개
+  // ─── 주간 ───
+  {id:99201,univ:'한성대학교',dept:'크리에이티브인문학부',        type:'한성인재',recruit:'35명',comp26:'8.7:1', fill:'65',csat:'없음',cut50:865.0,cut70:847.0,grade50:3.39,grade70:3.55,method:'서류100%',note:'주간',calcMode:'jh',major:'인문·사회'},
+  {id:99202,univ:'한성대학교',dept:'미래융합사회과학대학',        type:'한성인재',recruit:'40명',comp26:'9.6:1', fill:'82',csat:'없음',cut50:837.0,cut70:828.4,grade50:3.39,grade70:3.51,method:'서류100%',note:'주간(사회과학부)',calcMode:'jh',major:'인문·사회'},
+  {id:99203,univ:'한성대학교',dept:'AI패션학부',                type:'한성인재',recruit:'18명',comp26:'10.9:1',fill:'34',csat:'없음',cut50:870.0,cut70:855.4,grade50:3.34,grade70:3.53,method:'서류100%',note:'주간(글로벌패션산업학부)',calcMode:'jh',major:'인문·사회'},
+  {id:99204,univ:'한성대학교',dept:'AI뷰티디자인학과',           type:'한성인재',recruit:'5명', comp26:'66.6:1',fill:'7', csat:'없음',cut50:959.0,cut70:943.8,grade50:1.67,grade70:1.7, method:'서류100%',note:'주간(뷰티디자인매니지먼트학과)',calcMode:'jh',major:'인문·사회'},
+  {id:99205,univ:'한성대학교',dept:'IT공과대학',                type:'한성인재',recruit:'45명',comp26:'7.3:1', fill:'95',csat:'없음',cut50:841.0,cut70:820.4,grade50:3.5, grade70:3.66,method:'서류100%',note:'주간(컴퓨터·전기전자·산업시스템)',calcMode:'jh',major:'자연·공학'},
+  {id:99206,univ:'한성대학교',dept:'AI응용학과',                type:'한성인재',recruit:'27명',comp26:'7.1:1', fill:'26',csat:'없음',cut50:830.0,cut70:811.5,grade50:3.4, grade70:3.58,method:'서류100%',note:'주간',calcMode:'jh',major:'자연·공학'},
+  {id:99207,univ:'한성대학교',dept:'융합보안학과',               type:'한성인재',recruit:'10명',comp26:'5.3:1', fill:'19',csat:'없음',cut50:829.0,cut70:824.1,grade50:3.52,grade70:3.7, method:'서류100%',note:'주간',calcMode:'jh',major:'자연·공학'},
+  {id:99208,univ:'한성대학교',dept:'미래모빌리티학과',           type:'한성인재',recruit:'7명', comp26:'',      fill:'',  csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'서류100%',note:'주간·신설',calcMode:'jh',major:'자연·공학'},
+  {id:99209,univ:'한성대학교',dept:'AI기계로봇공학과',           type:'한성인재',recruit:'13명',comp26:'',      fill:'',  csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'서류100%',note:'주간·신설',calcMode:'jh',major:'자연·공학'},
+  {id:99210,univ:'한성대학교',dept:'문학문화콘텐츠학과',         type:'한성인재',recruit:'32명',comp26:'13.1:1',fill:'39',csat:'없음',cut50:875.5,cut70:860.5,grade50:3.5, grade70:3.65,method:'서류100%',note:'주간',calcMode:'jh',major:'인문·사회'},
+  {id:99211,univ:'한성대학교',dept:'상상력인재학부(자율전공)',    type:'한성인재',recruit:'28명',comp26:'',      fill:'',  csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'서류100%',note:'주간·자율전공',calcMode:'jh',major:'인문·사회'},
+  // ─── 야간 ───
+  {id:99221,univ:'한성대학교',dept:'크리에이티브인문학부(야)',    type:'한성인재',recruit:'9명', comp26:'9.4:1', fill:'16',csat:'없음',cut50:879.0,cut70:845.0,grade50:3.79,grade70:3.82,method:'서류100%',note:'야간',calcMode:'jh',major:'인문·사회'},
+  {id:99222,univ:'한성대학교',dept:'미래융합사회과학대학(야)',    type:'한성인재',recruit:'26명',comp26:'9.3:1', fill:'42',csat:'없음',cut50:860.0,cut70:836.5,grade50:3.93,grade70:4.06,method:'서류100%',note:'야간(사회과학부)',calcMode:'jh',major:'인문·사회'},
+  {id:99223,univ:'한성대학교',dept:'AI패션학부(야)',             type:'한성인재',recruit:'12명',comp26:'11.5:1',fill:'14',csat:'없음',cut50:867.0,cut70:866.0,grade50:3.7, grade70:3.85,method:'서류100%',note:'야간(글로벌패션산업학부)',calcMode:'jh',major:'인문·사회'},
+  {id:99224,univ:'한성대학교',dept:'AI뷰티디자인학과(야)',       type:'한성인재',recruit:'3명', comp26:'38.3:1',fill:'4', csat:'없음',cut50:936.0,cut70:920.0,grade50:2.62,grade70:2.77,method:'서류100%',note:'야간(뷰티디자인매니지먼트학과)',calcMode:'jh',major:'인문·사회'},
+  {id:99225,univ:'한성대학교',dept:'IT공과대학(야)',             type:'한성인재',recruit:'34명',comp26:'5.9:1', fill:'56',csat:'없음',cut50:829.5,cut70:813.8,grade50:4.09,grade70:4.25,method:'서류100%',note:'야간',calcMode:'jh',major:'자연·공학'},
+  {id:99226,univ:'한성대학교',dept:'AI응용학과(야)',             type:'한성인재',recruit:'10명',comp26:'6.6:1', fill:'20',csat:'없음',cut50:852.5,cut70:831.8,grade50:3.98,grade70:4.03,method:'서류100%',note:'야간',calcMode:'jh',major:'자연·공학'},
+  {id:99227,univ:'한성대학교',dept:'문학문화콘텐츠학과(야)',     type:'한성인재',recruit:'12명',comp26:'12.0:1',fill:'20',csat:'없음',cut50:868.5,cut70:863.0,grade50:3.91,grade70:4.04,method:'서류100%',note:'야간',calcMode:'jh',major:'인문·사회'},
+
+  // ── 동덕여자대학교 (동덕창의리더전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 (약학과만 있음: 국수탐 합6 이내) / 면접: O
+  // 전형방법: 1단계 서류100%(3배수) → 2단계 서류40%+면접60%
+  // 입결: 환산점수 비공개(0.0), 환산등급만 공개
+  // ─── 인문대학 ───
+  {id:99301,univ:'동덕여자대학교',dept:'국어국문학전공',      type:'동덕창의리더',recruit:'9명', comp26:'6.11:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.71,grade70:3.78,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99302,univ:'동덕여자대학교',dept:'국사학전공',          type:'동덕창의리더',recruit:'7명', comp26:'6.83:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.23,grade70:4.08,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99303,univ:'동덕여자대학교',dept:'문예창작전공',         type:'동덕창의리더',recruit:'7명', comp26:'12.33:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:4.39,grade70:4.33,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99304,univ:'동덕여자대학교',dept:'영어전공',            type:'동덕창의리더',recruit:'16명',comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'2027신설',calcMode:'jh',major:'인문·사회'},
+  {id:99305,univ:'동덕여자대학교',dept:'일어일본학전공',       type:'동덕창의리더',recruit:'11명',comp26:'7.6:1',  fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.75,grade70:4.26,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99306,univ:'동덕여자대학교',dept:'유러피언스터디즈전공', type:'동덕창의리더',recruit:'12명',comp26:'6.2:1',  fill:'4', csat:'없음',cut50:0,cut70:0,grade50:5.55,grade70:4.02,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99307,univ:'동덕여자대학교',dept:'중어중국학전공',       type:'동덕창의리더',recruit:'12명',comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'2027신설',calcMode:'jh',major:'인문·사회'},
+  // ─── 사회과학대학 ───
+  {id:99308,univ:'동덕여자대학교',dept:'문헌정보학전공',       type:'동덕창의리더',recruit:'8명', comp26:'6.13:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:4.35,grade70:3.77,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99309,univ:'동덕여자대학교',dept:'사회복지학전공',       type:'동덕창의리더',recruit:'7명', comp26:'12.0:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.92,grade70:3.6, method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99310,univ:'동덕여자대학교',dept:'아동학전공',           type:'동덕창의리더',recruit:'10명',comp26:'6.2:1',  fill:'14',csat:'없음',cut50:0,cut70:0,grade50:3.63,grade70:3.8, method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 경경대학 ───
+  {id:99311,univ:'동덕여자대학교',dept:'경영융합학부',          type:'동덕창의리더',recruit:'33명',comp26:'5.36:1', fill:'19',csat:'없음',cut50:0,cut70:0,grade50:3.44,grade70:4.13,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'상경'},
+  // ─── 자연정보과학대학 ───
+  {id:99312,univ:'동덕여자대학교',dept:'식품영양학전공',        type:'동덕창의리더',recruit:'9명', comp26:'9.25:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.8, grade70:3.11,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99313,univ:'동덕여자대학교',dept:'보건관리학전공',        type:'동덕창의리더',recruit:'8명', comp26:'8.57:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.47,grade70:3.41,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99314,univ:'동덕여자대학교',dept:'응용화학전공',          type:'동덕창의리더',recruit:'8명', comp26:'8.57:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.23,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99315,univ:'동덕여자대학교',dept:'화장품학전공',          type:'동덕창의리더',recruit:'7명', comp26:'9.33:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.72,grade70:3.7, method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99316,univ:'동덕여자대학교',dept:'컴퓨터학전공',          type:'동덕창의리더',recruit:'16명',comp26:'4.19:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:4.44,grade70:4.16,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99317,univ:'동덕여자대학교',dept:'정보통계학전공',        type:'동덕창의리더',recruit:'9명', comp26:'3.89:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.77,grade70:3.78,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  // ─── 약학대학 ───
+  {id:99318,univ:'동덕여자대학교',dept:'약학과',              type:'동덕창의리더',recruit:'8명', comp26:'11.63:1',fill:'1', csat:'국수탐(2과목중상위1) 합6',cut50:0,cut70:0,grade50:1.61,grade70:1.38,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'수능최저있음',calcMode:'jh',major:'의약학'},
+  // ─── 예술대학 ───
+  {id:99319,univ:'동덕여자대학교',dept:'큐레이터학전공',        type:'동덕창의리더',recruit:'4명', comp26:'8.75:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:4.18,grade70:4.18,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 문화지식융합대학 ───
+  {id:99320,univ:'동덕여자대학교',dept:'커뮤니케이션콘텐츠전공',type:'동덕창의리더',recruit:'9명', comp26:'9.11:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:4.3, grade70:3.38,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99321,univ:'동덕여자대학교',dept:'HCI사이언스전공',       type:'동덕창의리더',recruit:'9명', comp26:'4.78:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.54,grade70:4.06,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99322,univ:'동덕여자대학교',dept:'데이터사이언스전공',    type:'동덕창의리더',recruit:'6명', comp26:'4.8:1',  fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.55,grade70:3.53,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99323,univ:'동덕여자대학교',dept:'문화예술경영전공',      type:'동덕창의리더',recruit:'9명', comp26:'6.78:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.33,grade70:4.1, method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99324,univ:'동덕여자대학교',dept:'글로벌MICE융합전공',    type:'동덕창의리더',recruit:'9명', comp26:'6.22:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.73,grade70:3.65,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99325,univ:'동덕여자대학교',dept:'앙트러프러너십전공',    type:'동덕창의리더',recruit:'12명',comp26:'5.47:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:4.57,grade70:4.07,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 글로벌지역학부 ───
+  {id:99326,univ:'동덕여자대학교',dept:'글로벌지역학부 중어중국학전공',type:'동덕창의리더',recruit:'11명',comp26:'5.45:1',fill:'6',csat:'없음',cut50:0,cut70:0,grade50:4.61,grade70:3.75,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99327,univ:'동덕여자대학교',dept:'글로벌지역학부 영어전공',type:'동덕창의리더',recruit:'12명',comp26:'6.25:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:4.56,grade70:4.48,method:'1단계 서류100%(3배수)→2단계 서류40%+면접60%',note:'',calcMode:'jh',major:'인문·사회'},
+
+  // ── 명지대학교 (명지인재면접전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(4배수)→2단계 서류70%+면접30%
+  // 입결: 70%컷 등급 기준 (최종등록자 기준)
+  // ─── 인문캠퍼스(서울) ───
+  {id:99401,univ:'명지대학교(인문)',dept:'국어국문학전공',    type:'명지인재면접',recruit:'6명', comp26:'16.17:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.60,grade70:3.59,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99402,univ:'명지대학교(인문)',dept:'영어영문학전공',    type:'명지인재면접',recruit:'14명',comp26:'24.64:1',fill:'16',csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.91,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99403,univ:'명지대학교(인문)',dept:'미술사·역사학전공',  type:'명지인재면접',recruit:'6명', comp26:'20.67:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.38,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99404,univ:'명지대학교(인문)',dept:'문헌정보학전공',    type:'명지인재면접',recruit:'6명', comp26:'19.00:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.48,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99405,univ:'명지대학교(인문)',dept:'중어중문학전공',    type:'명지인재면접',recruit:'6명', comp26:'32.50:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:4.68,grade70:5.33,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99406,univ:'명지대학교(인문)',dept:'일어일문학전공',    type:'명지인재면접',recruit:'6명', comp26:'38.50:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:4.57,grade70:5.14,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99407,univ:'명지대학교(인문)',dept:'아랍지역학전공',    type:'명지인재면접',recruit:'6명', comp26:'14.50:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:5.16,grade70:5.80,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99408,univ:'명지대학교(인문)',dept:'문예창작학과',      type:'명지인재면접',recruit:'12명',comp26:'31.08:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.63,grade70:4.30,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99409,univ:'명지대학교(인문)',dept:'행정학전공',        type:'명지인재면접',recruit:'14명',comp26:'23.57:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.30,grade70:3.53,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99410,univ:'명지대학교(인문)',dept:'정치외교학전공',    type:'명지인재면접',recruit:'14명',comp26:'33.64:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:4.09,grade70:4.37,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99411,univ:'명지대학교(인문)',dept:'경제학전공',        type:'명지인재면접',recruit:'6명', comp26:'16.83:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.19,grade70:3.36,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99412,univ:'명지대학교(인문)',dept:'국제통상학전공',    type:'명지인재면접',recruit:'6명', comp26:'16.33:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.38,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99413,univ:'명지대학교(인문)',dept:'응용통계학전공',    type:'명지인재면접',recruit:'6명', comp26:'11.67:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.38,grade70:3.46,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99414,univ:'명지대학교(인문)',dept:'법학과',            type:'명지인재면접',recruit:'14명',comp26:'20.64:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.92,grade70:4.00,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99415,univ:'명지대학교(인문)',dept:'경영학전공',        type:'명지인재면접',recruit:'28명',comp26:'22.36:1',fill:'16',csat:'없음',cut50:0,cut70:0,grade50:3.40,grade70:3.53,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99416,univ:'명지대학교(인문)',dept:'AI경영정보학과',    type:'명지인재면접',recruit:'6명', comp26:'16.83:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:4.06,grade70:3.83,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99417,univ:'명지대학교(인문)',dept:'디지털미디어학부',  type:'명지인재면접',recruit:'6명', comp26:'38.33:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.35,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99418,univ:'명지대학교(인문)',dept:'청소년지도학전공',  type:'명지인재면접',recruit:'6명', comp26:'31.67:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:4.28,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99419,univ:'명지대학교(인문)',dept:'아동학전공',        type:'명지인재면접',recruit:'6명', comp26:'17.67:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.67,grade70:3.81,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99420,univ:'명지대학교(인문)',dept:'응용소프트웨어전공', type:'명지인재면접',recruit:'6명', comp26:'16.33:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.55,grade70:3.68,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99421,univ:'명지대학교(인문)',dept:'데이터사이언스전공', type:'명지인재면접',recruit:'6명', comp26:'15.67:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.39,grade70:3.56,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99422,univ:'명지대학교(인문)',dept:'인공지능전공',      type:'명지인재면접',recruit:'6명', comp26:'16.67:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.42,grade70:3.44,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99423,univ:'명지대학교(인문)',dept:'디지털콘텐츠디자인학과',type:'명지인재면접',recruit:'6명',comp26:'33.83:1',fill:'4',csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.95,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99424,univ:'명지대학교(인문)',dept:'자율전공학부(인문)', type:'명지인재면접',recruit:'5명', comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'인문캠퍼스·신설',calcMode:'jh',major:'인문·사회'},
+  // ─── 자연캠퍼스(용인) ───
+  {id:99431,univ:'명지대학교(자연)',dept:'화학나노학전공',    type:'명지인재면접',recruit:'6명', comp26:'25.33:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.16,grade70:3.41,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99432,univ:'명지대학교(자연)',dept:'융합에너지학전공',  type:'명지인재면접',recruit:'6명', comp26:'20.17:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.48,grade70:3.69,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99433,univ:'명지대학교(자연)',dept:'식품영양학전공',    type:'명지인재면접',recruit:'6명', comp26:'30.33:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.30,grade70:3.48,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99434,univ:'명지대학교(자연)',dept:'융합바이오학전공',  type:'명지인재면접',recruit:'6명', comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스·신설',calcMode:'jh',major:'자연·공학'},
+  {id:99435,univ:'명지대학교(자연)',dept:'시스템생명과학전공', type:'명지인재면접',recruit:'6명', comp26:'32.67:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.41,grade70:3.76,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99436,univ:'명지대학교(자연)',dept:'기계시스템공학부(기계공학·로봇공학)',type:'명지인재면접',recruit:'14명',comp26:'18.29:1',fill:'15',csat:'없음',cut50:0,cut70:0,grade50:3.44,grade70:3.63,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99437,univ:'명지대학교(자연)',dept:'건설환경공학전공',  type:'명지인재면접',recruit:'14명',comp26:'20.21:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.64,grade70:3.78,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99438,univ:'명지대학교(자연)',dept:'환경시스템공학전공', type:'명지인재면접',recruit:'14명',comp26:'20.71:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.23,grade70:3.29,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99439,univ:'명지대학교(자연)',dept:'스마트모빌리티공학전공',type:'명지인재면접',recruit:'14명',comp26:'19.33:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.91,grade70:4.42,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99440,univ:'명지대학교(자연)',dept:'화학공학전공',      type:'명지인재면접',recruit:'6명', comp26:'19.00:1',fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.08,grade70:3.14,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99441,univ:'명지대학교(자연)',dept:'신소재공학전공',    type:'명지인재면접',recruit:'6명', comp26:'18.67:1',fill:'', csat:'없음',cut50:0,cut70:0,grade50:3.39,grade70:3.45,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99442,univ:'명지대학교(자연)',dept:'반도체공학부',      type:'명지인재면접',recruit:'6명', comp26:'11.17:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.24,grade70:3.35,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99443,univ:'명지대학교(자연)',dept:'전기정보공학전공',  type:'명지인재면접',recruit:'8명', comp26:'12.24:1',fill:'19',csat:'없음',cut50:0,cut70:0,grade50:3.55,grade70:3.60,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99444,univ:'명지대학교(자연)',dept:'전자공학전공',      type:'명지인재면접',recruit:'13명',comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스·2026통합분리',calcMode:'jh',major:'자연·공학'},
+  {id:99445,univ:'명지대학교(자연)',dept:'AI컴퓨터공학전공',  type:'명지인재면접',recruit:'14명',comp26:'15.43:1',fill:'16',csat:'없음',cut50:0,cut70:0,grade50:3.54,grade70:3.62,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99446,univ:'명지대학교(자연)',dept:'정보통신공학전공',  type:'명지인재면접',recruit:'14명',comp26:'10.21:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.54,grade70:3.58,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99447,univ:'명지대학교(자연)',dept:'AI용융시스템전공',  type:'명지인재면접',recruit:'6명', comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스·신설',calcMode:'jh',major:'자연·공학'},
+  {id:99448,univ:'명지대학교(자연)',dept:'산업경영공학과',    type:'명지인재면접',recruit:'14명',comp26:'8.71:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.79,grade70:3.92,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99449,univ:'명지대학교(자연)',dept:'건축학전공',        type:'명지인재면접',recruit:'6명', comp26:'23.33:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.31,grade70:3.51,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99450,univ:'명지대학교(자연)',dept:'전통건축학전공',    type:'명지인재면접',recruit:'6명', comp26:'13.67:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.54,grade70:3.78,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99451,univ:'명지대학교(자연)',dept:'공간디자인학과',    type:'명지인재면접',recruit:'6명', comp26:'18.17:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.34,grade70:3.95,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99452,univ:'명지대학교(자연)',dept:'자율전공학부(자연)', type:'명지인재면접',recruit:'5명', comp26:'',      fill:'', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'자연캠퍼스·신설',calcMode:'jh',major:'자연·공학'},
+
+  // ── 명지대학교 (명지인재서류전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 서류100% 일괄합산
+  // ─── 인문캠퍼스(서울) ───
+  {id:99501,univ:'명지대학교(인문)',dept:'국어국문학전공',    type:'명지인재서류',recruit:'3명', comp26:'12.00:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.15,grade70:3.59,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99502,univ:'명지대학교(인문)',dept:'영어영문학전공',    type:'명지인재서류',recruit:'10명',comp26:'11.70:1',fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.67,grade70:4.26,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99503,univ:'명지대학교(인문)',dept:'미술사·역사학전공',  type:'명지인재서류',recruit:'5명', comp26:'12.40:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.51,grade70:3.77,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99504,univ:'명지대학교(인문)',dept:'문헌정보학전공',    type:'명지인재서류',recruit:'3명', comp26:'18.00:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.04,grade70:3.17,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99505,univ:'명지대학교(인문)',dept:'중어중문학전공',    type:'명지인재서류',recruit:'6명', comp26:'43.00:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:5.18,grade70:5.45,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99506,univ:'명지대학교(인문)',dept:'일어일문학전공',    type:'명지인재서류',recruit:'5명', comp26:'40.60:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.24,grade70:3.37,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99507,univ:'명지대학교(인문)',dept:'아랍지역학전공',    type:'명지인재서류',recruit:'3명', comp26:'10.00:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.50,grade70:3.73,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99508,univ:'명지대학교(인문)',dept:'행정학전공',        type:'명지인재서류',recruit:'10명',comp26:'12.60:1',fill:'12',csat:'없음',cut50:0,cut70:0,grade50:3.10,grade70:3.19,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99509,univ:'명지대학교(인문)',dept:'정치외교학전공',    type:'명지인재서류',recruit:'10명',comp26:'16.50:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.40,grade70:3.18,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99510,univ:'명지대학교(인문)',dept:'경제학전공',        type:'명지인재서류',recruit:'11명',comp26:'8.55:1', fill:'19',csat:'없음',cut50:0,cut70:0,grade50:2.75,grade70:2.99,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99511,univ:'명지대학교(인문)',dept:'국제통상학전공',    type:'명지인재서류',recruit:'4명', comp26:'11.00:1',fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:3.28,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99512,univ:'명지대학교(인문)',dept:'응용통계학전공',    type:'명지인재서류',recruit:'3명', comp26:'10.67:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.91,grade70:3.02,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99513,univ:'명지대학교(인문)',dept:'법학과',            type:'명지인재서류',recruit:'10명',comp26:'13.50:1',fill:'13',csat:'없음',cut50:0,cut70:0,grade50:3.11,grade70:3.26,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99514,univ:'명지대학교(인문)',dept:'경영학전공',        type:'명지인재서류',recruit:'32명',comp26:'9.00:1', fill:'26',csat:'없음',cut50:0,cut70:0,grade50:3.22,grade70:3.21,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99515,univ:'명지대학교(인문)',dept:'AI경영정보학과',    type:'명지인재서류',recruit:'6명', comp26:'13.50:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.04,grade70:3.58,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'상경'},
+  {id:99516,univ:'명지대학교(인문)',dept:'디지털미디어학부',  type:'명지인재서류',recruit:'6명', comp26:'15.17:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:2.86,grade70:3.22,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99517,univ:'명지대학교(인문)',dept:'청소년지도학전공',  type:'명지인재서류',recruit:'3명', comp26:'11.67:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.20,grade70:3.72,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99518,univ:'명지대학교(인문)',dept:'아동학전공',        type:'명지인재서류',recruit:'3명', comp26:'13.67:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.32,grade70:3.49,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99519,univ:'명지대학교(인문)',dept:'응용소프트웨어전공', type:'명지인재서류',recruit:'3명', comp26:'11.00:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.51,grade70:3.77,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99520,univ:'명지대학교(인문)',dept:'데이터사이언스전공', type:'명지인재서류',recruit:'3명', comp26:'8.67:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.73,grade70:2.98,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99521,univ:'명지대학교(인문)',dept:'인공지능전공',      type:'명지인재서류',recruit:'3명', comp26:'13.00:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.16,grade70:3.25,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99522,univ:'명지대학교(인문)',dept:'디지털콘텐츠디자인학과',type:'명지인재서류',recruit:'3명',comp26:'26.67:1',fill:'4',csat:'없음',cut50:0,cut70:0,grade50:3.09,grade70:3.28,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99523,univ:'명지대학교(인문)',dept:'자율전공학부(인문)', type:'명지인재서류',recruit:'52명',comp26:'19.42:1',fill:'63',csat:'없음',cut50:0,cut70:0,grade50:2.55,grade70:3.11,method:'서류100% 일괄합산',note:'인문캠퍼스',calcMode:'jh',major:'인문·사회'},
+  // ─── 자연캠퍼스(용인) ───
+  {id:99531,univ:'명지대학교(자연)',dept:'화학나노학전공',    type:'명지인재서류',recruit:'3명', comp26:'7.33:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:3.06,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99532,univ:'명지대학교(자연)',dept:'융합에너지학전공',  type:'명지인재서류',recruit:'2명', comp26:'10.50:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.33,grade70:3.75,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99533,univ:'명지대학교(자연)',dept:'식품영양학전공',    type:'명지인재서류',recruit:'3명', comp26:'10.67:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.30,grade70:3.48,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99534,univ:'명지대학교(자연)',dept:'시스템생명과학전공', type:'명지인재서류',recruit:'8명', comp26:'18.25:1',fill:'10',csat:'없음',cut50:0,cut70:0,grade50:2.80,grade70:2.85,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99535,univ:'명지대학교(자연)',dept:'기계시스템공학부(기계공학·로봇공학)',type:'명지인재서류',recruit:'9명',comp26:'8.56:1',fill:'17',csat:'없음',cut50:0,cut70:0,grade50:3.26,grade70:3.33,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99536,univ:'명지대학교(자연)',dept:'건설환경공학전공',  type:'명지인재서류',recruit:'6명', comp26:'15.33:1',fill:'33',csat:'없음',cut50:0,cut70:0,grade50:3.15,grade70:3.28,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99537,univ:'명지대학교(자연)',dept:'환경시스템공학전공', type:'명지인재서류',recruit:'8명', comp26:'11.75:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.22,grade70:3.34,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99538,univ:'명지대학교(자연)',dept:'스마트모빌리티공학전공',type:'명지인재서류',recruit:'5명',comp26:'13.80:1',fill:'7',csat:'없음',cut50:0,cut70:0,grade50:3.65,grade70:3.76,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99539,univ:'명지대학교(자연)',dept:'화학공학전공',      type:'명지인재서류',recruit:'8명', comp26:'8.13:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:2.77,grade70:3.08,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99540,univ:'명지대학교(자연)',dept:'신소재공학전공',    type:'명지인재서류',recruit:'7명', comp26:'10.57:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:2.95,grade70:3.07,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99541,univ:'명지대학교(자연)',dept:'반도체공학부',      type:'명지인재서류',recruit:'5명', comp26:'7.67:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.07,grade70:3.08,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99542,univ:'명지대학교(자연)',dept:'전기전자공학부(전기공학·전자공학)',type:'명지인재서류',recruit:'25명',comp26:'6.36:1',fill:'31',csat:'없음',cut50:0,cut70:0,grade50:3.19,grade70:3.27,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99543,univ:'명지대학교(자연)',dept:'AI컴퓨터공학전공',  type:'명지인재서류',recruit:'18명',comp26:'7.89:1', fill:'41',csat:'없음',cut50:0,cut70:0,grade50:3.21,grade70:3.35,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99544,univ:'명지대학교(자연)',dept:'정보통신공학전공',  type:'명지인재서류',recruit:'16명',comp26:'6.44:1', fill:'40',csat:'없음',cut50:0,cut70:0,grade50:3.41,grade70:3.51,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99545,univ:'명지대학교(자연)',dept:'산업경영공학과',    type:'명지인재서류',recruit:'7명', comp26:'7.00:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.39,grade70:3.46,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99546,univ:'명지대학교(자연)',dept:'건축학전공',        type:'명지인재서류',recruit:'11명',comp26:'15.55:1',fill:'21',csat:'없음',cut50:0,cut70:0,grade50:3.44,grade70:3.49,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99547,univ:'명지대학교(자연)',dept:'전통건축학전공',    type:'명지인재서류',recruit:'2명', comp26:'12.00:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.42,grade70:4.10,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+  {id:99548,univ:'명지대학교(자연)',dept:'공간디자인학과',    type:'명지인재서류',recruit:'2명', comp26:'22.00:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.12,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'인문·사회'},
+  {id:99549,univ:'명지대학교(자연)',dept:'자율전공학부(자연)', type:'명지인재서류',recruit:'19명',comp26:'13.91:1',fill:'30',csat:'없음',cut50:0,cut70:0,grade50:3.06,grade70:3.31,method:'서류100% 일괄합산',note:'자연캠퍼스',calcMode:'jh',major:'자연·공학'},
+
+  // ── 명지대학교 (크리스천리더전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(4배수)→2단계 서류70%+면접30%
+  // 입결: 단과대학 묶음으로만 공개
+  {id:99601,univ:'명지대학교(인문)',dept:'인문대학(통합)',      type:'크리스천리더',recruit:'4명', comp26:'14.50:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:4.37,grade70:4.80,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·인문캠',calcMode:'jh',major:'인문·사회'},
+  {id:99602,univ:'명지대학교(인문)',dept:'사회과학대학(통합)',   type:'크리스천리더',recruit:'4명', comp26:'16.50:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.30,grade70:3.43,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·인문캠',calcMode:'jh',major:'인문·사회'},
+  {id:99603,univ:'명지대학교(인문)',dept:'경영대학(통합)',      type:'크리스천리더',recruit:'4명', comp26:'10.75:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.45,grade70:3.44,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·인문캠',calcMode:'jh',major:'상경'},
+  {id:99604,univ:'명지대학교(인문)',dept:'미디어·휴먼라이프대학(통합)',type:'크리스천리더',recruit:'4명',comp26:'18.75:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.33,grade70:3.25,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·인문캠',calcMode:'jh',major:'인문·사회'},
+  {id:99605,univ:'명지대학교(인문)',dept:'인공지능·소프트웨어융합대학(통합)',type:'크리스천리더',recruit:'5명',comp26:'10.20:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.81,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·인문캠',calcMode:'jh',major:'자연·공학'},
+  {id:99606,univ:'명지대학교(인문)',dept:'자율전공학부(인문)',   type:'크리스천리더',recruit:'5명', comp26:'11.00:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.78,grade70:3.94,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·인문캠',calcMode:'jh',major:'인문·사회'},
+  {id:99611,univ:'명지대학교(자연)',dept:'화학·생명과학대학(통합)',type:'크리스천리더',recruit:'5명',comp26:'10.20:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.46,grade70:3.48,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·자연캠',calcMode:'jh',major:'자연·공학'},
+  {id:99612,univ:'명지대학교(자연)',dept:'스마트시스템공과대학(통합)',type:'크리스천리더',recruit:'7명',comp26:'6.86:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.55,grade70:3.67,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·자연캠',calcMode:'jh',major:'자연·공학'},
+  {id:99613,univ:'명지대학교(자연)',dept:'반도체·ICT대학(통합)', type:'크리스천리더',recruit:'7명', comp26:'9.00:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.73,grade70:3.94,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·자연캠',calcMode:'jh',major:'자연·공학'},
+  {id:99614,univ:'명지대학교(자연)',dept:'건축대학(통합)',      type:'크리스천리더',recruit:'2명', comp26:'22.00:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.40,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·자연캠',calcMode:'jh',major:'자연·공학'},
+  {id:99615,univ:'명지대학교(자연)',dept:'자율전공학부(자연)',   type:'크리스천리더',recruit:'5명', comp26:'6.60:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.76,grade70:4.00,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'크리스천리더·자연캠',calcMode:'jh',major:'자연·공학'},
+
+  // ── 가톨릭대학교 (잠재능력우수자서류전형 / 2027모집요강) ──
+  // 수능최저: 없음 / 서류100% 일괄합산 / 입결 미공개(학과별 상세입결 없음)
+  {id:99701,univ:'가톨릭대학교',dept:'연문사회계열',          type:'잠재능력우수서류',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'계열모집',calcMode:'jh',major:'인문·사회'},
+  {id:99702,univ:'가톨릭대학교',dept:'국어국문학과',          type:'잠재능력우수서류',recruit:'4명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99703,univ:'가톨릭대학교',dept:'철학과',               type:'잠재능력우수서류',recruit:'4명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99704,univ:'가톨릭대학교',dept:'국사학과',              type:'잠재능력우수서류',recruit:'4명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99705,univ:'가톨릭대학교',dept:'영어영문학부',           type:'잠재능력우수서류',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99706,univ:'가톨릭대학교',dept:'중국언어문화학과',       type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99707,univ:'가톨릭대학교',dept:'일어일본문화학과',       type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99708,univ:'가톨릭대학교',dept:'프랑스문화학과',        type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99709,univ:'가톨릭대학교',dept:'사회복지학과',          type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99710,univ:'가톨릭대학교',dept:'심리학과',              type:'잠재능력우수서류',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99711,univ:'가톨릭대학교',dept:'사회학과',              type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99712,univ:'가톨릭대학교',dept:'국제학부',              type:'잠재능력우수서류',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99713,univ:'가톨릭대학교',dept:'법학과',               type:'잠재능력우수서류',recruit:'4명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99714,univ:'가톨릭대학교',dept:'경제학과',              type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'상경'},
+  {id:99715,univ:'가톨릭대학교',dept:'행정학과',              type:'잠재능력우수서류',recruit:'4명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99716,univ:'가톨릭대학교',dept:'아동학과',              type:'잠재능력우수서류',recruit:'4명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99717,univ:'가톨릭대학교',dept:'경영학과',              type:'잠재능력우수서류',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'상경'},
+  {id:99718,univ:'가톨릭대학교',dept:'회계학과',              type:'잠재능력우수서류',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'상경'},
+  {id:99719,univ:'가톨릭대학교',dept:'특수교육과',            type:'잠재능력우수서류',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'교육'},
+  {id:99720,univ:'가톨릭대학교',dept:'자연공학계열',           type:'잠재능력우수서류',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'계열모집',calcMode:'jh',major:'자연·공학'},
+  {id:99721,univ:'가톨릭대학교',dept:'화학과',               type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99722,univ:'가톨릭대학교',dept:'수학과',               type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99723,univ:'가톨릭대학교',dept:'물리학과',              type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99724,univ:'가톨릭대학교',dept:'공간디자인소비자학과',   type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99725,univ:'가톨릭대학교',dept:'의류학과',              type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99726,univ:'가톨릭대학교',dept:'식품영양학과',           type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99727,univ:'가톨릭대학교',dept:'에너지환경공학과',       type:'잠재능력우수서류',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99728,univ:'가톨릭대학교',dept:'컴퓨터정보공학부',      type:'잠재능력우수서류',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99729,univ:'가톨릭대학교',dept:'미디어기술콘텐츠학과',   type:'잠재능력우수서류',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99730,univ:'가톨릭대학교',dept:'정보통신전자공학부',     type:'잠재능력우수서류',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99731,univ:'가톨릭대학교',dept:'인공지능학과',           type:'잠재능력우수서류',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99732,univ:'가톨릭대학교',dept:'데이터사이언스학과',     type:'잠재능력우수서류',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99733,univ:'가톨릭대학교',dept:'생명공학과',            type:'잠재능력우수서류',recruit:'7명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99734,univ:'가톨릭대학교',dept:'바이오메디컬화학공학과', type:'잠재능력우수서류',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99735,univ:'가톨릭대학교',dept:'의생명과학과',           type:'잠재능력우수서류',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99736,univ:'가톨릭대학교',dept:'바이오메디컬소프트웨어학과',type:'잠재능력우수서류',recruit:'5명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99737,univ:'가톨릭대학교',dept:'바이오로직스공학부',     type:'잠재능력우수서류',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99738,univ:'가톨릭대학교',dept:'AI의공학과',            type:'잠재능력우수서류',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+
+  // ── 가톨릭대학교 (잠재능력우수자면접전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(4배수)→2단계 서류70%+면접30%
+  // 입결: 신학과만 공개(환산점수 있음), 나머지 미공개
+  {id:99751,univ:'가톨릭대학교',dept:'국어국문학과',          type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99752,univ:'가톨릭대학교',dept:'철학과',               type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99753,univ:'가톨릭대학교',dept:'국사학과',              type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99754,univ:'가톨릭대학교',dept:'영어영문학부',           type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99755,univ:'가톨릭대학교',dept:'중국언어문화학과',       type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99756,univ:'가톨릭대학교',dept:'일어일본문화학과',       type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99757,univ:'가톨릭대학교',dept:'사회복지학과',          type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99758,univ:'가톨릭대학교',dept:'심리학과',              type:'잠재능력우수면접',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99759,univ:'가톨릭대학교',dept:'사회학과',              type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99760,univ:'가톨릭대학교',dept:'국제학부',              type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99761,univ:'가톨릭대학교',dept:'법학과',               type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99762,univ:'가톨릭대학교',dept:'경제학과',              type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'상경'},
+  {id:99763,univ:'가톨릭대학교',dept:'행정학과',              type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99764,univ:'가톨릭대학교',dept:'아동학과',              type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99765,univ:'가톨릭대학교',dept:'경영학과',              type:'잠재능력우수면접',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'상경'},
+  {id:99766,univ:'가톨릭대학교',dept:'회계학과',              type:'잠재능력우수면접',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'상경'},
+  {id:99767,univ:'가톨릭대학교',dept:'특수교육과',            type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'교육'},
+  {id:99768,univ:'가톨릭대학교',dept:'신학과',               type:'잠재능력우수면접',recruit:'32명',comp26:'1.4:1',csat:'없음',cut50:715.27,cut70:669.6,grade50:5.81,grade70:5.37,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99769,univ:'가톨릭대학교',dept:'화학과',               type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99770,univ:'가톨릭대학교',dept:'수학과',               type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99771,univ:'가톨릭대학교',dept:'물리학과',              type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99772,univ:'가톨릭대학교',dept:'공간디자인소비자학과',   type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99773,univ:'가톨릭대학교',dept:'의류학과',              type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99774,univ:'가톨릭대학교',dept:'식품영양학과',           type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99775,univ:'가톨릭대학교',dept:'에너지환경공학과',       type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99776,univ:'가톨릭대학교',dept:'컴퓨터정보공학부',      type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99777,univ:'가톨릭대학교',dept:'미디어기술콘텐츠학과',   type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99778,univ:'가톨릭대학교',dept:'정보통신전자공학부',     type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99779,univ:'가톨릭대학교',dept:'인공지능학과',           type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99780,univ:'가톨릭대학교',dept:'데이터사이언스학과',     type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99781,univ:'가톨릭대학교',dept:'생명공학과',            type:'잠재능력우수면접',recruit:'6명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99782,univ:'가톨릭대학교',dept:'바이오메디컬화학공학과', type:'잠재능력우수면접',recruit:'9명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99783,univ:'가톨릭대학교',dept:'의생명과학과',           type:'잠재능력우수면접',recruit:'10명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99784,univ:'가톨릭대학교',dept:'바이오메디컬소프트웨어학과',type:'잠재능력우수면접',recruit:'6명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99785,univ:'가톨릭대학교',dept:'바이오로직스공학부',     type:'잠재능력우수면접',recruit:'8명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99786,univ:'가톨릭대학교',dept:'AI의공학과',            type:'잠재능력우수면접',recruit:'5명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+
+  // ── 가톨릭대학교 (학교장추천전형 / 2027모집요강) ──
+  // 약학과·의예과: 수능최저 있음 / 간호학과: 수능최저 없음
+  // 1단계 서류100%(4배수)→2단계 서류70%+면접30%
+  {id:99801,univ:'가톨릭대학교',dept:'약학과',               type:'학교장추천',recruit:'9명', comp26:'',csat:'국영수과(1과목) 3합5',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'수능최저있음',calcMode:'jh',major:'의약학'},
+  {id:99802,univ:'가톨릭대학교',dept:'의예과',               type:'학교장추천',recruit:'25명',comp26:'',csat:'국영수과(2과목평균) 3합4+한국사4',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'수능최저있음·의예',calcMode:'jh',major:'의약학'},
+  {id:99803,univ:'가톨릭대학교',dept:'간호학과',              type:'학교장추천',recruit:'16명',comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'의약학'},
+
+  // ── 가톨릭대학교 (가톨릭지도자추천전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(4배수)→2단계 서류70%+면접30%
+  // 입결: 신학과만 공개
+  {id:99851,univ:'가톨릭대학교',dept:'영어영문학부',           type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99852,univ:'가톨릭대학교',dept:'중국언어문화학과',       type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99853,univ:'가톨릭대학교',dept:'일어일본문화학과',       type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99854,univ:'가톨릭대학교',dept:'사회복지학과',          type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99855,univ:'가톨릭대학교',dept:'심리학과',              type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99856,univ:'가톨릭대학교',dept:'국제학부',              type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99857,univ:'가톨릭대학교',dept:'경제학과',              type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'상경'},
+  {id:99858,univ:'가톨릭대학교',dept:'경영학과',              type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'상경'},
+  {id:99859,univ:'가톨릭대학교',dept:'회계학과',              type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'상경'},
+  {id:99860,univ:'가톨릭대학교',dept:'특수교육과',            type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'교육'},
+  {id:99861,univ:'가톨릭대학교',dept:'컴퓨터정보공학부',      type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'자연·공학'},
+  {id:99862,univ:'가톨릭대학교',dept:'미디어기술콘텐츠학과',   type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+  {id:99863,univ:'가톨릭대학교',dept:'정보통신전자공학부',     type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'자연·공학'},
+  {id:99864,univ:'가톨릭대학교',dept:'인공지능학과',           type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'자연·공학'},
+  {id:99865,univ:'가톨릭대학교',dept:'데이터사이언스학과',     type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'자연·공학'},
+  {id:99866,univ:'가톨릭대학교',dept:'바이오메디컬화학공학과', type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'자연·공학'},
+  {id:99867,univ:'가톨릭대학교',dept:'의생명과학과',           type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'자연·공학'},
+  {id:99868,univ:'가톨릭대학교',dept:'의예과',               type:'가톨릭지도자추천',recruit:'2명', comp26:'',csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'의약학'},
+  {id:99869,univ:'가톨릭대학교',dept:'신학과',               type:'가톨릭지도자추천',recruit:'15명',comp26:'1.12:1',csat:'없음',cut50:728.92,cut70:668.72,grade50:4.51,grade70:7.27,method:'1단계 서류100%(4배수)→2단계 서류70%+면접30%',note:'가톨릭추천',calcMode:'jh',major:'인문·사회'},
+
+  // ── 서울교육대학교 (교직인성우수자전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 국수영탐(사/과) 2합6 이내 + 한국사 4등급 이내
+  // 전형방법: 1단계 서류100%(2배수) → 2단계 1단계성적50%+면접50%
+  {id:99901,univ:'서울교육대학교',dept:'초등교육학과',type:'교직인성우수자',recruit:'150명',comp26:'6.49:1',fill:'0',csat:'국수영탐(사/과) 2합6+한국사4',cut50:473.98,cut70:472.36,grade50:1.93,grade70:2.07,method:'1단계 서류100%(2배수)→2단계 1단계성적50%+면접50%',note:'초등교육',calcMode:'jh',major:'교육'},
+
+  // ── 한양대학교(ERICA) 학생부종합(서류형) / 2027모집요강+2026실입결 ──
+  // 수능최저: 없음 / 서류100% 일괄합산
+  // 입결: 환산점수 비공개(0.0), 환산등급만 공개
+  // ─── 공학 ───
+  {id:99911,univ:'한양대학교(ERICA)',dept:'건축학전공',          type:'서류형',recruit:'5명', comp26:'12.2:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.67,grade70:2.76,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99912,univ:'한양대학교(ERICA)',dept:'건축공학전공',         type:'서류형',recruit:'5명', comp26:'13.8:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.85,grade70:3.1, method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99913,univ:'한양대학교(ERICA)',dept:'건설환경공학과',        type:'서류형',recruit:'5명', comp26:'16.0:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.96,grade70:2.97,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99914,univ:'한양대학교(ERICA)',dept:'교통·물류공학과',       type:'서류형',recruit:'5명', comp26:'14.4:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.21,grade70:3.22,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99915,univ:'한양대학교(ERICA)',dept:'전자공학부',           type:'서류형',recruit:'26명',comp26:'12.3:1', fill:'37',csat:'없음',cut50:0,cut70:0,grade50:2.81,grade70:2.97,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99916,univ:'한양대학교(ERICA)',dept:'배터리소재화학공학과',   type:'서류형',recruit:'14명',comp26:'8.7:1',  fill:'9', csat:'없음',cut50:0,cut70:0,grade50:2.67,grade70:3.52,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99917,univ:'한양대학교(ERICA)',dept:'기계공학과',           type:'서류형',recruit:'14명',comp26:'17.3:1', fill:'15',csat:'없음',cut50:0,cut70:0,grade50:2.87,grade70:2.89,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99918,univ:'한양대학교(ERICA)',dept:'산업경영공학과',        type:'서류형',recruit:'5명', comp26:'10.4:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:2.85,grade70:2.86,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99919,univ:'한양대학교(ERICA)',dept:'로봇공학과',           type:'서류형',recruit:'5명', comp26:'13.2:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:3.14,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99920,univ:'한양대학교(ERICA)',dept:'에너지바이오학과',      type:'서류형',recruit:'5명', comp26:'9.2:1',  fill:'0', csat:'없음',cut50:0,cut70:0,grade50:2.7, grade70:2.73,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99921,univ:'한양대학교(ERICA)',dept:'해양융합공학과',        type:'서류형',recruit:'5명', comp26:'10.2:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.97,grade70:3.1, method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  // ─── 소프트웨어융합 ───
+  {id:99922,univ:'한양대학교(ERICA)',dept:'컴퓨터학부',           type:'서류형',recruit:'5명', comp26:'11.4:1', fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.71,grade70:2.71,method:'서류100% 일괄합산',note:'학부모집',calcMode:'jh',major:'자연·공학'},
+  {id:99923,univ:'한양대학교(ERICA)',dept:'컴퓨터전공',           type:'서류형',recruit:'11명',comp26:'11.7:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.42,grade70:2.65,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99924,univ:'한양대학교(ERICA)',dept:'ICT융합학부',           type:'서류형',recruit:'5명', comp26:'13.0:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.66,grade70:2.99,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99925,univ:'한양대학교(ERICA)',dept:'인공지능학과',          type:'서류형',recruit:'10명',comp26:'12.4:1', fill:'13',csat:'없음',cut50:0,cut70:0,grade50:2.7, grade70:2.83,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99926,univ:'한양대학교(ERICA)',dept:'수리데이터사이언스학과', type:'서류형',recruit:'4명', comp26:'12.5:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.9, grade70:2.9, method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  // ─── 약학 ───
+  {id:99927,univ:'한양대학교(ERICA)',dept:'약학과',              type:'서류형',recruit:'15명',comp26:'35.7:1', fill:'28',csat:'없음',cut50:0,cut70:0,grade50:1.78,grade70:1.91,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'의약학'},
+  // ─── 첨단융합 ───
+  {id:99928,univ:'한양대학교(ERICA)',dept:'차세대반도체융합공학부', type:'서류형',recruit:'13명',comp26:'9.0:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.94,grade70:3.16,method:'서류100% 일괄합산',note:'학부모집',calcMode:'jh',major:'자연·공학'},
+  {id:99929,univ:'한양대학교(ERICA)',dept:'신소재·반도체공학전공', type:'서류형',recruit:'14명',comp26:'9.9:1',  fill:'21',csat:'없음',cut50:0,cut70:0,grade50:2.84,grade70:2.91,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99930,univ:'한양대학교(ERICA)',dept:'반도체·디스플레이공학전공',type:'서류형',recruit:'10명',comp26:'8.0:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.25,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99931,univ:'한양대학교(ERICA)',dept:'바이오신약융합학부',     type:'서류형',recruit:'20명',comp26:'8.3:1',  fill:'15',csat:'없음',cut50:0,cut70:0,grade50:2.47,grade70:2.59,method:'서류100% 일괄합산',note:'학부모집',calcMode:'jh',major:'자연·공학'},
+  {id:99932,univ:'한양대학교(ERICA)',dept:'분자의약전공',          type:'서류형',recruit:'12명',comp26:'9.3:1',  fill:'7', csat:'없음',cut50:0,cut70:0,grade50:2.6, grade70:2.63,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99933,univ:'한양대학교(ERICA)',dept:'바이오나노공학전공',     type:'서류형',recruit:'8명', comp26:'8.8:1',  fill:'1', csat:'없음',cut50:0,cut70:0,grade50:2.58,grade70:2.6, method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99934,univ:'한양대학교(ERICA)',dept:'국방지능정보융합공학부',  type:'서류형',recruit:'17명',comp26:'6.4:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.34,grade70:3.38,method:'서류100% 일괄합산',note:'지능형시스템공학전공',calcMode:'jh',major:'자연·공학'},
+  // ─── 글로벌문화통상 ───
+  {id:99935,univ:'한양대학교(ERICA)',dept:'글로벌문화통상학부',     type:'서류형',recruit:'40명',comp26:'19.9:1', fill:'38',csat:'없음',cut50:0,cut70:0,grade50:4.18,grade70:4.58,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 커뮤니케이션&컬처 ───
+  {id:99936,univ:'한양대학교(ERICA)',dept:'광고홍보학과',          type:'서류형',recruit:'10명',comp26:'12.2:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:2.81,grade70:2.87,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99937,univ:'한양대학교(ERICA)',dept:'미디어학과',            type:'서류형',recruit:'10명',comp26:'12.5:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:2.88,grade70:2.91,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99938,univ:'한양대학교(ERICA)',dept:'문화인류학과',          type:'서류형',recruit:'5명', comp26:'11.2:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.55,grade70:3.55,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99939,univ:'한양대학교(ERICA)',dept:'문화콘텐츠학과',        type:'서류형',recruit:'5명', comp26:'18.4:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.44,grade70:2.94,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 상경 ───
+  {id:99940,univ:'한양대학교(ERICA)',dept:'경제학부',              type:'서류형',recruit:'11명',comp26:'11.2:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.06,grade70:3.26,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'상경'},
+  {id:99941,univ:'한양대학교(ERICA)',dept:'경영학부',              type:'서류형',recruit:'22명',comp26:'11.8:1', fill:'18',csat:'없음',cut50:0,cut70:0,grade50:2.98,grade70:3.05,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'상경'},
+  // ─── 디자인·예체능 ───
+  {id:99942,univ:'한양대학교(ERICA)',dept:'디자인계열',            type:'서류형',recruit:'17명',comp26:'14.9:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:2.09,grade70:2.32,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'예체능'},
+  {id:99943,univ:'한양대학교(ERICA)',dept:'스포츠과학부',           type:'서류형',recruit:'10명',comp26:'48.4:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.3, grade70:4.7, method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'예체능'},
+  // ─── LIONS칼리지 ───
+  {id:99944,univ:'한양대학교(ERICA)',dept:'LIONS자율전공학부(자연계열)',type:'서류형',recruit:'53명',comp26:'17.4:1',fill:'60',csat:'없음',cut50:0,cut70:0,grade50:2.84,grade70:3.09,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99945,univ:'한양대학교(ERICA)',dept:'LIONS자율전공학부(인문사회계열)',type:'서류형',recruit:'68명',comp26:'19.7:1',fill:'56',csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.99,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 기타(입결만) ───
+  {id:99946,univ:'한양대학교(ERICA)',dept:'보험계리학과',           type:'서류형',recruit:'2명', comp26:'',      fill:'0', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100% 일괄합산',note:'3명이하미제출',calcMode:'jh',major:'상경'},
+
+  // ── 한양대학교(ERICA) 학생부종합(면접형) / 2027모집요강+2026실입결 ──
+  // LIONS자율전공학부 전계열만 / 1단계 서류100%(3배수)→2단계 서류70%+면접30%
+  {id:99951,univ:'한양대학교(ERICA)',dept:'LIONS자율전공학부(전계열)',type:'면접형',recruit:'60명',comp26:'33.2:1',fill:'31',csat:'없음',cut50:0,cut70:0,grade50:4.26,grade70:4.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'면접형',calcMode:'jh',major:'인문·사회'},
+
+  // ── 서울과학기술대학교 (학교생활우수자전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(3배수)→2단계 서류70%+면접30%
+  // 입결: 환산점수(cut50/cut70) + 환산등급(grade50/grade70) 모두 공개
+  // ─── 공과대학 ───
+  {id:99961,univ:'서울과학기술대학교',dept:'기계시스템공학부(지능형로봇전공)',type:'학교생활우수자',recruit:'26명',comp26:'11.7:1',fill:'12',csat:'없음',cut50:950.2, cut70:946.25,grade50:2.84,grade70:4.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99962,univ:'서울과학기술대학교',dept:'기계시스템공학부(미래자동차전공)',type:'학교생활우수자',recruit:'15명',comp26:'12.3:1',fill:'4', csat:'없음',cut50:956.02,cut70:947.36,grade50:2.73,grade70:3.07,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99963,univ:'서울과학기술대학교',dept:'기계공학과',           type:'학교생활우수자',recruit:'39명',comp26:'14.9:1',fill:'20',csat:'없음',cut50:951.72,cut70:948.11,grade50:2.87,grade70:3.06,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99964,univ:'서울과학기술대학교',dept:'안전공학과',           type:'학교생활우수자',recruit:'15명',comp26:'17.4:1',fill:'4', csat:'없음',cut50:957.12,cut70:953.41,grade50:3.01,grade70:3.21,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99965,univ:'서울과학기술대학교',dept:'신소재공학과',          type:'학교생활우수자',recruit:'18명',comp26:'21.8:1',fill:'7', csat:'없음',cut50:958.33,cut70:957.56,grade50:2.72,grade70:2.89,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99966,univ:'서울과학기술대학교',dept:'건설시스템공학과',       type:'학교생활우수자',recruit:'29명',comp26:'12.1:1',fill:'6', csat:'없음',cut50:950.4, cut70:948.94,grade50:3.11,grade70:3.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99967,univ:'서울과학기술대학교',dept:'건축학부(건축학전공)',   type:'학교생활우수자',recruit:'13명',comp26:'16.2:1',fill:'6', csat:'없음',cut50:949.68,cut70:947.35,grade50:2.73,grade70:2.97,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99968,univ:'서울과학기술대학교',dept:'건축학부(건축공학전공)', type:'학교생활우수자',recruit:'17명',comp26:'9.2:1', fill:'4', csat:'없음',cut50:952.53,cut70:948.28,grade50:3.21,grade70:3.33,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99969,univ:'서울과학기술대학교',dept:'스마트ICT융합공학과',    type:'학교생활우수자',recruit:'14명',comp26:'26.6:1',fill:'5', csat:'없음',cut50:955.16,cut70:951.69,grade50:2.58,grade70:2.61,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99970,univ:'서울과학기술대학교',dept:'환경공학과',            type:'학교생활우수자',recruit:'22명',comp26:'20.8:1',fill:'10',csat:'없음',cut50:961.51,cut70:959.57,grade50:2.41,grade70:2.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  // ─── 정보통신대학 ───
+  {id:99971,univ:'서울과학기술대학교',dept:'전기정보공학과',         type:'학교생활우수자',recruit:'32명',comp26:'9.2:1', fill:'17',csat:'없음',cut50:950.4, cut70:949.22,grade50:2.59,grade70:4.07,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99972,univ:'서울과학기술대학교',dept:'전자공학과',            type:'학교생활우수자',recruit:'19명',comp26:'10.5:1',fill:'11',csat:'없음',cut50:953.48,cut70:951.4, grade50:2.24,grade70:2.32,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99973,univ:'서울과학기술대학교',dept:'ICT융합학과',           type:'학교생활우수자',recruit:'14명',comp26:'',     fill:'', csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'2027신설',calcMode:'jh',major:'자연·공학'},
+  {id:99974,univ:'서울과학기술대학교',dept:'컴퓨터공학과',          type:'학교생활우수자',recruit:'26명',comp26:'18.7:1',fill:'31',csat:'없음',cut50:949.14,cut70:948.33,grade50:2.56,grade70:2.75,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  // ─── 에너지바이오대학 ───
+  {id:99975,univ:'서울과학기술대학교',dept:'화공생명공학과',         type:'학교생활우수자',recruit:'16명',comp26:'45.6:1',fill:'19',csat:'없음',cut50:954.5, cut70:952.57,grade50:2.65,grade70:4.4, method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99976,univ:'서울과학기술대학교',dept:'정밀화학과',            type:'학교생활우수자',recruit:'11명',comp26:'20.0:1',fill:'5', csat:'없음',cut50:962.71,cut70:961.55,grade50:2.23,grade70:2.31,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99977,univ:'서울과학기술대학교',dept:'식품생명공학과',         type:'학교생활우수자',recruit:'13명',comp26:'24.4:1',fill:'9', csat:'없음',cut50:964.15,cut70:962.59,grade50:2.35,grade70:2.45,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99978,univ:'서울과학기술대학교',dept:'안경광학과',            type:'학교생활우수자',recruit:'11명',comp26:'10.5:1',fill:'6', csat:'없음',cut50:954.04,cut70:951.74,grade50:2.79,grade70:3.07,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99979,univ:'서울과학기술대학교',dept:'스포츠과학과',          type:'학교생활우수자',recruit:'16명',comp26:'29.4:1',fill:'13',csat:'없음',cut50:957.79,cut70:955.87,grade50:2.75,grade70:3.13,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'예체능'},
+  // ─── 조형대학 ───
+  {id:99980,univ:'서울과학기술대학교',dept:'디자인학과(시각디자인전공)',type:'학교생활우수자',recruit:'3명', comp26:'44.7:1',fill:'4', csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'3명이하미제출',calcMode:'jh',major:'예체능'},
+  {id:99981,univ:'서울과학기술대학교',dept:'금속공예디자인학과',      type:'학교생활우수자',recruit:'3명', comp26:'33.0:1',fill:'3', csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'3명이하미제출',calcMode:'jh',major:'예체능'},
+  // ─── 인문사회대학 ───
+  {id:99982,univ:'서울과학기술대학교',dept:'행정학과',              type:'학교생활우수자',recruit:'13명',comp26:'16.0:1',fill:'7', csat:'없음',cut50:954.41,cut70:951.94,grade50:2.95,grade70:3.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99983,univ:'서울과학기술대학교',dept:'영어영문학과',           type:'학교생활우수자',recruit:'9명', comp26:'19.8:1',fill:'13',csat:'없음',cut50:945.65,cut70:939.6, grade50:3.7, grade70:4.23,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99984,univ:'서울과학기술대학교',dept:'문예창작학과',           type:'학교생활우수자',recruit:'32명',comp26:'10.7:1',fill:'13',csat:'없음',cut50:955.85,cut70:952.81,grade50:3.37,grade70:3.52,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  {id:99985,univ:'서울과학기술대학교',dept:'MSDE학과',             type:'학교생활우수자',recruit:'12명',comp26:'9.1:1', fill:'7', csat:'없음',cut50:954.95,cut70:954.16,grade50:2.24,grade70:2.43,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'인문·사회'},
+  // ─── 기술경영융합대학 ───
+  {id:99986,univ:'서울과학기술대학교',dept:'산업공학과(산업정보시스템전공)',type:'학교생활우수자',recruit:'18명',comp26:'15.2:1',fill:'7',csat:'없음',cut50:956.41,cut70:953.97,grade50:2.96,grade70:3.44,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'자연',calcMode:'jh',major:'자연·공학'},
+  {id:99987,univ:'서울과학기술대학교',dept:'산업공학과(ITM전공)',     type:'학교생활우수자',recruit:'11명',comp26:'9.3:1', fill:'5', csat:'없음',cut50:960.48,cut70:955.84,grade50:2.33,grade70:2.46,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'자연',calcMode:'jh',major:'자연·공학'},
+  {id:99988,univ:'서울과학기술대학교',dept:'경영학과(경영학전공)',     type:'학교생활우수자',recruit:'13명',comp26:'27.8:1',fill:'6', csat:'없음',cut50:964.12,cut70:961.57,grade50:2.78,grade70:3.89,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'인문',calcMode:'jh',major:'상경'},
+  {id:99989,univ:'서울과학기술대학교',dept:'경영학과(글로벌테크노경영전공_인문)',type:'학교생활우수자',recruit:'9명',comp26:'20.0:1',fill:'6',csat:'없음',cut50:962.4,cut70:961.84,grade50:2.91,grade70:3.14,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'인문',calcMode:'jh',major:'상경'},
+  {id:99990,univ:'서울과학기술대학교',dept:'경영학과(글로벌테크노경영전공_자연)',type:'학교생활우수자',recruit:'3명', comp26:'11.3:1',fill:'2',csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'3명이하미제출',calcMode:'jh',major:'상경'},
+  // ─── ST자유전공학부(인문*) ───
+  {id:99991,univ:'서울과학기술대학교',dept:'ST자유전공학부(인문)',    type:'학교생활우수자',recruit:'18명',comp26:'',     fill:'', csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'2027신설',calcMode:'jh',major:'인문·사회'},
+
+  // ── 서울과학기술대학교 (창의융합인재전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(3배수)→2단계 서류70%+면접30%
+  {id:99992,univ:'서울과학기술대학교',dept:'바이오메디컬학과',       type:'창의융합인재',recruit:'12명',comp26:'45.9:1',fill:'4', csat:'없음',cut50:970.52,cut70:965.87,grade50:6.72,grade70:6.77,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99993,univ:'서울과학기술대학교',dept:'양자융합컴퓨터학과',      type:'창의융합인재',recruit:'9명', comp26:'',     fill:'', csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'2027신설',calcMode:'jh',major:'자연·공학'},
+  {id:99994,univ:'서울과학기술대학교',dept:'인공지능응용학과',        type:'창의융합인재',recruit:'20명',comp26:'16.3:1',fill:'15',csat:'없음',cut50:949.09,cut70:948.04,grade50:2.61,grade70:2.69,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99995,univ:'서울과학기술대학교',dept:'지능형반도체공학과',      type:'창의융합인재',recruit:'18명',comp26:'12.3:1',fill:'7', csat:'없음',cut50:955.91,cut70:953.65,grade50:2.75,grade70:3.53,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99996,univ:'서울과학기술대학교',dept:'미래에너지융합학과',      type:'창의융합인재',recruit:'7명', comp26:'26.3:1',fill:'2', csat:'없음',cut50:957.06,cut70:956.81,grade50:2.49,grade70:2.49,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+  {id:99997,univ:'서울과학기술대학교',dept:'지능형드론체공학과',      type:'창의융합인재',recruit:'18명',comp26:'',     fill:'', csat:'없음',cut50:0,    cut70:0,    grade50:0,   grade70:0,   method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'2027신설',calcMode:'jh',major:'자연·공학'},
+  {id:99998,univ:'서울과학기술대학교',dept:'자유전공학부(창의융합대학)',type:'창의융합인재',recruit:'25명',comp26:'21.9:1',fill:'14',csat:'없음',cut50:955.56,cut70:953.91,grade50:2.95,grade70:4.49,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'',calcMode:'jh',major:'자연·공학'},
+
+  // ── 강원대학교 (미래인재서류전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음(간호학과 11등급, 수의학과 8등급 예외)
+  // 전형방법: 서류100% 일괄합산
+  // 입결: 환산점수 비공개(0.0), 환산등급만 공개
+  // ─── 춘천캠퍼스 ───
+  {id:100001,univ:'강원대학교(춘천)',dept:'배터리융합공학과',     type:'미래인재서류',recruit:'8명', comp26:'7.0:1',  fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.72,grade70:3.67,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100002,univ:'강원대학교(춘천)',dept:'건축공학과',           type:'미래인재서류',recruit:'5명', comp26:'15.0:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:4.03,grade70:4.1, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100003,univ:'강원대학교(춘천)',dept:'건축학과(5년제)',       type:'미래인재서류',recruit:'5명', comp26:'11.0:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.44,grade70:3.95,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100004,univ:'강원대학교(춘천)',dept:'토목공학과',            type:'미래인재서류',recruit:'8명', comp26:'8.75:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.63,grade70:3.49,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100005,univ:'강원대학교(춘천)',dept:'지역건설공학과',        type:'미래인재서류',recruit:'6명', comp26:'15.0:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.8, grade70:3.73,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100006,univ:'강원대학교(춘천)',dept:'일본학과',             type:'미래인재서류',recruit:'4명', comp26:'14.5:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.84,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100007,univ:'강원대학교(춘천)',dept:'정치외교학과',          type:'미래인재서류',recruit:'5명', comp26:'13.6:1', fill:'15',csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.8, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100008,univ:'강원대학교(춘천)',dept:'행정학과',             type:'미래인재서류',recruit:'5명', comp26:'10.8:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.36,grade70:2.55,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100009,univ:'강원대학교(춘천)',dept:'자유전공학부(자연계열)', type:'미래인재서류',recruit:'8명', comp26:'8.5:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.24,grade70:3.39,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100010,univ:'강원대학교(춘천)',dept:'자유전공학부(인문계열)', type:'미래인재서류',recruit:'8명', comp26:'11.63:1',fill:'8', csat:'없음',cut50:0,cut70:0,grade50:2.79,grade70:3.58,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100011,univ:'강원대학교(춘천)',dept:'AI융합학과',            type:'미래인재서류',recruit:'5명', comp26:'12.4:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.7, grade70:3.43,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100012,univ:'강원대학교(춘천)',dept:'철학과',               type:'미래인재서류',recruit:'4명', comp26:'9.5:1',  fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.34,grade70:3.49,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100013,univ:'강원대학교(춘천)',dept:'심리학과',             type:'미래인재서류',recruit:'8명', comp26:'14.5:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.01,grade70:3.2, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100014,univ:'강원대학교(춘천)',dept:'사학과',               type:'미래인재서류',recruit:'6명', comp26:'17.33:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.3, grade70:3.57,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100015,univ:'강원대학교(춘천)',dept:'국어국문학과',          type:'미래인재서류',recruit:'6명', comp26:'11.67:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:4.15,grade70:3.76,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100016,univ:'강원대학교(춘천)',dept:'펄프제지공학과',        type:'미래인재서류',recruit:'4명', comp26:'17.5:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:4.34,grade70:4.49,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100017,univ:'강원대학교(춘천)',dept:'의생명시스템과학과',     type:'미래인재서류',recruit:'5명', comp26:'8.0:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.04,grade70:3.18,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100018,univ:'강원대학교(춘천)',dept:'생명·환경융합학부',     type:'미래인재서류',recruit:'12명',comp26:'11.83:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.7, grade70:3.74,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100019,univ:'강원대학교(춘천)',dept:'스마트팜융합바이오시스템공학과',type:'미래인재서류',recruit:'5명',comp26:'15.4:1',fill:'3',csat:'없음',cut50:0,cut70:0,grade50:3.79,grade70:3.52,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100020,univ:'강원대학교(춘천)',dept:'스마트산업공학과',      type:'미래인재서류',recruit:'5명', comp26:'9.2:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:4.0, grade70:3.91,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100021,univ:'강원대학교(춘천)',dept:'문화인류학과',          type:'미래인재서류',recruit:'4명', comp26:'8.0:1',  fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.61,grade70:4.08,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100022,univ:'강원대학교(춘천)',dept:'관광경영학과',          type:'미래인재서류',recruit:'7명', comp26:'10.14:1',fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.58,grade70:3.5, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100023,univ:'강원대학교(춘천)',dept:'경제·정보통계학부',     type:'미래인재서류',recruit:'13명',comp26:'7.62:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.5, grade70:3.42,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'상경'},
+  {id:100024,univ:'강원대학교(춘천)',dept:'동물산업융합학과',      type:'미래인재서류',recruit:'7명', comp26:'14.71:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.95,grade70:4.0, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100025,univ:'강원대학교(춘천)',dept:'동물응용과학과',        type:'미래인재서류',recruit:'8명', comp26:'11.0:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.78,grade70:4.11,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100026,univ:'강원대학교(춘천)',dept:'중어중문학과',          type:'미래인재서류',recruit:'6명', comp26:'6.67:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.85,grade70:4.17,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100027,univ:'강원대학교(춘천)',dept:'영어영문학과',          type:'미래인재서류',recruit:'6명', comp26:'10.0:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.4, grade70:3.43,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100028,univ:'강원대학교(춘천)',dept:'독어독문학과',          type:'미래인재서류',recruit:'4명', comp26:'6.75:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:4.13,grade70:4.3, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100029,univ:'강원대학교(춘천)',dept:'불어불문학과',          type:'미래인재서류',recruit:'4명', comp26:'6.5:1',  fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.53,grade70:3.75,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100030,univ:'강원대학교(춘천)',dept:'식품생명공학과',        type:'미래인재서류',recruit:'7명', comp26:'10.43:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.37,grade70:3.54,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100031,univ:'강원대학교(춘천)',dept:'수학과',               type:'미래인재서류',recruit:'4명', comp26:'10.0:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.5, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100032,univ:'강원대학교(춘천)',dept:'산림바이오소재공학과',   type:'미래인재서류',recruit:'4명', comp26:'19.0:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.45,grade70:3.57,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100033,univ:'강원대학교(춘천)',dept:'컴퓨터공학과',          type:'미래인재서류',recruit:'17명',comp26:'7.94:1', fill:'19',csat:'없음',cut50:0,cut70:0,grade50:2.88,grade70:3.77,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100034,univ:'강원대학교(춘천)',dept:'화공·생물공학부',        type:'미래인재서류',recruit:'10명',comp26:'5.9:1',  fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.13,grade70:3.37,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100035,univ:'강원대학교(춘천)',dept:'생명건강공학과',        type:'미래인재서류',recruit:'5명', comp26:'7.6:1',  fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.77,grade70:3.06,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100036,univ:'강원대학교(춘천)',dept:'원예학과',             type:'미래인재서류',recruit:'3명', comp26:'16.67:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'서류100% 일괄합산',note:'3명이하미제출',calcMode:'jh',major:'자연·공학'},
+  {id:100037,univ:'강원대학교(춘천)',dept:'지질·지구물리학부',     type:'미래인재서류',recruit:'9명', comp26:'6.89:1', fill:'9', csat:'없음',cut50:0,cut70:0,grade50:3.96,grade70:3.93,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100038,univ:'강원대학교(춘천)',dept:'디지털밀리터리학과',    type:'미래인재서류',recruit:'4명', comp26:'12.0:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.91,grade70:3.54,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100039,univ:'강원대학교(춘천)',dept:'반도체물리학과',        type:'미래인재서류',recruit:'4명', comp26:'9.5:1',  fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.7, grade70:3.67,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100040,univ:'강원대학교(춘천)',dept:'간호학과',             type:'미래인재서류',recruit:'15명',comp26:'10.73:1',fill:'7', csat:'없음',cut50:0,cut70:0,grade50:2.72,grade70:2.59,method:'서류100% 일괄합산',note:'춘천·수능최저없음',calcMode:'jh',major:'의약학'},
+  {id:100041,univ:'강원대학교(춘천)',dept:'영상문화학과',          type:'미래인재서류',recruit:'7명', comp26:'17.71:1',fill:'10',csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.78,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100042,univ:'강원대학교(춘천)',dept:'생물의소재공학과',      type:'미래인재서류',recruit:'4명', comp26:'6.0:1',  fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.7, grade70:3.93,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100043,univ:'강원대학교(춘천)',dept:'생태조경디자인학과',    type:'미래인재서류',recruit:'4명', comp26:'10.5:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.58,grade70:2.39,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100044,univ:'강원대학교(춘천)',dept:'기계융합공학부',        type:'미래인재서류',recruit:'18명',comp26:'9.89:1', fill:'23',csat:'없음',cut50:0,cut70:0,grade50:3.65,grade70:3.56,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100045,univ:'강원대학교(춘천)',dept:'산림경영학과',          type:'미래인재서류',recruit:'5명', comp26:'8.2:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:4.21,grade70:3.59,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100046,univ:'강원대학교(춘천)',dept:'환경공학과',            type:'미래인재서류',recruit:'7명', comp26:'8.86:1', fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.35,grade70:3.5, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100047,univ:'강원대학교(춘천)',dept:'전기전자공학과',        type:'미래인재서류',recruit:'16명',comp26:'7.69:1', fill:'16',csat:'없음',cut50:0,cut70:0,grade50:3.29,grade70:3.78,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100048,univ:'강원대학교(춘천)',dept:'전자공학과',            type:'미래인재서류',recruit:'7명', comp26:'7.86:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.52,grade70:3.66,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100049,univ:'강원대학교(춘천)',dept:'에너지자원공학과',      type:'미래인재서류',recruit:'6명', comp26:'7.0:1',  fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.67,grade70:3.69,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100050,univ:'강원대학교(춘천)',dept:'경영·회계학부',         type:'미래인재서류',recruit:'34명',comp26:'10.41:1',fill:'29',csat:'없음',cut50:0,cut70:0,grade50:3.47,grade70:3.73,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'상경'},
+  {id:100051,univ:'강원대학교(춘천)',dept:'국제무역학과',          type:'미래인재서류',recruit:'10명',comp26:'11.5:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.52,grade70:3.7, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'상경'},
+  {id:100052,univ:'강원대학교(춘천)',dept:'사회학과',             type:'미래인재서류',recruit:'5명', comp26:'12.2:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.14,grade70:3.73,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100053,univ:'강원대학교(춘천)',dept:'미디어커뮤니케이션학과', type:'미래인재서류',recruit:'6명', comp26:'12.33:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.89,grade70:2.98,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100054,univ:'강원대학교(춘천)',dept:'식품자원경제학과',      type:'미래인재서류',recruit:'6명', comp26:'11.33:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.68,grade70:3.85,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100055,univ:'강원대학교(춘천)',dept:'산림환경보호학과',      type:'미래인재서류',recruit:'5명', comp26:'8.0:1',  fill:'4', csat:'없음',cut50:0,cut70:0,grade50:2.64,grade70:3.57,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100056,univ:'강원대학교(춘천)',dept:'생명과학과',            type:'미래인재서류',recruit:'4명', comp26:'13.0:1', fill:'4', csat:'없음',cut50:0,cut70:0,grade50:3.21,grade70:3.3, method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100057,univ:'강원대학교(춘천)',dept:'화학·생화학부',         type:'미래인재서류',recruit:'14명',comp26:'8.43:1', fill:'12',csat:'없음',cut50:0,cut70:0,grade50:3.52,grade70:3.64,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100058,univ:'강원대학교(춘천)',dept:'분자생명과학과',        type:'미래인재서류',recruit:'5명', comp26:'6.6:1',  fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.93,grade70:3.39,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100059,univ:'강원대학교(춘천)',dept:'의생명공학과',          type:'미래인재서류',recruit:'5명', comp26:'9.0:1',  fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.3, grade70:3.51,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100060,univ:'강원대학교(춘천)',dept:'수의학과',             type:'미래인재서류',recruit:'5명', comp26:'21.4:1', fill:'2', csat:'수의학 8등급이내',cut50:0,cut70:0,grade50:1.33,grade70:1.44,method:'서류100% 일괄합산',note:'춘천·수능최저있음',calcMode:'jh',major:'의약학'},
+  {id:100061,univ:'강원대학교(춘천)',dept:'동물자원과학과',        type:'미래인재서류',recruit:'10명',comp26:'10.6:1', fill:'13',csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.63,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100062,univ:'강원대학교(춘천)',dept:'산림자원학과',          type:'미래인재서류',recruit:'5명', comp26:'7.6:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.22,grade70:3.83,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100063,univ:'강원대학교(춘천)',dept:'생물자원과학부',        type:'미래인재서류',recruit:'9명', comp26:'11.56:1',fill:'13',csat:'없음',cut50:0,cut70:0,grade50:3.99,grade70:3.62,method:'서류100% 일괄합산',note:'춘천',calcMode:'jh',major:'자연·공학'},
+
+  // ── 강원대학교 (미래인재면접전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 없음 / 1단계 서류100%(4배수)→2단계 서류60%+면접40%
+  // (춘천캠 6명이상시 4배수, 5명이하시 5배수)
+  {id:100101,univ:'강원대학교(춘천)',dept:'일반사회교육과',        type:'미래인재면접',recruit:'4명', comp26:'16.5:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:2.48,grade70:2.98,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100102,univ:'강원대학교(춘천)',dept:'과학교육학부',          type:'미래인재면접',recruit:'15명',comp26:'6.87:1', fill:'8', csat:'없음',cut50:0,cut70:0,grade50:3.32,grade70:3.23,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100103,univ:'강원대학교(춘천)',dept:'수학교육과',            type:'미래인재면접',recruit:'9명', comp26:'6.89:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.45,grade70:2.77,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100104,univ:'강원대학교(춘천)',dept:'건축공학과',            type:'미래인재면접',recruit:'3명', comp26:'15.33:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'자연·공학'},
+  {id:100105,univ:'강원대학교(춘천)',dept:'건축학과(5년제)',       type:'미래인재면접',recruit:'3명', comp26:'18.0:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'자연·공학'},
+  {id:100106,univ:'강원대학교(춘천)',dept:'토목공학과',            type:'미래인재면접',recruit:'5명', comp26:'11.2:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.51,grade70:3.9, method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100107,univ:'강원대학교(춘천)',dept:'지역건설공학과',        type:'미래인재면접',recruit:'3명', comp26:'16.33:1',fill:'4', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'자연·공학'},
+  {id:100108,univ:'강원대학교(춘천)',dept:'일본학과',             type:'미래인재면접',recruit:'2명', comp26:'18.0:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'인문·사회'},
+  {id:100109,univ:'강원대학교(춘천)',dept:'역사교육과',            type:'미래인재면접',recruit:'4명', comp26:'12.25:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.68,grade70:2.67,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100110,univ:'강원대학교(춘천)',dept:'정치외교학과',          type:'미래인재면접',recruit:'3명', comp26:'12.67:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'인문·사회'},
+  {id:100111,univ:'강원대학교(춘천)',dept:'행정학과',             type:'미래인재면접',recruit:'3명', comp26:'13.33:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'인문·사회'},
+  {id:100112,univ:'강원대학교(춘천)',dept:'교학과',               type:'미래인재면접',recruit:'4명', comp26:'9.75:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.83,grade70:3.15,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100113,univ:'강원대학교(춘천)',dept:'자유전공학부(자연계열)', type:'미래인재면접',recruit:'5명', comp26:'9.2:1',  fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.79,grade70:3.78,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100114,univ:'강원대학교(춘천)',dept:'자유전공학부(인문계열)', type:'미래인재면접',recruit:'5명', comp26:'15.8:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.25,grade70:3.57,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100115,univ:'강원대학교(춘천)',dept:'국어교육과',            type:'미래인재면접',recruit:'9명', comp26:'7.33:1', fill:'7', csat:'없음',cut50:0,cut70:0,grade50:2.95,grade70:3.15,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100116,univ:'강원대학교(춘천)',dept:'AI융합학과',            type:'미래인재면접',recruit:'3명', comp26:'11.0:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:0,   grade70:0,   method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'3명이하미제출',calcMode:'jh',major:'자연·공학'},
+  {id:100117,univ:'강원대학교(춘천)',dept:'영어교육과',            type:'미래인재면접',recruit:'5명', comp26:'8.6:1',  fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.05,grade70:2.68,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100118,univ:'강원대학교(춘천)',dept:'한문교육과',            type:'미래인재면접',recruit:'4명', comp26:'4.5:1',  fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.5, grade70:3.82,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100119,univ:'강원대학교(춘천)',dept:'윤리교육과',            type:'미래인재면접',recruit:'4명', comp26:'9.0:1',  fill:'2', csat:'없음',cut50:0,cut70:0,grade50:2.72,grade70:2.91,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'교육'},
+  {id:100120,univ:'강원대학교(춘천)',dept:'사학과',               type:'미래인재면접',recruit:'4명', comp26:'16.5:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.67,grade70:3.64,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100121,univ:'강원대학교(춘천)',dept:'국어국문학과',          type:'미래인재면접',recruit:'4명', comp26:'12.5:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.95,grade70:3.83,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100122,univ:'강원대학교(춘천)',dept:'생명·환경융합학부',     type:'미래인재면접',recruit:'8명', comp26:'10.13:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.19,grade70:4.02,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100123,univ:'강원대학교(춘천)',dept:'관광경영학과',          type:'미래인재면접',recruit:'4명', comp26:'23.25:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:3.84,grade70:4.0, method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100124,univ:'강원대학교(춘천)',dept:'경제·정보통계학부',     type:'미래인재면접',recruit:'9명', comp26:'7.44:1', fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.48,grade70:3.69,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'상경'},
+  {id:100125,univ:'강원대학교(춘천)',dept:'동물산업융합학과',      type:'미래인재면접',recruit:'4명', comp26:'11.75:1',fill:'3', csat:'없음',cut50:0,cut70:0,grade50:4.27,grade70:4.56,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100126,univ:'강원대학교(춘천)',dept:'동물응용과학과',        type:'미래인재면접',recruit:'5명', comp26:'10.6:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:4.32,grade70:4.1, method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100127,univ:'강원대학교(춘천)',dept:'중어중문학과',          type:'미래인재면접',recruit:'4명', comp26:'8.0:1',  fill:'6', csat:'없음',cut50:0,cut70:0,grade50:3.94,grade70:4.48,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100128,univ:'강원대학교(춘천)',dept:'영어영문학과',          type:'미래인재면접',recruit:'4명', comp26:'11.5:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.52,grade70:3.54,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100129,univ:'강원대학교(춘천)',dept:'지질·지구물리학부',     type:'미래인재면접',recruit:'5명', comp26:'11.2:1', fill:'1', csat:'없음',cut50:0,cut70:0,grade50:4.05,grade70:4.28,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100130,univ:'강원대학교(춘천)',dept:'식품생명공학과',        type:'미래인재면접',recruit:'4명', comp26:'11.75:1',fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.53,grade70:3.32,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100131,univ:'강원대학교(춘천)',dept:'컴퓨터공학과',          type:'미래인재면접',recruit:'16명',comp26:'9.81:1', fill:'10',csat:'없음',cut50:0,cut70:0,grade50:4.05,grade70:3.67,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100132,univ:'강원대학교(춘천)',dept:'화공·생물공학부',        type:'미래인재면접',recruit:'7명', comp26:'8.0:1',  fill:'5', csat:'없음',cut50:0,cut70:0,grade50:3.28,grade70:3.54,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100133,univ:'강원대학교(춘천)',dept:'의예과',               type:'미래인재면접',recruit:'5명', comp26:'40.0:1', fill:'3', csat:'없음',cut50:0,cut70:0,grade50:1.49,grade70:1.41,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'의약학'},
+  {id:100134,univ:'강원대학교(춘천)',dept:'간호학과',             type:'미래인재면접',recruit:'7명', comp26:'14.29:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:2.78,grade70:2.47,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'의약학'},
+  {id:100135,univ:'강원대학교(춘천)',dept:'약학과',               type:'미래인재면접',recruit:'9명', comp26:'21.44:1',fill:'6', csat:'없음',cut50:0,cut70:0,grade50:1.26,grade70:1.32,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'의약학'},
+  {id:100136,univ:'강원대학교(춘천)',dept:'영상문화학과',          type:'미래인재면접',recruit:'5명', comp26:'27.6:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:3.57,grade70:3.44,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'인문·사회'},
+  {id:100137,univ:'강원대학교(춘천)',dept:'기계융합공학부',        type:'미래인재면접',recruit:'8명', comp26:'11.75:1',fill:'1', csat:'없음',cut50:0,cut70:0,grade50:3.77,grade70:3.55,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100138,univ:'강원대학교(춘천)',dept:'전기전자공학과',        type:'미래인재면접',recruit:'10명',comp26:'9.0:1',  fill:'7', csat:'없음',cut50:0,cut70:0,grade50:3.67,grade70:3.93,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100139,univ:'강원대학교(춘천)',dept:'전자공학과',            type:'미래인재면접',recruit:'4명', comp26:'9.0:1',  fill:'1', csat:'없음',cut50:0,cut70:0,grade50:4.11,grade70:3.99,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100140,univ:'강원대학교(춘천)',dept:'에너지자원공학과',      type:'미래인재면접',recruit:'4명', comp26:'6.75:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.79,grade70:4.07,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100141,univ:'강원대학교(춘천)',dept:'경영·회계학부',         type:'미래인재면접',recruit:'20명',comp26:'10.05:1',fill:'11',csat:'없음',cut50:0,cut70:0,grade50:3.5, grade70:3.68,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'상경'},
+  {id:100142,univ:'강원대학교(춘천)',dept:'국제무역학과',          type:'미래인재면접',recruit:'7명', comp26:'10.14:1',fill:'0', csat:'없음',cut50:0,cut70:0,grade50:3.49,grade70:3.72,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'상경'},
+  {id:100143,univ:'강원대학교(춘천)',dept:'화학·생화학부',         type:'미래인재면접',recruit:'9명', comp26:'9.0:1',  fill:'8', csat:'없음',cut50:0,cut70:0,grade50:4.02,grade70:4.08,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100144,univ:'강원대학교(춘천)',dept:'동물자원과학과',        type:'미래인재면접',recruit:'5명', comp26:'10.6:1', fill:'0', csat:'없음',cut50:0,cut70:0,grade50:4.49,grade70:3.8, method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+  {id:100145,univ:'강원대학교(춘천)',dept:'생물자원과학부',        type:'미래인재면접',recruit:'7명', comp26:'8.14:1', fill:'2', csat:'없음',cut50:0,cut70:0,grade50:4.15,grade70:4.34,method:'1단계 서류100%(4배수)→2단계 서류60%+면접40%',note:'춘천',calcMode:'jh',major:'자연·공학'},
+
+  // ── 강원대학교 (지역인재면접전형 / 2027모집요강+2026실입결) ──
+  // 수능최저: 적용(춘천캠 기준) / 강원지역 고교 졸업자
+  // 1단계 서류100%(3배수)→2단계 서류60%+면접40%
+  {id:100201,univ:'강원대학교(춘천)',dept:'의예과',               type:'지역인재면접',recruit:'12명',comp26:'11.67:1',fill:'0', csat:'국수영과탐(2) 4합5+한국사4',cut50:0,cut70:0,grade50:1.16,grade70:4.21,method:'1단계 서류100%(3배수)→2단계 서류60%+면접40%',note:'지역인재·수능최저있음',calcMode:'jh',major:'의약학'},
+
+  // ── 강원대학교 강릉캠 (미래인재면접I전형 / 2027모집요강) ──
+  // 치의예과 단독 / 수능최저: 국수영과탐(우수1) 3합6(수학필수)
+  {id:100251,univ:'강원대학교(강릉)',dept:'치의예과',              type:'미래인재면접I',recruit:'12명',comp26:'',      fill:'', csat:'국수영과탐(우수1) 3합6+수학필수',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(5배수)→2단계 서류60%+면접40%',note:'강릉캠',calcMode:'jh',major:'의약학'},
+
+  // ══════════════════════════════════════════════════════════════════
+  // ── 경기대학교 KGU학생부종합전형 (2027모집요강+2026실입결) ──
+  // ── 1단계 서류100%(3배수)→2단계 서류70%+면접30% / 수능최저 없음 ──
+  // ══════════════════════════════════════════════════════════════════
+  // ─── 인문대학 ───
+  {id:101001,univ:'경기대학교',dept:'국어국문학과',        type:'KGU학생부종합',recruit:'12명',comp26:'14.42:1',fill:'9',  csat:'없음',cut50:0,cut70:0,grade50:3.66,grade70:3.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  {id:101002,univ:'경기대학교',dept:'영어영문학과',        type:'KGU학생부종합',recruit:'13명',comp26:'9.85:1', fill:'14', csat:'없음',cut50:0,cut70:0,grade50:3.49,grade70:3.64,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  {id:101003,univ:'경기대학교',dept:'사학과',              type:'KGU학생부종합',recruit:'10명',comp26:'15.6:1', fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.38,grade70:3.75,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  {id:101004,univ:'경기대학교',dept:'문헌정보학과',        type:'KGU학생부종합',recruit:'10명',comp26:'12.1:1', fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.50,grade70:3.62,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  // ─── 사회과학대학 ───
+  {id:101005,univ:'경기대학교',dept:'사회과학부',          type:'KGU학생부종합',recruit:'18명',comp26:'13.0:1', fill:'22', csat:'없음',cut50:0,cut70:0,grade50:3.61,grade70:3.72,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠·휴먼서비스학부',calcMode:'jh',major:'인문'},
+  {id:101006,univ:'경기대학교',dept:'법학과',              type:'KGU학생부종합',recruit:'12명',comp26:'15.83:1',fill:'6',  csat:'없음',cut50:0,cut70:0,grade50:3.38,grade70:3.46,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  {id:101007,univ:'경기대학교',dept:'공공인재학부',        type:'KGU학생부종합',recruit:'24명',comp26:'12.38:1',fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.39,grade70:3.45,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  {id:101008,univ:'경기대학교',dept:'공공안전학부',        type:'KGU학생부종합',recruit:'24명',comp26:'12.04:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:2.84,grade70:3.08,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  // ─── 경상대학·소프트웨어경영대학 ───
+  {id:101009,univ:'경기대학교',dept:'경영학부',            type:'KGU학생부종합',recruit:'56명',comp26:'13.73:1',fill:'30', csat:'없음',cut50:0,cut70:0,grade50:3.53,grade70:3.70,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'상경'},
+  {id:101010,univ:'경기대학교',dept:'경제학부',            type:'KGU학생부종합',recruit:'42명',comp26:'10.74:1',fill:'32', csat:'없음',cut50:0,cut70:0,grade50:3.68,grade70:3.85,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'상경'},
+  {id:101011,univ:'경기대학교',dept:'무역학과',            type:'KGU학생부종합',recruit:'13명',comp26:'10.92:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.62,grade70:3.69,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'상경'},
+  {id:101012,univ:'경기대학교',dept:'산업경영공학과',      type:'KGU학생부종합',recruit:'36명',comp26:'8.44:1', fill:'32', csat:'없음',cut50:0,cut70:0,grade50:3.77,grade70:3.94,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101013,univ:'경기대학교',dept:'글로벌어문학부',      type:'KGU학생부종합',recruit:'55명',comp26:'16.38:1',fill:'40', csat:'없음',cut50:0,cut70:0,grade50:4.16,grade70:4.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'인문'},
+  // ─── 이공계열 ───
+  {id:101014,univ:'경기대학교',dept:'AI컴퓨터공학부',      type:'KGU학생부종합',recruit:'52명',comp26:'10.5:1', fill:'56', csat:'없음',cut50:0,cut70:0,grade50:3.33,grade70:3.47,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101015,univ:'경기대학교',dept:'전자공학부',          type:'KGU학생부종합',recruit:'36명',comp26:'12.28:1',fill:'43', csat:'없음',cut50:0,cut70:0,grade50:3.45,grade70:3.54,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101016,univ:'경기대학교',dept:'기계시스템공학과',    type:'KGU학생부종합',recruit:'24명',comp26:'13.71:1',fill:'29', csat:'없음',cut50:0,cut70:0,grade50:3.36,grade70:3.52,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101017,univ:'경기대학교',dept:'사회에너지시스템공학과',type:'KGU학생부종합',recruit:'28명',comp26:'10.18:1',fill:'20',csat:'없음',cut50:0,cut70:0,grade50:3.53,grade70:3.57,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101018,univ:'경기대학교',dept:'신소재화학공학부',    type:'KGU학생부종합',recruit:'28명',comp26:'12.54:1',fill:'21', csat:'없음',cut50:0,cut70:0,grade50:3.33,grade70:3.51,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101019,univ:'경기대학교',dept:'바이오융합학부',      type:'KGU학생부종합',recruit:'28명',comp26:'22.46:1',fill:'15', csat:'없음',cut50:0,cut70:0,grade50:3.12,grade70:3.27,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101020,univ:'경기대학교',dept:'수학과',              type:'KGU학생부종합',recruit:'10명',comp26:'10.6:1', fill:'7',  csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.74,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101021,univ:'경기대학교',dept:'화학과',              type:'KGU학생부종합',recruit:'12명',comp26:'12.83:1',fill:'15', csat:'없음',cut50:0,cut70:0,grade50:3.27,grade70:3.40,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  // ─── 예술체육대학 ───
+  {id:101022,univ:'경기대학교',dept:'디자인비즈학부',      type:'KGU학생부종합',recruit:'24명',comp26:'15.25:1',fill:'16', csat:'없음',cut50:0,cut70:0,grade50:3.77,grade70:3.93,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'예체능'},
+  {id:101023,univ:'경기대학교',dept:'스마트시티공학부',    type:'KGU학생부종합',recruit:'24명',comp26:'14.5:1', fill:'30', csat:'없음',cut50:0,cut70:0,grade50:3.77,grade70:3.84,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'자연·공학'},
+  {id:101024,univ:'경기대학교',dept:'건축학과',            type:'KGU학생부종합',recruit:'13명',comp26:'22.62:1',fill:'8',  csat:'없음',cut50:0,cut70:0,grade50:3.28,grade70:3.34,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠·5년제',calcMode:'jh',major:'자연·공학'},
+  {id:101025,univ:'경기대학교',dept:'FineArts학부',        type:'KGU학생부종합',recruit:'12명',comp26:'6.75:1', fill:'5',  csat:'없음',cut50:0,cut70:0,grade50:4.20,grade70:4.30,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠·실기반영',calcMode:'jh',major:'예체능'},
+  {id:101026,univ:'경기대학교',dept:'유아교육과',          type:'KGU학생부종합',recruit:'10명',comp26:'15.2:1', fill:'17', csat:'없음',cut50:0,cut70:0,grade50:3.45,grade70:3.82,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'수원캠',calcMode:'jh',major:'교육'},
+
+  // ── 경기대학교 SW우수자전형 (2027모집요강+2026실입결) ──
+  // ── 1단계 서류100%(3배수)→2단계 서류70%+면접30% / 수능최저 없음 / 소프트웨어 관심자 ──
+  {id:101051,univ:'경기대학교',dept:'AI컴퓨터공학부',      type:'SW우수자',     recruit:'15명',comp26:'13.67:1',fill:'19', csat:'없음',cut50:0,cut70:0,grade50:3.72,grade70:3.81,method:'1단계 서류100%(3배수)→2단계 서류70%+면접30%',note:'SW관심자특기자전형',calcMode:'jh',major:'자연·공학'},
+
 ];
 
 function jh_getRegion(u){var s=['서울대','연세대','고려대','서강대','성균관대','한양대','중앙대','경희대','이화여대','숙명여대','홍익대','건국대','동국대','국민대','숭실대','세종대','광운대','한국외국어대'];var m=['인하대','아주대','가천대','단국대','경기대','인천대','가톨릭대'];var g=['경북대','부산대','전남대','전북대','충남대','충북대','강원대','제주대','경상국립대'];if(s.some(function(k){return u.includes(k.replace('대학교','').replace('대',''));}))return '서울';if(m.some(function(k){return u.includes(k.replace('대학교','').replace('대','').split('(')[0]);}))return '수도권';if(g.some(function(k){return u.includes(k.replace('대학교','').replace('대','').split('(')[0]);}))return '지방국립';return '지방사립';}
@@ -18696,10 +19616,15 @@ function jh_analyze(){var hasQ=jh_quickMode.active&&(jh_quickMode.all||jh_quickM
   var methodNote=u.methodNote!==undefined?u.methodNote:(u.method||'');
   var evalFocus=u.evalFocus!==undefined?u.evalFocus:'';
   var note=u.note!==undefined?u.note:'';
+  var eff50=u.cut50>0?u.cut50:(u.grade50||0);
+  var eff70=u.cut70>0?u.cut70:(u.grade70||0);
+  var base2=my>0?jh_classify(my,eff50,eff70):'—';
+  var chance2=jh_applyCorr(base2,corr);
   return Object.assign({},u,{
     interview:interview,intPct:intPct,docPct:docPct,
     methodNote:methodNote,evalFocus:evalFocus,note:note,
-    myGrade:my,baseChance:base,chance:chance,corrected:base!==chance
+    cut50:eff50,cut70:eff70,
+    myGrade:my,baseChance:base2,chance:chance2,corrected:base2!==chance2
   });
 }).sort(function(a,b){return((ORD[a.chance]||5)-(ORD[b.chance]||5))||a.cut50-b.cut50;});jh_renderResult();jh_updateStats();var sg=document.getElementById('jh-stat-grid');if(sg)sg.style.display='grid';}
 function jh_updateStats(){['도전','상향','적정','안정','하향'].forEach(function(k){var el=document.getElementById('jh-cnt-'+k);if(el)el.textContent=jh_lastResults.filter(function(r){return r.chance===k;}).length;});}
@@ -18820,6 +19745,7 @@ function jh_print(sid){
       +'<td style="padding:6px 8px;font-size:10px;font-weight:700">'+r.univ+'</td>'
       +'<td style="padding:6px 5px;font-size:10px">'+r.dept+'</td>'
       +'<td style="padding:6px 5px;font-size:10px;text-align:center"><span style="display:inline-block;padding:2px 6px;border-radius:8px;background:#ede9fe;color:#6d28d9;font-size:9px;font-weight:700">'+r.type+'</span></td>'
+      +'<td style="padding:6px 5px;font-size:10px;text-align:center;font-weight:700;color:#1e40af">'+(r.recruit||'—')+'</td>'
       +'<td style="padding:6px 5px;font-size:10px;text-align:center">'+(r.interview==='있음'?'🎤 있음':'📄 없음')+'</td>'
       +'<td style="padding:6px 5px;font-size:10px;text-align:center">'+(r.csat&&r.csat!=='없음'?'<span style="color:#9a3412">'+r.csat+'</span>':'없음')+'</td>'
       +'<td style="padding:6px 5px;font-size:9px;color:#64748b;max-width:160px">'+(r.methodNote||'—')+'</td>'
@@ -18854,6 +19780,7 @@ function jh_print(sid){
       +'<th style="min-width:80px;text-align:left">대학명</th>'
       +'<th style="min-width:90px">학과</th>'
       +'<th>전형</th>'
+      +'<th>모집<br>인원</th>'
       +'<th>면접</th>'
       +'<th>수능최저</th>'
       +'<th style="min-width:130px">선발방법</th>'
