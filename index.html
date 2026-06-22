@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
- <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -470,7 +443,21 @@ async function fbLoadAll_all(){
           return sc.includes(curName);
         });
       }
-      ST.students = filteredStudents;
+      // ★ 수정: 저장 중인 학생(_savingIds)은 Firebase 구데이터로 덮어쓰지 않음
+      // weeklyInspect 등 입력 중인 데이터가 onSnapshot으로 초기화되는 현상 방지
+      const _saving = ST._savingIds || new Set();
+      if(_saving.size > 0){
+        ST.students = filteredStudents.map(fs=>{
+          if(_saving.has(String(fs.id))){
+            // 저장 중인 학생: 현재 메모리의 최신 데이터 유지 (Firebase 구데이터 무시)
+            const cur=ST.students.find(x=>String(x.id)===String(fs.id));
+            return cur||fs;
+          }
+          return fs;
+        });
+      } else {
+        ST.students = filteredStudents;
+      }
       if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel.id))||ST.sel;
       if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel.id))||ST.adminSel;
     }
@@ -6380,28 +6367,34 @@ function renderAchieve(s){
   const overallPct=tots.p&&tots.r?Math.round(tots.r/tots.p*100):null;
 
   window._saveInspect=(wk,subj,field,val)=>{
-    const s2=ST.sel||ST.adminSel;
+    // ★ 최신 학생 데이터를 참조 (render 후 s2가 구버전일 수 있으므로 ST에서 직접 조회)
+    const _sid=String((ST.sel||ST.adminSel)?.id);
+    const s2=ST.students.find(x=>String(x.id)===_sid)||(ST.sel||ST.adminSel);
+    if(!s2){console.warn('_saveInspect: 학생 없음');return;}
+    // ★ 깊은 복사로 weeklyInspect 전체 보존 (다른 wk 데이터 날아가지 않게)
     const wi=JSON.parse(JSON.stringify(s2.weeklyInspect||{}));
     if(!wi[wk])wi[wk]={};if(!wi[wk][subj])wi[wk][subj]={};
     wi[wk][subj][field]=val;
     const u={...s2,weeklyInspect:wi};
-    ST.students=ST.students.map(x=>x.id===s2.id?u:x);
-    if(String(ST.sel?.id)===String(s2.id))ST.sel=u;
-    if(ST.adminSel?.id===s2.id)ST.adminSel=u;
-    const sid2=String(u.id);
-    // onSnapshot 덮어쓰기 즉시 차단 (입력 중 Firebase에서 옛 데이터로 덮어쓰는 것 방지)
+    // ST 전체 갱신
+    ST.students=ST.students.map(x=>String(x.id)===_sid?u:x);
+    if(String(ST.sel?.id)===_sid) ST.sel=u;
+    if(String(ST.adminSel?.id)===_sid) ST.adminSel=u;
+    const sid2=_sid;
+    // onSnapshot 덮어쓰기 차단 (입력 중 Firebase 구데이터로 덮어쓰는 것 방지)
     if(!ST._savingIds) ST._savingIds=new Set();
     ST._savingIds.add(sid2);
-    // Firebase 저장은 디바운스 처리: 슬라이더 드래그/연속 타이핑 시마다 즉시 저장하면
-    // onSnapshot이 매번 render()를 호출해 화면이 떨리고 입력 포커스가 풀리는 문제가 발생함
+    // Firebase 저장 디바운스 (슬라이더 드래그/연속 타이핑 최적화)
     if(!ST._inspectFbTimers) ST._inspectFbTimers={};
     clearTimeout(ST._inspectFbTimers[sid2]);
     ST._inspectFbTimers[sid2]=setTimeout(()=>{
       if(FB_USE()){
+        // ★ 저장 시점의 최신 데이터로 저장 (디바운스 중 변경사항 누락 방지)
         const cur=ST.students.find(x=>String(x.id)===sid2);
         if(cur) fbSave('students', cur.id, cur);
       }
-      setTimeout(()=>{if(ST._savingIds) ST._savingIds.delete(sid2);},2000);
+      // 저장 완료 후 차단 해제 (3초 - Firebase 왕복 시간 고려)
+      setTimeout(()=>{if(ST._savingIds) ST._savingIds.delete(sid2);},3000);
     },800);
     save();
   };
@@ -6632,7 +6625,7 @@ function renderAchieve(s){
           +'<div style="font-size:11px;font-weight:700;color:#1a1a2e">✅ 플랜 달성도</div>'
           +'<span style="font-size:16px;font-weight:900;color:'+(achPct!=null?(achPct>=80?'#0f9d58':achPct>=60?'#f59e0b':'#e53935'):'#ddd')+'" id="ach_d_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'">'+(achPct!=null?achPct+'%':'–')+'</span>'
           +'</div>'
-          +'<input type="range" min="1" max="100" step="1" value="'+(achPct!=null?achPct:50)+'"'
+          +'<input type="range" min="0" max="100" step="1" value="'+(achPct!=null?achPct:0)+'"'
           +' style="width:100%;accent-color:'+(achPct!=null?(achPct>=80?'#0f9d58':achPct>=60?'#f59e0b':'#e53935'):'#8b5cf6')+';cursor:pointer"'
           +' oninput="event.stopPropagation();const v=+this.value;window._saveInspect(\''+wKey+'\',\''+insKey.replace(/'/g,"\\'")+'\',\'achievementPct\',v);const el=document.getElementById(\'ach_d_'+insKey.replace(/[^a-zA-Z0-9가-힣]/g,'_')+'\');if(el){el.textContent=v+\'%\';el.style.color=v>=80?\'#0f9d58\':v>=60?\'#f59e0b\':\'#e53935\';}this.style.accentColor=v>=80?\'#0f9d58\':v>=60?\'#f59e0b\':\'#e53935\';">'
           +'<div style="display:flex;justify-content:space-between;font-size:9px;color:#bbb;margin-top:2px"><span>1%</span><span>100%</span></div>'
@@ -6759,10 +6752,10 @@ function printAchieve(sid){
   const tots=studySubjs.reduce((a,subj)=>{const v=inspect[subj]||{};a.p+=stats[subj]||0;a.r+=(+v.actual||0);return a;},{p:0,r:0});
   const overallPct=tots.p&&tots.r?Math.round(tots.r/tots.p*100):null;
 
-  // 시간표 미니뷰
+  // 시간표 미니뷰 - 타임테이블에 실제 입력된 데이터가 있을 때만 시간표 표시
   const usedH=[...new Set(Object.keys(plan).map(k=>+k.split('-')[1]))].filter(n=>!isNaN(n)).sort((a,b)=>a-b);
-  const minH=usedH[0]??6,maxH=usedH[usedH.length-1]??23;
-  const ph=[];for(let h=minH;h<=maxH;h++)ph.push(h);
+  // ★ 수정: usedH가 비어있으면(타임테이블 미입력) ph도 비워서 인쇄 시 빈 표 안 나오게
+  const ph=usedH.length>0?(()=>{const minH=usedH[0],maxH=usedH[usedH.length-1];const arr=[];for(let h=minH;h<=maxH;h++)arr.push(h);return arr;})():[];
 
   let body=`<div class="info-box" style="margin-bottom:18px">
     <div class="info-box-main">
