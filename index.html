@@ -1,37 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- v1782313445 -->
+<!-- v1782314687 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -417,6 +390,37 @@ function _gg_sortSubjs(subjs, student){
   return [...inOrder, ...notInOrder];
 }
 
+
+// ★ weeklyInspect 키 마이그레이션: counselDate 키 → wKey 키로 변환
+// 수정중22~26에서 counselDate를 키로 사용한 데이터를 wKey 기반으로 통일
+function _gg_migrateInspectKeys(student){
+  const wi = student.weeklyInspect || {};
+  const pm = student.weeklyStrategyPeriod || {};
+  const wkeyPat = /^\d{4}-\d{2}-[Ww]\d+$/;
+  const datePat = /^\d{4}-\d{2}-\d{2}$/;
+  
+  let changed = false;
+  const newWi = JSON.parse(JSON.stringify(wi));
+  
+  Object.keys(wi).forEach(function(key){
+    if(datePat.test(key)){
+      // counselDate 형식의 키 발견 → wKey로 변환
+      const pe = pm[key];
+      const targetWk = (pe && pe._wKey) || null;
+      if(targetWk && wkeyPat.test(targetWk)){
+        // wKey로 병합 (기존 wKey 데이터와 합치기, 새 데이터 우선)
+        newWi[targetWk] = Object.assign({}, wi[key], newWi[targetWk]||{});
+        delete newWi[key];
+        changed = true;
+        console.log('[SG] weeklyInspect 키 마이그레이션:', key, '→', targetWk);
+      }
+    }
+  });
+  
+  if(!changed) return student;
+  return Object.assign({}, student, {weeklyInspect: newWi});
+}
+
 async function fbSave(col, id, data){
   if(!FB_USE()) return;
   try{
@@ -547,7 +551,10 @@ async function fbLoadAll_all(){
           const fbUp = fs._updatedAt||0;
           // ★ 로컬이 최신이거나 같은 경우 핵심 필드는 로컬 우선
           // (같은 _updatedAt: _saveInspect가 직접 ST 수정 후 Firebase 저장 중인 경우)
-          if(localUp < fbUp) return fs; // Firebase가 확실히 최신 → Firebase 사용
+          if(localUp < fbUp){
+            // Firebase가 확실히 최신 → Firebase 사용 (단, weeklyInspect는 마이그레이션)
+            return _gg_migrateInspectKeys(fs);
+          }
           // 로컬이 최신이거나 동일 → 핵심 필드는 로컬 유지
           const merged = Object.assign({}, fs);
           _kf2.forEach(function(f){
@@ -1648,21 +1655,38 @@ function doLogout(){
 function renderMain(){
   const isAdmin = ST.currentUser?.role==='admin';
   const isOrgAdmin = ST.currentUser?.role==='orgAdmin';
-  // ★ 최초 렌더 시 weeklySubjOrder 마이그레이션 (1회)
+  // ★ 최초 렌더 시 마이그레이션 (1회)
   if(!ST._orderMigrated){
     ST._orderMigrated = true;
     let _omChanged = false;
     ST.students = ST.students.map(function(fs){
+      let changed = false;
+      // 1) weeklySubjOrder 자동 생성
       if(!fs.weeklySubjOrder || !fs.weeklySubjOrder.length){
         const spKeys = Object.keys(_gg_getSubjPlans(fs)).filter(Boolean);
         if(spKeys.length > 0){
-          _omChanged = true;
-          return Object.assign({}, fs, {weeklySubjOrder: spKeys});
+          fs = Object.assign({}, fs, {weeklySubjOrder: spKeys});
+          changed = true;
         }
       }
+      // 2) weeklyInspect 키 마이그레이션 (counselDate → wKey)
+      const migratedFs = _gg_migrateInspectKeys(fs);
+      if(migratedFs !== fs){ fs = migratedFs; changed = true; }
+      if(changed) _omChanged = true;
       return fs;
     });
-    if(_omChanged){ save(); console.log('[SG] weeklySubjOrder 마이그레이션 완료'); }
+    if(_omChanged){
+      // Firebase에도 즉시 반영 (마이그레이션 완료 데이터 업로드)
+      if(FB_USE()){
+        ST.students.forEach(function(fs){
+          if(fs.weeklyInspect && Object.keys(fs.weeklyInspect).some(k=>/^\d{4}-\d{2}-\d{2}$/.test(k))){
+            fbSave('students', fs.id, fs);
+          }
+        });
+      }
+      save();
+      console.log('[SG] 마이그레이션 완료 (weeklySubjOrder + weeklyInspect 키 정리)');
+    }
   }
   // 기관 필터 반영한 선생님 목록
   const filteredTeachers = isAdmin
@@ -13890,9 +13914,9 @@ function startRealtimeSync(){
                 merged[f] = JSON.stringify(lv).length >= JSON.stringify(fv).length ? lv : fv;
               } else if(lv !== undefined){ merged[f] = lv; }
             });
-            ST.students[idx] = merged;
+            ST.students[idx] = _gg_migrateInspectKeys(merged);
           } else {
-            ST.students[idx] = fbStudent;
+            ST.students[idx] = _gg_migrateInspectKeys(fbStudent);
           }
         } else {
           ST.students.push(fbStudent);
