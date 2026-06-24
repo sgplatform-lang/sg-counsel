@@ -1,37 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- v1779775244 -->
+<!-- v1782296472 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -363,6 +336,84 @@ try{
 // ══ Firebase 동기화 ══
 const FB_USE = ()=>window._fbReady && window._fb;
 
+
+// ═══════════════════════════════════════════════════════
+// ★ 학습전략(weeklySubjPlans) 주차별 독립 저장 헬퍼 함수
+// 구조: {wKey: {과목:데이터}} (신규) 또는 {과목:데이터} (구버전)
+// 구버전 자동 마이그레이션: 구버전 데이터를 읽을 때 현재 wKey로 매핑
+// ═══════════════════════════════════════════════════════
+function _gg_isWkeyFormat(obj){
+  // wKey 형식: "YYYY-MM-WN"
+  const keys=Object.keys(obj||{});
+  if(!keys.length) return false;
+  return keys.some(k=>/^\d{4}-\d{2}-W\d+$/.test(k));
+}
+function _gg_getSubjPlanForWk(allSp, wKey){
+  if(!allSp||!wKey) return {};
+  if(_gg_isWkeyFormat(allSp)){
+    // 신규 구조: wKey 직접 읽기
+    return allSp[wKey]||{};
+  } else {
+    // 구버전: 전체가 과목:{} 구조 → 현재 wKey로 반환 (읽기만, 저장 시 마이그레이션)
+    return allSp;
+  }
+}
+function _gg_setSubjPlanForWk(allSp, wKey, wkData){
+  if(!wKey) return allSp;
+  if(_gg_isWkeyFormat(allSp)){
+    // 신규 구조: wKey에 저장
+    return Object.assign({}, allSp, {[wKey]: wkData});
+  } else {
+    // 구버전 → 마이그레이션: 기존 데이터를 현재 wKey로 옮기고 새 구조로 변환
+    // 기존 데이터(과목:{}) → {oldWk: 기존데이터, wKey: 새데이터}
+    // 단, 기존 데이터가 비어있으면 그냥 신규 구조로만 저장
+    const migratedObj = {};
+    const oldKeys = Object.keys(allSp||{});
+    if(oldKeys.length > 0){
+      // 구버전 데이터가 있으면 현재 wKey 이전 주차로 마이그레이션
+      // (어느 주차인지 알 수 없으므로 현재 wKey-1주 또는 현재 wKey에 병합)
+      // 가장 안전: 구버전 전체를 wKey 데이터의 베이스로 사용하되, 새 wkData로 override
+      migratedObj[wKey] = Object.assign({}, allSp, wkData);
+    } else {
+      migratedObj[wKey] = wkData;
+    }
+    return migratedObj;
+  }
+}
+// ★ 과목 학습전략 삭제 (현재 주차 wKey만 삭제)
+function _gg_deleteSubjCond(subj){
+  if(!confirm(subj+' 학습조건을 삭제할까요?')) return;
+  const stu=ST.sel||ST.adminSel;
+  if(!stu) return;
+  const _dn=new Date();
+  const _dwk=getWeekNum(
+    ST.weekYear||_dn.getFullYear(),
+    ST.weekMonth||(_dn.getMonth()+1),
+    ST.weekWeek||getWeekOfMonth(_dn.getFullYear(),_dn.getMonth()+1,_dn.getDate())
+  );
+  const _dAllSp=JSON.parse(JSON.stringify(stu.weeklySubjPlans||{}));
+  const _dWkSp=_gg_getSubjPlanForWk(_dAllSp,_dwk);
+  delete _dWkSp[subj];
+  const _dNewSp=_gg_setSubjPlanForWk(_dAllSp,_dwk,_dWkSp);
+  upd({...stu,weeklySubjPlans:_dNewSp});
+}
+
+// ★ 기존 데이터 완전 마이그레이션: 학생 저장 시 자동 호출
+function _gg_migrateSubjPlans(student){
+  const allSp = student.weeklySubjPlans||{};
+  if(!allSp || Object.keys(allSp).length===0) return student;
+  if(_gg_isWkeyFormat(allSp)) return student; // 이미 신규 구조
+  // 구버전: 현재 주차 wKey로 마이그레이션
+  const now=new Date();
+  const cy=now.getFullYear(),cm=now.getMonth()+1;
+  const cw=getWeekOfMonth(cy,cm,now.getDate());
+  const wKey=getWeekNum(cy,cm,cw);
+  // weeklyHistory의 subjPlans는 이미 snapshot이므로 그대로 유지
+  // 현재 weeklySubjPlans(구버전)만 wKey 기반으로 변환
+  const newSp = {[wKey]: Object.assign({},allSp)};
+  return Object.assign({},student,{weeklySubjPlans:newSp});
+}
+
 async function fbSave(col, id, data){
   if(!FB_USE()) return;
   try{
@@ -483,7 +534,13 @@ async function fbLoadAll_all(){
           return fs;
         });
       } else {
-        ST.students = filteredStudents;
+        // ★ Firebase 로드 시 weeklySubjPlans 구버전 자동 마이그레이션
+        ST.students = filteredStudents.map(fs=>{
+          if(fs.weeklySubjPlans && !_gg_isWkeyFormat(fs.weeklySubjPlans) && Object.keys(fs.weeklySubjPlans).length>0){
+            return _gg_migrateSubjPlans(fs);
+          }
+          return fs;
+        });
       }
       if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel.id))||ST.sel;
       if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel.id))||ST.adminSel;
@@ -1179,6 +1236,10 @@ function clearWeeklyPlan(){
   }
 }
 function upd(s){
+  // ★ weeklySubjPlans 구버전 → 주차별 구조 자동 마이그레이션
+  if(s.weeklySubjPlans && !_gg_isWkeyFormat(s.weeklySubjPlans) && Object.keys(s.weeklySubjPlans).length>0){
+    s=_gg_migrateSubjPlans(s);
+  }
   // 이 학생 ID만 일시적으로 onSnapshot 차단 (race condition 방지)
   if(!ST._savingIds) ST._savingIds=new Set();
   ST._savingIds.add(String(s.id));
@@ -1566,6 +1627,22 @@ function doLogout(){
 function renderMain(){
   const isAdmin = ST.currentUser?.role==='admin';
   const isOrgAdmin = ST.currentUser?.role==='orgAdmin';
+  // ★ 최초 렌더 시 localStorage 학생 데이터 weeklySubjPlans 마이그레이션 (1회만)
+  if(!ST._subjPlansMigrated){
+    ST._subjPlansMigrated=true;
+    let _migChanged=false;
+    ST.students=ST.students.map(function(fs){
+      if(fs.weeklySubjPlans && !_gg_isWkeyFormat(fs.weeklySubjPlans) && Object.keys(fs.weeklySubjPlans).length>0){
+        _migChanged=true;
+        return _gg_migrateSubjPlans(fs);
+      }
+      return fs;
+    });
+    if(_migChanged){
+      save(); // 마이그레이션 결과 즉시 저장
+      console.log('[SG] weeklySubjPlans 주차별 구조로 마이그레이션 완료');
+    }
+  }
   // 기관 필터 반영한 선생님 목록
   const filteredTeachers = isAdmin
     ? (ST.filterOrg&&ST.filterOrg!=='전체'&&ST.filterOrg!=='기관없음'
@@ -5624,7 +5701,7 @@ function ttCellClick(dayIdx, hour, wy, wm, ww){
     if(isNow){
       var p3 = Object.assign({}, s.weeklyPlan||{});
       var b3 = Object.assign({}, s.weeklyBookMap||{});
-      var sp = ((s.weeklySubjPlans||{})[ST.weekSubj]||{});
+      var sp = (_gg_getSubjPlanForWk(s.weeklySubjPlans||{},curKey2)[ST.weekSubj]||{});
       // ST.weekBook이 선택된 경우 우선 사용, 없으면 첫 번째 교재
       var bk = ST.weekBook!==undefined && ST.weekBook!=='' ? ST.weekBook : ((sp.bookDetails||[]).filter(function(d){return d.name;})[0]?.name || (sp.books||[]).filter(function(x){return !!x;})[0]||'');
       hrs.forEach(function(hh){ p3[day+'-'+hh]=ST.weekSubj; if(bk)b3[day+'-'+hh]=bk; });
@@ -5635,7 +5712,7 @@ function ttCellClick(dayIdx, hour, wy, wm, ww){
       var entry = hi2>=0 ? Object.assign({},hist2[hi2]) : {year:wy,month:wm,weekNum:ww,date:wy+'-'+String(wm).padStart(2,'0'),plan:{},bookMap:{}};
       var p4 = Object.assign({}, entry.plan||{});
       var b4 = Object.assign({}, entry.bookMap||{});
-      var sp4 = ((s.weeklySubjPlans||{})[ST.weekSubj]||{});
+      var sp4 = (_gg_getSubjPlanForWk(s.weeklySubjPlans||{},getWeekNum(wy,wm,ww))[ST.weekSubj]||{});
       var bk4 = ST.weekBook!==undefined && ST.weekBook!=='' ? ST.weekBook : ((sp4.bookDetails||[]).filter(function(d){return d.name;})[0]?.name || (sp4.books||[]).filter(function(x){return !!x;})[0]||'');
       hrs.forEach(function(hh){ p4[day+'-'+hh]=ST.weekSubj; if(bk4)b4[day+'-'+hh]=bk4; });
       entry.plan=p4; entry.bookMap=b4;
@@ -5668,12 +5745,20 @@ function renderWeekly(s){
   const planOk = (_pw===curKey);
   const plan=isCurrentWeek?(planOk?(s.weeklyPlan||{}):{}) :((hEntry&&hEntry.plan)||{});
   const bm=isCurrentWeek?(planOk?(s.weeklyBookMap||{}):{}) :((hEntry&&hEntry.bookMap)||{});
-  const subjPlans=isCurrentWeek?(s.weeklySubjPlans||{}):(hEntry&&hEntry.subjPlans)||{};
+  // ★ 학습전략 fallback: 현재 wKey 없으면 최근 데이터 사용
+  const subjPlans=(()=>{
+    const _asp=s.weeklySubjPlans||{};
+    const _wksp=_gg_getSubjPlanForWk(_asp,wKey);
+    if(!isCurrentWeek) return (hEntry&&hEntry.subjPlans)||_wksp||{};
+    if(Object.keys(_wksp).length>0) return _wksp;
+    if(_gg_isWkeyFormat(_asp)){const _wks=Object.keys(_asp).sort().reverse();for(const k of _wks){if(Object.keys(_asp[k]||{}).length>0)return _asp[k];}}
+    return (!_gg_isWkeyFormat(_asp)&&Object.keys(_asp).length>0)?_asp:{};
+  })();
   const achieve=(s.weeklyAchieve||{})[wKey]||{};
 
   const extraSubjs=s.extraSubjs||[];
   // 학습전략에 등록된 과목도 탭에 포함 (weeklySubjPlans 키 + 현재 주 배정 과목)
-  const condSubjsFromPlan=Object.keys(s.weeklySubjPlans||{}).filter(Boolean);
+  const condSubjsFromPlan=Object.keys(_gg_getSubjPlanForWk(s.weeklySubjPlans||{},wKey)).filter(Boolean);
   const allSubjs=[...new Set([...Object.keys(SC),...extraSubjs,...condSubjsFromPlan])];
   if(!ST.weekSubj||!allSubjs.includes(ST.weekSubj)) ST.weekSubj=allSubjs[0]||'국어';
   const stats={};Object.values(plan).forEach(x=>{stats[x]=(stats[x]||0)+1;});
@@ -5756,7 +5841,7 @@ function renderWeekly(s){
     +'<div style="display:flex;flex-wrap:wrap;gap:5px">'+subjBtns+'</div>'
     +(()=>{
       const _s2=ST.sel||ST.adminSel;
-      const _sp2=(_s2&&_s2.weeklySubjPlans||{})[ST.weekSubj]||{};
+      const _sp2=(_gg_getSubjPlanForWk((_s2&&_s2.weeklySubjPlans)||{},wKey)[ST.weekSubj]||{});
       const _bd2=(_sp2.bookDetails||[]).filter(function(d){return d.name;});
       const _bks2=(_sp2.books||[]).filter(Boolean);
       const _allBooks=[...new Set([..._bd2.map(function(d){return d.name;}), ..._bks2])];
@@ -6224,7 +6309,7 @@ function saveWeeklyHistory(sid){
     year, month, weekNum,
     plan: {...(s.weeklyPlan||{})},
     bookMap: {...(s.weeklyBookMap||{})},
-    subjPlans: JSON.parse(JSON.stringify(s.weeklySubjPlans||{})),
+    subjPlans: JSON.parse(JSON.stringify(_gg_getSubjPlanForWk(s.weeklySubjPlans||{},wKey))),
     memo,
   };
 
@@ -6384,7 +6469,7 @@ function renderWeeklyHistory(s){
               <span style="font-size:11px;color:#555;font-weight:600">${hTotal}h</span>
             </div>
             <div style="display:flex;gap:5px;align-items:center">
-              <button onclick="event.stopPropagation();if(confirm('이 이력을 현재 학습플랜으로 불러올까요?')){upd({...ST.sel,weeklyPlan:{...h.plan},weeklyBookMap:{...h.bookMap},weeklySubjPlans:JSON.parse(JSON.stringify(h.subjPlans||{}))});ST.weekTab='tt';render();alert('불러오기 완료!')};"
+              <button onclick="event.stopPropagation();if(confirm('이 이력을 현재 학습플랜으로 불러올까요?')){upd({...ST.sel,weeklyPlan:{...h.plan},weeklyBookMap:{...h.bookMap},weeklySubjPlans:(function(){var _lhWk=getWeekNum(ST.weekYear||(new Date().getFullYear()),ST.weekMonth||((new Date().getMonth()+1)),ST.weekWeek||getWeekOfMonth((new Date().getFullYear()),(new Date().getMonth()+1),(new Date().getDate())));return _gg_setSubjPlanForWk((ST.sel||{}).weeklySubjPlans||{},_lhWk,JSON.parse(JSON.stringify(h.subjPlans||{})));})() });ST.weekTab='tt';render();alert('불러오기 완료!')};"
                 style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">📥 불러오기</button>
               <button onclick="event.stopPropagation();printWeeklyHistoryOne(${s.id},${h.id})"
                 style="background:#f0fdf4;color:#0f9d58;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">🖨️ 인쇄</button>
@@ -6452,13 +6537,26 @@ function renderAchieve(s){
   const _rwPlanOk=(s._planWeek||'')===_rwCurKey;
   const plan=isCurrentWeek?(_rwPlanOk?(s.weeklyPlan||{}):{}):(hEntry?.plan||{});
   const bm=isCurrentWeek?(_rwPlanOk?(s.weeklyBookMap||{}):{}):(hEntry?.bookMap||{});
-  // ★ 수정: 타임테이블 미작성(planOk=false)이어도 학습전략 과목/교재가 플랜점검에 표시되도록
-  // 현재 주차: 항상 s.weeklySubjPlans 사용 (타임테이블 저장 여부 무관)
-  // 이전 주차: 이력의 subjPlans 사용하되, 현재 학습전략도 보조 포함
-  const subjPlans=isCurrentWeek?(s.weeklySubjPlans||{}):(hEntry?.subjPlans||s.weeklySubjPlans||{});
+  // ★ 현재 주차 학습전략 읽기 (wKey 기반)
+  // fallback: wKey에 데이터 없으면 → 가장 최근 저장된 주차 데이터 사용 (마이그레이션 전 대비)
+  const _rawAllSp = s.weeklySubjPlans||{};
+  const _rawWkSp = _gg_getSubjPlanForWk(_rawAllSp, wKey);
+  const _fallbackSp = (()=>{
+    if(Object.keys(_rawWkSp).length>0) return _rawWkSp;
+    // wKey 데이터 없음 → weeklyHistory에서 가장 가까운 subjPlans 찾기
+    if(isCurrentWeek && _gg_isWkeyFormat(_rawAllSp)){
+      // 신규구조인데 현재 wKey 없음 → 가장 최근 wKey 데이터
+      const wkKeys=Object.keys(_rawAllSp).sort().reverse();
+      for(const k of wkKeys){if(Object.keys(_rawAllSp[k]||{}).length>0) return _rawAllSp[k];}
+    }
+    // 구버전이면 그대로 반환
+    if(!_gg_isWkeyFormat(_rawAllSp) && Object.keys(_rawAllSp).length>0) return _rawAllSp;
+    return {};
+  })();
+  const subjPlans = isCurrentWeek ? _fallbackSp : (hEntry?.subjPlans||_fallbackSp||{});
   const stats={};Object.values(plan).forEach(x=>{stats[x]=(stats[x]||0)+1;});
   // 타임테이블 과목 + 학습전략에 등록된 과목 합집합 (시간표 미배정 과목도 점검 가능)
-  const _condSubjs=Object.keys(s.weeklySubjPlans||{}).filter(Boolean);
+  const _condSubjs=Object.keys(_fallbackSp).filter(Boolean);
   const _histCondSubjs=(hEntry?.subjPlans)?Object.keys(hEntry.subjPlans).filter(Boolean):[];
   const studySubjs=[...new Set([...Object.keys(stats).filter(x=>x!=='휴식'&&x!=='자습'),..._condSubjs,...(isCurrentWeek?[]:_histCondSubjs)])];
   // ★ 학습전략 과목이 있고 타임테이블 미배정인 경우 안내 표시 여부
@@ -6869,11 +6967,20 @@ function printAchieve(sid){
   const _paPlanOk=(s._planWeek||'')===_paCurKey;
   const plan=isCurrentWeek?(_paPlanOk?(s.weeklyPlan||{}):{}):(hEntry?.plan||{});
   // ★ 수정: 인쇄에서도 타임테이블 미작성시 학습전략 과목 포함
-  const subjPlans=isCurrentWeek?(s.weeklySubjPlans||{}):(hEntry?.subjPlans||s.weeklySubjPlans||{});
+  // ★ 인쇄용 학습전략 fallback
+  const _paRawAllSp=s.weeklySubjPlans||{};
+  const _paFallbackSp=(()=>{
+    const _wksp=_gg_getSubjPlanForWk(_paRawAllSp,wKey);
+    if(!isCurrentWeek) return hEntry?.subjPlans||_wksp||{};
+    if(Object.keys(_wksp).length>0) return _wksp;
+    if(_gg_isWkeyFormat(_paRawAllSp)){const _wks=Object.keys(_paRawAllSp).sort().reverse();for(const k of _wks){if(Object.keys(_paRawAllSp[k]||{}).length>0)return _paRawAllSp[k];}}
+    return (!_gg_isWkeyFormat(_paRawAllSp)&&Object.keys(_paRawAllSp).length>0)?_paRawAllSp:{};
+  })();
+  const subjPlans=_paFallbackSp;
   const bm=isCurrentWeek?(_paPlanOk?(s.weeklyBookMap||{}):{}):(hEntry?.bookMap||{});
   const stats={};Object.values(plan).forEach(x=>{stats[x]=(stats[x]||0)+1;});
   // 타임테이블 + 학습전략 등록 과목 합집합
-  const _pCondSubjs=Object.keys(s.weeklySubjPlans||{}).filter(Boolean);
+  const _pCondSubjs=Object.keys(_paFallbackSp).filter(Boolean);
   const _pHistCondSubjs=(hEntry?.subjPlans)?Object.keys(hEntry.subjPlans).filter(Boolean):[];
   const studySubjs=[...new Set([...Object.keys(stats).filter(x=>x!=='휴식'&&x!=='자습'),..._pCondSubjs,...(isCurrentWeek?[]:_pHistCondSubjs)])];
   // 교재별 셀 수
@@ -7066,7 +7173,7 @@ function exportAchieveXls(sid){
   const _exCurKey=getWeekNum(_exCy,_exCm,_exCw);
   const _exPlanOk=(s._planWeek||'')===_exCurKey;
   const plan=isCurrentWeek?(_exPlanOk?(s.weeklyPlan||{}):{}):(hEntry?.plan||{});
-  const subjPlans=isCurrentWeek?(_exPlanOk?(s.weeklySubjPlans||{}):{}):(hEntry?.subjPlans||{});
+  const subjPlans=isCurrentWeek?(_exPlanOk?_gg_getSubjPlanForWk(s.weeklySubjPlans||{},wKey):{}):(hEntry?.subjPlans||{});
   const stats={};Object.values(plan).forEach(x=>{stats[x]=(stats[x]||0)+1;});
   const studySubjs=Object.keys(stats).filter(x=>x!=='휴식'&&x!=='자습');
   const inspect=(s.weeklyInspect||{})[wKey]||{};
@@ -7395,7 +7502,10 @@ function renderWeeklyDetail(s){
 
   const stats={};Object.values(plan).forEach(x=>{stats[x]=(stats[x]||0)+1;});
   const usedFromPlan=[...new Set(Object.values(plan))].filter(x=>x&&x!=='휴식'&&x!=='자습');
-  const usedFromCond=Object.keys(s.weeklySubjPlans||{}).filter(Boolean);
+  // ★ wKey 기반: 해당 주차의 학습전략만 읽기
+  const _rdAllSp=s.weeklySubjPlans||{};
+  const _rdWkSp=_gg_getSubjPlanForWk(_rdAllSp, wKey);
+  const usedFromCond=Object.keys(_rdWkSp).filter(Boolean);
   const extraCondOnly=usedFromCond.filter(x=>!usedFromPlan.includes(x));
   const used=[...usedFromPlan,...extraCondOnly];
 
@@ -7538,12 +7648,12 @@ function renderWeeklyDetail(s){
 
   return periodBar+stratHistBar+addSubjBar+used.map(function(subj){
     var col=SC[subj]||'#3b5bdb';
-    var sp=(s.weeklySubjPlans||{})[subj]||{};
+    var sp=_gg_getSubjPlanForWk(s.weeklySubjPlans||{},wKey)[subj]||{};
     var hrs=stats[subj]||0;
     var books=(sp.books||[]).filter(Boolean);
     var cellBooks=[...new Set(Object.entries(bm).filter(function([k]){return plan[k]===subj;}).map(function([,b]){return b;}).filter(Boolean))];
     var isCondOnly=!usedFromPlan.includes(subj);
-    var delBtn=isCondOnly?('<button onclick="if(confirm(\''+subj.replace(/'/g,"\\'")+' 학습조건을 삭제할까요?\')){var stu2=ST.sel||ST.adminSel;var sp3={...(stu2.weeklySubjPlans||{})};delete sp3[\''+subj.replace(/'/g,"\\'")+'\'];upd({...stu2,weeklySubjPlans:sp3});}" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:7px;padding:5px 9px;font-size:10px;font-weight:700;cursor:pointer">🗑</button>'):'';
+    var delBtn=isCondOnly?('<button onclick="_gg_deleteSubjCond(\'' + subj.replace(/'/g,"\\'") + '\')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:7px;padding:5px 9px;font-size:10px;font-weight:700;cursor:pointer">🗑</button>'):'';
     var condTag=isCondOnly?'<span style="font-size:9px;background:#fff3e0;color:#f59e0b;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:4px">시간표 미배정</span>':'';
     // 교재별 상세 카드 표시
     var bookDetails=sp.bookDetails||[];
@@ -7604,7 +7714,12 @@ function renderWeeklyDetail(s){
 function printSubjCond(sid){
   const s=ST.students.find(x=>String(x.id)===String(sid))||ST.sel;
   if(!s)return;
-  const subjPlans=s.weeklySubjPlans||{};
+  // ★ 현재 표시 주차의 학습전략만 출력
+  const _pnow=new Date();const _pcy=_pnow.getFullYear(),_pcm=_pnow.getMonth()+1;
+  const _pcw=getWeekOfMonth(_pcy,_pcm,_pnow.getDate());
+  const _pwy=ST.weekYear||_pcy,_pwm=ST.weekMonth||_pcm,_pww=ST.weekWeek||_pcw;
+  const _pwKey=getWeekNum(_pwy,_pwm,_pww);
+  const subjPlans=_gg_getSubjPlanForWk(s.weeklySubjPlans||{},_pwKey);
   const planSubjs=[...new Set(Object.values(s.weeklyPlan||{}))].filter(x=>x&&x!=='휴식'&&x!=='자습');
   const condSubjs=Object.keys(subjPlans).filter(Boolean);
   const used=[...new Set([...planSubjs,...condSubjs])];
@@ -7861,7 +7976,15 @@ function biToggleType(bi, ti){
 function openSubjModal(subj){
   const col=SC[subj]||'#3b5bdb';
   const student=ST.sel||ST.adminSel;
-  const sp=(student.weeklySubjPlans||{})[subj]||{};
+  // ★ wKey 기반 주차별 독립 저장: 현재 표시 중인 주차의 데이터만 로드
+  const _now0=new Date();
+  const _cy0=_now0.getFullYear(),_cm0=_now0.getMonth()+1;
+  const _cw0=getWeekOfMonth(_cy0,_cm0,_now0.getDate());
+  const _wy=ST.weekYear||_cy0, _wm=ST.weekMonth||_cm0, _ww=ST.weekWeek||_cw0;
+  const _wKey=getWeekNum(_wy,_wm,_ww);
+  const _allSp=student.weeklySubjPlans||{};
+  const _wkSp=_gg_getSubjPlanForWk(_allSp, _wKey);
+  const sp=_wkSp[subj]||{};
   const curBooks=(sp.books||[]).filter(Boolean);
   const curDetails=(sp.bookDetails||[]);
 
@@ -8054,8 +8177,18 @@ function openSubjModal(subj){
     if(!DEFAULT_SUBJS.includes(subjName)&&!newExtra.includes(subjName)){
       newExtra.push(subjName);
     }
+    // ★ wKey 기반 주차별 독립 저장
+    const _snow=new Date();
+    const _scy=_snow.getFullYear(),_scm=_snow.getMonth()+1;
+    const _scw=getWeekOfMonth(_scy,_scm,_snow.getDate());
+    const _swy=ST.weekYear||_scy,_swm=ST.weekMonth||_scm,_sww=ST.weekWeek||_scw;
+    const _swKey=getWeekNum(_swy,_swm,_sww);
+    const _allSpS=stu.weeklySubjPlans||{};
+    const _wkSpS=_gg_getSubjPlanForWk(_allSpS, _swKey);
+    const _newWkSp=Object.assign({},_wkSpS,{[subjName]:Object.assign({},_wkSpS[subjName]||{},newSp)});
+    const _newAllSp=_gg_setSubjPlanForWk(_allSpS, _swKey, _newWkSp);
     upd(Object.assign({},stu,{
-      weeklySubjPlans:Object.assign({},stu.weeklySubjPlans||{},{[subjName]:Object.assign({},(stu.weeklySubjPlans||{})[subjName]||{},newSp)}),
+      weeklySubjPlans:_newAllSp,
       weeklyBookMap:newBm,
       extraSubjs:newExtra
     }));
@@ -8381,7 +8514,7 @@ function printTab(sid,tab){
     // 플랜/교재맵/과목플랜: 현재 주차(planOk일때만) or 이력
     const plan = _printIsCurrentWeek ? (_planOk?(s.weeklyPlan||{}):{}) : ((_printHEntry&&_printHEntry.plan)||{});
     const _printBm = _printIsCurrentWeek ? (_planOk?(s.weeklyBookMap||{}):{}) : ((_printHEntry&&_printHEntry.bookMap)||{});
-    const sp = _printIsCurrentWeek ? (_planOk?(s.weeklySubjPlans||{}):{}) : ((_printHEntry&&_printHEntry.subjPlans)||{});
+    const sp = _printIsCurrentWeek ? (_planOk?_gg_getSubjPlanForWk(s.weeklySubjPlans||{},_printWKey):{}) : ((_printHEntry&&_printHEntry.subjPlans)||{});
     const ws = {}; Object.values(plan).forEach(x=>{ws[x]=(ws[x]||0)+1;});
     const wt = Object.values(plan).length;
     const studyT = Object.entries(ws).filter(([x])=>x!=='휴식').reduce((a,[,v])=>a+v,0);
@@ -13708,6 +13841,27 @@ function startRealtimeSync(){
       if(ST.currentUser){
         const _act=document.activeElement;
         const _hasFocus=_act&&_act!==document.body&&_act.tagName!=='HTML';
+        // ★ 동시접속 화면 리셋 방지: 다른 관리자 변경 시 현재 UI 상태 보존
+        // 현재 선택된 학생이 변경된 학생이 아니면 → 현재 상태 그대로 유지
+        const _curSelId = String(ST.sel?.id||ST.adminSel?.id||'');
+        const _changedAll = (()=>{try{return snap.docChanges().map(c=>c.doc.id);}catch(e){return [];}})();
+        const _onlyOthersChanged = _changedAll.length>0 && !_changedAll.includes(_curSelId);
+        if(_onlyOthersChanged){
+          // 다른 학생만 바뀐 경우 → 사이드바(학생 목록)만 조용히 업데이트, 메인 화면 render() 생략
+          // 사이드바 학생 카드만 교체 (선택된 학생 화면은 건드리지 않음)
+          clearTimeout(window._sidebarRenderTimer);
+          window._sidebarRenderTimer=setTimeout(()=>{
+            try{
+              const _sb=document.querySelector('.sidebar');
+              if(_sb){
+                // 사이드바 내 학생 카드 부분만 선별 업데이트
+                // (전체 render() 없이 학생 목록 표시만 조용히 갱신)
+                window._lastHTML=''; render();
+              }
+            }catch(e){ render(); }
+          }, 1500); // 1.5초 지연으로 현재 입력 보호
+          return;
+        }
         if(_hasFocus){
           clearTimeout(window._studentsRenderTimer);
           window._studentsRenderTimer=setTimeout(()=>{
@@ -13715,6 +13869,7 @@ function startRealtimeSync(){
             if(!_a||_a===document.body||_a.tagName==='HTML'||_a.tagName==='BODY') render();
           },800);
         } else {
+          // 내가 선택한 학생이 다른 기기에서 수정된 경우 → 현재 탭/스크롤 상태 보존하며 render
           render();
         }
       }
@@ -18277,6 +18432,61 @@ var NS_UNIV_DB = [
   {id:200129,univ:'서울시립대학교',dept:'건축학부(건축공학전공)',type:'논술전형',recruit:'3명',comp26:'30.40:1',fill:'',csat:'없음',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'80%',evalMethod:'논술80%+학생부교과20%',note:'수리논술 4문항',nulsulSubject:'수학Ⅰ·Ⅱ, 확률과통계, 미적분, 기하',interviewDate:'10/3(토)',interviewTime:'10:00',cut50:0,cut70:0,grade50:449.00,grade70:0,major:'자연·공학'},
   {id:200130,univ:'서울시립대학교',dept:'교통공학과',          type:'논술전형',recruit:'4명', comp26:'28.33:1',fill:'',csat:'없음',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'80%',evalMethod:'논술80%+학생부교과20%',note:'수리논술 4문항',nulsulSubject:'수학Ⅰ·Ⅱ, 확률과통계, 미적분, 기하',interviewDate:'10/3(토)',interviewTime:'10:00',cut50:0,cut70:0,grade50:495.00,grade70:0,major:'자연·공학'},
   {id:200131,univ:'서울시립대학교',dept:'환경공학부',          type:'논술전형',recruit:'10명',comp26:'31.00:1',fill:'',csat:'없음',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'80%',evalMethod:'논술80%+학생부교과20%',note:'수리논술 4문항',nulsulSubject:'수학Ⅰ·Ⅱ, 확률과통계, 미적분, 기하',interviewDate:'10/3(토)',interviewTime:'10:00',cut50:0,cut70:0,grade50:486.50,grade70:0,major:'자연·공학'},
+
+  // ── 가천대학교 (논술전형 / 2027모집요강+2026실입결) ──
+  // 전형방법: 논술100% / 수능최저: 인문·자연 1개3등급이내, 바이오로직스 2개합5, 의예 3개각1등급, 한의예 2개각1등급, 약학 3개합5
+  // 논술시험일: 의예·한의예·약학 11/29(일), 인문계열·간호·바이오로직스·화공생명배터리 11/30(일), 자연계열 12/1(화)
+  // grade50 = 학생부등급 50%컷, grade70 = 학생부등급 70%컷
+  // 논술점수(150점 만점): nulsulScore50(70%컷), nulsulScore70(90%컷) 참고용
+  // ── 인문계열 ──
+  {id:210001,univ:'가천대학교',dept:'경영학과',              type:'논술',recruit:'45명',comp26:'58.73:1',fill:'4', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.69 논술70%:113 논술90%:111',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.69,grade70:5.23,major:'상경',region:'수도권'},
+  {id:210002,univ:'가천대학교',dept:'회계세무학과',           type:'논술',recruit:'16명',comp26:'42.06:1',fill:'4', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.11 논술70%:108 논술90%:107',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.11,grade70:4.45,major:'상경',region:'수도권'},
+  {id:210003,univ:'가천대학교',dept:'관광경영학과',           type:'논술',recruit:'14명',comp26:'43.38:1',fill:'2', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.39 논술70%:108 논술90%:104',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.39,grade70:4.49,major:'상경',region:'수도권'},
+  {id:210004,univ:'가천대학교',dept:'의료산업경영학과',       type:'논술',recruit:'13명',comp26:'41.08:1',fill:'0', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.59 논술70%:113 논술90%:110.5',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.59,grade70:5.0,major:'상경',region:'수도권'},
+  {id:210005,univ:'가천대학교',dept:'경제학과',              type:'논술',recruit:'15명',comp26:'43.8:1', fill:'1', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.48 논술70%:110 논술90%:104',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.48,grade70:5.22,major:'상경',region:'수도권'},
+  {id:210006,univ:'가천대학교',dept:'응용통계학과',           type:'논술',recruit:'13명',comp26:'41.38:1',fill:'0', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.74 논술70%:116 논술90%:114.5',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.74,grade70:5.28,major:'자연·공학',region:'수도권'},
+  {id:210007,univ:'가천대학교',dept:'심리학과',              type:'논술',recruit:'10명',comp26:'54.9:1', fill:'2', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.81 논술70%:112 논술90%:111',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:3.81,grade70:4.89,major:'인문·사회',region:'수도권'},
+  {id:210008,univ:'가천대학교',dept:'미디어커뮤니케이션학과', type:'논술',recruit:'8명', comp26:'83.75:1',fill:'0', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.72 논술70%:117 논술90%:116',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.72,grade70:4.97,major:'인문·사회',region:'수도권'},
+  {id:210009,univ:'가천대학교',dept:'사회복지학과',           type:'논술',recruit:'12명',comp26:'40.33:1',fill:'1', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.82 논술70%:105.5 논술90%:104',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:3.82,grade70:4.63,major:'인문·사회',region:'수도권'},
+  {id:210010,univ:'가천대학교',dept:'유아교육학과',           type:'논술',recruit:'15명',comp26:'40.0:1', fill:'0', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:5.09 논술70%:115 논술90%:110',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:5.09,grade70:5.36,major:'인문·사회',region:'수도권'},
+  {id:210011,univ:'가천대학교',dept:'패션산업학과',           type:'논술',recruit:'12명',comp26:'44.42:1',fill:'1', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.65 논술70%:120 논술90%:117',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.65,grade70:4.92,major:'인문·사회',region:'수도권'},
+  {id:210012,univ:'가천대학교',dept:'AI인문대학',             type:'논술',recruit:'73명',comp26:'45.2:1', fill:'9', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.67 논술70%:117 논술90%:115',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.67,grade70:5.29,major:'인문·사회',region:'수도권'},
+  {id:210013,univ:'가천대학교',dept:'법과대학',              type:'논술',recruit:'46명',comp26:'42.16:1',fill:'1', csat:'1개3등급이내',nulsulType:'인문',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.56 논술70%:117 논술90%:116',nulsulSubject:'인문계열 논술',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.56,grade70:4.85,major:'인문·사회',region:'수도권'},
+  // ── 자연계열 (자연계) ──
+  {id:210014,univ:'가천대학교',dept:'도시계획·조경학부',       type:'논술',recruit:'21명',comp26:'28.43:1',fill:'6', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.96 논술70%:104.5 논술90%:103',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:3.96,grade70:4.99,major:'자연·공학',region:'수도권'},
+  {id:210015,univ:'가천대학교',dept:'건축학부',              type:'논술',recruit:'20명',comp26:'52.4:1', fill:'2', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.28 논술70%:114 논술90%:111',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.28,grade70:5.46,major:'자연·공학',region:'수도권'},
+  {id:210016,univ:'가천대학교',dept:'건축공학과',             type:'논술',recruit:'14명',comp26:'28.07:1',fill:'5', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.69 논술70%:109 논술90%:105',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.69,grade70:5.07,major:'자연·공학',region:'수도권'},
+  {id:210017,univ:'가천대학교',dept:'화공생명배터리공학부',    type:'논술',recruit:'59명',comp26:'29.65:1',fill:'8', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.17 논술70%:113 논술90%:111.5',nulsulSubject:'자연계열 논술(수학)',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.17,grade70:4.5,major:'자연·공학',region:'수도권'},
+  {id:210018,univ:'가천대학교',dept:'기계공학부',             type:'논술',recruit:'56명',comp26:'32.45:1',fill:'8', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.56 논술70%:112 논술90%:109.5',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.56,grade70:5.12,major:'자연·공학',region:'수도권'},
+  {id:210019,univ:'가천대학교',dept:'건설환경공학과',          type:'논술',recruit:'14명',comp26:'26.43:1',fill:'0', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.71 논술70%:108 논술90%:107',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.71,grade70:5.43,major:'자연·공학',region:'수도권'},
+  {id:210020,univ:'가천대학교',dept:'스마트팩토리학과',        type:'논술',recruit:'18명',comp26:'28.63:1',fill:'4', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.48 논술70%:108 논술90%:105',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.48,grade70:4.8,major:'자연·공학',region:'수도권'},
+  {id:210021,univ:'가천대학교',dept:'신소재공학과',           type:'논술',recruit:'14명',comp26:'35.57:1',fill:'0', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.51 논술70%:111 논술90%:106',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.51,grade70:4.69,major:'자연·공학',region:'수도권'},
+  {id:210022,univ:'가천대학교',dept:'식품생명공학과',          type:'논술',recruit:'14명',comp26:'33.79:1',fill:'4', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.92 논술70%:107 논술90%:106',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:3.92,grade70:4.43,major:'자연·공학',region:'수도권'},
+  {id:210023,univ:'가천대학교',dept:'바이오나노학과',          type:'논술',recruit:'14명',comp26:'29.5:1', fill:'2', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.48 논술70%:113 논술90%:111',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.48,grade70:4.58,major:'자연·공학',region:'수도권'},
+  {id:210024,univ:'가천대학교',dept:'생명과학과',             type:'논술',recruit:'15명',comp26:'39.0:1', fill:'1', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.37 논술70%:107 논술90%:106',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.37,grade70:4.82,major:'자연·공학',region:'수도권'},
+  {id:210025,univ:'가천대학교',dept:'반도체클리학과',          type:'논술',recruit:'13명',comp26:'25.77:1',fill:'2', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.46 논술70%:104 논술90%:102',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.46,grade70:4.64,major:'자연·공학',region:'수도권'},
+  {id:210026,univ:'가천대학교',dept:'화학과',                type:'논술',recruit:'14명',comp26:'27.64:1',fill:'2', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.55 논술70%:108 논술90%:107',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.55,grade70:4.79,major:'자연·공학',region:'수도권'},
+  {id:210027,univ:'가천대학교',dept:'식품영양학과',           type:'논술',recruit:'12명',comp26:'33.33:1',fill:'1', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.16 논술70%:106 논술90%:104',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.16,grade70:4.26,major:'자연·공학',region:'수도권'},
+  {id:210028,univ:'가천대학교',dept:'전기공학과',             type:'논술',recruit:'20명',comp26:'30.75:1',fill:'7', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.97 논술70%:110.5 논술90%:107',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.97,grade70:5.18,major:'자연·공학',region:'수도권'},
+  {id:210029,univ:'가천대학교',dept:'스마트시티학과',          type:'논술',recruit:'16명',comp26:'29.56:1',fill:'3', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.92 논술70%:104 논술90%:101',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:3.92,grade70:4.18,major:'자연·공학',region:'수도권'},
+  {id:210030,univ:'가천대학교',dept:'클라우드공학과',          type:'논술',recruit:'7명', comp26:'77.29:1',fill:'0', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:5.2 논술70%:127 논술90%:124',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:5.2,grade70:5.44,major:'자연·공학',region:'수도권'},
+  {id:210031,univ:'가천대학교',dept:'컴퓨터공학과',           type:'논술',recruit:'41명',comp26:'33.68:1',fill:'12',csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.47 논술70%:109 논술90%:107',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.47,grade70:4.93,major:'자연·공학',region:'수도권'},
+  {id:210032,univ:'가천대학교',dept:'정보보안학과',           type:'논술',recruit:'18명',comp26:'28.17:1',fill:'5', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'2026:정보보호학과→스마트보안학과 명칭변경 / 학생부등급50%:4.44 논술70%:105 논술90%:102',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.44,grade70:4.88,major:'자연·공학',region:'수도권'},
+  {id:210033,univ:'가천대학교',dept:'인공지능학과',           type:'논술',recruit:'45명',comp26:'33.6:1', fill:'12',csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.64 논술70%:107 논술90%:106',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.64,grade70:5.16,major:'자연·공학',region:'수도권'},
+  {id:210034,univ:'가천대학교',dept:'운동재활학과',           type:'논술',recruit:'13명',comp26:'30.54:1',fill:'2', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.83 논술70%:107 논술90%:105',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.83,grade70:5.32,major:'자연·공학',region:'수도권'},
+  {id:210035,univ:'가천대학교',dept:'반도체대학',             type:'논술',recruit:'73명',comp26:'33.37:1',fill:'18',csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.71 논술70%:109 논술90%:107',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.71,grade70:5.22,major:'자연·공학',region:'수도권'},
+  {id:210036,univ:'가천대학교',dept:'시스템반도체학과',        type:'논술',recruit:'16명',comp26:'28.5:1', fill:'3', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.36 논술70%:107 논술90%:105.75',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.36,grade70:4.76,major:'자연·공학',region:'수도권'},
+  // ── 의약학계열 ──
+  {id:210037,univ:'가천대학교',dept:'의학과',                type:'논술',recruit:'6명', comp26:'577.0:1',fill:'0', csat:'3개각1등급(과탐2과목)',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:2.05 논술70%:123 논술90%:118',nulsulSubject:'자연계열 논술(수학)',interviewDate:'11/29(일)',interviewTime:'',cut50:0,cut70:0,grade50:2.05,grade70:3.26,major:'의약학',region:'수도권'},
+  {id:210038,univ:'가천대학교',dept:'한의예과',              type:'논술',recruit:'7명', comp26:'',        fill:'0', csat:'2개각1등급(과탐2과목)',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저: 국어·수학(기하/미적분)·영어·과탐(2과목) 중 2개각1등급',nulsulSubject:'자연계열 논술(수학)',interviewDate:'11/29(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'의약학',region:'수도권'},
+  {id:210039,univ:'가천대학교',dept:'약학과',               type:'논술',recruit:'6명', comp26:'',        fill:'0', csat:'3개합5(과탐2과목)',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저: 국어·수학(기하/미적분)·영어·과탐(2과목) 3개합5이내',nulsulSubject:'자연계열 논술(수학)',interviewDate:'11/29(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'의약학',region:'수도권'},
+  // ── 특수계열 (별도 수능최저) ──
+  {id:210040,univ:'가천대학교',dept:'간호학과',              type:'논술',recruit:'77명',comp26:'47.68:1',fill:'8', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.93 논술70%:118.5 논술90%:117',nulsulSubject:'자연계열 논술(수학)',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:3.93,grade70:4.49,major:'의약학',region:'수도권'},
+  {id:210041,univ:'가천대학교',dept:'치위생학과',            type:'논술',recruit:'9명', comp26:'32.0:1', fill:'1', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:5.23 논술70%:104 논술90%:101',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:5.23,grade70:5.3,major:'의약학',region:'수도권'},
+  {id:210042,univ:'가천대학교',dept:'응급구조학과',          type:'논술',recruit:'6명', comp26:'39.83:1',fill:'0', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.81 논술70%:103 논술90%:102',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.81,grade70:4.84,major:'의약학',region:'수도권'},
+  {id:210043,univ:'가천대학교',dept:'방사선학과',            type:'논술',recruit:'8명', comp26:'64.25:1',fill:'0', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:4.61 논술70%:123 논술90%:117',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:4.61,grade70:6.07,major:'의약학',region:'수도권'},
+  {id:210044,univ:'가천대학교',dept:'물리치료학과',          type:'논술',recruit:'8명', comp26:'76.25:1',fill:'2', csat:'1개3등급이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'학생부등급50%:3.89 논술70%:115 논술90%:114',nulsulSubject:'자연계열 논술(수학)',interviewDate:'12/1(화)',interviewTime:'',cut50:0,cut70:0,grade50:3.89,grade70:4.1,major:'의약학',region:'수도권'},
+  {id:210045,univ:'가천대학교',dept:'바이오로직스학과',      type:'논술',recruit:'28명',comp26:'33.36:1',fill:'10',csat:'2개합5이내',nulsulType:'자연',nulsulTime:'',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저: 국어·수학·영어·사회/과학탐구(1과목) 중 2개합5이내 / 학생부등급50%:4.09 논술70%:110 논술90%:108',nulsulSubject:'자연계열 논술(수학)',interviewDate:'11/30(일)',interviewTime:'',cut50:0,cut70:0,grade50:4.09,grade70:4.86,major:'의약학',region:'수도권'},
 ];
 
 // ── 논술분석 상태 변수 ──
