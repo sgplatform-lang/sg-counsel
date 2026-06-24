@@ -1,37 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- v1782314687 -->
+<!-- v1782315501 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -446,6 +419,41 @@ function _gg_migrateInspectKeys(student){
   
   if(!changed) return student;
   return Object.assign({}, student, {weeklyInspect: newWi});
+}
+
+
+// ★ 로컬→Firebase 강제 전체 동기화
+// 로컬 파일에서 작업한 내용을 GitHub Pages에서도 동일하게 보이게 하려면
+// 이 함수를 실행하여 로컬 데이터를 Firebase에 완전히 덮어씁니다
+async function _gg_forceUploadAll(){
+  if(!FB_USE()){
+    alert('Firebase 연결이 필요합니다.\n인터넷 연결 후 다시 시도하세요.');
+    return;
+  }
+  const cnt = ST.students.length;
+  if(!cnt){ alert('업로드할 학생 데이터가 없습니다.'); return; }
+  if(!confirm(cnt+'명의 학생 데이터를 Firebase에 강제 업로드합니다.\n\n이 작업은 Firebase의 기존 데이터를 로컬 데이터로 완전히 덮어씁니다.\n\n계속하시겠습니까?')) return;
+  
+  const btn = document.getElementById('_gg_syncBtn');
+  if(btn){ btn.textContent='⏳ 업로드 중...'; btn.disabled=true; }
+  
+  let ok=0, fail=0;
+  for(const s of ST.students){
+    try{
+      // weeklyInspect 키 마이그레이션 적용
+      const cleaned = _gg_migrateInspectKeys(s);
+      const saveData = {...cleaned, _updatedAt: Date.now()};
+      const ref = window._fb.db.collection('students').doc(String(s.id));
+      await ref.set(saveData); // set()으로 완전 덮어쓰기
+      ok++;
+    }catch(e){
+      console.warn('업로드 실패:', s.id, e);
+      fail++;
+    }
+  }
+  
+  if(btn){ btn.textContent='🔄 Firebase 동기화'; btn.disabled=false; }
+  alert('✅ 업로드 완료!\n성공: '+ok+'명' + (fail?'\n실패: '+fail+'명':'') + '\n\n이제 GitHub Pages에서 접속하면 동일한 데이터가 표시됩니다.');
 }
 
 async function fbSave(col, id, data){
@@ -1783,6 +1791,7 @@ function renderMain(){
           <button onclick="openSForm(null)" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">+ 학생 추가</button>
         `:'') + (isAdmin?`
           <button onclick="backupData()" title="데이터 백업" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">💾</button>
+          <button id="_gg_syncBtn" onclick="_gg_forceUploadAll()" title="로컬→Firebase 강제 동기화 (깃허브와 데이터 맞출 때 사용)" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">🔄 Firebase 동기화</button>
           <button onclick="restoreData()" title="데이터 복원" style="background:#fff8e1;color:#d97706;border:1.5px solid #fde68a;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">📥</button>
           <span title="${typeof FB_USE==='function'&&FB_USE()?'Firebase 연결됨':'로컬 모드'}" style="font-size:13px;cursor:default">${typeof FB_USE==='function'&&FB_USE()?'🟢':'🟡'}</span>
         `:'');
@@ -13364,6 +13373,33 @@ function init(){
       const loaded = await fbLoadAll_all();
       if(loaded){
         console.log("✅ Firebase 데이터 로드 완료, teachers:", ST.teachers.length);
+        // ★ 로컬 데이터가 Firebase보다 최신인 학생 자동 업로드
+        // (로컬 파일에서 작업한 데이터를 GitHub 접속 시에도 보이게)
+        const _localStudents = [];
+        try{ const _ls=JSON.parse(localStorage.getItem(SK)||'[]'); if(Array.isArray(_ls)) _ls.forEach(function(ls){ _localStudents.push(ls); }); }catch(e){}
+        if(_localStudents.length){
+          const _toUpload = [];
+          _localStudents.forEach(function(ls){
+            const fbStu = ST.students.find(x=>String(x.id)===String(ls.id));
+            const lUp = ls._updatedAt||0;
+            const fUp = fbStu ? (fbStu._updatedAt||0) : 0;
+            if(lUp > fUp){
+              // 로컬이 최신 → 마이그레이션 후 Firebase에 업로드 대상
+              _toUpload.push(_gg_migrateInspectKeys(ls));
+            }
+          });
+          if(_toUpload.length){
+            console.log('[SG] 로컬→Firebase 자동 동기화:', _toUpload.length+'명');
+            _toUpload.forEach(function(s){
+              fbSave('students', s.id, s);
+              // ST.students도 최신으로 교체
+              const idx = ST.students.findIndex(x=>String(x.id)===String(s.id));
+              if(idx>=0) ST.students[idx]=s; else ST.students.push(s);
+            });
+            if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel.id))||ST.sel;
+            if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel.id))||ST.adminSel;
+          }
+        }
         render();
       }
       startRealtimeSync();
