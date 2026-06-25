@@ -1,37 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- v1782348672 -->
+<!-- v1782349523 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -464,14 +437,29 @@ async function _gg_forceUploadAll(){
   const btn = document.getElementById('_gg_syncBtn');
   if(btn){ btn.textContent='⏳ 업로드 중...'; btn.disabled=true; }
   
+  // ★ localStorage의 원본 데이터를 직접 읽어서 업로드
+  // (ST.students는 Firebase 데이터와 병합된 상태일 수 있음)
+  let _srcStudents = [];
+  try{
+    const _lsRaw = localStorage.getItem(SK)||'[]';
+    _srcStudents = JSON.parse(_lsRaw);
+    if(!Array.isArray(_srcStudents)||!_srcStudents.length){
+      _srcStudents = ST.students; // localStorage 없으면 ST 사용
+    }
+  }catch(e){ _srcStudents = ST.students; }
+  
   let ok=0, fail=0;
-  for(const s of ST.students){
+  for(const s of _srcStudents){
     try{
-      // weeklyInspect 키 마이그레이션 적용
       const cleaned = _gg_migrateInspectKeys(s);
+      // weeklySubjOrder 없으면 현재 ST에서 보완
+      if(!cleaned.weeklySubjOrder){
+        const stStu = ST.students.find(x=>String(x.id)===String(s.id));
+        if(stStu && stStu.weeklySubjOrder) cleaned.weeklySubjOrder = stStu.weeklySubjOrder;
+      }
       const saveData = {...cleaned, _updatedAt: Date.now()};
       const ref = window._fb.db.collection('students').doc(String(s.id));
-      await ref.set(saveData); // set()으로 완전 덮어쓰기
+      await ref.set(saveData);
       ok++;
     }catch(e){
       console.warn('업로드 실패:', s.id, e);
@@ -481,6 +469,146 @@ async function _gg_forceUploadAll(){
   
   if(btn){ btn.textContent='🔄 Firebase 동기화'; btn.disabled=false; }
   alert('✅ 업로드 완료!\n성공: '+ok+'명' + (fail?'\n실패: '+fail+'명':'') + '\n\n이제 GitHub Pages에서 접속하면 동일한 데이터가 표시됩니다.');
+}
+
+
+// ★ Firebase 데이터 진단 도구 - 특정 학생의 weeklyInspect 키 구조 확인
+async function _gg_diagStudent(studentName){
+  if(!FB_USE()){ alert('Firebase 연결 필요'); return; }
+  const s = ST.students.find(x=>x.name===studentName||(studentName&&x.name&&x.name.includes(studentName)));
+  if(!s){ alert('학생을 찾을 수 없습니다: '+studentName); return; }
+  
+  // Firebase에서 직접 읽기
+  const doc = await window._fb.db.collection('students').doc(String(s.id)).get();
+  const fbData = doc.data();
+  
+  const wi_fb = fbData ? fbData.weeklyInspect||{} : {};
+  const wi_local = s.weeklyInspect||{};
+  const order_fb = fbData ? fbData.weeklySubjOrder : null;
+  const order_local = s.weeklySubjOrder;
+  
+  let msg = '=== '+studentName+' 데이터 진단 ===\n\n';
+  msg += '[Firebase] weeklySubjOrder: ' + JSON.stringify(order_fb) + '\n';
+  msg += '[로컬] weeklySubjOrder: ' + JSON.stringify(order_local) + '\n\n';
+  msg += '[Firebase] weeklyInspect 키: ' + JSON.stringify(Object.keys(wi_fb)) + '\n';
+  msg += '[로컬] weeklyInspect 키: ' + JSON.stringify(Object.keys(wi_local)) + '\n\n';
+  
+  Object.keys(wi_fb).forEach(function(wk){
+    msg += '[Firebase] '+wk+':\n';
+    Object.keys(wi_fb[wk]).forEach(function(subj){
+      const ins = wi_fb[wk][subj];
+      msg += '  '+subj+': 달성도='+ins.pct+'% 학습시간='+ins.sat+'\n';
+    });
+  });
+  msg += '\n';
+  Object.keys(wi_local).forEach(function(wk){
+    msg += '[로컬] '+wk+':\n';
+    Object.keys(wi_local[wk]).forEach(function(subj){
+      const ins = wi_local[wk][subj];
+      msg += '  '+subj+': 달성도='+ins.pct+'% 학습시간='+ins.sat+'\n';
+    });
+  });
+  
+  console.log(msg);
+  alert(msg);
+  
+  // 로컬 데이터를 Firebase에 강제 덮어쓰기 여부 확인
+  if(confirm('\n로컬 데이터를 Firebase에 강제 업로드하시겠습니까?\n(로컬의 최신 데이터로 Firebase를 완전히 교체합니다)')){
+    const ref = window._fb.db.collection('students').doc(String(s.id));
+    await ref.set({...s, _updatedAt: Date.now()});
+    alert('✅ 업로드 완료!\nGitHub에서 새로고침 후 확인하세요.');
+  }
+}
+
+// 콘솔에서 쉽게 접근
+window._diag = _gg_diagStudent;
+
+
+// ★ 데이터 내보내기: localStorage 전체를 JSON 파일로 다운로드
+function _gg_exportData(){
+  try{
+    const students = JSON.parse(localStorage.getItem(SK)||'[]');
+    if(!students.length){ alert('내보낼 데이터가 없습니다.'); return; }
+    const exportObj = {
+      _exportedAt: new Date().toISOString(),
+      _version: 'sg_export_v1',
+      students: students
+    };
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sg_data_' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert('✅ 데이터 내보내기 완료!\n' + students.length + '명의 학생 데이터가 다운로드됩니다.\n\n다음 단계:\n1. 이 JSON 파일을 저장하세요\n2. GitHub Pages에서 로그인 후 "📤 가져오기" 버튼을 클릭하여 이 파일을 선택하세요');
+  }catch(e){
+    alert('내보내기 오류: ' + e.message);
+  }
+}
+
+// ★ 데이터 가져오기: JSON 파일을 읽어서 Firebase에 저장
+function _gg_importData(){
+  if(!FB_USE()){
+    alert('Firebase 연결이 필요합니다.\n인터넷 환경(GitHub Pages 등)에서 실행하세요.');
+    return;
+  }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if(data._version !== 'sg_export_v1' || !Array.isArray(data.students)){
+        alert('올바른 SG 데이터 파일이 아닙니다.');
+        return;
+      }
+      const students = data.students;
+      if(!confirm(students.length + '명의 학생 데이터를 Firebase에 업로드합니다.\n' +
+        '내보낸 시각: ' + (data._exportedAt||'알 수 없음') + '\n\n계속하시겠습니까?')) return;
+      
+      const btn = document.getElementById('_gg_importBtn');
+      if(btn){ btn.textContent = '⏳ 업로드 중...'; btn.disabled = true; }
+      
+      let ok = 0, fail = 0;
+      for(const s of students){
+        try{
+          const cleaned = _gg_migrateInspectKeys(s);
+          // weeklySubjOrder 없으면 weeklySubjPlans 키 순서로 생성
+          if(!cleaned.weeklySubjOrder){
+            const spKeys = Object.keys(_gg_getSubjPlans(cleaned)).filter(Boolean);
+            if(spKeys.length) cleaned.weeklySubjOrder = spKeys;
+          }
+          const saveData = {...cleaned, _updatedAt: Date.now()};
+          await window._fb.db.collection('students').doc(String(s.id)).set(saveData);
+          // ST.students도 업데이트
+          const idx = ST.students.findIndex(x=>String(x.id)===String(s.id));
+          if(idx>=0) ST.students[idx]=saveData; else ST.students.push(saveData);
+          ok++;
+        }catch(e2){
+          console.warn('업로드 실패:', s.id, e2);
+          fail++;
+        }
+      }
+      if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel?.id))||ST.sel;
+      if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel?.id))||ST.adminSel;
+      
+      if(btn){ btn.textContent = '📤 가져오기'; btn.disabled = false; }
+      // localStorage도 업데이트
+      try{ localStorage.setItem(SK, JSON.stringify(ST.students)); }catch(e){}
+      render();
+      alert('✅ 업로드 완료!\n성공: ' + ok + '명' + (fail?'\n실패: '+fail+'명':'') +
+        '\n\n이제 GitHub Pages에서 새로고침하면 동일한 데이터가 표시됩니다.');
+    }catch(e){
+      alert('파일 읽기 오류: ' + e.message);
+    }
+  };
+  input.click();
 }
 
 async function fbSave(col, id, data){
@@ -1835,7 +1963,8 @@ function renderMain(){
           <button onclick="openSForm(null)" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">+ 학생 추가</button>
         `:'') + (isAdmin?`
           <button onclick="backupData()" title="데이터 백업" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">💾</button>
-          <button id="_gg_syncBtn" onclick="_gg_forceUploadAll()" title="로컬→Firebase 강제 동기화 (깃허브와 데이터 맞출 때 사용)" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">🔄 Firebase 동기화</button>
+          <button onclick="_gg_exportData()" title="로컬 데이터를 JSON으로 내보내기 (로컬 파일에서 사용)" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">📥 내보내기</button>
+          <button id="_gg_importBtn" onclick="_gg_importData()" title="JSON 파일을 Firebase에 업로드 (GitHub Pages에서 사용)" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">📤 가져오기</button>
           <button onclick="restoreData()" title="데이터 복원" style="background:#fff8e1;color:#d97706;border:1.5px solid #fde68a;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">📥</button>
           <span title="${typeof FB_USE==='function'&&FB_USE()?'Firebase 연결됨':'로컬 모드'}" style="font-size:13px;cursor:default">${typeof FB_USE==='function'&&FB_USE()?'🟢':'🟡'}</span>
         `:'');
