@@ -1,37 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 관리자용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (관리자용 - 파란색 로고) -->
-    <link rel="icon" href="logo_admin.png" type="image/png">
-    <link rel="shortcut icon" href="logo_admin.png">
-    <link rel="apple-touch-icon" href="logo_admin.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG관리자">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/관리자페이지파일명.html">
-    <meta property="og:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta property="og:image" content="og-admin.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🖥️ SG상담플랫폼 - 관리자용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-admin.png"> </head>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- v1782355398 -->
+<!-- v1782370629 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title>
@@ -18276,7 +18249,18 @@ function gg_analyze(){
   gg_lastResults=UNIV_DB.map(function(u){
     var myGrade=gg_getMyAvg(u.calcMode||'weighted',u.major||'');
     var chance=myGrade>0?gg_classifyChance(myGrade,u.cut50,u.cut70):'—';
-    return Object.assign({},u,{myGrade:myGrade,chance:chance});
+    // ★ JH_UNIV_DB에서 동일 대학/학과의 interviewDate/interviewTime 보완
+    var _jhMatch=null;
+    if(!u.interviewDate&&!u.interviewTime){
+      _jhMatch=(JH_UNIV_DB||[]).find(function(j){
+        return j.univ===u.univ&&j.dept===u.dept&&(j.interviewDate||j.interviewTime);
+      });
+    }
+    return Object.assign({},u,{
+      myGrade:myGrade,chance:chance,
+      interviewDate:u.interviewDate||(_jhMatch&&_jhMatch.interviewDate)||'',
+      interviewTime:u.interviewTime||(_jhMatch&&_jhMatch.interviewTime)||''
+    });
   });
   gg_lastResults.sort(function(a,b){return((ORDER[a.chance]||5)-(ORDER[b.chance]||5))||a.cut50-b.cut50;});
   gg_renderResult();
@@ -18745,7 +18729,8 @@ function gyogwaExportXls(sid){
   var s=ST.students.find(function(x){return String(x.id)===String(sid);});
   if(!s){alert('학생 정보를 찾을 수 없습니다.');return;}
   if(!gg_lastResults.length){alert('먼저 [지원 가능 대학 분석] 버튼을 눌러주세요.');return;}
-  var filtered=gg_getFilteredResults();
+  // ★ 엑셀은 필터 무관하게 전체 gg_lastResults 사용 (면접일 누락 방지)
+  var filtered=gg_lastResults.length?gg_lastResults:gg_getFilteredResults();
   if(!filtered.length){alert('내보낼 결과가 없습니다.');return;}
   var ORDER={도전:0,상향:1,적정:2,안정:3,하향:4,'—':5,참고:6};
   var sorted=[].concat(filtered).sort(function(a,b){return((ORDER[a.chance]||5)-(ORDER[b.chance]||5))||a.cut50-b.cut50;});
@@ -18788,8 +18773,48 @@ var NS_UNIV_DB = [
   {id:200001,univ:'연세대학교',dept:'인문·사회계열',    type:'논술우수자',recruit:'200명',comp26:'',fill:'',csat:'없음',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'100%',evalMethod:'논술100%',note:'계열모집',nulsulSubject:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문'},
   {id:200002,univ:'연세대학교',dept:'자연계열',          type:'논술우수자',recruit:'150명',comp26:'',fill:'',csat:'없음',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'100%',evalMethod:'논술100%',note:'계열모집·수학+과학',nulsulSubject:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학'},
   // ── 성균관대학교 ──
-  {id:200011,univ:'성균관대학교',dept:'인문과학계열',    type:'논술우수',recruit:'139명', comp26:'',fill:'',csat:'없음',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'60%',evalMethod:'논술60%+학생부40%',note:'',nulsulSubject:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문'},
-  {id:200012,univ:'성균관대학교',dept:'자연과학계열',    type:'논술우수',recruit:'191명', comp26:'',fill:'',csat:'없음',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'60%',evalMethod:'논술60%+학생부40%',note:'수학+과학',nulsulSubject:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학'},
+  // ══ 성균관대학교 논술전형 (2027모집요강+2026입결) ══
+  // ★ 논술위주(언어형): 논술100%, 100분, 11/21(토), 국어·사회(역사/도덕)·한국사 3문제
+  // ★ 논술위주(수리형): 논술100%, 100분, 11/22(일), 수학·수학Ⅰ·수학Ⅱ 3문제
+  // 수능최저: 대부분 국·수·영·탐구(2과목평균) 4개합6이내
+  //           자유전공·글로벌경제·글로벌경영·전자전기·컴퓨터: 4개합5이내
+  //           의예과(수리형): 4개합5이내(탐구 2과목 평균+수학의무)
+  // comp26=2026경쟁률 (언어형:이미지5, 수리형:이미지6)
+  // ── 논술위주(언어형) - 11/21(토) ──
+  {id:280001,univ:'성균관대학교',dept:'인문과학계열',         type:'논술위주(언어형)',recruit:'38명', comp26:'111.39:1',fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회(역사/도덕)·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:280002,univ:'성균관대학교',dept:'사회과학계열',         type:'논술위주(언어형)',recruit:'40명', comp26:'121.60:1',fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:280003,univ:'성균관대학교',dept:'경영학과(언어형)',     type:'논술위주(언어형)',recruit:'20명', comp26:'105.64:1',fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280004,univ:'성균관대학교',dept:'글로벌리더학부(언어형)',type:'논술위주(언어형)',recruit:'10명', comp26:'90.40:1', fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:280005,univ:'성균관대학교',dept:'글로벌경제학과(언어형)',type:'논술위주(언어형)',recruit:'10명', comp26:'82.20:1', fill:'',csat:'4개합5이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280006,univ:'성균관대학교',dept:'글로벌경영학과(언어형)',type:'논술위주(언어형)',recruit:'10명', comp26:'88.40:1', fill:'',csat:'4개합5이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280007,univ:'성균관대학교',dept:'자연과학계열(언어형)',  type:'논술위주(언어형)',recruit:'5명',  comp26:'86.80:1', fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280008,univ:'성균관대학교',dept:'전자전기정보공학부(언어형)',type:'논술위주(언어형)',recruit:'5명',comp26:'75.60:1', fill:'',csat:'4개합5이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280009,univ:'성균관대학교',dept:'공학계열(언어형)',      type:'논술위주(언어형)',recruit:'10명', comp26:'85.40:1', fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280010,univ:'성균관대학교',dept:'건설환경공학부(언어형)', type:'논술위주(언어형)',recruit:'5명',  comp26:'68.80:1', fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'전공예약/국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280011,univ:'성균관대학교',dept:'컴퓨터공학과(언어형)',  type:'논술위주(언어형)',recruit:'5명',  comp26:'72.60:1', fill:'',csat:'4개합5이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280012,univ:'성균관대학교',dept:'글로벌AI융합학부(언어형)',type:'논술위주(언어형)',recruit:'4명', comp26:'92.00:1', fill:'',csat:'4개합6이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국어·사회·한국사 3문제',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280013,univ:'성균관대학교',dept:'자유전공계열(언어형)',  type:'논술위주(언어형)',recruit:'10명', comp26:'85.60:1', fill:'',csat:'4개합5이내',nulsulType:'인문',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'자유전공/수능최저강화/국어·사회·한국사',nulsulSubject:'국어·사회(역사/도덕포함)·한국사',interviewDate:'11/21(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  // ── 논술위주(수리형) - 11/22(일) ──
+  {id:280014,univ:'성균관대학교',dept:'사회과학계열(수리형)',  type:'논술위주(수리형)',recruit:'5명',  comp26:'134.80:1',fill:'',csat:'4개합6이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280015,univ:'성균관대학교',dept:'경영학과(수리형)',      type:'논술위주(수리형)',recruit:'5명',  comp26:'124.80:1',fill:'',csat:'4개합6이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280016,univ:'성균관대학교',dept:'글로벌리더학부(수리형)', type:'논술위주(수리형)',recruit:'5명',  comp26:'80.20:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:280017,univ:'성균관대학교',dept:'글로벌경제학과(수리형)', type:'논술위주(수리형)',recruit:'5명',  comp26:'82.60:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280018,univ:'성균관대학교',dept:'글로벌경영학과(수리형)', type:'논술위주(수리형)',recruit:'5명',  comp26:'93.80:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  {id:280019,univ:'성균관대학교',dept:'자연과학계열(수리형)',  type:'논술위주(수리형)',recruit:'25명', comp26:'123.40:1',fill:'',csat:'4개합6이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280020,univ:'성균관대학교',dept:'전자전기정보공학부(수리형)',type:'논술위주(수리형)',recruit:'25명',comp26:'102.32:1',fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280021,univ:'성균관대학교',dept:'공학계열(수리형)',      type:'논술위주(수리형)',recruit:'40명', comp26:'123.62:1',fill:'',csat:'4개합6이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280022,univ:'성균관대학교',dept:'반도체시스템공학과(수리형)',type:'논술위주(수리형)',recruit:'10명',comp26:'106.20:1',fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280023,univ:'성균관대학교',dept:'지능형소프트웨어학과(수리형)',type:'논술위주(수리형)',recruit:'5명',comp26:'85.00:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280024,univ:'성균관대학교',dept:'글로벌바이오메디컬공학과(수리형)',type:'논술위주(수리형)',recruit:'10명',comp26:'81.40:1',fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280025,univ:'성균관대학교',dept:'글로벌AI융합학부(수리형)',type:'논술위주(수리형)',recruit:'4명',  comp26:'96.50:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280026,univ:'성균관대학교',dept:'약학과(수리형)',         type:'논술위주(수리형)',recruit:'5명',  comp26:'515.40:1',fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'의약학',region:'수도권'},
+  {id:280027,univ:'성균관대학교',dept:'의예과(수리형)',         type:'논술위주(수리형)',recruit:'5명',  comp26:'567.00:1',fill:'',csat:'4개합5이내(탐구2과목평균+수학의무)',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'의예과/수능최저강화(수학의무)/수학·수학Ⅰ·수학Ⅱ',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'의약학',region:'수도권'},
+  {id:280028,univ:'성균관대학교',dept:'건설환경공학부(수리형)',  type:'논술위주(수리형)',recruit:'10명', comp26:'89.20:1', fill:'',csat:'4개합6이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'전공예약/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280029,univ:'성균관대학교',dept:'컴퓨터공학과(수리형)',   type:'논술위주(수리형)',recruit:'5명',  comp26:'',        fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280030,univ:'성균관대학교',dept:'반도체융합공학과(수리형)',type:'논술위주(수리형)',recruit:'5명',  comp26:'80.80:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280031,univ:'성균관대학교',dept:'에너지학과(수리형)',      type:'논술위주(수리형)',recruit:'5명',  comp26:'74.40:1', fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280032,univ:'성균관대학교',dept:'인공지능학과(수리형)',    type:'논술위주(수리형)',recruit:'5명',  comp26:'',        fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수능최저강화/수학·수학Ⅰ·수학Ⅱ 3문제',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:280033,univ:'성균관대학교',dept:'자유전공계열(수리형)',   type:'논술위주(수리형)',recruit:'20명', comp26:'116.47:1',fill:'',csat:'4개합5이내',nulsulType:'자연',nulsulTime:'100분',nulsulWeight:'100%',evalMethod:'논술100%',note:'자유전공/수능최저강화/수학·수학Ⅰ·수학Ⅱ',nulsulSubject:'수학·수학Ⅰ·수학Ⅱ',interviewDate:'11/22(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
   // ── 중앙대학교 ──
   // ── 중앙대학교 논술전형 (2027모집요강+2026입결) ──
   // ★ 논술(일반형): 수능최저 있음 / 논술(창의형): 수능최저 없음
@@ -19064,7 +19089,7 @@ var NS_UNIV_DB = [
   {id:260045,univ:'고려대학교',dept:'컴퓨터학과',            type:'논술전형',recruit:'9명', comp26:'64.56:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'자연',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'정보대학/수학논술/11/21(토)08:30',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'11/21(토)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
   {id:260046,univ:'고려대학교',dept:'데이터과학과',          type:'논술전형',recruit:'3명', comp26:'62.00:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'자연',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'정보대학/수학논술/11/21(토)08:30',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'11/21(토)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
   {id:260047,univ:'고려대학교',dept:'인공지능학과',          type:'논술전형',recruit:'9명', comp26:'71.33:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'자연',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'정보대학/수학논술/11/21(토)08:30',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'11/21(토)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
-  {id:260048,univ:'고려대학교',dept:'국제학부',              type:'논술전형',recruit:'5명', comp26:'76.20:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'인문',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국제대학/인문사회통합형논술/11/22(일)08:30',nulsulSubject:'인문사회통합형논술',interviewDate:'11/22(일)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:260048,univ:'고려대학교',dept:'국제학부',              type:'논술전형',recruit:'4명', comp26:'76.20:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'인문',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'국제대학/인문사회통합형논술/11/22(일)08:30',nulsulSubject:'인문사회통합형논술',interviewDate:'11/22(일)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
   {id:260049,univ:'고려대학교',dept:'미디어학부',            type:'논술전형',recruit:'6명', comp26:'74.67:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'인문',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'미디어대학/인문사회통합형논술/11/22(일)12:30',nulsulSubject:'인문사회통합형논술',interviewDate:'11/22(일)',interviewTime:'12:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
   // ── 보건과학대학 ──
   {id:260050,univ:'고려대학교',dept:'바이오의공학부',        type:'논술전형',recruit:'7명', comp26:'64.71:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'자연',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'보건과학대학/수학논술/11/21(토)08:30',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'11/21(토)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
@@ -19076,6 +19101,48 @@ var NS_UNIV_DB = [
   {id:260055,univ:'고려대학교',dept:'스마트보안학부',        type:'논술전형',recruit:'5명', comp26:'59.60:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'자연',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수학논술/11/21(토)08:30',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'11/21(토)',interviewTime:'08:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
   {id:260056,univ:'고려대학교',dept:'심리학부',              type:'논술전형',recruit:'4명', comp26:'67.50:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'인문',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'인문사회통합형논술/11/22(일)12:30',nulsulSubject:'인문사회통합형논술',interviewDate:'11/22(일)',interviewTime:'12:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
   {id:260057,univ:'고려대학교',dept:'학부대학',              type:'논술전형',recruit:'8명', comp26:'65.38:1', fill:'',csat:'4개합8이내+한국사4',nulsulType:'자연',nulsulTime:'80분',nulsulWeight:'100%',evalMethod:'논술100%',note:'수학논술/11/21(토)12:30',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'11/21(토)',interviewTime:'12:30입실',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+
+  // ══ 홍익대학교 논술전형 (2027모집요강+2026입결) ══
+  // 전형방법: 논술90%+학생부교과10% / 총 384명 / 시험시간 120분
+  // 수능최저: 전계열 국·수·영·탐구(사/과) 2개합5이내+한국사4이내 (탐구 최상위1과목)
+  // 논술유형: 인문=통합교과형논술(1,600자 답안), 자연=수리형(수식/노트형 답안)
+  // 출제범위: 자연-수학+수학Ⅱ+미적분+확률과통계+기하(공통+선택), 인문-국어/사회/도덕/역사
+  // 시험: 자연계열/캠퍼스자율전공(자연·예능) 10/3(토), 인문계열/예술학과/캠퍼스자율전공(인문·예능) 10/4(일)
+  // 서울캠퍼스 / comp26=2026경쟁률
+  // ── 캠퍼스자율전공 ──
+  {id:270001,univ:'홍익대학교',dept:'서울캠퍼스자율전공(자연·예능)',type:'논술전형',recruit:'53명',comp26:'21.21:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'자연+예능 통합/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270002,univ:'홍익대학교',dept:'서울캠퍼스자율전공(인문·예능)',type:'논술전형',recruit:'38명',comp26:'55.87:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'인문+예능 통합/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  // ── 공과대학 (자연계열) ──
+  {id:270003,univ:'홍익대학교',dept:'전자·전기공학부',        type:'논술전형',recruit:'39명',comp26:'19.18:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'공과대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270004,univ:'홍익대학교',dept:'신소재·화공시스템공학부',  type:'논술전형',recruit:'25명',comp26:'19.48:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'공과대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270005,univ:'홍익대학교',dept:'컴퓨터공학과',           type:'논술전형',recruit:'29명',comp26:'18.62:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'공과대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270006,univ:'홍익대학교',dept:'산업·데이터공학과',       type:'논술전형',recruit:'14명',comp26:'22.00:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'공과대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270007,univ:'홍익대학교',dept:'기계·시스템디자인공학과',  type:'논술전형',recruit:'29명',comp26:'19.45:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'공과대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270008,univ:'홍익대학교',dept:'건설환경공학과',          type:'논술전형',recruit:'9명', comp26:'20.22:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'공과대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  // ── 건축도시대학 ──
+  {id:270009,univ:'홍익대학교',dept:'건축학전공(5년제)',        type:'논술전형',recruit:'9명', comp26:'29.33:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'건축도시대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270010,univ:'홍익대학교',dept:'실내건축학전공',          type:'논술전형',recruit:'4명', comp26:'21.50:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'건축학부 실내건축학전공/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  {id:270011,univ:'홍익대학교',dept:'도시공학과',              type:'논술전형',recruit:'9명', comp26:'20.56:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'건축도시대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  // ── 사범대학 (자연) ──
+  {id:270012,univ:'홍익대학교',dept:'수학교육과',              type:'논술전형',recruit:'5명', comp26:'24.20:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'자연',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'사범대학/수리논술',nulsulSubject:'수학Ⅰ·Ⅱ,미적분,확률과통계,기하',interviewDate:'10/3(토)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'자연·공학',region:'수도권'},
+  // ── 사범대학 (인문) ──
+  {id:270013,univ:'홍익대학교',dept:'국어교육과',              type:'논술전형',recruit:'5명', comp26:'46.40:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'사범대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:270014,univ:'홍익대학교',dept:'영어교육과',              type:'논술전형',recruit:'5명', comp26:'48.00:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'사범대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:270015,univ:'홍익대학교',dept:'역사교육과',              type:'논술전형',recruit:'4명', comp26:'44.50:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'사범대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:270016,univ:'홍익대학교',dept:'교육학과',               type:'논술전형',recruit:'5명', comp26:'47.60:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'사범대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  // ── 경영대학 ──
+  {id:270017,univ:'홍익대학교',dept:'경영학부',                type:'논술전형',recruit:'48명',comp26:'53.46:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'경영대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  // ── 문과대학 ──
+  {id:270018,univ:'홍익대학교',dept:'영어영문학과',            type:'논술전형',recruit:'6명', comp26:'50.00:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'문과대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:270019,univ:'홍익대학교',dept:'독어독문학과',            type:'논술전형',recruit:'4명', comp26:'53.00:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'문과대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:270020,univ:'홍익대학교',dept:'불어불문학과',            type:'논술전형',recruit:'4명', comp26:'50.75:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'문과대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  {id:270021,univ:'홍익대학교',dept:'국어국문학과',            type:'논술전형',recruit:'4명', comp26:'50.00:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'문과대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  // ── 법과대학 ──
+  {id:270022,univ:'홍익대학교',dept:'법학부',                  type:'논술전형',recruit:'24명',comp26:'52.63:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'법과대학/통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문·사회',region:'수도권'},
+  // ── 경제학부 ──
+  {id:270023,univ:'홍익대학교',dept:'경제학부',                type:'논술전형',recruit:'8명', comp26:'47.00:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'통합교과형논술',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'상경',region:'수도권'},
+  // ── 미술대학 ──
+  {id:270024,univ:'홍익대학교',dept:'예술학과',                type:'논술전형',recruit:'4명', comp26:'55.50:1',fill:'',csat:'2개합5이내+한국사4',nulsulType:'인문',nulsulTime:'120분',nulsulWeight:'90%',evalMethod:'논술90%+학생부교과10%',note:'미술대학/통합교과형논술(인문계열과 동일)',nulsulSubject:'국어·사회·도덕·역사',interviewDate:'10/4(일)',interviewTime:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'예체능',region:'수도권'},
 
   // ── 한국외국어대학교 ──
   {id:200041,univ:'한국외국어대학교',dept:'인문계열',    type:'논술우수자',recruit:'261명',comp26:'',fill:'',csat:'없음',nulsulType:'인문',nulsulTime:'80분',nulsulWeight:'70%',evalMethod:'논술70%+학생부30%',note:'외국어 능력 활용',nulsulSubject:'',cut50:0,cut70:0,grade50:0,grade70:0,major:'인문'},
@@ -19263,7 +19330,12 @@ function ns_analyze() {
   var ORD = {도전:0,상향:1,적정:2,안정:3,하향:4,'—':5,참고:6};
   ns_lastResults = NS_UNIV_DB.map(function(u) {
     var chance = my > 0 ? ns_classify(my) : '참고';
-    return Object.assign({}, u, { myGrade: my, chance: chance });
+    return Object.assign({}, u, {
+      myGrade: my, chance: chance,
+      // ★ 명시적 포함 (u에 없어도 빈문자열 보장)
+      interviewDate: u.interviewDate||'',
+      interviewTime: u.interviewTime||''
+    });
   }).sort(function(a,b){ return ((ORD[a.chance]||5)-(ORD[b.chance]||5)); });
   ns_renderResult();
   ns_updateStats();
@@ -19324,7 +19396,7 @@ function ns_renderResult(){
   var f=ns_getFiltered();
   if(cnt)cnt.textContent='('+f.length+'개)';
   if(!f.length){
-    tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="13" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';
     return;
   }
   var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb',참고:'#94a3b8'};
@@ -19337,6 +19409,7 @@ function ns_renderResult(){
       +'<td style="padding:8px 6px;font-size:12px;font-weight:600">'+r.dept+((r.interviewDate||r.interviewTime)?'<div style="margin-top:3px"><span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">📅 '+(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+( r.interviewTime||'')+'</span></div>':'')+'</td>'
       +'<td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626">'+r.type+'</span></td>'
       +'<td style="padding:4px 6px;text-align:center;font-size:11px;font-weight:600">'+(r.recruit||'—')+'</td>'
+      +'<td style="padding:4px 6px;text-align:center;font-weight:700;color:#7c3aed;font-size:11px">'+(r.comp26||'—')+'</td>'
       +'<td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;background:#f0f9ff;color:#0369a1">'+r.nulsulType+'</span></td>'
       +'<td style="padding:4px 6px;text-align:center;font-size:11px">'+(r.nulsulTime||'—')+'</td>'
       +'<td style="padding:4px 6px;font-size:10px;color:#475569;max-width:140px;white-space:normal;line-height:1.4">'+(r.nulsulSubject||'—')+'</td>'
@@ -19444,7 +19517,7 @@ function renderNulsul(s) {
 
   // ── 결과 테이블 ──
   +'<div style="overflow-x:auto;max-height:600px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
-  +'<thead><tr style="background:#991b1b"><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:11px;text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집단위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집인원</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술유형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">시험시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">출제유형/범위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술반영</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술시험일/시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">지원경향 <span id="ns-result-count" style="font-size:9px;font-weight:400">(0개)</span></th></tr></thead>'
+  +'<thead><tr style="background:#991b1b"><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:11px;text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집단위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집인원</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">경쟁률(26)</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술유형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">시험시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">출제유형/범위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술반영</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술시험일/시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">지원경향 <span id="ns-result-count" style="font-size:9px;font-weight:400">(0개)</span></th></tr></thead>'
   +'<tbody id="ns-result-tbody"><tr><td colspan="12" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">✏️</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
 
   // ── 안내 ──
@@ -19550,7 +19623,7 @@ function nulsulPrint(sid) {
     +'<div class="ph"><div class="phl">✏️ 수시 논술전형 분석 결과 — '+stuName+'</div><div class="phr">'+dateStr+' · 내신 '+avgStr+' · 총 '+filtered.length+'개</div></div>'
     +'<div class="sb">'+counts+'</div>'
     +'<table><thead><tr>'
-    +'<th style="min-width:60px;text-align:left;padding-left:8px">대학명</th><th style="min-width:70px">모집단위</th><th>전형</th><th>모집인원</th><th>논술유형</th><th>시험시간</th><th>출제유형/범위</th><th>논술반영</th><th style="min-width:80px">전형방법</th><th style="min-width:60px">수능최저</th><th style="min-width:80px">논술시험일/시간</th><th>지원경향</th>'
+    +'<th style="min-width:60px;text-align:left;padding-left:8px">대학명</th><th style="min-width:70px">모집단위</th><th>전형</th><th>모집인원</th><th>경쟁률(26)</th><th>논술유형</th><th>시험시간</th><th>출제유형/범위</th><th>논술반영</th><th style="min-width:80px">전형방법</th><th style="min-width:60px">수능최저</th><th style="min-width:80px">논술시험일/시간</th><th>지원경향</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="footer">※ 논술전형은 내신 반영비율이 낮으므로 논술 준비 수준이 합격을 좌우합니다. 각 대학 공식 입학처 발표 자료를 반드시 확인하시기 바랍니다.</div>'
     +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script>'
@@ -19563,19 +19636,20 @@ function nulsulExportXls(sid) {
   var s=ST.students.find(function(x){return String(x.id)===String(sid);});
   if(!s){alert('학생 정보를 찾을 수 없습니다.');return;}
   if(!ns_lastResults.length){alert('먼저 [지원 가능 대학 분석] 버튼을 눌러주세요.');return;}
-  var filtered=ns_getFiltered();
+  // ★ 엑셀은 필터 무관하게 전체 ns_lastResults 사용
+  var filtered=ns_lastResults.length?ns_lastResults:ns_getFiltered();
   if(!filtered.length){alert('내보낼 결과가 없습니다.');return;}
   var myGrade=ns_getMyGrade();
   var avgStr=myGrade>0?myGrade.toFixed(2)+'등급':'—';
   var chLabel={도전:'🔥 도전',상향:'⬆ 상향',적정:'✓ 적정',안정:'🛡 안정',참고:'참고'};
-  var headers=['대학명','모집단위','전형명','모집인원','논술유형','시험시간','출제유형/범위','논술반영','전형방법','수능최저','계열','논술시험일','논술시험시간','지원경향'];
+  var headers=['대학명','모집단위','전형명','모집인원','경쟁률(26)','논술유형','시험시간','출제유형/범위','논술반영','전형방법','수능최저','계열','논술시험일','논술시험시간','지원경향'];
   var rows=filtered.map(function(r){
-    return [r.univ, r.dept, r.type, r.recruit||'', r.nulsulType||'', r.nulsulTime||'', r.nulsulSubject||'', r.nulsulWeight||'', r.evalMethod||'', r.csat||'없음', r.major||'', r.interviewDate||'', r.interviewTime||'', chLabel[r.chance]||r.chance];
+    return [r.univ, r.dept, r.type, r.recruit||'', r.comp26||'', r.nulsulType||'', r.nulsulTime||'', r.nulsulSubject||'', r.nulsulWeight||'', r.evalMethod||'', r.csat||'없음', r.major||'', r.interviewDate||'', r.interviewTime||'', chLabel[r.chance]||r.chance];
   });
   var summary=[[s.name+' 수시 논술전형 분석 결과'],['분석일: '+new Date().toLocaleDateString('ko-KR')+' | 내신: '+avgStr+' | 총 '+filtered.length+'개'],[],headers].concat(rows).concat([[],['※ 논술전형은 내신 반영비율이 낮으므로 논술 준비 수준이 합격을 좌우합니다.']]);
   function doExport(){
     var ws=XLSX.utils.aoa_to_sheet(summary);
-    ws['!cols']=[{wch:16},{wch:22},{wch:12},{wch:8},{wch:8},{wch:8},{wch:30},{wch:8},{wch:20},{wch:20},{wch:10},{wch:12},{wch:10},{wch:8}];
+    ws['!cols']=[{wch:16},{wch:22},{wch:12},{wch:8},{wch:10},{wch:8},{wch:8},{wch:30},{wch:8},{wch:20},{wch:20},{wch:10},{wch:12},{wch:10},{wch:8}];
     var wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'논술전형분석');
     var date=new Date().toLocaleDateString('ko-KR').replace(/\. /g,'').replace('.','');
@@ -24270,7 +24344,10 @@ function jh_analyze(){var hasQ=jh_quickMode.active&&(jh_quickMode.all||jh_quickM
     interview:interview,intPct:intPct,docPct:docPct,
     methodNote:methodNote,evalFocus:evalFocus,note:note,
     cut50:eff50,cut70:eff70,
-    myGrade:my,baseChance:base2,chance:chance2,corrected:base2!==chance2
+    myGrade:my,baseChance:base2,chance:chance2,corrected:base2!==chance2,
+    // ★ interviewDate/interviewTime 명시적 포함 (u에 없어도 빈문자열 보장)
+    interviewDate:u.interviewDate||'',
+    interviewTime:u.interviewTime||''
   });
 }).sort(function(a,b){return((ORD[a.chance]||5)-(ORD[b.chance]||5))||a.cut50-b.cut50;});jh_renderResult();jh_updateStats();var sg=document.getElementById('jh-stat-grid');if(sg)sg.style.display='grid';}
 function jh_updateStats(){['도전','상향','적정','안정','하향'].forEach(function(k){var el=document.getElementById('jh-cnt-'+k);if(el)el.textContent=jh_lastResults.filter(function(r){return r.chance===k;}).length;});}
@@ -24320,7 +24397,11 @@ function jh_deleteUniv(id){if(!confirm('삭제하시겠습니까?'))return;JH_UN
 function jh_addUniv(){var univ=(document.getElementById('jh-f-univ')||{}).value||'';var dept=(document.getElementById('jh-f-dept')||{}).value||'';var c50=parseFloat((document.getElementById('jh-f-cut50')||{}).value)||0;var c70=parseFloat((document.getElementById('jh-f-cut70')||{}).value)||0;if(!univ.trim()||!dept.trim()){alert('대학명과 학과는 필수입니다.');return;}if(!c50||!c70){alert('입결 50%, 70%는 필수입니다.');return;}JH_UNIV_DB.push({id:jh_nextId++,univ:univ.trim(),dept:dept.trim(),type:(document.getElementById('jh-f-type')||{}).value||'일반전형',recruit:(document.getElementById('jh-f-recruit')||{}).value||'',comp26:(document.getElementById('jh-f-comp26')||{}).value||'',fill:(document.getElementById('jh-f-fill')||{}).value||'',interview:(document.getElementById('jh-f-interview')||{}).value||'없음',intPct:parseInt((document.getElementById('jh-f-intpct')||{}).value)||0,docPct:parseInt((document.getElementById('jh-f-docpct')||{}).value)||100,csat:(document.getElementById('jh-f-csat')||{}).value||'없음',evalFocus:(document.getElementById('jh-f-evalfocus')||{}).value||'',methodNote:(document.getElementById('jh-f-method')||{}).value||'',note:(document.getElementById('jh-f-note')||{}).value||'',cut50:c50,cut70:c70,major:(document.getElementById('jh-f-major')||{}).value||''});jh_renderDbList();['jh-f-univ','jh-f-dept','jh-f-recruit','jh-f-comp26','jh-f-fill','jh-f-intpct','jh-f-docpct','jh-f-csat','jh-f-evalfocus','jh-f-method','jh-f-note','jh-f-cut50','jh-f-cut70'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});alert('✅ 추가 완료!');}
 function jh_importCsv(input){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){var lines=e.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(lines.length<2){alert('데이터가 없습니다.');return;}var header=lines[0].split(',').map(function(h){return h.trim().replace(/"/g,'');});var idx={};header.forEach(function(h,i){idx[h]=i;});var getv=function(row,k){return idx[k]!==undefined?(row[idx[k]]||'').replace(/"/g,''):'';};var added=0,skip=0;lines.slice(1).forEach(function(line){var row=line.split(',');var c50=parseFloat(getv(row,'입결50')),c70=parseFloat(getv(row,'입결70'));if(!getv(row,'대학명')||!getv(row,'학과')||!c50||!c70){skip++;return;}JH_UNIV_DB.push({id:jh_nextId++,univ:getv(row,'대학명'),dept:getv(row,'학과'),type:getv(row,'전형명')||'일반전형',recruit:getv(row,'모집인원'),comp26:getv(row,'경쟁률'),fill:getv(row,'충원율'),interview:getv(row,'면접유무')||'없음',intPct:parseInt(getv(row,'면접비중'))||0,docPct:parseInt(getv(row,'서류비중'))||100,csat:getv(row,'수능최저')||'없음',evalFocus:getv(row,'서류핵심요소'),methodNote:getv(row,'선발방법'),note:getv(row,'전형특징'),cut50:c50,cut70:c70,major:getv(row,'계열')});added++;});alert('✅ '+added+'개 추가 완료'+(skip?' ('+skip+'개 건너뜀)':''));jh_renderDbList();input.value='';};reader.readAsText(file,'UTF-8');}
 function jh_exportCsv(){var hdr='대학명,학과,전형명,모집인원,경쟁률,충원율,면접유무,면접비중,서류비중,수능최저,서류핵심요소,선발방법,전형특징,입결50,입결70,계열';var rows=JH_UNIV_DB.map(function(u){return [u.univ,u.dept,u.type,u.recruit||'',u.comp26||'',u.fill||'',u.interview||'없음',u.intPct||0,u.docPct||100,u.csat||'없음',u.evalFocus||'',u.methodNote||'',u.note||'',u.cut50,u.cut70,u.major||''].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');});var csv='\uFEFF'+hdr+'\n'+rows.join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='종합전형DB_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.csv';a.click();URL.revokeObjectURL(url);}
-function jh_exportXls(sid){var s=ST.students.find(function(x){return String(x.id)===String(sid);});if(!jh_lastResults.length){alert('먼저 분석을 실행해주세요.');return;}function doExport(){var f=jh_getFiltered();var rows=[['대학명','학과','전형명','모집인원','경쟁률','면접','면접일','면접시간','수능최저','서류비중','면접비중','서류핵심요소','선발방법','전형특징','합격50%','합격70%','내신평균','50%대비','지원경향']];f.forEach(function(r){var d50=r.myGrade>0?(r.myGrade-r.cut50).toFixed(2):'—';rows.push([r.univ,r.dept,r.type,r.recruit||'',r.comp26||'',r.interview||'없음',r.interviewDate||'',r.interviewTime||'',r.csat||'없음',(r.docPct||100)+'%',(r.intPct||0)+'%',r.evalFocus||'',r.methodNote||'',r.note||'',r.cut50>0?r.cut50:'',r.cut70>0?r.cut70:'',r.myGrade>0?r.myGrade.toFixed(2):'',d50,r.chance]);});var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[14,18,12,8,8,8,12,10,14,7,7,20,28,18,8,8,8,8,10].map(function(w){return{wch:w};});XLSX.utils.book_append_sheet(wb,ws,'종합전형분석');XLSX.writeFile(wb,(s?s.name:'학생')+'_수시종합전형분석_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.xlsx');}if(typeof XLSX!=='undefined')doExport();else{var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=doExport;document.head.appendChild(sc);}}
+function jh_exportXls(sid){var s=ST.students.find(function(x){return String(x.id)===String(sid);});if(!jh_lastResults.length){alert('먼저 분석을 실행해주세요.');return;}function doExport(){
+  // ★ 엑셀은 필터 무관하게 전체 jh_lastResults 사용 (면접일 누락 방지)
+  var f=jh_lastResults.length?jh_lastResults:jh_getFiltered();
+  var rows=[['대학명','학과','전형명','모집인원','경쟁률','면접','면접일','면접시간','수능최저','서류비중','면접비중','서류핵심요소','선발방법','전형특징','합격50%','합격70%','내신평균','50%대비','지원경향']];
+  f.forEach(function(r){var d50=r.myGrade>0?(r.myGrade-r.cut50).toFixed(2):'—';rows.push([r.univ,r.dept,r.type,r.recruit||'',r.comp26||'',r.interview||'없음',r.interviewDate||'',r.interviewTime||'',r.csat||'없음',(r.docPct||100)+'%',(r.intPct||0)+'%',r.evalFocus||'',r.methodNote||'',r.note||'',r.cut50>0?r.cut50:'',r.cut70>0?r.cut70:'',r.myGrade>0?r.myGrade.toFixed(2):'',d50,r.chance]);});var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[14,18,12,8,8,8,12,10,14,7,7,20,28,18,8,8,8,8,10].map(function(w){return{wch:w};});XLSX.utils.book_append_sheet(wb,ws,'종합전형분석');XLSX.writeFile(wb,(s?s.name:'학생')+'_수시종합전형분석_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.xlsx');}if(typeof XLSX!=='undefined')doExport();else{var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=doExport;document.head.appendChild(sc);}}
 function jh_loadStudentGrades(s){jh_grades={};if(!s||!s.subjects)return;var sub=s.subjects;var km={korean:'국어',math:'수학',english:'영어',history:'한국사',social:'사회',science:'과학'};Object.keys(km).forEach(function(sk){var jk=km[sk];var sv=sub[sk];if(!sv)return;jh_grades[jk]={s1:String(sv.s1||sv.grade||''),s2:String(sv.s2||''),credit:sv.credit||(JH_SUBJECTS.find(function(x){return x.key===jk;})||{credit:3}).credit};});}
 
 function renderJonghap(s){
