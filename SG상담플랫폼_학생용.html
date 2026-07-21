@@ -1,39 +1,19 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-   <link rel="manifest" href="manifest.json">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>SG상담플랫폼 - 학생용</title>
-    <!-- 1. 바탕화면 아이콘 설정 (학생용) -->
-    <link rel="icon" href="logo_student.png" type="image/png">
-    <link rel="shortcut icon" href="logo_student.png">
-    <link rel="apple-touch-icon" href="logo_student.png">
-    <!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SG학생용">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- 3. 카카오톡/SNS 공유 미리보기 (OG 태그) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/SG상담플랫폼_학생용.html">
-    <meta property="og:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta property="og:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta property="og:image" content="og-student.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="SG상담플랫폼">
-    <!-- 4. 트위터 카드 설정 -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="🎓 SG상담플랫폼 - 학생용">
-    <meta name="twitter:description" content="SG 상담 관리 시스템 - 학생 전용 페이지입니다.">
-    <meta name="twitter:image" content="og-student.png"> </head>
-
 <meta charset="UTF-8">
+<link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>SG상담플랫폼 - 학생용</title>
+<!-- 1. 바탕화면 아이콘 설정 (학생용) -->
+<link rel="icon" href="logo_student.png" type="image/png">
+<link rel="shortcut icon" href="logo_student.png">
+<link rel="apple-touch-icon" href="logo_student.png">
+<!-- 2. 모바일 앱 환경 설정 (홈 화면 추가 시 앱처럼 작동) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SG학생용">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <!-- SEO & 공유 미리보기 (카카오톡/라인/문자 등) -->
 <meta name="description" content="SG상담플랫폼 학생 페이지 - 주간 학습 플랜, 시간표, 테스트 답안 작성, 수시 지원 현황 확인">
 <meta property="og:type" content="website">
@@ -367,16 +347,24 @@ function render(){
   if(!CU){app.innerHTML=renderLogin();return;}
   // 상태 변화 시 history push
   if(!_histPushing) _pushHist();
+  // ★ 2026-07 수정: innerHTML을 통째로 교체하면 스크롤 컨테이너(#content)도 새로
+  // 만들어져서 스크롤 위치가 매번 맨 위로 리셋되던 문제가 있었다(문항 추가,
+  // 오답원인 저장 등 render()가 호출될 때마다 화면이 위로 튐).
+  // → 교체 전 스크롤 위치를 기억해뒀다가 교체 직후 그대로 복원한다.
+  const _prevContent = document.getElementById('content');
+  const _prevScrollTop = _prevContent ? _prevContent.scrollTop : 0;
   const fbStatus=FB()?'<div class="fb-bar fb-ok">🟢 Firebase 연결됨</div>':'<div class="fb-bar fb-no">⚠️ Firebase 미연결</div>';
   app.innerHTML=`
     ${fbStatus}
     ${renderHdr()}
     <div class="content" id="content">
       <div class="inner">
-        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():renderInfo()}
+        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():renderInfo()}
       </div>
     </div>
     ${renderTabbar()}`;
+  const _newContent = document.getElementById('content');
+  if(_newContent && _prevScrollTop) _newContent.scrollTop = _prevScrollTop;
 }
 
 function renderLogin(){
@@ -457,7 +445,7 @@ function renderHdr(){
 }
 
 function renderTabbar(){
-  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'info',icon:'👤',label:'내 정보'}];
+  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'info',icon:'👤',label:'내 정보'}];
   return`<div class="tabbar">${tabs.map(t=>`<button class="tb-item ${curTab===t.id?'act':''}" onclick="curTab='${t.id}';render()">
     <span class="tb-icon">${t.icon}</span><span>${t.label}</span>
   </button>`).join('')}</div>`;
@@ -1447,6 +1435,212 @@ window.openMockEdit=function(){
 };
 
 
+// ══════════════════════════════════════════════════
+// 🎯 챌린저 모의고사 학생 입력 (관리자 챌린저와 양방향 동기화)
+// ══════════════════════════════════════════════════
+function chgInit(){
+  if(!CU.challengerData) CU.challengerData = {};
+  const cd = CU.challengerData;
+  if(!cd.meta) cd.meta = {};
+  if(!Array.isArray(cd.lastSubjects)) cd.lastSubjects = [];
+  return cd;
+}
+function chgNewSubject(){
+  return {subject:'KOR',detail:'',level:'중위권',focus:'집중',processRange:'고난도/킬러 제외',
+    difficultySelect:'중상 난이도 선별',accuracyTarget:'정답률 70% 이상',score:'',grade:'',percentile:'',
+    targetScore:'',targetGrade:'',targetPercentile:'',wrongCount:'',order:'번호 순서대로',orderMemo:'',
+    time:'없음',mental:'안정',items:[{no:'',unit:'',diff:'중',reasons:[],memo:''}]};
+}
+let _chgSaveTimer=null;
+function chgScheduleSave(){
+  clearTimeout(_chgSaveTimer);
+  _chgSaveTimer=setTimeout(async function(){
+    if(!CU||!CU.id) return;
+    const cd = CU.challengerData||{};
+    window._studentSaving = true;
+    if(FB()){
+      const ref=window._db.collection('students').doc(String(CU.id));
+      const partial={
+        'challengerData.lastTestDate': cd.lastTestDate||'',
+        'challengerData.lastTestName': cd.lastTestName||'',
+        'challengerData.lastSubjects': cd.lastSubjects||[],
+        'challengerData.meta.target': (cd.meta&&cd.meta.target)||'',
+        '_t': Date.now()
+      };
+      try{
+        await ref.update(partial);
+      }catch(e2){
+        if(e2.code==='not-found'||(e2.message||'').includes('NOT_FOUND')||(e2.message||'').includes('No document')){
+          await ref.set({challengerData: cd}, {merge:true});
+        } else { console.warn('챌린저 저장 오류:', e2.message); }
+      }
+    }
+    setTimeout(function(){window._studentSaving=false;},2000);
+  }, 500);
+}
+function chgAddSubject(){
+  const cd=chgInit();
+  cd.lastSubjects.push(chgNewSubject());
+  render();
+  chgScheduleSave();
+}
+function chgRemoveSubject(idx){
+  if(!confirm('이 과목을 삭제할까요?')) return;
+  const cd=chgInit();
+  cd.lastSubjects.splice(idx,1);
+  render();
+  chgScheduleSave();
+}
+function chgAddItem(sIdx){
+  const cd=chgInit();
+  cd.lastSubjects[sIdx].items.push({no:'',unit:'',diff:'중',reasons:[],memo:''});
+  render();
+  chgScheduleSave();
+}
+function chgRemoveItem(sIdx,iIdx){
+  const cd=chgInit();
+  cd.lastSubjects[sIdx].items.splice(iIdx,1);
+  render();
+  chgScheduleSave();
+}
+function chgSetSubjField(sIdx,field,val){
+  const cd=chgInit();
+  cd.lastSubjects[sIdx][field]=val;
+  chgScheduleSave();
+}
+const CHG_TAGS={KOR:['문제를 잘못 읽음','끝까지 못읽어서','지문 독해 지연','선지 판단 미스','어휘 및 개념어 부족','고전 어려움','독서 특정제재 어려움','보기유형 이해부족','멘탈/집중력 저하'],MATH:['계산 실수','개념 이해 부족','공식이 떠오르지 않아서','문제 해석 오류','풀이 방법 몰라서','시간 부족','중반이후 마무리 부족','킬러 문항 포기','검산 안 함','멘탈 붕괴'],ENG:['어휘 몰라서','구문 해석 실패','빈칸 추론 실패','순서/삽입 실패','장문 시간 부족','주제/요지 오독','연결사 판단 실수','집중력 저하'],INQ:['개념 이해 부족','자료 해석 오류','시간 부족','암기 부족','계산 실수','문제 독해 실패','응용력 부족','집중력 저하'],HIST:['시대/시기 착각','사건 순서 오류','인물/사건 혼동','암기 부족','자료 해석 실패','시간 부족','문제 독해 실패','집중력 저하'],LANG:['어휘 몰라서','문법 이해 부족','듣기 못 들음','시간 부족','독해 실패','암기 부족','문화 이해 부족','집중력 저하']};
+let chgModalTarget=null;
+function chgOpenReasonModal(sIdx,iIdx){
+  const cd=chgInit();
+  const sub=cd.lastSubjects[sIdx];
+  chgModalTarget={sIdx,iIdx,temp:[...(sub.items[iIdx].reasons||[])]};
+  render();
+}
+function chgToggleReason(tag){
+  if(!chgModalTarget) return;
+  const i=chgModalTarget.temp.indexOf(tag);
+  if(i>-1) chgModalTarget.temp.splice(i,1); else chgModalTarget.temp.push(tag);
+  render();
+}
+function chgSaveReasons(){
+  if(!chgModalTarget) return;
+  const cd=chgInit();
+  cd.lastSubjects[chgModalTarget.sIdx].items[chgModalTarget.iIdx].reasons=[...chgModalTarget.temp];
+  chgModalTarget=null;
+  render();
+  chgScheduleSave();
+}
+function chgCloseReasonModal(){ chgModalTarget=null; render(); }
+function chgReasonModalHtml(){
+  if(!chgModalTarget) return '';
+  const cd=chgInit();
+  const sub=cd.lastSubjects[chgModalTarget.sIdx];
+  const tags=CHG_TAGS[sub.subject]||[];
+  return `<div style="position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)chgCloseReasonModal()">
+    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow:auto;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:15px;font-weight:900">오답원인 선택</div>
+        <button class="btn-sm" onclick="chgCloseReasonModal()">닫기</button>
+      </div>
+      <p style="font-size:11px;color:#888;margin-bottom:12px;line-height:1.5">문항 하나에 여러 원인을 선택할 수 있습니다. 선택 후 저장하면 문항 행에는 요약이 표시됩니다.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+        ${tags.map(t=>`<span onclick="chgToggleReason('${t.replace(/'/g,"\\'")}')" style="padding:8px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid ${chgModalTarget.temp.includes(t)?'#3b5bdb':'#e2e8f0'};background:${chgModalTarget.temp.includes(t)?'#3b5bdb':'#fff'};color:${chgModalTarget.temp.includes(t)?'#fff':'#333'}">${esc(t)}</span>`).join('')}
+      </div>
+      <button class="btn-sm" style="width:100%;background:#3b5bdb;color:#fff;min-height:44px" onclick="chgSaveReasons()">선택 저장</button>
+    </div>
+  </div>`;
+}
+function chgSetItemField(sIdx,iIdx,field,val){
+  const cd=chgInit();
+  const it=cd.lastSubjects[sIdx].items[iIdx];
+  if(field==='reasons'){ it.reasons = val.split(',').map(x=>x.trim()).filter(Boolean); }
+  else { it[field]=val; }
+  chgScheduleSave();
+}
+function chgSetMeta(field,val){
+  const cd=chgInit();
+  if(field==='lastTestDate'||field==='lastTestName'){ cd[field]=val; }
+  else { cd.meta[field]=val; }
+  chgScheduleSave();
+}
+const CHG_SUBJ_OPT=[['KOR','국어'],['MATH','수학'],['ENG','영어'],['INQ','탐구'],['HIST','한국사'],['LANG','제2외국어']];
+function chgSelect(id,options,value,onch){
+  return `<select onchange="${onch}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+}
+function renderChallengerInput(){
+  const s=CU;
+  const cd=chgInit();
+  return `<div>
+    <div class="stitle">🎯 챌린저 모의고사 입력</div>
+    <div class="card"><div class="card-body">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">기본 정보</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px">
+        <div><label style="font-size:11px;color:#888">학생명</label><input value="${esc(s.name)}" readonly style="background:#f5f6fa;color:#888"></div>
+        <div><label style="font-size:11px;color:#888">학교/학년</label><input value="${esc((s.school||'')+' '+(s.grade||''))}" readonly style="background:#f5f6fa;color:#888"></div>
+        <div><label style="font-size:11px;color:#888">응시일</label><input type="date" value="${esc(cd.lastTestDate||'')}" onchange="chgSetMeta('lastTestDate',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">시험명/회차</label><input value="${esc(cd.lastTestName||'')}" placeholder="예: 6월 모의평가" oninput="chgSetMeta('lastTestName',this.value)"></div>
+        <div style="grid-column:span 2"><label style="font-size:11px;color:#888">목표 대학/전공</label><input value="${esc((cd.meta&&cd.meta.target)||'')}" placeholder="예: OO대학교 OO학과" oninput="chgSetMeta('target',this.value)"></div>
+      </div>
+    </div></div>
+
+    <div style="margin:16px 0 8px">
+      <div class="stitle" style="margin:0">📚 이번 회차 과목별 입력</div>
+    </div>
+
+    ${cd.lastSubjects.length===0?`<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">입력된 과목이 없습니다</div><div class="empty-sub">아래 '+ 과목 추가'를 눌러 이번 회차 결과를 입력해보세요</div></div>`:''}
+
+    ${cd.lastSubjects.map((sub,sIdx)=>`
+    <div class="card" style="margin-bottom:12px"><div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700">과목 ${sIdx+1}</div>
+        <button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveSubject(${sIdx})">삭제</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
+        <div><label style="font-size:11px;color:#888">과목</label><select onchange="chgSetSubjField(${sIdx},'subject',this.value);render()">${CHG_SUBJ_OPT.map(([v,l])=>`<option value="${v}" ${sub.subject===v?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">실력 수준</label>${chgSelect(0,['상위권','중위권','하위권','불안정권'],sub.level,`chgSetSubjField(${sIdx},'level',this.value)`)}</div>
+        <div><label style="font-size:11px;color:#888">이번 회차 집중 여부</label>${chgSelect(0,['집중','유지','관찰','보류'],sub.focus,`chgSetSubjField(${sIdx},'focus',this.value)`)}</div>
+        <div><label style="font-size:11px;color:#888">정답률 목표</label>${chgSelect(0,['정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'],sub.accuracyTarget,`chgSetSubjField(${sIdx},'accuracyTarget',this.value)`)}</div>
+        <div><label style="font-size:11px;color:#888">오답개수</label><input type="number" value="${esc(sub.wrongCount)}" oninput="chgSetSubjField(${sIdx},'wrongCount',this.value)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
+        <div><label style="font-size:11px;color:#888">성적</label><input type="number" value="${esc(sub.score)}" oninput="chgSetSubjField(${sIdx},'score',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">등급</label><input value="${esc(sub.grade)}" oninput="chgSetSubjField(${sIdx},'grade',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">백분위</label><input type="number" value="${esc(sub.percentile)}" oninput="chgSetSubjField(${sIdx},'percentile',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">목표 성적</label><input type="number" value="${esc(sub.targetScore)}" oninput="chgSetSubjField(${sIdx},'targetScore',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">목표 등급</label><input value="${esc(sub.targetGrade)}" oninput="chgSetSubjField(${sIdx},'targetGrade',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">목표 백분위</label><input type="number" value="${esc(sub.targetPercentile)}" oninput="chgSetSubjField(${sIdx},'targetPercentile',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">문제풀이순서</label>${chgSelect(0,['번호 순서대로','쉬운 문제부터 선별해서','선택과목부터','공통부터','화작/언매→독서론→문학→독서','직접 입력'],sub.order,`chgSetSubjField(${sIdx},'order',this.value)`)}</div>
+        <div><label style="font-size:11px;color:#888">문제풀이순서 직접 입력</label><input value="${esc(sub.orderMemo)}" oninput="chgSetSubjField(${sIdx},'orderMemo',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">시간부족</label>${chgSelect(0,['없음','약간','뚜렷함','심각'],sub.time,`chgSetSubjField(${sIdx},'time',this.value)`)}</div>
+        <div><label style="font-size:11px;color:#888">집중/멘탈</label>${chgSelect(0,['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'],sub.mental,`chgSetSubjField(${sIdx},'mental',this.value)`)}</div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:#888">틀린 문항별 오답 원인</label>
+        ${(sub.items||[]).map((it,iIdx)=>`
+        <div style="border:1px solid #f0f0f8;border-radius:8px;padding:8px;margin-top:6px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 8px">
+            <div><input placeholder="문항 번호" value="${esc(it.no)}" oninput="chgSetItemField(${sIdx},${iIdx},'no',this.value)"></div>
+            <div><input placeholder="단원/유형" value="${esc(it.unit)}" oninput="chgSetItemField(${sIdx},${iIdx},'unit',this.value)"></div>
+            <div>${chgSelect(0,['하','중','상','최상','킬러'],it.diff,`chgSetItemField(${sIdx},${iIdx},'diff',this.value)`)}</div>
+            <div><button class="btn-sm" style="width:100%;background:#e8f5e9;color:#2e7d32" onclick="chgOpenReasonModal(${sIdx},${iIdx})">오답원인 선택</button></div>
+            <div style="grid-column:span 2;font-size:12px;color:${(it.reasons&&it.reasons.length)?'#333':'#aaa'};padding:6px 2px">${(it.reasons&&it.reasons.length)?esc(it.reasons.join(', ')):'선택 전'}</div>
+          </div>
+          <button class="btn-sm" style="margin-top:6px;background:#fee2e2;color:#dc2626" onclick="chgRemoveItem(${sIdx},${iIdx})">이 문항 삭제</button>
+        </div>`).join('')}
+        <button class="btn-sm" style="margin-top:8px;width:100%" onclick="chgAddItem(${sIdx})">+ 문항 추가</button>
+      </div>
+    </div></div>`).join('')}
+
+    <button class="btn-sm" style="width:100%;min-height:46px;margin-bottom:12px;background:#3b5bdb;color:#fff;font-size:14px" onclick="chgAddSubject()">+ 과목 추가</button>
+
+    <div class="card"><div class="card-body">
+      <p style="font-size:11px;color:#888;line-height:1.6">✏️ 입력한 내용은 자동으로 저장되며, 담당 선생님 화면(챌린저)에도 실시간으로 반영됩니다. 선생님이 내용을 수정하시면 이 화면도 함께 업데이트됩니다.</p>
+    </div></div>
+  </div>
+  ${chgReasonModalHtml()}`;
+}
+
 function renderInfo(){
   const s=CU;
   const rows=[['🏢 기관',s.orgName],['🏫 학교',s.school],['📚 학년',s.grade],['🏷️ 반',s.className],['📱 연락처',s.phone],['👨‍🏫 담당 선생님',s.counselor]].filter(([,v])=>v);
@@ -1544,7 +1738,7 @@ function startStudentRealtimeSync(studentId){
         // [학생용 onSnapshot] 데이터 수신
         // 타임테이블 관련 필드만 업데이트 (UI 상태 보존)
         const planFields = ['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
-          'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs'];
+          'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData'];
         planFields.forEach(function(field){
           if(incoming[field] !== undefined) CU[field] = incoming[field];
         });
@@ -1585,7 +1779,7 @@ async function refreshData(){
     if(student){
       // 관리자가 관리하는 필드(플랜/과목) 업데이트
       const adminFields=['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
-        'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs'];
+        'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData'];
       adminFields.forEach(function(f){if(student[f]!==undefined) CU[f]=student[f];});
       DATA={student:CU,tests:tests.filter(t=>!t.classNames?.length||t.classNames.includes(student.className)),students};
       render();toast('✅ 최신 데이터로 업데이트됨');
@@ -1618,10 +1812,10 @@ async function refreshData(){
   render(); // 세션 없으면 로그인 화면
 })();
 </script>
-  <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
-  }
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
 </script>
 </body>
 </html>
