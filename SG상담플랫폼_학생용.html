@@ -359,7 +359,7 @@ function render(){
     ${renderHdr()}
     <div class="content" id="content">
       <div class="inner">
-        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():renderInfo()}
+        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='inspect'?renderPlanInspect():renderInfo()}
       </div>
     </div>
     ${renderTabbar()}`;
@@ -445,7 +445,7 @@ function renderHdr(){
 }
 
 function renderTabbar(){
-  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'info',icon:'👤',label:'내 정보'}];
+  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}];
   return`<div class="tabbar">${tabs.map(t=>`<button class="tb-item ${curTab===t.id?'act':''}" onclick="curTab='${t.id}';render()">
     <span class="tb-icon">${t.icon}</span><span>${t.label}</span>
   </button>`).join('')}</div>`;
@@ -1641,6 +1641,319 @@ function renderChallengerInput(){
   ${chgReasonModalHtml()}`;
 }
 
+// ══════════════════════════════════════════════════
+// ✅ 플랜점검 (학습전략 선택 후 일자별 학습완성도·특이사항 입력)
+// 관리자 페이지의 weeklyInspect[wKey][날짜__과목/교재] 구조와 완전히 동일하게 저장
+// ══════════════════════════════════════════════════
+function inspGetWeekOfMonth(year, month, day){
+  const firstDay = new Date(year, month-1, 1).getDay();
+  const firstMonStart = 1 - (firstDay===0?6:firstDay-1);
+  return Math.ceil((day - firstMonStart + 1) / 7);
+}
+function inspGetWeekNum(y,m,w){ return `${y}-${String(m).padStart(2,'0')}-w${w}`; }
+function inspCurrentWeekKey(){
+  const now=new Date();
+  return inspGetWeekNum(now.getFullYear(), now.getMonth()+1, inspGetWeekOfMonth(now.getFullYear(), now.getMonth()+1, now.getDate()));
+}
+let _inspSelKey = undefined; // undefined=아직 미결정(최신 전략으로 자동 선택), null=선택 안 함
+let _inspSelISO = null;
+function inspPeriods(){
+  const pm = CU.weeklyStrategyPeriod || {};
+  return Object.entries(pm).filter(([k,p])=>p).sort((a,b)=>{
+    const da=a[1].counselDate||a[1].start||'', db=b[1].counselDate||b[1].start||'';
+    return db.localeCompare(da);
+  });
+}
+function inspPeriodLabel(p){
+  const fmt=s=>{ if(!s) return ''; const d=new Date(s); return isNaN(d)?'':(d.getMonth()+1)+'/'+d.getDate(); };
+  if(p.start && p.end) return fmt(p.start)+'~'+fmt(p.end)+' 전략'+(p.counselDate?' ('+fmt(p.counselDate)+' 상담)':'');
+  if(p.counselDate) return fmt(p.counselDate)+' 상담 전략';
+  return '전략기간 미상';
+}
+function inspSetPeriod(key){ _inspSelKey = key||null; _inspSelISO=null; render(); }
+function inspSetDate(iso){ _inspSelISO = iso; render(); }
+let _inspPendingWrites = []; // [{key, dInsKey, field, val}] - 아직 서버에 반영 안 된 변경들
+function inspSaveField(wKey,dInsKey,field,val){
+  if(!CU.weeklyInspect) CU.weeklyInspect={};
+  const _writeTo=(k)=>{
+    if(!k) return;
+    if(!CU.weeklyInspect[k]) CU.weeklyInspect[k]={};
+    if(!CU.weeklyInspect[k][dInsKey]) CU.weeklyInspect[k][dInsKey]={};
+    CU.weeklyInspect[k][dInsKey][field]=val;
+    _inspPendingWrites.push({key:k, dInsKey, field, val});
+  };
+  // ★ 2026-07 3중 저장: 관리자 페이지 코드를 확인해보니 "전략 저장 키"와
+  // "완료 표시(✅) 확인 키"가 서로 다르게 쓰이고 있었다(저장은 전략의 storageKey
+  // 기준, 완료표시는 counselDate 기준). 관리자가 정확히 어느 키로 읽어올지
+  // 확실하지 않으므로, 있을 수 있는 키 전부에 동일하게 저장해 안전하게 맞춘다.
+  const period = (CU.weeklyStrategyPeriod||{})[wKey];
+  const curWk = inspCurrentWeekKey();
+  const _targetKeys = [...new Set([wKey, period&&period.counselDate, curWk].filter(Boolean))];
+  _targetKeys.forEach(_writeTo);
+  inspScheduleSave();
+}
+let _inspSaveTimer=null;
+let _inspSaveStatus = 'idle'; // idle | saving | saved | error
+let _inspLastError = '';
+let _inspVerify = null; // {ok, expected, actual, path, usedFallback, studentId} - 저장 직후 서버 재조회 검증 결과
+async function inspFlushWrites(){
+  if(!CU||!CU.id||!FB()){ _inspPendingWrites=[]; return; }
+  // ★ 2026-07 진단 버그 수정: 같은 경로(key+dInsKey+field)에 대해 타이핑 중
+  // 여러 번 쌓인 값 중 "마지막(최종) 값"만 남기고 나머지는 버린다.
+  // (예: "7"→"78" 처럼 두 글자를 입력하면 중간값 "7"과 최종값 "78"이 둘 다
+  // 큐에 쌓이는데, 예전 진단 로직은 첫 번째 값과 서버의 최종 상태를 비교해서
+  // "값이 다르다"는 오탐(false alarm)을 내고 있었다. 실제 저장은 정상이었음.)
+  const _dedup = {};
+  _inspPendingWrites.forEach(w=>{ _dedup[w.key+'|'+w.dInsKey+'|'+w.field] = w; });
+  const writes = Object.values(_dedup);
+  _inspPendingWrites = [];
+  if(!writes.length) return;
+  window._studentSaving = true;
+  const ref = window._db.collection('students').doc(String(CU.id));
+  _inspLastError = '';
+  let _usedFallback = false;
+  try{
+    // ★ 2026-07 근본 수정: weeklyInspect 전체를 보내던 방식 대신, 바뀐 필드
+    // 하나하나를 FieldPath로 정확히 지정해서 저장. 문서 전체(또는 weeklyInspect
+    // 전체)를 로컬 데이터로 교체하는 게 아니므로, 관리자가 동시에 다른 과목/날짜를
+    // 저장해도 서로의 데이터를 절대 덮어쓰지 않는다.
+    const args = [];
+    writes.forEach(w=>{
+      const fp = new firebase.firestore.FieldPath('weeklyInspect', w.key, w.dInsKey, w.field);
+      args.push(fp, w.val);
+    });
+    // ★★★ 2026-07 진짜 근본 원인 수정: 관리자 페이지는 "내 로컬 데이터가 서버보다
+    // 최신인지"를 _updatedAt 필드로 판단하는데, 학생 쪽에서 이 필드를 갱신하지 않고
+    // 엉뚱한 이름(_t)으로만 저장하고 있었다. 그래서 관리자는 서버가 갱신된 걸 전혀
+    // 인식하지 못하고, 새로고침을 해도 계속 자기 로컬(오래된) 캐시를 신뢰해서 보여주고
+    // 있었다. 이제 관리자가 실제로 확인하는 필드명과 정확히 일치시킨다.
+    args.push('_updatedAt', Date.now());
+    await ref.update(...args);
+    _inspSaveStatus='saved';
+  }catch(e2){
+    _usedFallback = true;
+    _inspLastError = '1차(update) 실패: '+(e2&&e2.message||e2);
+    // 문서가 아직 없는 경우(최초 저장) 등에는 병합 저장으로 폴백
+    // (set+merge:true는 중첩된 객체도 재귀적으로 병합되므로 여기서도 다른 데이터는 보존됨)
+    try{
+      const mergeObj = {weeklyInspect:{}, _updatedAt: Date.now()};
+      writes.forEach(w=>{
+        if(!mergeObj.weeklyInspect[w.key]) mergeObj.weeklyInspect[w.key]={};
+        if(!mergeObj.weeklyInspect[w.key][w.dInsKey]) mergeObj.weeklyInspect[w.key][w.dInsKey]={};
+        mergeObj.weeklyInspect[w.key][w.dInsKey][w.field]=w.val;
+      });
+      await ref.set(mergeObj, {merge:true});
+      _inspSaveStatus='saved';
+    }catch(e3){
+      _inspSaveStatus='error';
+      _inspLastError += ' / 2차(set merge) 실패: '+(e3&&e3.message||e3);
+      console.warn('플랜점검 저장 오류:', _inspLastError);
+    }
+  }
+  // ★ 진단: 저장 직후 실제로 서버에 반영됐는지 즉시 재조회해서 확인
+  // (중복제거된 writes의 "마지막" 항목 = 이 필드의 실제 최종 의도값과 비교)
+  if(_inspSaveStatus==='saved'){
+    try{
+      const snap = await ref.get();
+      const w0 = writes[writes.length-1];
+      const serverVal = snap.exists ? (((snap.data().weeklyInspect||{})[w0.key]||{})[w0.dInsKey]||{})[w0.field] : undefined;
+      _inspVerify = { ok: serverVal===w0.val, expected:w0.val, actual:serverVal, path:'weeklyInspect.'+w0.key+'.'+w0.dInsKey+'.'+w0.field, usedFallback:_usedFallback, studentId:CU.id };
+    }catch(e4){
+      _inspVerify = { ok:false, error:'재조회 실패: '+(e4&&e4.message||e4), studentId:CU.id };
+    }
+  }
+  render();
+  setTimeout(function(){window._studentSaving=false;},2000);
+}
+function inspScheduleSave(){
+  clearTimeout(_inspSaveTimer);
+  _inspSaveStatus='saving';
+  _inspSaveTimer=setTimeout(inspFlushWrites, 500);
+}
+async function inspForceSaveNow(){
+  clearTimeout(_inspSaveTimer);
+  _inspSaveStatus='saving'; render();
+  await inspFlushWrites();
+}
+async function inspManualRefresh(){
+  if(!CU||!CU.id||!FB()){ toast('Firebase 연결을 확인해주세요'); return; }
+  try{
+    const snap = await window._db.collection('students').doc(String(CU.id)).get();
+    if(snap.exists){
+      const data = snap.data();
+      if(data.weeklyInspect!==undefined) CU.weeklyInspect = data.weeklyInspect;
+      if(data.weeklyStrategyPeriod!==undefined) CU.weeklyStrategyPeriod = data.weeklyStrategyPeriod;
+      if(data.weeklySubjPlans!==undefined) CU.weeklySubjPlans = data.weeklySubjPlans;
+    }
+    toast('최신 내용을 불러왔습니다');
+    render();
+  }catch(e){ toast('불러오기 실패: '+e.message); }
+}
+
+function renderPlanInspect(){
+  const s=CU;
+  const periods=inspPeriods();
+  if(_inspSelKey===undefined){ _inspSelKey = periods.length? periods[0][0] : null; }
+  const period = _inspSelKey ? (s.weeklyStrategyPeriod||{})[_inspSelKey] : null;
+
+  if(!periods.length){
+    return `<div>
+      <div class="stitle">✅ 플랜점검</div>
+      <div class="empty"><div class="empty-icon">📋</div><div class="empty-title">등록된 학습전략이 없습니다</div><div class="empty-sub">담당 선생님이 주간플랜 &gt; 학습전략을 입력하시면 여기서 점검할 수 있습니다</div></div>
+    </div>`;
+  }
+
+  // 전략기간의 날짜 범위 계산 (최대 60일)
+  // ★ 2026-07 수정: period.start/end가 문자열이 아니라 Firestore Timestamp
+  // 객체로 저장되어 있는 경우(관리자 쪽에서 Date 객체로 저장했을 때 자동 변환됨),
+  // new Date(timestamp객체)가 제대로 파싱되지 않아 날짜 범위 계산이 실패하고
+  // 오늘 하루만 표시되던 문제를 수정. 어떤 형태로 저장돼 있어도 안전하게 변환.
+  const _toDate=(v)=>{
+    if(!v) return null;
+    if(typeof v.toDate==='function') return v.toDate(); // Firestore Timestamp
+    if(v instanceof Date) return isNaN(v)?null:v;
+    if(typeof v==='number') return new Date(v);
+    if(typeof v==='string'){ const d=new Date(v); return isNaN(d)?null:d; }
+    if(typeof v==='object' && typeof v.seconds==='number') return new Date(v.seconds*1000); // {seconds,nanoseconds} 형태
+    return null;
+  };
+  const DAYS_KOR=['월','화','수','목','금','토','일'];
+  let dates=[];
+  const pS=period?_toDate(period.start):null, pE=period?_toDate(period.end):null;
+  if(pS && pE && pS<=pE){
+    const span=Math.round((pE-pS)/86400000)+1;
+    if(!isNaN(span) && span>=1 && span<=60){
+      for(let i=0;i<span;i++){ const d=new Date(pS); d.setDate(pS.getDate()+i); dates.push(d); }
+    }
+  }
+  if(!dates.length){ dates=[new Date()]; }
+
+  const toISO=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!_inspSelISO || !dates.some(d=>toISO(d)===_inspSelISO)){
+    const todayISO=toISO(new Date());
+    const todayIdx=dates.findIndex(d=>toISO(d)===todayISO);
+    _inspSelISO = todayIdx>=0 ? todayISO : toISO(dates[0]);
+  }
+  const selDate = dates.find(d=>toISO(d)===_inspSelISO) || dates[0];
+  // ★ 관리자 페이지의 저장 키 규칙과 동일하게 맞춤: weeklyStrategyPeriod는
+  // counselDate 또는 wKey 형식의 문자열이 그 자체로 키이며(별도 _wKey 필드가
+  // 항상 있는 게 아님), weeklyInspect도 그 "전략 자체의 키"로 저장/조회한다.
+  const wKey = _inspSelKey;
+
+  // 과목/교재 행 구성 (전략기간 스냅샷 우선, 없으면 현재 학습전략)
+  const subjPlans = (period && period.subjPlansSnapshot) ? period.subjPlansSnapshot : (s.weeklySubjPlans||{});
+  const rows=[];
+  Object.keys(subjPlans).filter(Boolean).forEach(subj=>{
+    const sp=subjPlans[subj]||{};
+    const bd=(sp.bookDetails||[]).filter(d=>d.name);
+    if(bd.length){ bd.forEach((d,di)=>rows.push({subj,bookName:d.name,bookIdx:di,detail:d})); }
+    else { rows.push({subj,bookName:'',bookIdx:-1,detail:null}); }
+  });
+  // ★ 저장 때와 마찬가지로 읽을 때도 3개 키(전략키/counselDate/현재주차키)를
+  // 전부 확인해서 병합한다 (관리자가 어느 키로 저장했든 놓치지 않게).
+  // ★ 항목(dInsKey) 단위로 깊은 병합 - 단순 Object.assign은 같은 dInsKey를
+  // 통째로 덮어써서 한쪽의 achievementPct/note 중 하나가 사라지는 버그가 있었음.
+  const _wi7 = s.weeklyInspect||{};
+  const _keysToCheck = [wKey, period&&period.counselDate, inspCurrentWeekKey()].filter(Boolean);
+  const inspect = {};
+  _keysToCheck.forEach(k=>{
+    const src=_wi7[k]||{};
+    Object.keys(src).forEach(dk=>{ inspect[dk]=Object.assign({}, inspect[dk]||{}, src[dk]); });
+  });
+
+  const amtOf=d=>d&&d.amountVal?(d.amountType==='페이지'?(d.amountEnd?d.amountVal+'~'+d.amountEnd+'p':d.amountVal+'p'):(d.amountVal+'문제')):'–';
+  const unitOf=d=>d?((d.units||'').split(',').map(u=>u.trim()).filter(Boolean).join(', ')||'–'):'–';
+  const typeOf=d=>d?(d.type==='직접입력'&&d.typeDetail?'직접: '+d.typeDetail:(d.type||'–')):'–';
+
+  return `<div>
+    <div class="stitle">✅ 플랜점검</div>
+
+    <div class="card"><div class="card-body">
+      <label style="font-size:11px;color:#888">점검할 학습전략 선택</label>
+      <select onchange="inspSetPeriod(this.value)" style="margin-top:4px">
+        ${periods.map(([k,p])=>`<option value="${k}" ${k===_inspSelKey?'selected':''}>${esc(inspPeriodLabel(p))}</option>`).join('')}
+      </select>
+    </div></div>
+
+    <div class="card" style="margin-top:10px"><div class="card-body">
+      <label style="font-size:11px;color:#888;display:block;margin-bottom:8px">📆 점검할 날짜 선택</label>
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
+        ${dates.map(d=>{
+          const iso=toISO(d);
+          const isAct=iso===_inspSelISO;
+          const dow=DAYS_KOR[(d.getDay()+6)%7];
+          return `<button onclick="inspSetDate('${iso}')" style="flex-shrink:0;min-width:50px;background:${isAct?'#3b5bdb':'#fff'};color:${isAct?'#fff':'#333'};border:1.5px solid ${isAct?'#3b5bdb':'#e2e8f0'};border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer">${d.getMonth()+1}/${d.getDate()}(${dow})</button>`;
+        }).join('')}
+      </div>
+    </div></div>
+
+    ${rows.length===0?`<div class="empty" style="margin-top:10px"><div class="empty-icon">📚</div><div class="empty-title">이 전략에 등록된 과목이 없습니다</div></div>`:''}
+
+    ${rows.map(r=>{
+      const insKey = r.bookIdx>=0 ? (r.subj+'__'+r.bookName+'__'+r.bookIdx) : r.subj;
+      const dInsKey = _inspSelISO+'__'+insKey;
+      const ins = inspect[dInsKey]||{};
+      const pct = ins.achievementPct!=null ? ins.achievementPct : '';
+      const pctColor = ins.achievementPct!=null ? (ins.achievementPct>=80?'#0f9d58':ins.achievementPct>=60?'#f59e0b':'#e53935') : '#333';
+      const SUBJ_COLOR={국어:'#3b82f6',수학:'#ef4444',영어:'#10b981',과학:'#f59e0b',사회:'#8b5cf6',한국사:'#f97316',논술:'#ec4899'}[r.subj]||'#3b5bdb';
+      return `<div class="card" style="margin-top:10px;overflow:hidden">
+        <div style="background:${SUBJ_COLOR}15;padding:14px 16px;border-bottom:1.5px solid ${SUBJ_COLOR}30">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px">
+            <div style="font-weight:900;font-size:19px;color:${SUBJ_COLOR}">${esc(r.subj)}</div>
+            ${r.bookName?`<div style="font-size:14px;font-weight:700;color:#444">${esc(r.bookName)}</div>`:''}
+          </div>
+        </div>
+        <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+          <div style="background:#f7f8fc;border-radius:10px;padding:9px 12px;grid-column:span 2">
+            <div style="font-size:11px;color:#999;margin-bottom:2px">📖 단원</div>
+            <div style="font-size:14px;font-weight:700;color:#222">${esc(unitOf(r.detail))}</div>
+          </div>
+          <div style="background:#f7f8fc;border-radius:10px;padding:9px 12px">
+            <div style="font-size:11px;color:#999;margin-bottom:2px">📏 분량</div>
+            <div style="font-size:14px;font-weight:700;color:#222">${esc(amtOf(r.detail))}</div>
+          </div>
+          <div style="background:#f7f8fc;border-radius:10px;padding:9px 12px">
+            <div style="font-size:11px;color:#999;margin-bottom:2px">✍️ 학습형태</div>
+            <div style="font-size:14px;font-weight:700;color:#222">${esc(typeOf(r.detail))}</div>
+          </div>
+        </div>
+        ${(r.detail&&r.detail.memo)?`<div style="background:#fef9c3;border:1.5px solid #fde047;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+          <div style="font-size:11px;color:#92400e;font-weight:700;margin-bottom:3px">📢 전달사항</div>
+          <div style="font-size:13px;color:#78350f;line-height:1.5">${esc(r.detail.memo)}</div>
+        </div>`:''}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <label style="font-size:11px;color:#888;white-space:nowrap">학습완성도</label>
+          <input type="number" min="1" max="100" value="${pct}" placeholder="–"
+            oninput="if(this.value!==''){this.value=Math.max(1,Math.min(100,+this.value))};this.style.color=(this.value>=80?'#0f9d58':this.value>=60?'#f59e0b':this.value?'#e53935':'#333');inspSaveField('${wKey}','${dInsKey.replace(/'/g,"\\'")}','achievementPct',this.value===''?null:+this.value)"
+            style="width:70px;text-align:center;font-weight:800;color:${pctColor}">
+          <span style="font-size:11px;color:#888">%</span>
+        </div>
+        <textarea rows="2" placeholder="특이사항 (예: 계획보다 느리게 진행됨, 특정 단원 반복 필요 등)"
+          oninput="inspSaveField('${wKey}','${dInsKey.replace(/'/g,"\\'")}','note',this.value)">${esc(ins.note||'')}</textarea>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <div class="card" style="margin-top:10px"><div class="card-body">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;font-weight:700">
+        ${_inspSaveStatus==='saving'?'<span style="color:#f59e0b">⏳ 저장 중...</span>':_inspSaveStatus==='saved'?'<span style="color:#0f9d58">✅ 저장됨</span>':_inspSaveStatus==='error'?'<span style="color:#e53935">⚠️ 저장 실패 - 다시 시도해주세요</span>':'<span style="color:#aaa">입력하면 자동 저장됩니다</span>'}
+      </div>
+      ${_inspLastError?`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:10.5px;color:#991b1b;font-family:monospace;word-break:break-all">❌ 오류 상세: ${esc(_inspLastError)}</div>`:''}
+      ${_inspVerify?`<div style="background:${_inspVerify.ok?'#dcfce7':'#fee2e2'};border:1px solid ${_inspVerify.ok?'#86efac':'#fca5a5'};border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:10.5px;font-family:monospace;word-break:break-all;color:${_inspVerify.ok?'#166534':'#991b1b'}">
+        ${_inspVerify.ok?'✅ 서버 재조회 확인: 정상 저장됨':'❌ 서버 재조회 확인: 값이 다름!'}<br>
+        학생ID: ${esc(String(_inspVerify.studentId))}<br>
+        ${_inspVerify.error?('오류: '+esc(_inspVerify.error)):`경로: ${esc(_inspVerify.path)}<br>보낸 값: ${esc(String(_inspVerify.expected))} / 서버에서 읽은 값: ${esc(String(_inspVerify.actual))}${_inspVerify.usedFallback?' (폴백 저장 사용됨)':''}`}
+      </div>`:''}
+      <div style="display:flex;gap:8px">
+        <button class="btn-sm" style="flex:1;min-height:42px;background:#3b5bdb;color:#fff;font-size:13px" onclick="inspForceSaveNow()">💾 지금 저장</button>
+        <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px" onclick="inspManualRefresh()">🔄 최신 내용 불러오기</button>
+      </div>
+      <p style="font-size:11px;color:#888;line-height:1.6;margin-top:10px">✏️ 입력한 내용은 자동으로 저장되며, 담당 선생님 화면(주간플랜 &gt; 플랜점검)에도 실시간으로 반영됩니다. 혹시 반영이 늦다면 "최신 내용 불러오기"를 눌러주세요.</p>
+    </div></div>
+  </div>`;
+}
+
 function renderInfo(){
   const s=CU;
   const rows=[['🏢 기관',s.orgName],['🏫 학교',s.school],['📚 학년',s.grade],['🏷️ 반',s.className],['📱 연락처',s.phone],['👨‍🏫 담당 선생님',s.counselor]].filter(([,v])=>v);
@@ -1738,7 +2051,8 @@ function startStudentRealtimeSync(studentId){
         // [학생용 onSnapshot] 데이터 수신
         // 타임테이블 관련 필드만 업데이트 (UI 상태 보존)
         const planFields = ['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
-          'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData'];
+          'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData',
+          'weeklyInspect','weeklyStrategyPeriod'];
         planFields.forEach(function(field){
           if(incoming[field] !== undefined) CU[field] = incoming[field];
         });
@@ -1779,7 +2093,8 @@ async function refreshData(){
     if(student){
       // 관리자가 관리하는 필드(플랜/과목) 업데이트
       const adminFields=['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
-        'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData'];
+        'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData',
+        'weeklyInspect','weeklyStrategyPeriod'];
       adminFields.forEach(function(f){if(student[f]!==undefined) CU[f]=student[f];});
       DATA={student:CU,tests:tests.filter(t=>!t.classNames?.length||t.classNames.includes(student.className)),students};
       render();toast('✅ 최신 데이터로 업데이트됨');
