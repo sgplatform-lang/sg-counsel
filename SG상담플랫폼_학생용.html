@@ -1793,7 +1793,16 @@ async function inspManualRefresh(){
 function renderPlanInspect(){
   const s=CU;
   const periods=inspPeriods();
-  if(_inspSelKey===undefined){ _inspSelKey = periods.length? periods[0][0] : null; }
+  // ★ 2026-07-22 수정: 기본 선택 전략을 "가장 최근에 등록된 전략(다음주차 등)"이 아니라
+  // "오늘 날짜가 포함된 전략기간"을 우선 선택하도록 변경. 다음주차 학습전략이 미리
+  // 등록돼 있으면 예전 로직(periods[0][0], counselDate/start 최신순)은 그 다음주차
+  // 전략을 기본으로 띄워서 오늘 점검할 항목이 안 보이는 문제가 있었음.
+  // 오늘을 포함하는 전략이 없을 때만 기존 방식(가장 최근 전략)으로 폴백.
+  if(_inspSelKey===undefined){
+    const _todayISO0=(()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+    const _todayPeriod=periods.find(([k,p])=>p&&p.start&&p.end&&p.start<=_todayISO0&&_todayISO0<=p.end);
+    _inspSelKey = _todayPeriod ? _todayPeriod[0] : (periods.length? periods[0][0] : null);
+  }
   const period = _inspSelKey ? (s.weeklyStrategyPeriod||{})[_inspSelKey] : null;
 
   if(!periods.length){
