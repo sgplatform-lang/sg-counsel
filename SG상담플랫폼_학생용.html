@@ -1853,8 +1853,12 @@ function renderPlanInspect(){
   // 전부 확인해서 병합한다 (관리자가 어느 키로 저장했든 놓치지 않게).
   // ★ 항목(dInsKey) 단위로 깊은 병합 - 단순 Object.assign은 같은 dInsKey를
   // 통째로 덮어써서 한쪽의 achievementPct/note 중 하나가 사라지는 버그가 있었음.
+  // ★★ 2026-07 우선순위 버그 수정: 관리자는 실제로 "전략 고유 키(wKey)"만
+  // 정확히 사용하는데, 여기서 "현재주차키"를 나중에 처리해서 그 오래된 값이
+  // 항상 이겨버리고 있었다(전략 고유 키의 새 값을 덮어씀). 전략 고유 키가
+  // 가장 신뢰할 수 있는 정본이므로 반드시 마지막(최우선)에 처리한다.
   const _wi7 = s.weeklyInspect||{};
-  const _keysToCheck = [wKey, period&&period.counselDate, inspCurrentWeekKey()].filter(Boolean);
+  const _keysToCheck = [inspCurrentWeekKey(), period&&period.counselDate, wKey].filter(Boolean);
   const inspect = {};
   _keysToCheck.forEach(k=>{
     const src=_wi7[k]||{};
@@ -1940,11 +1944,6 @@ function renderPlanInspect(){
         ${_inspSaveStatus==='saving'?'<span style="color:#f59e0b">⏳ 저장 중...</span>':_inspSaveStatus==='saved'?'<span style="color:#0f9d58">✅ 저장됨</span>':_inspSaveStatus==='error'?'<span style="color:#e53935">⚠️ 저장 실패 - 다시 시도해주세요</span>':'<span style="color:#aaa">입력하면 자동 저장됩니다</span>'}
       </div>
       ${_inspLastError?`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:10.5px;color:#991b1b;font-family:monospace;word-break:break-all">❌ 오류 상세: ${esc(_inspLastError)}</div>`:''}
-      ${_inspVerify?`<div style="background:${_inspVerify.ok?'#dcfce7':'#fee2e2'};border:1px solid ${_inspVerify.ok?'#86efac':'#fca5a5'};border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:10.5px;font-family:monospace;word-break:break-all;color:${_inspVerify.ok?'#166534':'#991b1b'}">
-        ${_inspVerify.ok?'✅ 서버 재조회 확인: 정상 저장됨':'❌ 서버 재조회 확인: 값이 다름!'}<br>
-        학생ID: ${esc(String(_inspVerify.studentId))}<br>
-        ${_inspVerify.error?('오류: '+esc(_inspVerify.error)):`경로: ${esc(_inspVerify.path)}<br>보낸 값: ${esc(String(_inspVerify.expected))} / 서버에서 읽은 값: ${esc(String(_inspVerify.actual))}${_inspVerify.usedFallback?' (폴백 저장 사용됨)':''}`}
-      </div>`:''}
       <div style="display:flex;gap:8px">
         <button class="btn-sm" style="flex:1;min-height:42px;background:#3b5bdb;color:#fff;font-size:13px" onclick="inspForceSaveNow()">💾 지금 저장</button>
         <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px" onclick="inspManualRefresh()">🔄 최신 내용 불러오기</button>
