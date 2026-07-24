@@ -1574,6 +1574,48 @@ function chgSaveReasons(){
   chgScheduleSave();
 }
 function chgCloseReasonModal(){ chgModalTarget=null; render(); }
+
+// ★ 2026-07-22 추가: "과거 회차 보기" 팝업 - 시험명/회차 옆 버튼을 누르면
+// 그동안 "이번 회차 저장(확정)"으로 저장해둔 회차 목록을 보여주고, 선택하면
+// 그 회차 내용을 불러와서 화면에 표시한다(수정 후 다시 저장도 가능).
+let _chgHistOpen = false;
+function chgOpenHistoryPicker(){ _chgHistOpen = true; render(); }
+function chgCloseHistoryPicker(){ _chgHistOpen = false; render(); }
+function chgLoadHistoryRound(idx){
+  const cd=chgInit();
+  const list=(cd.history||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  const rec=list[idx];
+  if(!rec) return;
+  if(!confirm(rec.date+' · '+rec.test+' 회차를 불러올까요?\n(지금 화면에 입력 중인 내용은 먼저 "이번 회차 저장"을 하지 않으면 사라집니다)')) return;
+  cd.lastTestDate = rec.date||'';
+  cd.lastTestName = rec.test||'';
+  cd.lastSubjects = rec.fullSubjects && rec.fullSubjects.length ? JSON.parse(JSON.stringify(rec.fullSubjects)) : [];
+  _chgHistOpen = false;
+  render();
+  chgScheduleSave();
+  toast(rec.date+' · '+rec.test+' 회차를 불러왔습니다.');
+}
+function chgHistoryModalHtml(){
+  if(!_chgHistOpen) return '';
+  const cd=chgInit();
+  const list=(cd.history||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return `<div style="position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)chgCloseHistoryPicker()">
+    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow:auto;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:15px;font-weight:900">📋 과거 회차 보기</div>
+        <button class="btn-sm" onclick="chgCloseHistoryPicker()">닫기</button>
+      </div>
+      ${!list.length ? `<p style="font-size:12px;color:#888;padding:20px 0;text-align:center">아직 저장된 회차가 없습니다.<br>과목 입력 후 "이번 회차 저장(확정)"을 눌러 회차를 남겨보세요.</p>` : `
+      <p style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.5">불러올 회차를 선택하세요. 현재 화면 내용은 먼저 저장하지 않으면 사라집니다.</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${list.map((h,i)=>`<div onclick="chgLoadHistoryRound(${i})" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;cursor:pointer" onmousedown="this.style.background='#f4f6fb'">
+          <div style="font-size:13px;font-weight:700">${esc(h.date||'날짜없음')} · ${esc(h.test||'회차명없음')}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">${(h.subjects||[]).map(s=>esc(s.name)+' '+esc(String(s.score||0))+'점').join(' / ')||'과목 정보 없음'}</div>
+        </div>`).join('')}
+      </div>`}
+    </div>
+  </div>`;
+}
 function chgReasonModalHtml(){
   if(!chgModalTarget) return '';
   const cd=chgInit();
@@ -1621,7 +1663,7 @@ function renderChallengerInput(){
         <div><label style="font-size:11px;color:#888">학생명</label><input value="${esc(s.name)}" readonly style="background:#f5f6fa;color:#888"></div>
         <div><label style="font-size:11px;color:#888">학교/학년</label><input value="${esc((s.school||'')+' '+(s.grade||''))}" readonly style="background:#f5f6fa;color:#888"></div>
         <div><label style="font-size:11px;color:#888">응시일</label><input type="date" value="${esc(cd.lastTestDate||'')}" onchange="chgSetMeta('lastTestDate',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">시험명/회차</label><input value="${esc(cd.lastTestName||'')}" placeholder="예: 6월 모의평가" oninput="chgSetMeta('lastTestName',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">시험명/회차</label><div style="display:flex;gap:6px"><input style="flex:1" value="${esc(cd.lastTestName||'')}" placeholder="예: 6월 모의평가" oninput="chgSetMeta('lastTestName',this.value)"><button type="button" class="btn-sm" style="white-space:nowrap;padding:0 10px" onclick="chgOpenHistoryPicker()">📋 과거 회차</button></div></div>
         <div style="grid-column:span 2"><label style="font-size:11px;color:#888">목표 대학/전공</label><input value="${esc((cd.meta&&cd.meta.target)||'')}" placeholder="예: OO대학교 OO학과" oninput="chgSetMeta('target',this.value)"></div>
       </div>
     </div></div>
@@ -1685,7 +1727,8 @@ function renderChallengerInput(){
       ${Array.isArray(cd.history)&&cd.history.length?('<br>📋 지금까지 저장된 회차: '+cd.history.length+'건 ('+cd.history.map(h=>h.date+' '+h.test).join(', ')+')'):''}</p>
     </div></div>
   </div>
-  ${chgReasonModalHtml()}`;
+  ${chgReasonModalHtml()}
+  ${chgHistoryModalHtml()}`;
 }
 
 // ══════════════════════════════════════════════════
