@@ -933,7 +933,15 @@ async function fbSave(col, id, data){
       //       저장 직전 서버의 weeklyInspect를 확인해 로컬과 깊이 병합(wKey→과목 단위,
       //       두 쪽 다 있으면 로컬 우선하되 서버에만 있는 항목은 보존).
       const _hasInspectData = data.weeklyInspect && typeof data.weeklyInspect==='object' && Object.keys(data.weeklyInspect).length>0;
-      if(_riskStudent || _hasInspectData){
+      // ★ 2026-07-25 추가: weeklyPlan(주간 시간표)/weeklyBookMap 유실 방지
+      // (정파학습관 고수완 학생 사례 — 챌린저 결과 일괄반영처럼 학생 객체 전체를 다시
+      // 저장하는 작업이 실행될 때, 관리자의 로컬 캐시(ST.students)가 그 사이 학생이
+      // 입력한 최신 weeklyPlan을 아직 반영하지 못한 상태(스테일)였다면, ref.set()의
+      // 전체 문서 교체 특성상 서버의 실제 시간표가 통째로 사라질 수 있었다.
+      // consultations 보호 로직과 동일한 패턴: 서버 쪽 키 개수가 로컬보다 많으면
+      // (=로컬이 스테일할 가능성) 서버 데이터를 기준으로 병합(로컬 값 있으면 우선).
+      const _hasPlanData = data.weeklyPlan && typeof data.weeklyPlan==='object';
+      if(_riskStudent || _hasInspectData || _hasPlanData){
         try{
           const snap = await ref.get();
           if(snap.exists){
@@ -959,6 +967,21 @@ async function fbSave(col, id, data){
                 // (이 저장은 admin이 weeklyInspect가 아닌 다른 필드를 고치는 중에 실행되는
                 // 것이므로, weeklyInspect에 한해서는 서버가 항상 더 신뢰할 수 있는 최신본)
                 saveData = {...saveData, weeklyInspect: _gg_mergeWeeklyInspect(localWi, serverWi, 'b')};
+              }
+            }
+            if(_hasPlanData){
+              const serverPlan = serverData.weeklyPlan;
+              if(serverPlan && typeof serverPlan==='object'){
+                const localPlan = saveData.weeklyPlan || {};
+                const localCount = Object.keys(localPlan).length;
+                const serverCount = Object.keys(serverPlan).length;
+                if(serverCount > localCount){
+                  saveData = {...saveData, weeklyPlan: Object.assign({}, serverPlan, localPlan)};
+                  const serverBookMap = serverData.weeklyBookMap;
+                  if(serverBookMap && typeof serverBookMap==='object'){
+                    saveData = {...saveData, weeklyBookMap: Object.assign({}, serverBookMap, saveData.weeklyBookMap||{})};
+                  }
+                }
               }
             }
           }
