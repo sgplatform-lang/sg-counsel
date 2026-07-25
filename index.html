@@ -23198,7 +23198,7 @@ function appendField(id,txt){let el=$(id);let cur=(el.value||'').trim();el.value
 function appendSubjectMemo(sid,type){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);let iss=issues(s);let txt='';if(type==='reason')txt=iss.map(i=>i.tag).join(' / ')||'오답원인 미선택';if(type==='action')txt=iss.slice(0,2).map(i=>actionFor(s,i.tag)).join(' / ')||'행동강령 생성 전';if(type==='range')txt=\`\${s.processRange} · \${s.difficultySelect} · \${s.accuracyTarget}\`;if(type==='items')txt=iss.map(i=>\`\${i.items.join(', ')}번 \${[...new Set(i.units)].join(', ')}\`).join(' / ')||'문항·단원 미입력';if(type==='student')txt=\`이번 회차는 \${name(s)}에서 \${s.difficultySelect} 범위만 완료하고 \${s.accuracyTarget} 달성을 확인한다.\`;s.memo=((s.memo||'')+(s.memo?'\\n':'')+txt).trim();renderSubjects();toast('매니저 메모에 반영했습니다.')}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','analysis','weekly','long','short','trend','aarPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='long')renderLong();if(id==='short')renderShort();if(id==='trend')renderTrend();if(id==='aarPanel')renderAAR()}
 function loadStudent(){ $('studentName').value='홍길동';$('studentSchool').value='합격고등학교 3학년';$('target').value='서울대학교 자유전공학부';$('managerName').value='에이스';toast('학생정보를 불러왔습니다.')}
-function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid,subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'중위권',focus:p.focus||'집중',processRange:p.processRange||'고난도/킬러 제외',difficultySelect:p.difficultySelect||'중상 난이도 선별',accuracyTarget:p.accuracyTarget||'정답률 70% 이상',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:''}],preparationLevel:p.preparationLevel||'전 범위 실전 준비 완료',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'0',learnedErrorCount:p.learnedErrorCount||'0',scoreBasis:p.scoreBasis||'전 범위 학습 완료 상태의 실전 점수',concentrationBreak:p.concentrationBreak||'없음',recoveryResult:p.recoveryResult||'해당 없음',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||''});renderSubjects()}
+function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid,subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'중위권',focus:p.focus||'집중',processRange:p.processRange||'고난도/킬러 제외',difficultySelect:p.difficultySelect||'중상 난이도 선별',accuracyTarget:p.accuracyTarget||'정답률 70% 이상',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:''}],preparationLevel:p.preparationLevel||'전 범위 실전 준비 완료',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'0',learnedErrorCount:p.learnedErrorCount||'0',scoreBasis:p.scoreBasis||'전 범위 학습 완료 상태의 실전 점수',concentrationBreak:p.concentrationBreak||'없음',recoveryResult:p.recoveryResult||'해당 없음',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||'',aar:p.aar||{}});renderSubjects()}
 function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','order','orderMemo','time','mental','preparationLevel','completedUnits','inProgressUnits','unlearnedUnits','weakUnits','unlearnedCount','learnedErrorCount','scoreBasis','concentrationBreak','recoveryResult','situationType','primaryFactor','progressImpact','operationImpact','recommendedActions','managerSituationType','managerActions','nextCriteria','managerConfirmed','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.value});s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value}))}
 function syncAll(){state.subjects.forEach(s=>syncSubject(s.sid))}
 function renderSubjects(){$('subjects').innerHTML=state.subjects.map(card).join('')}
@@ -23332,7 +23332,7 @@ function renderWeekly(){
      <div class="weekly-part"><h2>PART 2. 학생 실천 처방전</h2>\${shortBody}</div>
      <div class="weekly-part"><h2>PART 3. 누적 변화 리포트</h2>\${trendBody}</div>\`;
 }
-function populateHistoryDropdown(){let sel=$('historyLoadSelect');if(!sel)return;let st=$('studentName').value;let list=state.history.filter(h=>h.student===st).sort((a,b)=>(a.date||'').localeCompare(b.date||''));if(!list.length){sel.innerHTML='<option value="">저장된 과거 회차 없음</option>';return;}sel.innerHTML=list.map((h,i)=>\`<option value="\${i}">\${h.date||'날짜없음'} · \${h.test||'회차명없음'}\${h.fullSubjects&&h.fullSubjects.length?'':' (요약만 저장됨)'}</option>\`).join('')}
+function populateHistoryDropdown(){let sel=$('historyLoadSelect');if(!sel)return;let st=$('studentName').value;let list=state.history.filter(h=>h.student===st).sort((a,b)=>(a.date||'').localeCompare(b.date||''));if(!list.length){sel.innerHTML='<option value="">저장된 과거 회차 없음</option>';return;}sel.innerHTML=list.map((h,i)=>\`<option value="\${i}">\${h.date||'날짜없음'} · \${h.test||'회차명없음'}\${h.fullSubjects&&h.fullSubjects.length?'':' (요약만 저장됨)'}</option>\`).join('');const curDate=$('testDate').value,curTest=$('testName').value;let matchIdx=list.findIndex(h=>h.date===curDate&&h.test===curTest);if(matchIdx<0)matchIdx=list.length-1;sel.value=String(matchIdx)}
 function loadHistoryRound(){let sel=$('historyLoadSelect');if(!sel||sel.value===''){toast('불러올 회차를 선택해주세요.');return;}let st=$('studentName').value;let list=state.history.filter(h=>h.student===st).sort((a,b)=>(a.date||'').localeCompare(b.date||''));let rec=list[+sel.value];if(!rec)return;if(!rec.fullSubjects||!rec.fullSubjects.length){alert('이 회차는 상세 문항 데이터가 저장되기 전(구버전 저장분)이라 성적/오답수/태그 요약만 남아있습니다.\\n상세 리포트는 볼 수 없고, "11. 누적" 탭의 표에서 요약만 확인 가능합니다.');return;}if(!confirm(rec.date+' · '+rec.test+' 회차를 불러올까요?\\n(현재 입력 중인 내용은 먼저 저장하지 않으면 사라집니다)')){return;}$('testDate').value=rec.date||'';$('testName').value=rec.test||'';state.subjects=JSON.parse(JSON.stringify(rec.fullSubjects));state.subjects.forEach(s=>{let n=+String(s.sid||'').replace('s','');if(!isNaN(n)&&n>seq)seq=n;});renderSubjects();generate();showTab('input');toast(rec.date+' · '+rec.test+' 회차를 불러왔습니다.')}
 function saveSession(){syncAll();state.history=state.history.filter(h=>!(h.student===$('studentName').value&&h.date===$('testDate').value&&h.test===$('testName').value));state.history.push(currentRecord());localStorage.setItem('challenger_v20_history',JSON.stringify(state.history));populateHistoryDropdown();toast('현재 회차를 저장했습니다.')}
 function resetSampleHistory(){let st=$('studentName').value;state.history=state.history.filter(h=>h.student!==st);state.history.push({student:st,date:'2026-06-01',test:'실전 -2회',subjects:[{name:'국어(화작)',score:78,wrong:7,tags:['끝까지 못읽어서','지문 독해 지연']},{name:'수학(미적분)',score:65,wrong:9,tags:['공식이 떠오르지 않아서','시간 부족']}]},{student:st,date:'2026-06-15',test:'실전 -1회',subjects:[{name:'국어(화작)',score:82,wrong:5,tags:['선지 판단 미스','끝까지 못읽어서']},{name:'수학(미적분)',score:70,wrong:7,tags:['중반이후 마무리 부족','공식이 떠오르지 않아서']}]});localStorage.setItem('challenger_v20_history',JSON.stringify(state.history));populateHistoryDropdown();toast('샘플 과거 회차를 다시 불러왔습니다.');renderTrend()}
@@ -25222,7 +25222,25 @@ function __SG_initFromHost(data){
   // 저장된 상세 데이터가 있으면 그것을 쓰고, 없으면(최초 진입) 빈 카드 3개로 시작
   state.subjects = [];
   if(Array.isArray(data.lastSubjects) && data.lastSubjects.length){
-    data.lastSubjects.forEach(sp=>addSubject(sp));
+    // ★ 2026-07-25 안전장치: 국어/수학/영어/한국사/제2외국어는 학생당 한 과목만 있어야
+    // 하는데, 저장된 데이터에 같은 과목이 중복으로 남아있으면(예: 국어가 두 번) 화면에도
+    // 그대로 중복 표시되던 문제가 있었다. 복원 시점에 단일과목은 "첫 번째 항목"만 남기고
+    // 정리한다(탐구는 detail로 구분되는 별개 항목일 수 있으므로 대상에서 제외).
+    // ★ 반드시 "첫 번째 유지"여야 한다: 챌린저 결과 일괄반영(cbrConfirmApply)이 배열에서
+    // 첫 번째로 일치하는 항목을 찾아 그 자리에 최신 점수를 갱신하는 방식이라서, 만약
+    // "마지막 유지"로 정리하면 뒤쪽에 남아있던 예전(갱신 안 된) 중복 항목이 선택되어
+    // 방금 반영한 최신 데이터가 화면에 안 보이는 문제가 생긴다.
+    const _singleInstance=['KOR','MATH','ENG','HIST','LANG'];
+    const _seenSingle={};
+    const _dedup=[];
+    data.lastSubjects.forEach(sp=>{
+      if(_singleInstance.includes(sp.subject)){
+        if(_seenSingle[sp.subject]!==undefined) return; // 이미 있으면 이후 중복은 무시(첫 번째 유지)
+        _seenSingle[sp.subject]=true;
+      }
+      _dedup.push(sp);
+    });
+    _dedup.forEach(sp=>addSubject(sp));
   } else {
     addSubject({subject:'KOR'});
     addSubject({subject:'MATH'});
@@ -25516,18 +25534,41 @@ function openChallengerBulkReflect(){
   }
   document.getElementById('cbr-overlay').style.display = 'flex';
 }
-function closeChallengerBulkReflect(){
+function closeChallengerBulkReflect(force){
+  const inputEl = document.getElementById('cbr-input');
+  const hasUnsaved = !force && inputEl && inputEl.value && inputEl.value.trim().length > 0;
+  // ★ 2026-07-25 추가: 붙여넣은 내용이 아직 "매칭된 학생 전체 반영"으로 저장되지 않은
+  // 상태에서 닫으려고 하면, 데이터를 다시 붙여넣지 않아도 되도록 미리 확인 메시지를 띄운다.
+  if(hasUnsaved && !confirm('⚠️ 붙여넣은 내용이 아직 반영되지 않았습니다.\n지금 닫으면 입력한 내용이 사라지고 다시 붙여넣어야 합니다.\n\n그래도 닫으시겠습니까? (반영하려면 "취소"를 누르고 "분석하기 → 매칭된 학생 전체 반영"을 눌러주세요)')){
+    return;
+  }
   const el = document.getElementById('cbr-overlay');
   if(el) el.style.display = 'none';
 }
+// ★ 2026-07-25 추가: 결과 일괄반영 모달이 열려있고 아직 반영 안 된 붙여넣기 내용이 있는
+// 상태에서 브라우저 탭을 닫거나 새로고침해도 데이터가 사라지지 않도록 한 번 더 경고.
+window.addEventListener('beforeunload', function(e){
+  const el = document.getElementById('cbr-overlay');
+  const inputEl = document.getElementById('cbr-input');
+  if(el && el.style.display !== 'none' && inputEl && inputEl.value && inputEl.value.trim().length > 0){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
+function cbrNormalizeDate(s){
+  if(!s) return '';
+  const m = String(s).trim().match(/(\d{4})[.\-\/\s년]+(\d{1,2})[.\-\/\s월]+(\d{1,2})/);
+  if(!m) return s;
+  return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+}
 function cbrParseRows(text){
   const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
   const rows = [];
   let lastExamDate='', lastExamName='';
   lines.forEach(line=>{
     const c = line.split('\t');
-    if(c[4] && c[4].trim()) lastExamDate = c[4].trim();
+    if(c[4] && c[4].trim()) lastExamDate = cbrNormalizeDate(c[4].trim());
     if(c[5] && c[5].trim()) lastExamName = c[5].trim();
   });
   lines.forEach(line=>{
@@ -25656,12 +25697,26 @@ function cbrConfirmApply(){
 
   const subjMap = {KOR:'KOR',MATH:'MATH',ENG:'ENG',HIST:'HIST',LANG:'LANG',INQ1:'INQ',INQ2:'INQ'};
   let successCount = 0;
+  const updatedStudents = [];
+  const _prevLoadedFor = window.__challengerLoadedFor;
   ready.forEach(name=>{
     const id = matchInfo[name].selectedId;
     const stu = ST.students.find(s=>String(s.id)===String(id));
     if(!stu) return;
     const cd = stu.challengerData || {};
     let subjects = Array.isArray(cd.lastSubjects) ? JSON.parse(JSON.stringify(cd.lastSubjects)) : [];
+    // ★ 2026-07-25 안전장치: 반영 시작 전, 이미 저장돼있던 과목 목록에 단일과목(국/수/영/
+    // 한국사/제2외국어) 중복이 있으면 먼저 정리한다(첫 번째만 유지). 정리 안 하면 아래
+    // find()가 첫 번째 항목만 갱신하고, 뒤에 남은 예전 중복 항목이 화면에 다시 보여서
+    // "반영했는데 데이터가 안 들어온 것처럼" 보이는 문제가 생긴다.
+    {
+      const _si=['KOR','MATH','ENG','HIST','LANG'], _seen={};
+      subjects = subjects.filter(s=>{
+        if(!_si.includes(s.subject)) return true;
+        if(_seen[s.subject]) return false;
+        _seen[s.subject]=true; return true;
+      });
+    }
     const rowsForStudent = byStudent[name];
     const todayStr = new Date().toLocaleDateString('ko-KR');
     // 국/수/영/한국사/제2외국어는 보통 학생당 한 과목뿐이므로, 세부과목 표기가
@@ -25705,10 +25760,46 @@ function cbrConfirmApply(){
     });
     upd(Object.assign({}, stu, {challengerData: newChallengerData}));
     successCount++;
+    updatedStudents.push({id, stu: Object.assign({}, stu, {challengerData: newChallengerData})});
   });
 
-  toast(successCount+'명 학생에게 챌린저 결과를 반영했습니다.');
-  closeChallengerBulkReflect();
+  closeChallengerBulkReflect(true);
+  // ★ 2026-07-25 재수정: 반영 직후 이미 열려있는 챌린저 iframe이 예전 데이터를 계속
+  // 보여주는 문제를 window.__challengerLoadedFor 플래그(캐시용 힌트일 뿐 신뢰 불가)가
+  // 아니라, 관리자가 "지금 실제로 보고 있는 학생"(ST.sel/ST.adminSel) 기준으로 직접
+  // 판단해서 처리한다. 이 학생이 방금 반영된 학생 중 하나이면, render()가 실제로
+  // renderChallenger()를 다시 호출하는지 여부와 무관하게 iframe에 곧바로 최신 데이터를
+  // 재전송한다. 그리고 로컬 캐시(ST.students)도 즉시 최신값으로 교체해서, 이후 어떤
+  // 경로로 다시 그려지더라도 항상 최신 데이터를 사용하게 만든다.
+  updatedStudents.forEach(function(u){
+    const idx = ST.students.findIndex(x=>String(x.id)===u.id);
+    if(idx>-1) ST.students[idx] = u.stu;
+  });
+  window.__challengerLoadedFor = null;
+  const _ifr = document.getElementById('challenger-iframe');
+  const _viewingStu = ST.sel || ST.adminSel;
+  const _viewingId = _viewingStu ? String(_viewingStu.id) : null;
+  const _match = _viewingId ? updatedStudents.find(u=>u.id===_viewingId) : null;
+  if(_ifr && _ifr.contentWindow && _match){
+    const cur = _match.stu;
+    window.__challengerLoadedFor = String(cur.id);
+    _ifr.contentWindow.postMessage({
+      type: 'sg_init_student',
+      studentId: String(cur.id),
+      studentName: cur.name || '',
+      studentSchool: (cur.school||'')+' '+(cur.grade||''),
+      target: (cur.challengerData?.meta?.target)||cur.target||cur.targetUniv||'',
+      managerName: cur.counselor || (ST.currentUser?.name||''),
+      lastTestDate: (cur.challengerData?.lastTestDate)||'',
+      lastTestName: (cur.challengerData?.lastTestName)||'',
+      history: (cur.challengerData?.history)||[],
+      lastSubjects: (cur.challengerData?.lastSubjects)||[],
+      meta: (cur.challengerData?.meta)||{}
+    }, '*');
+  }
+  // ★ 2026-07-25 추가: toast()는 놓치기 쉬워서, 명확한 완료 알림창을 별도로 띄운다.
+  alert('✅ 챌린저 결과 반영 완료\n\n'+successCount+'명 학생에게 반영했습니다.'+(_match?'\n(현재 보고 있는 '+_match.stu.name+' 학생 화면에도 바로 반영됐습니다)':''));
+  render();
 }
 
 function renderNulsul(s) {
