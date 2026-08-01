@@ -25327,8 +25327,7 @@ function __SG_printSection(btn){
     printWin.document.write(\`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>\${title}</title>
       \${styleEl ? styleEl.outerHTML : ''}
       <style>body{margin:0;padding:20px;background:#fff}.no-print{display:none!important}</style>
-      </head><body>\${reportEl.innerHTML}</body></html>\`);
-    printWin.document.close();
+      </head><body>\${reportEl.innerHTML}</body></html>\`);    printWin.document.close();
     // 콘텐츠 렌더링 시간을 약간 두고 인쇄 다이얼로그 호출
     setTimeout(()=>{ printWin.focus(); printWin.print(); }, 300);
   }catch(e){
@@ -33480,33 +33479,27 @@ function generateReport() {
   }
 
   window._gg_printAllChallengerReports=function(){
-    // ★ 팝업 차단 문제 수정: 예전에는 학생 확인(confirm 대화상자) 등을 먼저 처리한 뒤에야
-    // window.open()을 호출했는데, 클릭과 window.open() 사이에 confirm() 같은 다른 동작이
-    // 끼어들면 브라우저가 "클릭에 곧바로 이어진 동작"으로 인식하지 못해 첫 클릭에서는
-    // 팝업이 차단되고, 두 번째 클릭부터만 허용되는 문제가 있었다. → window.open()을
-    // 클릭 직후 가장 먼저(다른 로직보다 앞서) 호출해서 이 문제를 없앤다.
-    var win=window.open('','_blank','width=1000,height=1100');
-    if(!win){alert('팝업이 차단되었습니다. 브라우저에서 팝업을 허용한 뒤 다시 시도해주세요.');return;}
-    win.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>챌린저_전체학생_상담리포트_처방전</title><style>body{font-family:sans-serif;padding:40px;text-align:center;color:#334155}.spin{font-size:28px;margin:40px}</style></head><body><div class="spin">⏳ 확인 중입니다...</div></body></html>');
-    win.document.close();
-
+    // ★ window.open() 계열 방식(관리자 창에서 열기 / iframe 창에서 열기)을 세 차례
+    // 시도했는데도 계속 막혀서, 팝업 차단 메커니즘 자체를 건드리지 않는 방식으로
+    // 완전히 바꾼다: 리포트 전체를 하나의 HTML 문자열로 먼저 만든 뒤 Blob으로 감싸고,
+    // target="_blank" 링크(<a>)를 코드로 클릭해서 새 탭으로 연다. 이 방식은 window.open()
+    // 스크립트 호출이 아니라 "링크 클릭에 의한 이동"에 가깝게 처리되어 브라우저/확장
+    // 프로그램의 팝업 차단에 걸리는 경우가 훨씬 적다. 인쇄 실행도 팝업 쪽에서 열리자마자
+    // 자체적으로 window.print()를 호출하도록 문서 안에 심어서, 여기서 별도로 창을
+    // 붙잡고 있을 필요가 없게 했다.
     var ifr=document.getElementById('challenger-iframe');
-    if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');win.close();return;}
+    if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
     var cw=ifr.contentWindow, cd=cw.document;
     if(typeof cw.__SG_initFromHost!=='function'||typeof cw.renderLong!=='function'||typeof cw.renderShort!=='function'){
-      alert('챌린저 리포트가 아직 준비되지 않았습니다. 잠시 후 다시 눌러주세요.');win.close();return;
+      alert('챌린저 리포트가 아직 준비되지 않았습니다. 잠시 후 다시 눌러주세요.');return;
     }
     var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
     var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'');
     var cur=info.cur, targets=info.targets;
-    if(!cur){alert('먼저 챌린저 학생 한 명을 선택해주세요.');win.close();return;}
-    if(!targets.length){alert('출력할 챌린저 결과가 있는 학생을 찾지 못했습니다.');win.close();return;}
+    if(!cur){alert('먼저 챌린저 학생 한 명을 선택해주세요.');return;}
+    if(!targets.length){alert('출력할 챌린저 결과가 있는 학생을 찾지 못했습니다.');return;}
     var label=(info.date||'날짜 미입력')+(info.name?' · '+info.name:'');
-    if(!confirm(label+'\n\n총 '+targets.length+'명의 상담용 리포트와 처방전을 한 번에 생성합니다.\nDB에는 저장하거나 변경하지 않습니다.\n\n계속할까요?')){ win.close(); return; }
-
-    win.document.open();
-    win.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>챌린저_전체학생_상담리포트_처방전</title><style>body{font-family:sans-serif;padding:40px;text-align:center;color:#334155}.spin{font-size:28px;margin:40px}</style></head><body><div class="spin">⏳ '+targets.length+'명 리포트를 생성하고 있습니다...</div></body></html>');
-    win.document.close();
+    if(!confirm(label+'\n\n총 '+targets.length+'명의 상담용 리포트와 처방전을 한 번에 생성합니다.\nDB에는 저장하거나 변경하지 않습니다.\n\n계속할까요?')) return;
 
     var original=_batchPayload(cur);
     var pieces=[];
@@ -33524,7 +33517,6 @@ function generateReport() {
       });
     }catch(e){
       console.error('[SG] 전체 리포트 생성 오류',e);
-      win.close();
       alert('전체 리포트 생성 중 오류가 발생했습니다.\n'+(e&&e.message?e.message:e));
       try{cw.__SG_initFromHost(original);}catch(_e){}
       return;
@@ -33533,11 +33525,24 @@ function generateReport() {
 
     var styles=Array.from(cd.querySelectorAll('style')).map(function(x){return x.outerHTML;}).join('\n');
     var title='챌린저_'+(info.date||'회차')+'_전체학생_'+targets.length+'명_상담리포트_처방전';
-    win.document.open();
-    win.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+title.replace(/[\\/:*?"<>|]/g,'')+'</title>'+styles+
-      '<style>\nbody{margin:0!important;padding:0!important;background:#fff!important}.no-print{display:none!important}.batch-student{break-after:page;page-break-after:always}.batch-student:last-child{break-after:auto;page-break-after:auto}.batch-report{padding:0}.batch-short{break-before:page;page-break-before:always}\n/* v47 일괄 인쇄 DOM 적용 (v46보다 여백 완화 — 개인 출력 대비 지나치게 좁아 보이는 문제 대응) */\n.batch-long .report-card{margin-bottom:8px!important;padding-bottom:10px!important}\n.batch-long .aar-record-list{margin:4px 0!important;row-gap:3px!important;column-gap:10px!important}\n.batch-long .aar-record-item{padding:4px 8px!important;margin:0!important;line-height:1.32!important;min-height:0!important}\n.batch-long .aar-record-list + .aar-objective-box{margin-top:2px!important}\n.batch-long .aar-objective-box{margin:2px 0 6px!important;padding:7px 9px!important}\n.batch-long .aar-objective-box h4{margin:0 0 3px!important;line-height:1.2!important}\n.batch-long .aar-mini-stats{margin:3px 0!important;gap:5px!important}\n.batch-long .aar-mini-stat{padding:5px 6px!important}\n.batch-long .aar-mini-stat b{font-size:15px!important;line-height:1.1!important}\n.batch-long .aar-mini-stat span{font-size:9.5px!important;line-height:1.1!important}\n.batch-long .aar-objective-box p{margin:2px 0 0!important;line-height:1.32!important}\n@media print{.batch-student{width:100%}.batch-report{padding:0}.batch-long .aar-record-list{margin-bottom:0!important}.batch-long .aar-objective-box{margin-top:0!important}}\n</style></head><body>'+pieces.join('')+'</body></html>');
-    win.document.close();
-    setTimeout(function(){win.focus();win.print();},700);
+    var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+title.replace(/[\\/:*?"<>|]/g,'')+'</title>'+styles+
+      '<style>\nbody{margin:0!important;padding:0!important;background:#fff!important}.no-print{display:none!important}.batch-student{break-after:page;page-break-after:always}.batch-student:last-child{break-after:auto;page-break-after:auto}.batch-report{padding:0}.batch-short{break-before:page;page-break-before:always}\n/* v47 일괄 인쇄 DOM 적용 (v46보다 여백 완화 — 개인 출력 대비 지나치게 좁아 보이는 문제 대응) */\n.batch-long .report-card{margin-bottom:8px!important;padding-bottom:10px!important}\n.batch-long .aar-record-list{margin:4px 0!important;row-gap:3px!important;column-gap:10px!important}\n.batch-long .aar-record-item{padding:4px 8px!important;margin:0!important;line-height:1.32!important;min-height:0!important}\n.batch-long .aar-record-list + .aar-objective-box{margin-top:2px!important}\n.batch-long .aar-objective-box{margin:2px 0 6px!important;padding:7px 9px!important}\n.batch-long .aar-objective-box h4{margin:0 0 3px!important;line-height:1.2!important}\n.batch-long .aar-mini-stats{margin:3px 0!important;gap:5px!important}\n.batch-long .aar-mini-stat{padding:5px 6px!important}\n.batch-long .aar-mini-stat b{font-size:15px!important;line-height:1.1!important}\n.batch-long .aar-mini-stat span{font-size:9.5px!important;line-height:1.1!important}\n.batch-long .aar-objective-box p{margin:2px 0 0!important;line-height:1.32!important}\n@media print{.batch-student{width:100%}.batch-report{padding:0}.batch-long .aar-record-list{margin-bottom:0!important}.batch-long .aar-objective-box{margin-top:0!important}}\n</style></head><body>'+pieces.join('')+
+      '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
+      '</body></html>';
+
+    try{
+      var blob=new Blob([html],{type:'text/html'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.target='_blank'; a.rel='noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    }catch(e){
+      console.error('[SG] 리포트 창 생성 오류',e);
+      alert('리포트 창을 여는 중 오류가 발생했습니다. 브라우저의 팝업/다운로드 차단 설정을 확인한 뒤 다시 시도해주세요.\n'+(e&&e.message?e.message:e));
+    }
   };
 
   function _injectBatchButton(){
