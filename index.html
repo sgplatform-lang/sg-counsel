@@ -379,6 +379,19 @@ try{
   }
 }
 </style>
+
+<style id="v44-item-unit-table">
+/* v44: 상담용/처방전 본문에 새로 추가된 문항별 단원/유형 표 스타일 */
+table.aar-item-unit-table{width:100%;border-collapse:collapse;margin:6px 0 8px;font-size:11px}
+table.aar-item-unit-table th,table.aar-item-unit-table td{border:1px solid #e2e8f0;padding:3px 8px;text-align:center}
+table.aar-item-unit-table th{background:#f0fdfa;color:#0f766e;font-weight:700}
+table.aar-item-unit-table td:nth-child(2){text-align:left}
+.aar-assignment-table td:nth-child(2){text-align:left;font-size:11px}
+@media print{
+  table.aar-item-unit-table{font-size:9.5px;margin:4px 0 6px}
+  table.aar-item-unit-table th,table.aar-item-unit-table td{padding:2px 5px}
+}
+</style>
 </head>
 
 
@@ -24685,7 +24698,16 @@ function generateAARMemo(sid){
   s.memo=lines.join('\\n');
   if(aarHasValue(a.managerFinalAction)) s.managerActions=a.managerFinalAction;
   renderSubjects(); renderAAR();
-  toast(name(s)+' AAR 입력 항목('+filled.length+'개)을 메모에 반영했습니다.');
+  // ★ 예전에는 "메모 생성"이 화면(메모리)만 갱신하고, 실제 서버(Firestore) 저장은
+  // "현재 회차 저장(확정)" 버튼을 별도로 눌러야만 이뤄졌다. 지금 화면에 열려있는
+  // 최신 회차는 그 상태 그대로 인쇄에 보이니 문제가 안 보이지만, 저장을 따로 누르지
+  // 않고 다른 회차로 넘어가면(과거 회차 등) 방금 입력한 AAR이 서버에 남지 않아
+  // 나중에 그 회차 인쇄물에는 AAR이 빠져 보이는 문제가 있었다. → 메모 생성 시
+  // 저장까지 자동으로 함께 진행한다.
+  if(typeof saveSession==='function'){
+    try{ saveSession(); }catch(e){ console.warn('[SG] AAR 메모 저장 실패:', e); }
+  }
+  toast(name(s)+' AAR 입력 항목('+filled.length+'개)을 메모에 반영하고 저장했습니다.');
 }
 function renderAAR(){
   const box=$('aarBody'); if(!box) return;
@@ -25637,12 +25659,25 @@ function __SG_initFromHost(data){
     var n=(s.items||[]).filter(function(it){return Array.isArray(it.reasons)&&it.reasons.length;}).length;
     return n?'<div class="v41-cause-status ok"><b>학생 문항별 오답원인 '+n+'개 문항 반영</b> · 자동오답노트 정밀화 가능</div>':'<div class="v41-cause-status wait"><b>학생 문항별 오답원인 미제출</b> · 현재는 점수·오답률·매니저 메모 기반 1차 진단이며, 학생 링크 응답 후 자동오답노트가 정밀화됩니다.</div>';
   }
+  // ★ v44: 문항별 단원/유형/난이도가 지금까지 "부록"(전체 학생 대비 오답률 표)에만
+  // 나오고, 정작 9.상담용/10.처방전 본문에는 문항 번호만 나열될 뿐 어떤 단원인지가
+  // 안 보였다. 1.기본입력(과목 카드)에는 이미 나오고 있었으므로, 같은 데이터(s.items[].unit)를
+  // 상담용/처방전 본문에도 표로 보여준다.
+  function v41ItemUnitTableHtml(s){
+    var items=(s.items||[]).filter(function(it){return it&&it.no;});
+    if(!items.length) return '';
+    var rows=items.map(function(it){
+      return '<tr><td>'+esc(it.no)+'번</td><td>'+esc(it.unit||'단원정보 미입력')+'</td><td>'+esc(it.diff||'-')+'</td></tr>';
+    }).join('');
+    return '<table class="aar-item-unit-table"><thead><tr><th>문항</th><th>단원/유형</th><th>난이도</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
   window.aarSubjectReport=function(s){
     var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f), record=window.aarRecordHtml(f);
     var wrong=f['전체 오답']||((s.items||[]).map(function(x){return x.no;}).filter(Boolean).join(', '));
     var criteria=aarDynamicCriteria(s,f,inf.action);
     return '<div class="report-card"><h3>'+aarSubjectTitle(s)+' 실전 AAR</h3>'+
       '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>오답</b><span>'+esc(s.wrongCount||'0')+'개</span>'+(v41Valid(wrong)?'<b>문항</b><span>'+esc(wrong)+'</span>':'')+'</div>'+
+      v41ItemUnitTableHtml(s)+
       v41RankingHtml(s)+record+window.aarObjectiveSummary(s)+v41StudentCauseStatus(s)+
       '<div class="aar-analysis-box"><h4>무너진 원인과 점수 영향</h4><p>'+esc(inf.analysis)+'</p></div>'+
       '<div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div>'+
@@ -25666,15 +25701,16 @@ function __SG_initFromHost(data){
       var reasons=(item.reasons||x.reasons||[]).filter(Boolean);
       var causeCell=reasons.length?esc(reasons.join(' / ')):'□개념 □적용 □실수 □시간 □집중';
       var rateCell=(x.rate!=null&&isFinite(Number(x.rate)))?Number(x.rate).toFixed(1)+'%':'____%';
-      return '<tr><td>'+esc(x.no||'____')+'번</td><td>'+rateCell+'</td><td>'+causeCell+'</td><td>□해결 □미해결</td><td>'+esc(inf.action)+'</td></tr>';
+      var unitCell=esc(item.unit&&item.unit!=='단원정보 미입력'?item.unit:(x.unit||'-'));
+      return '<tr><td>'+esc(x.no||'____')+'번</td><td>'+unitCell+'</td><td>'+rateCell+'</td><td>'+causeCell+'</td><td>□해결 □미해결</td><td>'+esc(inf.action)+'</td></tr>';
     }).join('');
-    while((rows.match(/<tr>/g)||[]).length<2)rows+='<tr><td>____번</td><td>____%</td><td>□개념 □적용 □실수 □시간 □집중</td><td>□해결 □미해결</td><td>________________</td></tr>';
+    while((rows.match(/<tr>/g)||[]).length<2)rows+='<tr><td>____번</td><td>-</td><td>____%</td><td>□개념 □적용 □실수 □시간 □집중</td><td>□해결 □미해결</td><td>________________</td></tr>';
     return '<div class="report-card v42-prescription"><h3>'+name(s)+'</h3>'+ 
       '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>전체 오답</b><span>'+(v41Valid(wrong)?esc(wrong):'채점 결과 확인')+'</span></div>'+ 
       (v41Valid(cause)?'<p class="v42-cause"><b>시험 직후 확인된 원인:</b> '+esc(cause)+'</p>':'')+ 
       '<div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div>'+ 
       '<p class="v42-suggest"><b>우선 분석 권장 문항:</b> '+esc(suggested||'오답 중 우선 문항 2개 선택')+'</p>'+ 
-      '<table class="aar-assignment-table"><tr><th>문항</th><th>전체 오답률</th><th>실제 원인</th><th>다시 풀기</th><th>행동강령 연결</th></tr>'+rows+'</table></div>';
+      '<table class="aar-assignment-table"><tr><th>문항</th><th>단원/유형</th><th>전체 오답률</th><th>실제 원인</th><th>다시 풀기</th><th>행동강령 연결</th></tr>'+rows+'</table></div>';
   };
   window.renderLong=function(){
     syncAll();
@@ -25954,6 +25990,21 @@ function openChallengerBulkReflect(){
       </div>
       <p style="font-size:13px;color:#64748b;margin-top:0">엑셀의 '결과일괄반영용' 시트를 전체 선택해서 그대로 붙여넣으세요 (헤더 행이 포함돼도 자동으로 걸러집니다).</p>
       <textarea id="cbr-input" style="width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="학생번호	학생명	학교	학년	시험일	시험명/회차	담당매니저	과목코드	과목명	선택과목/세부과목	점수	전체오답번호	오답수	미응답번호	비고"></textarea>
+      <div style="margin-top:14px">
+        <div style="font-size:13px;font-weight:700;color:#0f172a">📚 (선택) 이번 회차 문항별 단원/유형</div>
+        <p style="font-size:12px;color:#64748b;margin:4px 0 6px">
+          같은 회차를 본 학생 전체에게 한 번에 적용됩니다 — 학생마다 따로 입력할 필요 없습니다.
+          이미 학생이 직접 입력해둔 단원/유형이 있으면 그 값이 우선 유지됩니다.<br>
+          <b>세부과목</b> 칸은 국어(화작/언매)·수학(미적분/기하/확통)처럼 <b>선택문항이 과목마다 다른 경우</b>에만 채우고,
+          공통문항처럼 세부과목 상관없이 똑같이 적용할 문항은 <b>세부과목 칸을 비워두세요.</b><br>
+          이미 쓰고 계신 문항 DB 엑셀(과목코드·과목명·선택과목·문항·대영역·세부단원·유형·배점 형식)도 그대로 붙여넣으면 자동으로 인식합니다 — 다시 만드실 필요 없습니다.
+        </p>
+        <textarea id="cbr-itemmeta-input" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)
+KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상
+KOR	언어와매체	38	언어와매체 · 언어(문법)	상
+MATH		13	수학Ⅰ · 삼각함수 · 삼각함수 그래프	상
+MATH	미적분	22	미적분 · 도함수의 활용	최상"></textarea>
+      </div>
       <div style="margin-top:10px;display:flex;gap:8px">
         <button onclick="cbrAnalyze()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:700">🔍 분석하기</button>
       </div>
@@ -26145,9 +26196,54 @@ function _sgItemMeta(subjectCode, detail, no){
   return (window.SG_ITEM_META[code]||{})[n]||null;
 }
 
+function _cbrParseItemMeta(){
+  const el=document.getElementById('cbr-itemmeta-input');
+  const text=el?el.value.trim():'';
+  // key: "과목코드|세부과목" (세부과목을 비워두면 그 과목 전체 공통 적용 — 예: 수학 공통문항)
+  const map={};
+  if(!text) return map;
+  text.split(/\r?\n/).forEach(line=>{
+    if(!line.trim()) return;
+    const c=line.split('\t').map(x=>(x||'').trim());
+    if(c.length<4) return;
+    if(c[0]==='과목코드') return; // 헤더 행 걸러내기 (양쪽 형식 공통)
+
+    let subj, detail, no, unit, diff;
+    if(c.length>=7){
+      // ★ 기존에 쓰던 마스터 문항 DB 형식도 그대로 인식한다:
+      // 과목코드 / 과목명 / 선택과목 / 문항 / 대영역 / 세부단원 / 유형 / (배점)
+      subj=c[0].toUpperCase();
+      detail=(c[2]==='공통'||!c[2])?'':c[2];
+      no=c[3];
+      unit=[c[4],c[5],c[6]].filter(Boolean).join(' · ');
+      diff='';
+    } else {
+      // 기본 형식: 과목코드 / 세부과목(공통이면 비움) / 문항번호 / 단원유형 / 난이도(선택)
+      subj=c[0].toUpperCase();
+      detail=c[1];
+      no=c[2];
+      unit=c[3];
+      diff=c[4]||'';
+    }
+    if(!subj||!no||!unit) return;
+    const key=subj+'|'+detail;
+    if(!map[key]) map[key]={};
+    map[key][no]={unit, diff};
+  });
+  return map;
+}
+function _cbrLookupItemMeta(pastedItemMeta, subjectCode, detail, no){
+  const subj=String(subjectCode||'').toUpperCase();
+  // 세부과목(선택과목)이 일치하는 항목을 먼저 찾고, 없으면 세부과목 구분 없는
+  // 공통 매핑(예: 수학 공통문항)을 사용한다.
+  const exact=(pastedItemMeta[subj+'|'+(detail||'')]||{})[no];
+  if(exact) return exact;
+  return (pastedItemMeta[subj+'|']||{})[no] || null;
+}
 function cbrConfirmApply(){
   if(!CBR_parsed) return;
   const { byStudent, rates, matchInfo } = CBR_parsed;
+  const pastedItemMeta = _cbrParseItemMeta();
   const names = Object.keys(byStudent);
   const ready = names.filter(n=>matchInfo[n].selectedId);
   const notReady = names.filter(n=>!matchInfo[n].selectedId);
@@ -26216,8 +26312,8 @@ function cbrConfirmApply(){
         const autoDiff = rt>=70?'최상':rt>=50?'상':rt>=30?'중상':rt>=15?'중':'하';
         return {
           no: String(no),
-          unit: prev?.unit || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).unit) || '단원정보 미입력',
-          diff: prev?.diff || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).diff) || autoDiff, // 기존 수동값 우선, 없으면 문항DB→오답률 기준
+          unit: (prev?.unit && prev.unit!=='단원정보 미입력' ? prev.unit : null) || (_cbrLookupItemMeta(pastedItemMeta, r.subjectCode, r.detail, no)||{}).unit || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).unit) || '단원정보 미입력',
+          diff: prev?.diff || (_cbrLookupItemMeta(pastedItemMeta, r.subjectCode, r.detail, no)||{}).diff || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).diff) || autoDiff, // 기존 수동값 우선(단, '단원정보 미입력' 플레이스홀더는 값으로 치지 않음), 그다음 이번에 붙여넣은 값(세부과목 일치 우선, 없으면 공통), 그다음 범용 문항DB→오답률 기준
           reasons: prev?.reasons || [],
           memo: `전체 오답률 ${rt.toFixed(1)}% (일괄반영 ${todayStr})`
         };
@@ -33545,24 +33641,128 @@ function generateReport() {
     }
   };
 
+  function _statGroupKey(subjCode,detail){
+    if(subjCode==='INQ') return 'INQ:'+(detail||'미상');
+    return subjCode;
+  }
+  function _statGroupLabel(subjCode,detail){
+    var base={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',LANG:'제2외국어'}[subjCode];
+    if(subjCode==='INQ') return detail||'탐구';
+    return base||subjCode;
+  }
+  function _statEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function _denseRank(rows,key,desc){
+    var sorted=rows.slice().sort(function(a,b){ return desc?(b[key]-a[key]):(a[key]-b[key]); });
+    var rank=0, prev=null, out={};
+    sorted.forEach(function(r){
+      if(prev===null||r[key]!==prev){ rank++; prev=r[key]; }
+      out[r._i]=rank;
+    });
+    return out;
+  }
+
+  // ★ 회차(응시일+시험명) 기준 학생별 성적순위·오답방어 통계표. 성적순위/오답방어 모두
+  // 동점자는 같은 순위를 공유하고, 다음으로 다른 값이 나오면 그 다음 순위(건너뛰지 않고
+  // 바로 다음 숫자)를 받는 "밀집 순위(dense rank)" 방식을 쓴다(예: 74,74,72 → 3,3,4).
+  // 팝업은 일괄 출력과 같은 이유로 window.open() 대신 Blob+링크 클릭 방식을 쓴다.
+  window._gg_printExamStats=function(){
+    var ifr=document.getElementById('challenger-iframe');
+    if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
+    var cw=ifr.contentWindow, cd=cw.document;
+    var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
+    var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'');
+    var targets=info.targets;
+    if(!targets.length){alert('통계표를 만들 학생을 찾지 못했습니다.');return;}
+
+    var groups={};
+    targets.forEach(function(stu){
+      var subs=(stu.challengerData&&stu.challengerData.lastSubjects)||[];
+      subs.forEach(function(s){
+        if(!s||!s.subject) return;
+        var score=+s.score||0;
+        var wrong=+s.wrongCount||(Array.isArray(s.items)?s.items.length:0);
+        if(!score && !wrong) return; // 응시 안 한 과목은 제외
+        var key=_statGroupKey(s.subject,s.detail);
+        if(!groups[key]) groups[key]={label:_statGroupLabel(s.subject,s.detail), rows:[]};
+        groups[key].rows.push({name:stu.name||'', score:score, wrong:wrong});
+      });
+    });
+    var groupKeys=Object.keys(groups);
+    if(!groupKeys.length){alert('통계표를 만들 과목 데이터가 없습니다.');return;}
+    var order={KOR:0,MATH:1,ENG:2,HIST:3};
+    groupKeys.sort(function(a,b){
+      var oa=(a in order)?order[a]:(a.indexOf('INQ:')===0?4:9);
+      var ob=(b in order)?order[b]:(b.indexOf('INQ:')===0?4:9);
+      return oa-ob || a.localeCompare(b,'ko');
+    });
+
+    var sections=groupKeys.map(function(key){
+      var g=groups[key];
+      g.rows.forEach(function(r,i){ r._i=i; });
+      var scoreRank=_denseRank(g.rows,'score',true);
+      var wrongRank=_denseRank(g.rows,'wrong',false);
+      var displayRows=g.rows.slice().sort(function(a,b){ return scoreRank[a._i]-scoreRank[b._i]; });
+      var trs=displayRows.map(function(r){
+        return '<tr><td>'+scoreRank[r._i]+'</td><td>'+_statEsc(r.name)+'</td><td>'+r.score+'</td><td>'+r.wrong+'</td><td>'+wrongRank[r._i]+'위</td></tr>';
+      }).join('');
+      return '<h3>'+_statEsc(g.label)+' 성적·오답 방어력</h3>'+
+        '<table class="stat-table"><thead><tr><th>성적순위</th><th>학생</th><th>점수</th><th>오답</th><th>오답방어</th></tr></thead><tbody>'+trs+'</tbody></table>';
+    }).join('');
+
+    var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계';
+    var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_statEsc(title)+'</title>'+
+      '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px}table.stat-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:13px}table.stat-table th,table.stat-table td{border:1px solid #e2e8f0;padding:6px 10px;text-align:center}table.stat-table th{background:#f0fdfa;color:#0f766e}table.stat-table td:nth-child(2){text-align:left}@media print{body{padding:8mm}}</style>'+
+      '</head><body>'+
+      '<h1>CHALLENGER 통계 리포트</h1>'+
+      '<h2>회차: '+_statEsc(info.date||'')+' · '+_statEsc(info.name||'')+' · '+targets.length+'명</h2>'+
+      sections+
+      '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
+      '</body></html>';
+
+    try{
+      var blob=new Blob([html],{type:'text/html'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.target='_blank'; a.rel='noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    }catch(e){
+      console.error('[SG] 통계표 생성 오류',e);
+      alert('통계표를 여는 중 오류가 발생했습니다.\n'+(e&&e.message?e.message:e));
+    }
+  };
+
   function _injectBatchButton(){
     var ifr=document.getElementById('challenger-iframe');
     if(!ifr||!ifr.contentDocument) return;
     var d=ifr.contentDocument;
-    if(d.getElementById('sg-batch-print-all')) return;
     var nav=d.querySelector('nav.tabs');
     if(!nav) return;
-    var b=d.createElement('button');
-    b.id='sg-batch-print-all';
-    b.className='tab';
-    b.type='button';
-    b.textContent='🖨 전체 학생 상담+처방 일괄 출력';
-    // ★ 기존에는 .tab.active와 완전히 같은 브랜드 색(#0f766e)을 상시 칠해서,
-    // 실제로 선택되지 않았는데도 항상 "선택된 탭"처럼 보이는 문제가 있었다.
-    // 흰 배경 + 테두리만 강조하는 스타일로 바꿔 다른 탭들의 active 표시와 구분한다.
-    b.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
-    b.onclick=function(){window._gg_printAllChallengerReports();};
-    nav.appendChild(b);
+    if(!d.getElementById('sg-batch-print-all')){
+      var b=d.createElement('button');
+      b.id='sg-batch-print-all';
+      b.className='tab';
+      b.type='button';
+      b.textContent='🖨 전체 학생 상담+처방 일괄 출력';
+      // ★ 기존에는 .tab.active와 완전히 같은 브랜드 색(#0f766e)을 상시 칠해서,
+      // 실제로 선택되지 않았는데도 항상 "선택된 탭"처럼 보이는 문제가 있었다.
+      // 흰 배경 + 테두리만 강조하는 스타일로 바꿔 다른 탭들의 active 표시와 구분한다.
+      b.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
+      b.onclick=function(){window._gg_printAllChallengerReports();};
+      nav.appendChild(b);
+    }
+    if(!d.getElementById('sg-exam-stats-print')){
+      var b2=d.createElement('button');
+      b2.id='sg-exam-stats-print';
+      b2.className='tab';
+      b2.type='button';
+      b2.textContent='📊 회차 통계표';
+      b2.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
+      b2.onclick=function(){window._gg_printExamStats();};
+      nav.appendChild(b2);
+    }
   }
 
   // ★ 예전에 챌린저 iframe 위치를 setInterval로 계속(무한히) 확인하다가 스크롤 시
