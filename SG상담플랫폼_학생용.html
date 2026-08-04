@@ -1476,6 +1476,8 @@ window.openMockEdit=function(){
 // ══════════════════════════════════════════════════
 // 🎯 챌린저 모의고사 학생 입력 (관리자 챌린저와 양방향 동기화)
 // ══════════════════════════════════════════════════
+let _chgViewMode='wrong'; // 'wrong'=챌린저 오답 입력, 'aar'=챌린저 AAR 입력
+function chgSetViewMode(m){ _chgViewMode=m; render(); }
 function chgInit(){
   if(!CU.challengerData) CU.challengerData = {};
   const cd = CU.challengerData;
@@ -1690,9 +1692,109 @@ const CHG_SUBJ_OPT=[['KOR','국어'],['MATH','수학'],['ENG','영어'],['INQ','
 function chgSelect(id,options,value,onch){
   return `<select onchange="${onch}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
 }
+const CHG_AAR_FIELDS = {"KOR": [{"key": "electivePrep", "label": "선택과목 준비도", "phase": "pre", "type": "select", "opts": ["선택하지 않는 과목", "미학습", "개념 학습 중", "개념 완료·문제풀이 부족", "실전 문제풀이 진행 중", "실전 준비 완료"]}, {"key": "literaturePrep", "label": "문학 준비도", "phase": "pre", "type": "select", "opts": ["거의 학습하지 않음", "갈래별 개념 학습 중", "기본 작품·개념 학습 완료", "기출 문제풀이 진행 중", "실전 대비 진행 중", "실전 준비 완료"]}, {"key": "readingPrep", "label": "독서 준비도", "phase": "pre", "type": "select", "opts": ["거의 학습하지 않음", "독해 방법 학습 중", "기본 지문 풀이 진행 중", "기출 문제풀이 진행 중", "고난도·실전 대비 진행 중", "실전 준비 완료"]}, {"key": "pretestWeakArea", "label": "시험 전 예상 취약 영역", "phase": "pre", "type": "multi", "max": 2, "opts": ["화법", "작문", "언어와매체 문법", "언어와매체 매체", "현대시", "고전시가", "현대소설", "고전소설", "극·수필", "독서 인문", "독서 사회", "독서 과학·기술", "독서 융합", "아직 판단하기 어려움"]}, {"key": "solvingOrder", "label": "오늘 선택한 풀이 순서", "phase": "post", "type": "select", "opts": ["화법과작문 → 문학 → 독서", "화법과작문 → 독서 → 문학", "언어와매체 → 문학 → 독서", "언어와매체 → 독서 → 문학", "독서 → 문학 → 선택과목", "문학 → 독서 → 선택과목", "기타"]}, {"key": "timeCollapseArea", "label": "가장 크게 시간이 무너진 영역", "phase": "post", "type": "select", "opts": ["화법과작문", "언어와매체", "문학", "독서 인문", "독서 사회", "독서 과학·기술", "독서 융합", "특정 영역 없음"]}, {"key": "timeShortageLevel", "label": "시간 부족 정도", "phase": "post", "type": "select", "opts": ["시간 여유가 있었다", "마킹까지 간신히 완료했다", "1~2문항을 충분히 검토하지 못했다", "3~5문항을 급하게 풀었다", "3문항 이상 풀지 못했다", "마킹을 완료하지 못했다"]}, {"key": "primaryCause", "label": "핵심 불안정 원인", "phase": "post", "type": "multi", "max": 2, "opts": ["첫 지문에서 당황함", "독서 지문 체류시간 초과", "문학 선지 판단 지연", "선택과목 시간 초과", "지문을 반복해서 읽음", "선지 근거를 찾지 못함", "두 선지 사이에서 과도하게 고민함", "답을 여러 번 변경함", "집중력 저하", "후반 체력 저하", "마킹 시간 미확보", "특별한 문제 없음"]}, {"key": "riskyBehavior", "label": "가장 위험했던 행동", "phase": "post", "type": "select", "opts": ["어려운 지문을 끝까지 붙잡았다", "내용이 들어오지 않아 반복해서 읽었다", "근거 없이 답을 바꿨다", "한 문항 때문에 전체 속도가 무너졌다", "시간이 부족해 지문을 제대로 읽지 않았다", "앞 문항의 실패를 계속 생각했다", "계획한 순서 대신 즉흥적으로 풀었다", "위험 행동 없음"]}, {"key": "collapseTiming", "label": "집중 붕괴 시점", "phase": "post", "type": "select", "opts": ["시작 후 10분 이내", "선택과목 종료 직후", "문학 풀이 중", "첫 독서 지문", "두 번째 독서 지문", "마지막 독서 지문", "종료 10분 전", "붕괴 없음"]}, {"key": "confirmedWeakArea", "label": "시험 후 확인된 부족 영역", "phase": "post", "type": "multi", "max": 3, "opts": ["화법", "작문", "언어와매체 문법", "언어와매체 매체", "현대시", "고전시가", "현대소설", "고전소설", "극·수필", "독서 인문", "독서 사회", "독서 과학·기술", "독서 융합", "특정 영역 없음"]}, {"key": "weakAreaStatus", "label": "부족 영역의 학습 상태", "phase": "post", "type": "select", "opts": ["아직 배우지 않은 영역", "학습 중이지만 개념 미완성", "배웠지만 문제 적용 부족", "충분히 배웠지만 실전에서 흔들림", "시간 부족으로 판단 어려움", "집중력 저하로 수행하지 못함"]}, {"key": "scoreBasis", "label": "학생 점수 자가해석", "phase": "post", "type": "select", "opts": ["전 범위 학습 완료 상태의 점수", "선택과목 학습 미완성 상태의 점수", "문학 일부 갈래 미학습 상태의 점수", "독서 실전훈련 부족 상태의 점수", "미학습보다 시험 운영 문제가 더 큰 점수", "진도와 시험 운영 문제가 함께 반영된 점수"]}], "MATH": [{"key": "electiveSubject", "label": "수학 선택과목", "phase": "pre", "type": "select", "opts": ["확률과통계", "미적분", "기하"]}, {"key": "pretestWeakUnits", "label": "시험 전 예상 취약 단원", "phase": "pre", "type": "multi", "max": 3, "opts": ["지수함수와 로그함수", "삼각함수", "수열", "함수의 극한과 연속", "미분", "적분", "경우의 수·순열과 조합", "확률", "통계", "수열의 극한", "미적분 미분법", "미적분 적분법", "이차곡선", "평면벡터", "공간도형과 공간좌표", "아직 판단하기 어려움"]}, {"key": "strategy", "label": "오늘 사용한 풀이 전략", "phase": "post", "type": "select", "opts": ["1번부터 순서대로", "공통 쉬운 문항 우선", "공통 완료 후 선택과목", "선택과목 일부를 먼저 해결", "어려운 문항 표시 후 1차·2차 풀이", "별도 전략 없이 진행"]}, {"key": "timeLossArea", "label": "가장 큰 시간 손실 구간", "phase": "post", "type": "select", "opts": ["공통 2·3점", "공통 중난도 4점", "공통 고난도", "선택과목 초반", "선택과목 중난도", "선택과목 고난도", "계산 검토", "특정 구간 없음"]}, {"key": "unfinishedCount", "label": "미완료 문항 수", "phase": "post", "type": "select", "opts": ["0문항", "1문항", "2문항", "3문항", "4문항 이상", "마킹 미완료"]}, {"key": "primaryCause", "label": "핵심 불안정 원인", "phase": "post", "type": "multi", "max": 2, "opts": ["개념이 기억나지 않음", "조건 해석 실패", "풀이 방향을 찾지 못함", "계산이 길어짐", "같은 계산을 반복함", "고난도 문항 집착", "쉬운 문항 실수", "선택과목 시간 초과", "검산 부족", "문제를 잘못 읽음", "멘탈 흔들림", "특별한 문제 없음"]}, {"key": "riskyBehavior", "label": "가장 위험했던 행동", "phase": "post", "type": "select", "opts": ["풀이 방향 없이 계산부터 시작했다", "진전이 없는데 계속 붙잡았다", "같은 풀이를 반복했다", "어려운 문제 때문에 쉬운 문제를 놓쳤다", "조건이나 범위를 누락했다", "시간 부족으로 후반 문항을 읽지 못했다", "답안 번호를 잘못 옮겼다", "위험 행동 없음"]}, {"key": "collapseTiming", "label": "집중 붕괴 시점", "phase": "post", "type": "select", "opts": ["1~10번", "11~15번", "16~22번", "선택과목 초반", "선택과목 후반", "종료 20분 전", "종료 10분 전", "붕괴 없음"]}, {"key": "confirmedWeakArea", "label": "시험 후 확인된 부족 단원", "phase": "post", "type": "multi", "max": 5, "opts": ["지수함수와 로그함수", "삼각함수", "수열", "함수의 극한과 연속", "미분", "적분", "경우의 수·순열과 조합", "확률", "통계", "수열의 극한", "미적분 미분법", "미적분 적분법", "이차곡선", "평면벡터", "공간도형과 공간좌표", "복합 단원", "특정 단원 없음"]}, {"key": "weakAreaStatus", "label": "부족 영역의 학습 상태", "phase": "post", "type": "select", "opts": ["아직 배우지 않은 단원", "개념 학습 중", "개념은 배웠지만 유형 연습 부족", "기본 유형은 가능하나 고난도 적용 부족", "충분히 학습했지만 시험에서 꺼내지 못함", "시간 부족으로 시도하지 못함", "계산 실수로 틀림"]}, {"key": "scoreBasis", "label": "학생 점수 자가해석", "phase": "post", "type": "select", "opts": ["전 범위 학습 완료 상태의 실전 점수", "공통과목 일부 미학습 상태의 점수", "선택과목 일부 미학습 상태의 점수", "개념은 완료했으나 문제풀이 부족 상태의 점수", "학습 진도보다 시험 운영 문제가 더 큰 점수", "진도 부족과 시험 운영 문제가 함께 반영된 점수"]}], "ENG": [{"key": "prepLevel", "label": "영어 준비도", "phase": "pre", "type": "select", "opts": ["전 범위 실전 준비 완료", "개념 완료·실전 부족", "주요 유형만 준비", "학습 진행 중", "거의 미준비"]}, {"key": "pretestWeakType", "label": "시험 전 예상 취약 유형", "phase": "pre", "type": "multi", "max": 2, "opts": ["어휘", "주제·제목", "주장·요지", "빈칸 추론", "무관한 문장", "글의 순서", "문장 삽입", "요약문", "장문 독해", "듣기", "아직 판단하기 어려움"]}, {"key": "listeningState", "label": "듣기 수행 상태", "phase": "post", "type": "select", "opts": ["안정적으로 수행", "1문항에서 흔들렸으나 회복", "여러 문항에서 집중이 끊김", "독해 병행으로 듣기를 놓침", "듣기 이후 멘탈이 흔들림"]}, {"key": "parallelReadingCount", "label": "듣기 중 독해 병행 문항 수", "phase": "post", "type": "select", "opts": ["하지 않음", "1~2문항", "3~4문항", "5문항 이상", "계획 없이 진행"]}, {"key": "timeLossType", "label": "시간이 가장 많이 소요된 유형", "phase": "post", "type": "select", "opts": ["어휘", "주제·제목", "주장·요지", "빈칸 추론", "무관한 문장", "글의 순서", "문장 삽입", "요약문", "장문 독해", "특정 유형 없음"]}, {"key": "timeShortageLevel", "label": "시간 부족 정도", "phase": "post", "type": "select", "opts": ["검토 시간까지 확보", "간신히 완료", "1~2문항 급하게 해결", "3문항 이상 급하게 해결", "미완료 문항 발생", "마킹 미완료"]}, {"key": "primaryCause", "label": "핵심 불안정 원인", "phase": "post", "type": "multi", "max": 2, "opts": ["듣기 집중력 저하", "모르는 단어에 집착", "문장 구조 해석 지연", "빈칸 문항 집착", "순서·삽입 문항 집착", "장문 독해 속도 저하", "지문 재독 반복", "후반 체력 저하", "시간 배분 실패", "불안으로 답 변경", "특별한 문제 없음"]}, {"key": "riskyBehavior", "label": "가장 위험했던 행동", "phase": "post", "type": "select", "opts": ["한 단어를 몰라 지문 전체가 막혔다", "고난도 문항을 끝까지 붙잡았다", "듣기 중 무리하게 독해를 병행했다", "근거 없이 답을 바꿨다", "시간 부족으로 지문을 거의 읽지 않았다", "앞 문항의 실패를 계속 생각했다", "위험 행동 없음"]}, {"key": "nextAction", "label": "다음 영어 시험 행동강령", "phase": "post", "type": "select", "opts": ["듣기 중 독해 병행 범위를 고정한다", "빈칸·순서·삽입 제한시간을 정한다", "모르는 단어보다 문장의 방향을 먼저 확인한다", "고난도 문항을 표시하고 해결 가능한 문항부터 푼다", "마지막 5분을 미응답과 마킹 확인에 사용한다", "답 변경 시 지문 근거를 다시 확인한다", "기존 전략 유지"]}], "INQ": [{"key": "subjectRole", "label": "과목 역할", "phase": "pre", "type": "select", "opts": ["주력 과목", "보조 과목", "학습 진행 중인 과목", "임시 응시 과목", "과목 변경 검토 중"]}, {"key": "pretestWeakUnits", "label": "시험 전 예상 취약 단원", "phase": "pre", "type": "text"}, {"key": "preparationLevel", "label": "준비도", "phase": "post", "type": "select", "opts": ["전 범위 실전 준비 완료", "개념 완료·실전 부족", "주요 단원만 준비", "학습 진행 중", "거의 미준비"]}, {"key": "timeState", "label": "시간 상태", "phase": "post", "type": "select", "opts": ["검토 가능", "간신히 완료", "1~2문항 급하게 풀이", "미완료 문항 발생", "마킹 미완료"]}, {"key": "primaryCause", "label": "핵심 불안정 원인", "phase": "post", "type": "multi", "max": 2, "opts": ["개념 기억 부족", "자료 해석 실패", "계산 지연", "조건 누락", "선지 판단 지연", "고난도 문항 집착", "미학습 단원 출제", "시간 배분 실패", "멘탈 흔들림", "과목 준비도 부족", "특별한 문제 없음"]}, {"key": "confirmedWeakArea", "label": "시험 후 확인된 부족 단원", "phase": "post", "type": "text"}, {"key": "weakAreaStatus", "label": "부족 영역의 학습 상태", "phase": "post", "type": "multi", "max": 2, "opts": ["아직 배우지 않은 단원", "개념 학습 중인 단원", "개념은 배웠지만 암기·정리 부족", "개념은 알지만 자료·사례 적용 부족", "충분히 학습했지만 실전에서 흔들림", "시간 부족으로 시도하지 못함", "계산·선지 판단 실수"]}, {"key": "preparedRangePerformance", "label": "준비한 범위 수행 수준", "phase": "post", "type": "select", "opts": ["준비한 범위는 거의 정확하게 해결", "준비한 범위에서 일부 실수", "준비한 범위에서도 개념 혼동이 많음", "준비한 범위에서 자료·계산 적용 부족", "시간 부족으로 충분히 풀지 못함", "집중력 저하로 수행이 무너짐"]}, {"key": "scoreBasis", "label": "학생 점수 자가해석", "phase": "post", "type": "select", "opts": ["전 범위 학습 완료 상태의 점수", "일부 단원 미학습 상태의 점수", "주요 단원만 학습한 상태의 점수", "준비한 범위는 안정적이나 미학습 때문에 낮아진 점수", "미학습보다 준비한 범위의 실수가 더 큰 점수", "진도보다 시간·운영 문제가 더 큰 점수", "진도와 시험 운영이 모두 영향을 준 점수"]}, {"key": "nextAction", "label": "다음 행동강령", "phase": "post", "type": "select", "opts": ["한 문항 제한시간을 정한다", "자료의 조건과 단위를 먼저 표시한다", "계산 문항을 2차 풀이로 넘긴다", "준비한 단원의 정확도를 먼저 높인다", "미학습 단원과 실수 문항을 구분한다", "탐구 1의 감정을 탐구 2로 넘기지 않는다", "기존 전략 유지"]}], "HIST": [{"key": "preparationLevelPre", "label": "준비도(시험 전)", "phase": "pre", "type": "select", "opts": ["전 범위 실전 준비 완료", "개념 완료·실전 부족", "주요 시대만 준비", "학습 진행 중", "거의 미준비"]}, {"key": "pretestWeakEra", "label": "시험 전 예상 취약 시대", "phase": "pre", "type": "text"}, {"key": "timeState", "label": "시간 상태", "phase": "post", "type": "select", "opts": ["검토 가능", "간신히 완료", "1~2문항 급하게 풀이", "미완료 문항 발생", "마킹 미완료"]}, {"key": "primaryCause", "label": "핵심 불안정 원인", "phase": "post", "type": "multi", "max": 2, "opts": ["시대·사건 연결 실패", "사료 해석 실패", "자료 해석 실패", "조건 누락", "선지 판단 지연", "미학습 시대 출제", "시간 배분 실패", "멘탈 흔들림", "특별한 문제 없음"]}, {"key": "confirmedWeakArea", "label": "시험 후 확인된 부족 시대/영역", "phase": "post", "type": "text"}, {"key": "weakAreaStatus", "label": "부족 영역의 학습 상태", "phase": "post", "type": "select", "opts": ["아직 배우지 않은 시대", "개념 학습 중인 시대", "개념은 배웠지만 암기 부족", "자료 해석 적용 부족", "충분히 학습했지만 실전에서 흔들림", "시간 부족으로 시도하지 못함"]}, {"key": "scoreBasis", "label": "학생 점수 자가해석", "phase": "post", "type": "select", "opts": ["전 범위 학습 완료 상태의 점수", "일부 시대 미학습 상태의 점수", "준비한 범위는 안정적이나 미학습 때문에 낮아진 점수", "진도보다 시간·운영 문제가 더 큰 점수", "진도와 시험 운영이 모두 영향을 준 점수"]}, {"key": "nextAction", "label": "다음 행동강령", "phase": "post", "type": "select", "opts": ["연표 중심으로 시대를 재정리한다", "사료의 핵심 단서를 먼저 찾는다", "한 문항 제한시간을 정한다", "미학습 시대와 실수 문항을 구분한다", "기존 전략 유지"]}]};
+const CHG_INQ_ELECTIVE_FIELDS = {"생활과윤리": {"err": ["사상가 입장 혼동", "개념어 정의 혼동", "공통점과 차이점 구분 실패", "제시문 사상가 판별 실패", "조건 표현 누락", "현실 사례 적용 실패", "강한 표현·한정 표현 누락", "시간 부족", "미학습 단원"], "act": ["사상가별 핵심 기준어를 비교한다", "강한 한정 표현에 표시한다", "공통점과 차이점을 구분한다", "제시문에서 사상가 판별 근거를 먼저 찾는다", "미학습 단원을 별도 표시한다"]}, "윤리와사상": {"err": ["동양 사상가 혼동", "서양 사상가 혼동", "시대·학파 연결 실패", "원전 제시문 해석 실패", "사상가 간 공통점 혼동", "핵심 개념 의미 혼동", "선지의 부분적 오류 누락", "미학습 사상가"], "act": ["사상가를 시대·학파·핵심어로 연결한다", "원전의 반복어와 핵심어를 찾는다", "공통 주장과 고유 주장을 구분한다", "선지 전체가 아닌 틀린 한 부분을 찾는다", "미학습 사상가를 별도 분류한다"]}, "사회문화": {"err": ["개념 구분 실패", "자료 계산 실수", "표·그래프 해석 실패", "모집단·표본 판단 오류", "사회집단 유형 혼동", "문화 이해 태도 혼동", "계층·불평등 자료 해석 실패", "시간 부족", "미학습 단원"], "act": ["개념 문항과 자료 문항 시간을 분리한다", "비율·증감·배수 관계를 식으로 표시한다", "기준 집단과 비교 집단을 확인한다", "자료 단위를 표시한다", "계산 문항은 2차 풀이로 넘긴다"]}, "정치와법": {"err": ["헌법기관 권한 혼동", "선거제도 계산 오류", "민법 관계 판단 실패", "형사 절차 순서 혼동", "국제법 개념 혼동", "사례 법률관계 해석 실패", "조건 누락", "시간 부족", "미학습 단원"], "act": ["기관별 권한을 주체와 행위로 구분한다", "선거 계산 기준을 먼저 적는다", "사례에서 당사자와 법률관계를 표시한다", "절차는 시간 순서로 배열한다", "판례형은 기본 원칙부터 적용한다"]}, "경제": {"err": ["수요·공급 이동 혼동", "탄력성 판단 오류", "기회비용 계산 오류", "비교우위 계산 오류", "금융상품 특성 혼동", "국민경제 지표 계산 오류", "환율 방향 판단 오류", "그래프 해석 실패", "시간 부족", "미학습 단원"], "act": ["변화 원인과 그래프 이동 방향을 구분한다", "계산 전 기준 단위와 비교 대상을 적는다", "비교우위는 기회비용부터 구한다", "환율은 기준 통화를 표시한다", "복잡한 계산은 2차 풀이로 넘긴다"]}, "한국지리": {"err": ["지역 위치 혼동", "지형 형성 과정 혼동", "기후 그래프 해석 실패", "산업·인구 자료 해석 실패", "지도 축척·방향 오류", "지역 특성 암기 부족", "기준연도 누락", "시간 부족", "미학습 단원"], "act": ["지도에서 위치를 먼저 특정한다", "기후는 기온·강수·계절 순으로 읽는다", "기준연도와 단위를 확인한다", "지역 특성을 자연·인문으로 나눈다", "주변 지형과 교통축으로 추론한다"]}, "세계지리": {"err": ["국가·지역 위치 혼동", "기후대 판별 실패", "농업·자원 분포 혼동", "종교·문화권 혼동", "도시·인구 자료 해석 실패", "무역 자료 해석 실패", "지도 방향 판단 오류", "시간 부족", "미학습 지역"], "act": ["대륙·위도·해안 위치부터 확인한다", "기후는 위도·해류·대륙성을 함께 본다", "생산지역과 수출지역을 구분한다", "절대량과 비율을 구분한다", "미학습 지역을 별도 표시한다"]}, "동아시아사": {"err": ["국가별 사건 혼동", "시대 순서 오류", "인물·제도 연결 실패", "사료 해석 실패", "전쟁·조약 연결 실패", "문화 교류 흐름 혼동", "연표 판단 지연", "시간 부족", "미학습 시대"], "act": ["사건을 동시대 흐름으로 연결한다", "사료의 국가·인물·제도 단서를 찾는다", "조약의 체결 국가와 결과를 함께 본다", "확실한 기준 사건부터 배치한다", "미학습 시대를 구분한다"]}, "세계사": {"err": ["지역별 시대 혼동", "왕조·국가 연결 실패", "종교사 흐름 혼동", "혁명·전쟁 순서 오류", "사료 해석 실패", "인물·사건 연결 실패", "동시대 비교 실패", "시간 부족", "미학습 지역·시대"], "act": ["지역별 사건을 세기 단위로 연결한다", "사료에서 종교·제도·지역 단서를 찾는다", "혁명과 전쟁의 원인·결과를 구분한다", "동시대 사건을 가로로 비교한다", "미학습 지역을 별도 표시한다"]}, "물리학Ⅰ": {"err": ["개념 적용 방향 오류", "힘·운동 관계 혼동", "에너지 보존 적용 실패", "전기 회로 해석 실패", "파동·빛 조건 해석 실패", "그래프 기울기·면적 해석 실패", "단위 변환 오류", "계산 지연", "시간 부족", "미학습 단원"], "act": ["방향과 기준점을 먼저 표시한다", "그래프 축·기울기·면적 의미를 확인한다", "보존 법칙 적용 가능 여부를 판단한다", "복잡한 계산은 표시 후 이동한다", "단위를 마지막에 검토한다"]}, "화학Ⅰ": {"err": ["몰 계산 오류", "양적 관계 해석 실패", "원자 구조·주기성 혼동", "결합·분자 구조 혼동", "산화환원 판단 실패", "중화 반응 계산 오류", "동적 평형 해석 실패", "조건·계수 누락", "계산 시간 초과", "미학습 단원"], "act": ["반응식 계수와 몰비를 표시한다", "주어진 양의 단위를 통일한다", "산화수 변화와 전자 이동을 구분한다", "초기량과 반응 후 양을 구분한다", "고난도 양적 관계는 2차 풀이로 넘긴다"]}, "생명과학Ⅰ": {"err": ["개념 혼동", "유전 가계도 해석 실패", "유전자형 추론 오류", "신경·호르몬 과정 혼동", "항상성 자료 해석 실패", "생태 자료 계산 오류", "표·그래프 조건 누락", "경우의 수 과다 계산", "시간 부족", "미학습 단원"], "act": ["확정 조건과 추론 조건을 구분한다", "가능한 유전자형을 표로 정리한다", "자극과 반응의 순서를 확인한다", "개체수·개체군·군집 단위를 구분한다", "유전 고난도는 제한시간 후 이동한다"]}, "지구과학Ⅰ": {"err": ["천체 위치·운동 해석 실패", "지질 단면 순서 판단 오류", "대기·해양 자료 해석 실패", "판 구조론 적용 실패", "기후 변화 자료 혼동", "별의 물리량 관계 혼동", "그래프 축·단위 누락", "공간 시각화 실패", "시간 부족", "미학습 단원"], "act": ["관측 위치와 시점을 표시한다", "지질 사건의 선후 기준을 찾는다", "대기·해양의 방향과 깊이를 확인한다", "관측자 기준과 우주 기준을 구분한다", "그래프 축과 단위를 먼저 확인한다"]}};
+
+function chgAarNormElective(detail){
+  var s=String(detail||'').trim();
+  if(!s) return null;
+  s=s.replace(/[1IiㅣⅰⅠ]$/,'Ⅰ');
+  return CHG_INQ_ELECTIVE_FIELDS[s]?s:null;
+}
+function chgAarFieldsFor(subjCode,detail){
+  var base=CHG_AAR_FIELDS[subjCode]||CHG_AAR_FIELDS['INQ']||[];
+  if(subjCode==='INQ'){
+    var key=chgAarNormElective(detail);
+    var extra=key&&CHG_INQ_ELECTIVE_FIELDS[key];
+    if(extra){
+      base=base.concat([
+        {key:'electiveErrorType',label:key+' 핵심 오류 유형',phase:'post',type:'multi',max:2,opts:extra.err},
+        {key:'electiveNextAction',label:key+' 다음 행동강령',phase:'post',type:'select',opts:extra.act}
+      ]);
+    }
+  }
+  return base;
+}
+function chgAarInit(sub){ if(!sub.aar) sub.aar={}; return sub.aar; }
+function chgAarHasValue(v){ return Array.isArray(v)?v.length>0:!!(v&&String(v).trim()); }
+function chgAarSetField(sIdx,key,val){
+  const cd=chgInit();
+  const sub=cd.lastSubjects[sIdx];
+  const a=chgAarInit(sub);
+  a[key]=val;
+  render();
+  chgScheduleSave();
+}
+function chgAarToggleMulti(sIdx,key,val,max){
+  const cd=chgInit();
+  const sub=cd.lastSubjects[sIdx];
+  const a=chgAarInit(sub);
+  const cur=Array.isArray(a[key])?a[key].slice():[];
+  const i=cur.indexOf(val);
+  if(i>-1) cur.splice(i,1);
+  else{
+    if(max&&cur.length>=max) cur.shift();
+    cur.push(val);
+  }
+  a[key]=cur;
+  render();
+  chgScheduleSave();
+}
+function chgAarFieldButtons(sIdx,f,a){
+  const cur=a[f.key];
+  if(f.type==='multi'){
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px">${(f.opts||[]).map(o=>{
+      const on=Array.isArray(cur)&&cur.includes(o);
+      return `<span onclick="chgAarToggleMulti(${sIdx},'${f.key}','${esc(o).replace(/'/g,"\\'")}',${f.max||0})" style="padding:7px 11px;border-radius:16px;font-size:11.5px;font-weight:700;cursor:pointer;border:1.5px solid ${on?'#0f766e':'#e2e8f0'};background:${on?'#0f766e':'#fff'};color:${on?'#fff':'#333'}">${esc(o)}</span>`;
+    }).join('')}</div>`;
+  }
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px">${(f.opts||[]).map(o=>{
+    const on=cur===o;
+    return `<span onclick="chgAarSetField(${sIdx},'${f.key}','${esc(o).replace(/'/g,"\\'")}')" style="padding:7px 11px;border-radius:16px;font-size:11.5px;font-weight:700;cursor:pointer;border:1.5px solid ${on?'#3b5bdb':'#e2e8f0'};background:${on?'#3b5bdb':'#fff'};color:${on?'#fff':'#333'}">${esc(o)}</span>`;
+  }).join('')}</div>`;
+}
+function chgAarSectionHtml(sIdx,sub){
+  const fields=chgAarFieldsFor(sub.subject,sub.detail);
+  if(!fields.length) return '';
+  const a=chgAarInit(sub);
+  const pre=fields.filter(f=>f.phase==='pre');
+  const post=fields.filter(f=>f.phase==='post');
+  const block=(title,list)=>!list.length?'':`
+    <div style="margin:12px 0 6px;font-size:12px;font-weight:800;color:#0f766e">${title}</div>
+    ${list.map(f=>`<div style="margin-bottom:10px">
+      <div style="font-size:11.5px;color:#555;margin-bottom:5px">${esc(f.label)}${f.type==='multi'?' (최대 '+(f.max||1)+'개)':''}</div>
+      ${chgAarFieldButtons(sIdx,f,a)}
+    </div>`).join('')}`;
+  return `<div style="border-top:1.5px dashed #e2e8f0;margin-top:12px;padding-top:8px">
+    <div style="font-size:13px;font-weight:800;margin-bottom:2px">🎯 시험 전·후 AAR (탭해서 선택)</div>
+    ${block('시험 전', pre)}
+    ${block('시험 직후', post)}
+    <button class="btn-sm" style="width:100%;margin-top:6px;background:#0f766e;color:#fff;font-weight:700" onclick="chgGenerateAarMemo(${sIdx})">✅ 이 내용으로 메모 생성</button>
+    ${sub.memo?`<div style="margin-top:8px;padding:8px;background:#f0fdfa;border-radius:8px;font-size:11px;color:#334155;white-space:pre-wrap;line-height:1.5">${esc(sub.memo)}</div>`:''}
+  </div>`;
+}
+function chgGenerateAarMemo(sIdx){
+  const cd=chgInit();
+  const sub=cd.lastSubjects[sIdx];
+  const a=chgAarInit(sub);
+  const fields=chgAarFieldsFor(sub.subject,sub.detail);
+  const filled=fields.filter(f=>chgAarHasValue(a[f.key]));
+  if(!filled.length){ toast('먼저 항목을 선택해주세요.'); return; }
+  const lines=filled.map((f,i)=>{
+    const v=a[f.key];
+    const vt=Array.isArray(v)?v.join(' / '):v;
+    return (i+1)+'. '+f.label+': '+vt;
+  });
+  sub.memo=lines.join('\n');
+  render();
+  chgScheduleSave();
+  toast('AAR 입력 항목('+filled.length+'개)을 메모에 반영했습니다.');
+}
+
 function renderChallengerInput(){
   const s=CU;
   const cd=chgInit();
+  const mode=_chgViewMode||'wrong';
   return `<div>
     <div class="stitle">🎯 챌린저 모의고사 입력</div>
     <div class="card"><div class="card-body">
@@ -1710,6 +1812,11 @@ function renderChallengerInput(){
       <div class="stitle" style="margin:0">📚 이번 회차 과목별 입력</div>
     </div>
 
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px;font-weight:800;border:1.5px solid ${mode==='wrong'?'#3b5bdb':'#e2e8f0'};background:${mode==='wrong'?'#3b5bdb':'#fff'};color:${mode==='wrong'?'#fff':'#333'}" onclick="chgSetViewMode('wrong')">📝 챌린저 오답</button>
+      <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px;font-weight:800;border:1.5px solid ${mode==='aar'?'#0f766e':'#e2e8f0'};background:${mode==='aar'?'#0f766e':'#fff'};color:${mode==='aar'?'#fff':'#333'}" onclick="chgSetViewMode('aar')">🎯 챌린저 AAR</button>
+    </div>
+
     ${cd.lastSubjects.length===0?`<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">입력된 과목이 없습니다</div><div class="empty-sub">아래 '+ 과목 추가'를 눌러 이번 회차 결과를 입력해보세요</div></div>`:''}
 
     ${cd.lastSubjects.map((sub,sIdx)=>`
@@ -1721,6 +1828,9 @@ function renderChallengerInput(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
         <div><label style="font-size:11px;color:#888">과목</label><select onchange="chgSetSubjField(${sIdx},'subject',this.value);render()">${CHG_SUBJ_OPT.map(([v,l])=>`<option value="${v}" ${sub.subject===v?'selected':''}>${l}</option>`).join('')}</select></div>
         <div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>
+      </div>
+      ${mode==='wrong'?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
         <div><label style="font-size:11px;color:#888">실력 수준</label>${chgSelect(0,['상위권','중위권','하위권','불안정권'],sub.level,`chgSetSubjField(${sIdx},'level',this.value)`)}</div>
         <div><label style="font-size:11px;color:#888">이번 회차 집중 여부</label>${chgSelect(0,['집중','유지','관찰','보류'],sub.focus,`chgSetSubjField(${sIdx},'focus',this.value)`)}</div>
         <div><label style="font-size:11px;color:#888">정답률 목표</label>${chgSelect(0,['정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'],sub.accuracyTarget,`chgSetSubjField(${sIdx},'accuracyTarget',this.value)`)}</div>
@@ -1753,6 +1863,7 @@ function renderChallengerInput(){
         </div>`).join('')}
         <button class="btn-sm" style="margin-top:8px;width:100%" onclick="chgAddItem(${sIdx})">+ 문항 추가</button>
       </div>
+      `:chgAarSectionHtml(sIdx,sub)}
     </div></div>`).join('')}
 
     <button class="btn-sm" style="width:100%;min-height:46px;margin-bottom:12px;background:#3b5bdb;color:#fff;font-size:14px" onclick="chgAddSubject()">+ 과목 추가</button>
