@@ -1524,29 +1524,25 @@ function chgScheduleSave(){
 // 저장(같은 조합이 이미 있으면 덮어씀)한다. 이 버튼을 누르지 않고 그냥 응시일/시험명만
 // 바꿔서 계속 입력하면 "가장 최근 입력값(lastTestDate/lastTestName/lastSubjects)"만
 // 계속 덮어써져서, 이전 회차 내용이 사라지고 관리자 쪽에서 회차별로 불러올 수 없다.
-async function chgSaveRound(){
+async function chgArchiveRound(date, test, subjectsSnapshot){
   const cd=chgInit();
-  if(!cd.lastTestDate||!cd.lastTestName){ toast('응시일과 시험명/회차를 먼저 입력해주세요'); return; }
-  if(!cd.lastSubjects.length){ toast('과목을 최소 1개 이상 입력해주세요'); return; }
-  if(!confirm(cd.lastTestDate+' · '+cd.lastTestName+' 회차를 저장할까요?\n(같은 응시일+시험명으로 이미 저장된 회차가 있으면 그 내용을 덮어씁니다)\n저장 후에는 응시일/시험명을 바꿔서 다음 회차를 이어서 입력하시면 됩니다.')) return;
+  if(!date||!test||!subjectsSnapshot||!subjectsSnapshot.length) return false;
+  const fullCopy=JSON.parse(JSON.stringify(subjectsSnapshot));
   const rec={
     student: CU.name||'',
-    date: cd.lastTestDate,
-    test: cd.lastTestName,
-    subjects: cd.lastSubjects.map(function(s){
-      return {
-        name: (s.subject||'')+(s.detail?('('+s.detail+')'):''),
-        score: +s.score||0,
-        wrong: +s.wrongCount||0,
-        tags: [...new Set((s.items||[]).flatMap(function(it){ return it.reasons||[]; }))].slice(0,4)
-      };
-    }),
-    fullSubjects: JSON.parse(JSON.stringify(cd.lastSubjects))
+    date: date,
+    test: test,
+    // ★ 예전엔 여기 subjects가 "국어(화작)" 같은 요약 문자열만 담고 있어서, 관리자
+    // 쪽에서 같은 회차 다른 학생과 비교(등수 등)할 때 과목코드(subject)/세부과목(detail)이
+    // 없어 못 찾는 문제가 있었다. 이제 admin의 아카이브 방식과 똑같이 subject/detail/score가
+    // 살아있는 전체 데이터를 그대로 저장한다.
+    subjects: fullCopy,
+    fullSubjects: fullCopy
   };
   if(!Array.isArray(cd.history)) cd.history=[];
   cd.history = cd.history.filter(function(h){ return !(h.student===rec.student && h.date===rec.date && h.test===rec.test); });
   cd.history.push(rec);
-  if(!CU.id) return;
+  if(!CU.id) return false;
   window._studentSaving=true;
   if(FB()){
     const ref=window._db.collection('students').doc(String(CU.id));
@@ -1554,11 +1550,20 @@ async function chgSaveRound(){
       await ref.update({'challengerData.history': cd.history, '_t': Date.now()});
     }catch(e2){
       try{ await ref.set({challengerData:{history:cd.history}}, {merge:true}); }
-      catch(e3){ console.warn('회차 저장 오류:', e3.message); toast('회차 저장 중 오류가 발생했습니다'); }
+      catch(e3){ console.warn('회차 저장 오류:', e3.message); }
     }
   }
   setTimeout(function(){window._studentSaving=false;},2000);
-  toast(rec.date+' · '+rec.test+' 회차가 저장되었습니다. 이제 다음 응시일/시험명을 입력하시면 됩니다.');
+  return true;
+}
+async function chgSaveRound(){
+  const cd=chgInit();
+  if(!cd.lastTestDate||!cd.lastTestName){ toast('응시일과 시험명/회차를 먼저 입력해주세요'); return; }
+  if(!cd.lastSubjects.length){ toast('과목을 최소 1개 이상 입력해주세요'); return; }
+  if(!confirm(cd.lastTestDate+' · '+cd.lastTestName+' 회차를 저장할까요?\n(같은 응시일+시험명으로 이미 저장된 회차가 있으면 그 내용을 덮어씁니다)\n저장 후에는 응시일/시험명을 바꿔서 다음 회차를 이어서 입력하시면 됩니다.')) return;
+  const ok=await chgArchiveRound(cd.lastTestDate, cd.lastTestName, cd.lastSubjects);
+  if(!ok){ toast('회차 저장 중 오류가 발생했습니다'); return; }
+  toast(cd.lastTestDate+' · '+cd.lastTestName+' 회차가 저장되었습니다. 이제 다음 응시일/시험명을 입력하시면 됩니다.');
   render();
 }
 function chgAddSubject(){
@@ -1650,7 +1655,7 @@ function chgHistoryModalHtml(){
       <div style="display:flex;flex-direction:column;gap:8px">
         ${list.map((h,i)=>`<div onclick="chgLoadHistoryRound(${i})" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;cursor:pointer" onmousedown="this.style.background='#f4f6fb'">
           <div style="font-size:13px;font-weight:700">${esc(h.date||'날짜없음')} · ${esc(h.test||'회차명없음')}</div>
-          <div style="font-size:11px;color:#888;margin-top:3px">${(h.subjects||[]).map(s=>esc(s.name)+' '+esc(String(s.score||0))+'점').join(' / ')||'과목 정보 없음'}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">${(h.subjects||[]).map(s=>esc((s.subject||s.name||'')+(s.detail?'('+s.detail+')':''))+' '+esc(String(s.score||0))+'점').join(' / ')||'과목 정보 없음'}</div>
         </div>`).join('')}
       </div>`}
     </div>
@@ -1684,7 +1689,30 @@ function chgSetItemField(sIdx,iIdx,field,val){
 }
 function chgSetMeta(field,val){
   const cd=chgInit();
-  if(field==='lastTestDate'||field==='lastTestName'){ cd[field]=val; }
+  if(field==='lastTestDate'||field==='lastTestName'){
+    const oldDate=cd.lastTestDate, oldName=cd.lastTestName;
+    const newDate = field==='lastTestDate'?val:oldDate;
+    const newName = field==='lastTestName'?val:oldName;
+    const changed = String(oldDate||'').trim()!==String(newDate||'').trim() || String(oldName||'').trim()!==String(newName||'').trim();
+    // ★ 예전엔 학생이 그냥 응시일/시험명 칸을 다음 회차로 바꿔 적으면, [이번 회차
+    // 저장(확정)] 버튼을 따로 눌러야만 지난 회차가 이력에 보관됐다. 그 버튼을
+    // 모르고 그냥 새 회차를 이어서 입력하는 경우가 많아서, 지난 회차 내용이
+    // 흔적도 없이 사라지는 문제가 있었다. 이제 응시일/시험명이 실제로 달라지는
+    // 순간(둘 다 채워져 있고 과목 데이터가 있을 때) 자동으로 지난 회차를 이력에
+    // 보관하고 새 회차는 빈 과목 목록으로 시작한다 — 확정 버튼은 이제 "굳이
+    // 이 시점에 확실히 저장해두고 싶을 때" 쓰는 선택 사항이 된다.
+    if(changed && oldDate && oldName && Array.isArray(cd.lastSubjects) && cd.lastSubjects.length){
+      chgArchiveRound(oldDate, oldName, cd.lastSubjects).then(function(ok){
+        if(ok) toast(oldDate+' · '+oldName+' 회차를 이력에 자동 보관했습니다.');
+      });
+      cd.lastSubjects = [];
+      cd[field]=val;
+      render();
+      chgScheduleSave();
+      return;
+    }
+    cd[field]=val;
+  }
   else { cd.meta[field]=val; }
   chgScheduleSave();
 }
