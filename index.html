@@ -832,7 +832,7 @@ async function _gg_recoverOrgInspect(orgNameFilter){
     save();
   }catch(e){}
 
-  const summary = '✅ 복구 완료 (2026-06-20 ~ 현재)\n\n대상: '+targets.length+'명\n처리: '+ok+'명\n복구됨: '+recovered+'명\n건너뜀(이미복구): '+skipped+'명\n실패: '+fail+'명\n\n'+logLines.slice(0,20).join('\n');
+  const summary = '✅ 복구 완료 (2026-06-20 ~ 현재)\n\n대상: '+targets.length+'명\n처리: '+ok+'명\n복구됨: '+recovered+'명\n건너뜀(이미복구): '+skipped+'명\n실패: '+fail+'명\n\n'+logLines.slice(0,20).join('\\n');
   console.log(summary);
   alert(summary);
   render();
@@ -6699,7 +6699,7 @@ async function aiAllAnalysis(){
   const el=document.getElementById('ai-all');
   if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:14px;background:#eef1ff;border-radius:10px;margin-top:10px;font-size:13px;color:#93c5fd"><div style="width:18px;height:18px;border:2px solid #c5cae9;border-top-color:#3b5bdb;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>전체 라인업 종합 분석 중...</div>`;
   const sAvg=gAvg(s.subjects);
-  const list=tgts.map((t,i)=>`${i+1}. ${t.univ} ${t.dept} [${t.jeon}] → ${t.chance||'미분석'}${t.passRate?' ('+t.passRate+'%)':''}`).join('\n');
+  const list=tgts.map((t,i)=>`${i+1}. ${t.univ} ${t.dept} [${t.jeon}] → ${t.chance||'미분석'}${t.passRate?' ('+t.passRate+'%)':''}`).join('\\n');
   const prompt=`당신은 대한민국 4년제 대학 입시 전문 컨설턴트입니다.
 아래 데이터를 기준으로 2025~2026학년도 최신 입시 정보를 반영하여 분석하세요:
 ▶ 대학어디가(adiga.kr): 각 대학 최근 3개년 경쟁률·내신컷·충원율
@@ -13601,7 +13601,7 @@ function bulkGradeUp(){
   const checked=[...document.querySelectorAll('[id^=mgmt_chk_]:checked')].map(c=>c.value);
   if(!checked.length){alert('승급할 학생을 선택해주세요.');return;}
   const targets=ST.students.filter(s=>checked.includes(String(s.id)));
-  const preview=targets.map(s=>s.name+' ('+s.grade+' -> '+(NEXT[s.grade]||s.grade)+')').join('\n');
+  const preview=targets.map(s=>s.name+' ('+s.grade+' -> '+(NEXT[s.grade]||s.grade)+')').join('\\n');
   if(!confirm('다음 학생을 승급 처리하겠습니까?\n\n'+preview)){return;}
   let changed=0;
   targets.forEach(s=>{
@@ -14619,6 +14619,9 @@ function loadAccounts(){
   }catch(e){return null;}
 }
 
+
+
+
 function init(){
   // 초기 history state 등록 (뒤로가기 이탈 방지)
   history.replaceState({tab:'overview',page:'main',sel:null,adminSel:null,adminTab:'report',ts:Date.now()}, '');
@@ -14934,7 +14937,7 @@ function printQRPage(){
 function copyAllUrls(){
   const adminUrl=(document.getElementById('share_admin_url')?.value||'').trim();
   const studentUrl=(document.getElementById('share_student_url')?.value||'').trim();
-  const text=[adminUrl?'[관리자] '+adminUrl:'',studentUrl?'[학생용] '+studentUrl:''].filter(Boolean).join('\n');
+  const text=[adminUrl?'[관리자] '+adminUrl:'',studentUrl?'[학생용] '+studentUrl:''].filter(Boolean).join('\\n');
   if(!text){alert('URL을 먼저 입력해주세요.');return;}
   navigator.clipboard?.writeText(text).then(()=>alert('✅ URL이 클립보드에 복사되었습니다!'))
     .catch(()=>{
@@ -21931,7 +21934,7 @@ h2{font-size:21px;margin:0 0 12px}h3{font-size:17px;margin:0 0 10px}h4{font-size
 label{font-size:13px;font-weight:800;color:#344054;display:block;margin-bottom:4px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fff;font-size:14px}textarea{min-height:58px;resize:vertical}
 button{border:0;border-radius:11px;padding:9px 13px;font-weight:800;background:var(--brand);color:white;cursor:pointer}button.secondary{background:#e2e8f0;color:#111827}button.ghost{background:#fff;color:var(--brand);border:1px solid var(--brand)}button.warn{background:var(--red)}button:active{transform:scale(.98)}button.clicked{box-shadow:0 0 0 3px rgba(15,118,110,.18)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.right{margin-left:auto}.subject-card{border-left:6px solid var(--brand)}
-.item-row{display:grid;grid-template-columns:65px 1fr 110px 1.1fr 1.1fr 1.25fr 44px;gap:7px;margin-bottom:7px;align-items:start}@media(max-width:1050px){.item-row{grid-template-columns:1fr}}
+.item-row{display:grid;grid-template-columns:60px 1fr 70px 1.5fr 1fr 1fr 1.2fr 40px;gap:7px;margin-bottom:7px;align-items:start}@media(max-width:1050px){.item-row{grid-template-columns:1fr}}
 .pill{display:inline-block;border-radius:999px;padding:3px 8px;font-size:12px;font-weight:900;margin:1px;background:#edf2f7}.pill.red{background:#fee2e2;color:#991b1b}.pill.amber{background:#fef3c7;color:#92400e}.pill.green{background:#dcfce7;color:#166534}.pill.blue{background:#dbeafe;color:#1e40af}.pill.purple{background:#ede9fe;color:#5b21b6}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#f8fafc;border:1px solid var(--line);border-radius:13px;padding:8px 10px;font-size:13px;margin:8px 0}.bar b{color:#101828}
 .notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:13px;padding:10px 12px;margin:8px 0}.quicktags{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}.quicktag{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:800;cursor:pointer;color:#344054}.quicktag:hover,.quicktag.active{background:#e6fffb;border-color:#0f766e;color:#0f766e}.memo-tools{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:9px;margin-top:8px}.memo-tools b{font-size:12px;color:#344054}
@@ -22396,7 +22399,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   </div>
 </header>
 <nav class="tabs no-print">
-<button class="tab" onclick="showTab(&#39;omrAutomationPanel&#39;)">★ OMR 자동화</button><button class="tab active" onclick="showTab(&#39;input&#39;)">1. 기본 입력</button><button class="tab" onclick="showTab(&#39;answerKeyPanel&#39;)">2. 단일 자동채점</button><button class="tab" onclick="showTab(&#39;batchGradingPanel&#39;)">3. 다학생 일괄채점</button><button class="tab" onclick="showTab(&#39;qrAdminPanel&#39;)">4. QR 회차</button><button class="tab" onclick="showTab(&#39;studentReflectionPanel&#39;)">5. 학생 복기</button><button class="tab" onclick="showTab(&#39;reflectionApplyPanel&#39;)">6. 복기 반영</button><button class="tab" onclick="showTab(&#39;analysis&#39;)">7. 행동강령</button><button class="tab" onclick="showTab(&#39;weekly&#39;)">8. 상담리포트</button><button class="tab" onclick="showTab(&#39;aarPanel&#39;)">9. 매니저 AAR</button>
+<button class="tab" onclick="showTab(&#39;omrAutomationPanel&#39;)">★ OMR 자동화</button><button class="tab active" onclick="showTab(&#39;input&#39;)">1. 기본 입력</button><button class="tab" onclick="showTab(&#39;answerKeyPanel&#39;)">2. 단일 자동채점</button><button class="tab" onclick="showTab(&#39;batchGradingPanel&#39;)">3. 다학생 일괄채점</button><button class="tab" onclick="showTab(&#39;qrAdminPanel&#39;)">4. QR 회차</button><button class="tab" onclick="showTab(&#39;studentReflectionPanel&#39;)">5. 학생 복기</button><button class="tab" onclick="showTab(&#39;reflectionApplyPanel&#39;)">6. 복기 반영</button><button class="tab" onclick="showTab(&#39;weekly&#39;)">7. 상담리포트</button><button class="tab" onclick="showTab(&#39;aarPanel&#39;)">8. 매니저 AAR</button>
 </nav>
 
 
@@ -22633,7 +22636,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
 <div class="row"><h2>기본 정보</h2><button class="ghost right" onclick="loadStudent();markClicked(event)">학생정보 불러오기</button></div>
 <div class="grid g4">
 <div><label>학생명</label><input id="studentName" value="홍길동" onchange="populateHistoryDropdown()"></div><div><label>학교/학년</label><input id="studentSchool" value="합격고등학교 3학년"></div><div><label>응시일</label><input id="testDate" type="date"></div><div><label>시험명/회차</label><input id="testName" value="실전 모의고사 1회"></div>
-<div><label>담당 매니저</label><input id="managerName" value="에이스"></div><div><label>목표 대학/전공</label><input id="target" value="서울대학교 자유전공학부"></div><div><label>전체 이행률(%)</label><input id="compliance" type="number" value="55"></div><div><label>이번 회차 필수 집중 과목 수</label><select id="focusLimit"><option value="1">1개</option><option value="2" selected="">2개</option><option value="3">3개</option><option value="4">4개</option><option value="5">5개</option></select></div>
+<div><label>담당 매니저</label><input id="managerName" value="에이스"></div><div><label>목표 대학/전공</label><input id="target" value="서울대학교 자유전공학부"></div><div><label>전체 이행률(%)</label><input id="compliance" type="number" value="" placeholder="예: 55"></div><div><label>이번 회차 필수 집중 과목 수</label><select id="focusLimit"><option value="">선택 안 함</option><option value="1">1개</option><option value="2">2개</option><option value="3">3개</option><option value="4">4개</option><option value="5">5개</option></select></div>
 </div>
 <div class="grid g3" style="margin-top:10px">
 <div><label>변경사항</label><input id="changes" value="수학은 고난도/킬러 제외, 중상 난도 정답률 회복 우선"><div class="quicktags"><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;고난도/킬러 제외 운영&#39;)">고난도/킬러 제외</span><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;집중 과목 변경&#39;)">집중 과목 변경</span><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;정답률 목표 상향&#39;)">정답률 목표 상향</span><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;진도 범위 축소&#39;)">진도 범위 축소</span></div></div>
@@ -22651,7 +22654,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
   <button class="warn" onclick="deleteHistoryRound();markClicked(event)">🗑 선택 회차 삭제</button>
   <span style="font-size:11px;color:#94a3b8;">※ 불러오면 현재 입력 중인 내용은 사라집니다(먼저 저장하세요)</span>
 </div>
-<div class="row no-print"><button onclick="generate();showTab(&#39;analysis&#39;);markClicked(event)">분석/행동강령 생성</button><button class="secondary" onclick="saveSession();markClicked(event)">현재 회차 저장 후 누적 반영</button><button class="ghost" id="sampleHistBtn" onclick="__SG_confirmSampleLoad(event)">샘플 과거 회차 불러오기</button><button class="warn" onclick="clearCurrentStudentHistory();markClicked(event)">현재 학생 누적기록 초기화</button></div></div>
+<div class="row no-print"><button onclick="generate();showTab(&#39;weekly&#39;);markClicked(event)">분석/행동강령 생성</button><button class="secondary" onclick="saveSession();markClicked(event)">현재 회차 저장 후 누적 반영</button><button class="ghost" id="sampleHistBtn" onclick="__SG_confirmSampleLoad(event)">샘플 과거 회차 불러오기</button><button class="warn" onclick="clearCurrentStudentHistory();markClicked(event)">현재 학생 누적기록 초기화</button></div></div>
 </section>
 
 
@@ -23127,7 +23130,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
       <div class="row">
         <button onclick="reflectGradingToAnalysis();markClicked(event)">오답번호 자동 반영</button>
         <button class="secondary" onclick="showTab(&#39;input&#39;);markClicked(event)">입력 화면 확인</button>
-        <button class="ghost" onclick="generate();showTab(&#39;analysis&#39;);markClicked(event)">분석 생성</button>
+        <button class="ghost" onclick="generate();showTab(&#39;weekly&#39;);markClicked(event)">분석 생성</button>
       </div>
       <div id="autoReflectStatus" class="auto-reflect-status">아직 반영 전입니다.</div>
     </div>
@@ -23351,7 +23354,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
           <h3>마스터 확인 요청 초안</h3>
           <p class="muted">중복 누적을 막기 위해 학생 복기 요약은 1회만 정리됩니다. 버튼을 여러 번 눌러도 같은 내용이 계속 붙지 않습니다.</p>
           <textarea id="masterReviewMemo" placeholder="매니저가 반영한 학생 복기 요약과 최종 확인 요청 내용이 여기에 정리됩니다."></textarea>
-          <div class="row" style="margin-top:10px"><button onclick="requestMasterReview();markClicked(event)">마스터 확인 요청</button><button class="secondary" onclick="generate();showTab(&#39;analysis&#39;);markClicked(event)">분석 생성으로 이동</button></div>
+          <div class="row" style="margin-top:10px"><button onclick="requestMasterReview();markClicked(event)">마스터 확인 요청</button><button class="secondary" onclick="generate();showTab(&#39;weekly&#39;);markClicked(event)">분석 생성으로 이동</button></div>
           <div id="masterReviewStatus" class="apply-log">아직 마스터 확인 요청 전입니다.</div>
         </div>
       </main>
@@ -23359,7 +23362,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
   </div>
 </section>
 
-<section id="analysis" class="panel"><div class="card"><h2>오답 해결/행동강령</h2><div class="notice">문항 행에는 선택 결과만 짧게 표시됩니다. 오답원인은 \`오답원인 선택\` 버튼을 눌러 깔끔한 보기 패널에서 고릅니다.</div><div id="analysisBody"><div class="bar"><b>전체 반복 확인 근거</b><span>선지 판단 미스(2) · 끝까지 못읽어서(1) · 중반이후 마무리 부족(1) · 시간 부족(1)</span></div><div class="bar"><b>이번 회차 집중 과목</b><span>국어(화작), 수학(미적분)</span></div><div class="report-card"><h3>국어(화작) <span class="pill green">집중</span></h3><p><b>범위:</b> 중하 난이도 정답률 집중 · <b>난이도:</b> 중상 난이도 선별 · <b>목표:</b> 정답률 80% 이상 · <b>오답개수:</b> 5</p><div class="progress-report"><h4>국어(화작) · 진도 보정 해석</h4><table><tbody><tr><th>준비도</th><td>전 범위 실전 준비 완료</td><th>미학습 문항</th><td>0</td><th>학습범위 오답</th><td>0</td></tr><tr><th>학습 완료</th><td colspan="2">-</td><th>학습 중</th><td colspan="2">-</td></tr><tr><th>미학습</th><td colspan="2">-</td><th>부족 단원</th><td colspan="2">-</td></tr><tr><th>집중 붕괴</th><td>없음</td><th>회복</th><td>해당 없음</td><th>해석 기준</th><td>전 범위 학습 완료 상태의 실전 점수</td></tr></tbody></table><p><b>해석:</b> 전 범위 학습 완료 상태의 실전 점수. 세부 단원 미입력</p></div><div class="report-card"><h4>국어(화작) · 상황 분석 행동강령</h4><table><tbody><tr><th>추천 상황 유형</th><td>안정 수행형</td><th>매니저 최종 유형</th><td>안정 수행형</td></tr><tr><th>주요 요인</th><td>특별한 위험 요인 없음</td><th>확정 상태</th><td>미확정</td></tr><tr><th>진도 영향</th><td>낮음</td><th>시험 운영 영향</th><td>낮음</td></tr><tr><th>최종 행동강령</th><td colspan="3">현재 풀이 순서와 시간 운영을 유지한다.<br>다음 회차에는 동일 전략의 재현 여부만 확인한다.</td></tr><tr><th>다음 회차 확인</th><td colspan="3">동일 전략 재현 / 마킹 완료 / 붕괴 없이 완주</td></tr></tbody></table></div><div class="issue selected"><h4>선지 판단 미스</h4><table><tbody><tr><th>문항</th><td>12, 18</td><th>단원/유형</th><td>독서, 문학</td></tr><tr><th>행동강령</th><td colspan="3">선지 선택 전 지문 근거 문장 1개와 오답 선지 제거 근거 1개를 확인한다.</td></tr></tbody></table></div><div class="issue selected"><h4>끝까지 못읽어서</h4><table><tbody><tr><th>문항</th><td>12</td><th>단원/유형</th><td>독서</td></tr><tr><th>행동강령</th><td colspan="3">발문을 끝까지 읽은 뒤 조건어·부정어·범위어에 표시하고 선지 판단으로 이동한다.</td></tr></tbody></table></div></div><div class="report-card"><h3>수학(미적분) <span class="pill green">집중</span></h3><p><b>범위:</b> 고난도/킬러 제외 · <b>난이도:</b> 4점 중간 난도까지 · <b>목표:</b> 정답률 70% 이상 · <b>오답개수:</b> 7</p><div class="progress-report"><h4>수학(미적분) · 진도 보정 해석</h4><table><tbody><tr><th>준비도</th><td>전 범위 실전 준비 완료</td><th>미학습 문항</th><td>0</td><th>학습범위 오답</th><td>0</td></tr><tr><th>학습 완료</th><td colspan="2">-</td><th>학습 중</th><td colspan="2">-</td></tr><tr><th>미학습</th><td colspan="2">-</td><th>부족 단원</th><td colspan="2">-</td></tr><tr><th>집중 붕괴</th><td>없음</td><th>회복</th><td>해당 없음</td><th>해석 기준</th><td>전 범위 학습 완료 상태의 실전 점수</td></tr></tbody></table><p><b>해석:</b> 전 범위 학습 완료 상태의 실전 점수. 세부 단원 미입력</p></div><div class="report-card"><h4>수학(미적분) · 상황 분석 행동강령</h4><table><tbody><tr><th>추천 상황 유형</th><td>고난도 집착형</td><th>매니저 최종 유형</th><td>고난도 집착형</td></tr><tr><th>주요 요인</th><td>문제 전환 실패·시간 배분</td><th>확정 상태</th><td>미확정</td></tr><tr><th>진도 영향</th><td>낮음</td><th>시험 운영 영향</th><td>높음</td></tr><tr><th>최종 행동강령</th><td colspan="3">풀이 진전이 없으면 과목별 제한시간 안에 표시 후 이동한다.<br>1차 풀이에서는 해결 가능한 문항을 먼저 확보한다.</td></tr><tr><th>다음 회차 확인</th><td colspan="3">미완료 문항 수 감소 / 제한시간 전환 실행 / 쉬운 문항 확보 여부</td></tr></tbody></table></div><div class="bar"><b>이번 미션 제외</b><span>22번(킬러): 고난도/킬러 제외 / 4점 중간 난도까지 기준에서 킬러 난이도는 이번 회차 미션 제외</span></div><div class="issue selected"><h4>중반이후 마무리 부족</h4><table><tbody><tr><th>문항</th><td>28</td><th>단원/유형</th><td>적분</td></tr><tr><th>행동강령</th><td colspan="3">중반 이후 남은 시간과 남은 문항 수를 5분 단위로 확인하고 마무리 가능한 문항부터 확정한다.</td></tr></tbody></table></div><div class="issue selected"><h4>시간 부족</h4><table><tbody><tr><th>문항</th><td>28</td><th>단원/유형</th><td>적분</td></tr><tr><th>행동강령</th><td colspan="3">풀이 방향이 보이지 않는 문항은 3분 내 보류 표시 후 다음 문항으로 이동한다.</td></tr></tbody></table></div></div></div></div></section>
+
 <section id="weekly" class="panel print-target"><div class="card"><div class="row no-print"><h2>8. 상담리포트 (상담용+처방전+누적 통합)</h2><button class="right" onclick="__SG_printSection(this)">한 번에 인쇄/PDF</button></div><div id="weeklyReport"><div class="premium-cover">
   <div class="cover-side">PRECISION<br>ANALYSIS<br>ACHIEVES<br>EXCELLENCE</div>
   <div class="cover-side-list"><div>◎ 정밀 분석</div><div>✓ 실천 처방</div><div>↗ 누적 변화</div></div>
@@ -23487,18 +23490,24 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function toast(msg){let t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500)}function markClicked(e){if(!e)return;e.currentTarget.classList.add('clicked');setTimeout(()=>e.currentTarget.classList.remove('clicked'),600)}
 function appendField(id,txt){let el=$(id);let cur=(el.value||'').trim();el.value=cur?cur+' / '+txt:txt;toast('입력란에 반영했습니다.')}
 function appendSubjectMemo(sid,type){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);let iss=issues(s);let txt='';if(type==='reason')txt=iss.map(i=>i.tag).join(' / ')||'오답원인 미선택';if(type==='action')txt=iss.slice(0,2).map(i=>actionFor(s,i.tag)).join(' / ')||'행동강령 생성 전';if(type==='range')txt=\`\${s.processRange} · \${s.difficultySelect} · \${s.accuracyTarget}\`;if(type==='items')txt=iss.map(i=>\`\${i.items.join(', ')}번 \${[...new Set(i.units)].join(', ')}\`).join(' / ')||'문항·단원 미입력';if(type==='student')txt=\`이번 회차는 \${name(s)}에서 \${s.difficultySelect} 범위만 완료하고 \${s.accuracyTarget} 달성을 확인한다.\`;s.memo=((s.memo||'')+(s.memo?'\\n':'')+txt).trim();renderSubjects();toast('매니저 메모에 반영했습니다.')}
-function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','analysis','weekly','aarPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR()}
+function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','weekly','aarPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR()}
 function loadStudent(){ $('studentName').value='홍길동';$('studentSchool').value='합격고등학교 3학년';$('target').value='서울대학교 자유전공학부';$('managerName').value='에이스';toast('학생정보를 불러왔습니다.')}
-function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid,subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'중위권',focus:p.focus||'집중',processRange:p.processRange||'고난도/킬러 제외',difficultySelect:p.difficultySelect||'중상 난이도 선별',accuracyTarget:p.accuracyTarget||'정답률 70% 이상',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:''}],preparationLevel:p.preparationLevel||'전 범위 실전 준비 완료',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'0',learnedErrorCount:p.learnedErrorCount||'0',scoreBasis:p.scoreBasis||'전 범위 학습 완료 상태의 실전 점수',concentrationBreak:p.concentrationBreak||'없음',recoveryResult:p.recoveryResult||'해당 없음',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||'',aar:p.aar||{}});renderSubjects()}
-function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','order','orderMemo','time','mental','preparationLevel','completedUnits','inProgressUnits','unlearnedUnits','weakUnits','unlearnedCount','learnedErrorCount','scoreBasis','concentrationBreak','recoveryResult','situationType','primaryFactor','progressImpact','operationImpact','recommendedActions','managerSituationType','managerActions','nextCriteria','managerConfirmed','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.value});s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value}))}
+function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid,subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'',focus:p.focus||'',processRange:p.processRange||'',difficultySelect:p.difficultySelect||'',accuracyTarget:p.accuracyTarget||'',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',totalItemCount:p.totalItemCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false}],preparationLevel:p.preparationLevel||'',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'',learnedErrorCount:p.learnedErrorCount||'',scoreBasis:p.scoreBasis||'',concentrationBreak:p.concentrationBreak||'',recoveryResult:p.recoveryResult||'',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',studentSituationTypes:p.studentSituationTypes||[],managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||'',aar:p.aar||{}});renderSubjects()}
+function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','totalItemCount','order','orderMemo','time','mental','preparationLevel','weakUnits','unlearnedCount','learnedErrorCount','concentrationBreak','recoveryResult','primaryFactor','progressImpact','operationImpact','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.value});['completedUnits','inProgressUnits','unlearnedUnits'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.multiple?[...e.selectedOptions].map(o=>o.value).join(', '):e.value});{let e=c.querySelector('.studentSituationTypes');if(e)s.studentSituationTypes=[...e.selectedOptions].map(o=>o.value);}s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value,points:(r.querySelector('.points')||{}).value||'',causePrimary:(r.querySelector('.causePrimary')||{}).value||'',guessedTime:!!(r.querySelector('.guessedTime')||{}).checked,answer:s.items[i]?.answer||'',explanation:s.items[i]?.explanation||'',question:s.items[i]?.question||''}))}
 function syncAll(){state.subjects.forEach(s=>syncSubject(s.sid))}
 function renderSubjects(){$('subjects').innerHTML=state.subjects.map(card).join('')}
-function card(s){let rows=s.items.map((it,i)=>\`<div class="item-row"><input class="no" placeholder="문항" value="\${esc(it.no)}" oninput="syncSubject('\${s.sid}')"><input class="unit" placeholder="단원/유형" value="\${esc(it.unit)}" oninput="syncSubject('\${s.sid}')"><select class="diff" onchange="syncSubject('\${s.sid}')">\${['하','중','상','최상','킬러'].map(v=>\`<option \${it.diff===v?'selected':''}>\${v}</option>\`).join('')}</select><button class="ghost" onclick="openReasonModal('\${s.sid}',\${i});markClicked(event)">오답원인 선택</button><div class="reason-summary">\${esc((it.reasons||[]).join(', ')||'선택 전')}</div><input class="imemo" placeholder="상황메모" value="\${esc(it.memo)}" oninput="syncSubject('\${s.sid}')"><button class="secondary" onclick="removeItem('\${s.sid}',\${i});markClicked(event)">×</button></div>\`).join('');
-return \`<div class="card subject-card" data-sid="\${s.sid}"><div class="row"><h3>과목 입력</h3><button class="secondary right" onclick="removeSubject('\${s.sid}');markClicked(event)">삭제</button></div><div class="grid g4"><div><label>과목</label><select class="subject" onchange="syncSubject('\${s.sid}');let ss=state.subjects.find(x=>x.sid==='\${s.sid}');ss.items.forEach(i=>i.reasons=[]);renderSubjects()">\${Object.entries(SUBJECTS).map(([k,v])=>\`<option value="\${k}" \${s.subject===k?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>세부 과목</label><input class="detail" value="\${esc(s.detail)}" oninput="syncSubject('\${s.sid}')"></div><div><label>실력 수준</label><select class="level" onchange="syncSubject('\${s.sid}')">\${['상위권','중위권','하위권','불안정권'].map(v=>\`<option \${s.level===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>이번 회차 집중 여부</label><select class="focus" onchange="syncSubject('\${s.sid}')">\${['집중','유지','관찰','보류'].map(v=>\`<option \${s.focus===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>문항 처리 범위</label><select class="processRange" onchange="syncSubject('\${s.sid}')">\${['전체 오답 분석','고난도/킬러 제외','중하 난이도 정답률 집중','집중 과목 핵심문항만'].map(v=>\`<option \${s.processRange===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>난이도 선별</label><select class="difficultySelect" onchange="syncSubject('\${s.sid}')">\${['하~중 난이도 우선','중상 난이도 선별','4점 중간 난도까지','고난도/킬러 제외','킬러 포함 심화'].map(v=>\`<option \${s.difficultySelect===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>정답률 목표</label><select class="accuracyTarget" onchange="syncSubject('\${s.sid}')">\${['정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'].map(v=>\`<option \${s.accuracyTarget===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>오답개수</label><input class="wrongCount" type="number" value="\${esc(s.wrongCount)}" placeholder="없으면 자동" oninput="syncSubject('\${s.sid}')"></div></div><div class="grid g4" style="margin-top:10px"><div><label>성적</label><input class="score" type="number" value="\${esc(s.score)}" oninput="syncSubject('\${s.sid}')"></div><div><label>등급</label><input class="grade" value="\${esc(s.grade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>백분위</label><input class="percentile" type="number" value="\${esc(s.percentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표 성적</label><input class="targetScore" type="number" value="\${esc(s.targetScore)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표등급</label><input class="targetGrade" value="\${esc(s.targetGrade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표백분위</label><input class="targetPercentile" type="number" value="\${esc(s.targetPercentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>문제풀이순서</label><select class="order" onchange="syncSubject('\${s.sid}')">\${['번호 순서대로','쉬운 문제부터 선별해서','선택과목부터','공통부터','화작/언매→독서론→문학→독서','직접 입력'].map(v=>\`<option \${s.order===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>문제풀이순서 직접 입력</label><input class="orderMemo" value="\${esc(s.orderMemo)}" oninput="syncSubject('\${s.sid}')"></div><div><label>시간부족</label><select class="time" onchange="syncSubject('\${s.sid}')">\${['없음','약간','뚜렷함','심각'].map(v=>\`<option \${s.time===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>집중/멘탈</label><select class="mental" onchange="syncSubject('\${s.sid}')">\${['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'].map(v=>\`<option \${s.mental===v?'selected':''}>\${v}</option>\`).join('')}</select></div></div><div style="margin-top:12px"><label>틀린 문항별 오답 원인</label>\${rows}<button class="ghost" onclick="addItem('\${s.sid}');markClicked(event)">+ 문항 추가</button></div><details class="progress-box" open><summary>학습 진도 · 미학습 범위 · 점수 해석 보정</summary><div class="progress-grid"><div><label>현재 준비도</label><select class="preparationLevel" onchange="syncSubject('\${s.sid}')">\${['전 범위 실전 준비 완료','개념 완료·실전 연습 부족','주요 단원만 학습','개념 학습 진행 중','거의 준비하지 못함'].map(v=>\`<option \${s.preparationLevel===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>미학습 문항 수</label><select class="unlearnedCount" onchange="syncSubject('\${s.sid}')">\${['0','1~2','3~5','6개 이상'].map(v=>\`<option \${s.unlearnedCount===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>학습 완료 범위 오답 수</label><select class="learnedErrorCount" onchange="syncSubject('\${s.sid}')">\${['0','1~2','3~5','6개 이상'].map(v=>\`<option \${s.learnedErrorCount===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>학습 완료 단원/영역</label><textarea class="completedUnits" oninput="syncSubject('\${s.sid}')" placeholder="예: 수학Ⅰ 수열, 수학Ⅱ 미분 / 독서 사회·문학 현대시">\${esc(s.completedUnits)}</textarea></div><div><label>학습 중 단원/영역</label><textarea class="inProgressUnits" oninput="syncSubject('\${s.sid}')" placeholder="예: 적분 기본유형 / 언어와매체 문법">\${esc(s.inProgressUnits)}</textarea></div><div><label>미학습 단원/영역</label><textarea class="unlearnedUnits" oninput="syncSubject('\${s.sid}')" placeholder="예: 미적분 적분법 / 탐구 유전">\${esc(s.unlearnedUnits)}</textarea></div><div><label>시험 후 확인된 부족 단원</label><textarea class="weakUnits" oninput="syncSubject('\${s.sid}')" placeholder="단원명과 관련 문항을 함께 기록">\${esc(s.weakUnits)}</textarea></div><div><label>집중 붕괴 시점</label><select class="concentrationBreak" onchange="syncSubject('\${s.sid}')">\${['없음','초반','중반','후반','마지막 10분','여러 번 반복'].map(v=>\`<option \${s.concentrationBreak===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>집중 회복 결과</label><select class="recoveryResult" onchange="syncSubject('\${s.sid}')">\${['해당 없음','10초 리셋 후 바로 회복','문제 이동 후 회복','부분 회복','회복 실패'].map(v=>\`<option \${s.recoveryResult===v?'selected':''}>\${v}</option>\`).join('')}</select></div></div><div style="margin-top:9px"><label>점수 해석 기준</label><select class="scoreBasis" onchange="syncSubject('\${s.sid}')">\${['전 범위 학습 완료 상태의 실전 점수','일부 미학습 범위가 반영된 점수','주요 단원만 학습한 상태의 점수','개념 완료·문제풀이 부족 상태의 점수','진도보다 시험 운영 영향이 큰 점수','진도와 시험 운영이 함께 반영된 점수'].map(v=>\`<option \${s.scoreBasis===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div class="progress-note">실제 원점수는 그대로 유지합니다. 이 항목은 진도 부족과 시험 운영 실패를 구분해 리포트 문구를 보정하는 데 사용됩니다.</div></details><details class="situation-box" open><summary>CHALLENGER AAR 상황 분석 · 행동강령 확정</summary><div class="situation-grid"><div><label>시스템 추천 상황 유형</label><input class="situationType" value="\${esc(s.situationType)}" readonly></div><div><label>주요 영향 요인</label><input class="primaryFactor" value="\${esc(s.primaryFactor)}" readonly></div><div><label>진도 영향</label><input class="progressImpact" value="\${esc(s.progressImpact)}" readonly></div><div><label>시험 운영 영향</label><input class="operationImpact" value="\${esc(s.operationImpact)}" readonly></div><div><label>매니저 최종 상황 유형</label><select class="managerSituationType" onchange="syncSubject('\${s.sid}')">\${['','진도 부족형','개념 미완성형','학습 후 인출 실패형','문제 적용 부족형','시간 배분 실패형','고난도 집착형','정확도·실수형','집중 회복 실패형','장시간 시험 체력형','과목 간 감정 전이형','미준비 과목 완주 부족형','복합 원인형','안정 수행형'].map(v=>\`<option value="\${v}" \${s.managerSituationType===v?'selected':''}>\${v||'시스템 추천 후 선택'}</option>\`).join('')}</select></div><div><label>매니저 확정 상태</label><select class="managerConfirmed" onchange="syncSubject('\${s.sid}')">\${['미확정','추천 그대로 적용','수정 후 확정','이번 회차 보류'].map(v=>\`<option \${s.managerConfirmed===v?'selected':''}>\${v}</option>\`).join('')}</select></div></div><div class="situation-result"><label>시스템 추천 행동강령</label><textarea class="recommendedActions" readonly>\${esc(s.recommendedActions)}</textarea><label style="margin-top:8px">매니저 최종 행동강령 · 학생에게는 1~2개만 제시</label><textarea class="managerActions" oninput="syncSubject('\${s.sid}')" placeholder="추천 문구를 확인하고 학생 상황에 맞게 최종 확정하세요">\${esc(s.managerActions)}</textarea><label style="margin-top:8px">다음 회차 확인 기준</label><textarea class="nextCriteria" oninput="syncSubject('\${s.sid}')" placeholder="예: 미완료 문항 감소 / 집중 붕괴 시점 지연 / 10초 리셋 실행 여부">\${esc(s.nextCriteria)}</textarea><div class="row no-print" style="margin-top:9px"><button type="button" onclick="recommendSituation('\${s.sid}');markClicked(event)">상황 분석 추천</button><button type="button" class="ghost" onclick="applySituationRecommendation('\${s.sid}');markClicked(event)">추천 행동강령 적용</button></div></div><div class="manager-confirm">점수는 수정하지 않습니다. 진도 영향과 시험 운영 영향을 분리한 뒤, 시스템 추천을 매니저가 최종 확정합니다.</div></details><div style="margin-top:12px"><label>매니저 수정/추가 메모</label><textarea class="memo" oninput="syncSubject('\${s.sid}')" placeholder="아래 옵션 태그를 눌러 자동 삽입 후 학생 상황에 맞게 수정하세요">\${esc(s.memo)}</textarea><div class="memo-tools"><b>빠른 메모 옵션</b><div class="quicktags"><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','reason')">오답원인 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','action')">핵심행동 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','range')">처리범위 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','items')">문항·단원 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','student')">학생용 한 줄 처방</span></div></div></div></div>\`}
+const _SG_UNIT_LIST = {
+  KOR: ['화법','작문','언어와매체 문법','언어와매체 매체','현대시','고전시가','현대소설','고전소설','극·수필','독서 인문','독서 사회','독서 과학·기술','독서 융합'],
+  MATH: ['지수함수와 로그함수','삼각함수','수열','함수의 극한과 연속','미분','적분','경우의 수·순열과 조합','확률','통계','수열의 극한','미적분 미분법','미적분 적분법','이차곡선','평면벡터','공간도형과 공간좌표'],
+  ENG: ['어휘','주제·제목','주장·요지','빈칸 추론','무관한 문장','글의 순서','문장 삽입','요약문','장문 독해','듣기'],
+  INQ: [], HIST: [], LANG: []
+};
+function card(s){let rows=s.items.map((it,i)=>{const _sug=suggestCause(it);const _sugId='cp_'+s.sid+'_'+i;return \`<div class="item-row"><input class="no" placeholder="문항" value="\${esc(it.no)}" oninput="syncSubject('\${s.sid}')"><input class="unit" placeholder="단원/유형" value="\${esc(it.unit)}" oninput="syncSubject('\${s.sid}')"><select class="diff" onchange="syncSubject('\${s.sid}')">\${['하','중','상','최상','킬러'].map(v=>\`<option \${it.diff===v?'selected':''}>\${v}</option>\`).join('')}</select><div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0"><input class="points" type="number" placeholder="배점" title="문항 배점" value="\${esc(it.points)}" style="width:52px;flex:none" oninput="syncSubject('\${s.sid}')"><select id="\${_sugId}" class="causePrimary" title="오답 1차 원인(교정가능점수용)" style="width:auto;flex:none" onchange="syncSubject('\${s.sid}')">\${[['','1차원인'],['K','K 지식부족'],['T','T 시간손실'],['M','M 실수'],['J','J 판단·집착'],['C','C 집중붕괴'],['U','U 판정보류']].map(o=>\`<option value="\${o[0]}" \${(it.causePrimary||'')===o[0]?'selected':''}>\${o[1]}</option>\`).join('')}</select>\${_sug&&!it.causePrimary?\`<span class="small muted" style="white-space:nowrap" title="시스템 추천(참고용) — 최종 판정은 매니저가 선택">추천:\${_SG_CAUSE_LABEL[_sug]} <button type="button" class="ghost" style="padding:2px 6px;font-size:10px" onclick="document.getElementById('\${_sugId}').value='\${_sug}';syncSubject('\${s.sid}');markClicked(event)">적용</button></span>\`:''}<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748b;white-space:nowrap;flex:none"><input type="checkbox" class="guessedTime" style="width:16px;height:16px;flex:none;padding:0;margin:0;-webkit-appearance:checkbox;appearance:checkbox" \${it.guessedTime?'checked':''} onchange="syncSubject('\${s.sid}')">찍음/미응답</label></div><button class="ghost" onclick="openReasonModal('\${s.sid}',\${i});markClicked(event)">오답원인 선택</button><div class="reason-summary">\${esc((it.reasons||[]).join(', ')||'선택 전')}</div><input class="imemo" placeholder="상황메모" value="\${esc(it.memo)}" oninput="syncSubject('\${s.sid}')"><button class="secondary" onclick="removeItem('\${s.sid}',\${i});markClicked(event)">×</button></div>\`}).join('');
+return \`<div class="card subject-card" data-sid="\${s.sid}"><div class="row"><h3>과목 입력</h3><button class="secondary right" onclick="removeSubject('\${s.sid}');markClicked(event)">삭제</button></div><div class="grid g4"><div><label>과목</label><select class="subject" onchange="syncSubject('\${s.sid}');let ss=state.subjects.find(x=>x.sid==='\${s.sid}');ss.items.forEach(i=>i.reasons=[]);renderSubjects()">\${Object.entries(SUBJECTS).map(([k,v])=>\`<option value="\${k}" \${s.subject===k?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>세부 과목</label><input class="detail" value="\${esc(s.detail)}" oninput="syncSubject('\${s.sid}')"></div><div><label>실력 수준</label><select class="level" onchange="syncSubject('\${s.sid}')">\${['','상위권','중위권','하위권','불안정권'].map(v=>\`<option value="\${v}" \${s.level===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>이번 회차 집중 여부</label><select class="focus" onchange="syncSubject('\${s.sid}')">\${['','집중','유지','관찰','보류'].map(v=>\`<option value="\${v}" \${s.focus===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>문항 처리 범위</label><select class="processRange" onchange="syncSubject('\${s.sid}')">\${['','전체 오답 분석','고난도/킬러 제외','중하 난이도 정답률 집중','집중 과목 핵심문항만'].map(v=>\`<option value="\${v}" \${s.processRange===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>난이도 선별</label><select class="difficultySelect" onchange="syncSubject('\${s.sid}')">\${['','하~중 난이도 우선','중상 난이도 선별','4점 중간 난도까지','고난도/킬러 제외','킬러 포함 심화'].map(v=>\`<option value="\${v}" \${s.difficultySelect===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>정답률 목표</label><select class="accuracyTarget" onchange="syncSubject('\${s.sid}')">\${['','정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'].map(v=>\`<option value="\${v}" \${s.accuracyTarget===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>오답개수</label><input class="wrongCount" type="number" value="\${esc(s.wrongCount)}" placeholder="없으면 자동" oninput="syncSubject('\${s.sid}')"></div><div><label>전체 문항 수</label><input class="totalItemCount" type="number" value="\${esc(s.totalItemCount)}" placeholder="예: 45" oninput="syncSubject('\${s.sid}')"></div></div><div class="grid g4" style="margin-top:10px"><div><label>성적</label><input class="score" type="number" value="\${esc(s.score)}" oninput="syncSubject('\${s.sid}')"></div><div><label>등급</label><input class="grade" value="\${esc(s.grade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>백분위</label><input class="percentile" type="number" value="\${esc(s.percentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표 성적</label><input class="targetScore" type="number" value="\${esc(s.targetScore)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표등급</label><input class="targetGrade" value="\${esc(s.targetGrade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표백분위</label><input class="targetPercentile" type="number" value="\${esc(s.targetPercentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>문제풀이순서</label><select class="order" onchange="syncSubject('\${s.sid}')">\${['번호 순서대로','쉬운 문제부터 선별해서','선택과목부터','공통부터','화작/언매→독서론→문학→독서','직접 입력'].map(v=>\`<option \${s.order===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>문제풀이순서 직접 입력</label><input class="orderMemo" value="\${esc(s.orderMemo)}" oninput="syncSubject('\${s.sid}')"></div><div><label>시간부족</label><select class="time" onchange="syncSubject('\${s.sid}')">\${['없음','약간','뚜렷함','심각'].map(v=>\`<option \${s.time===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>집중/멘탈</label><select class="mental" onchange="syncSubject('\${s.sid}')">\${['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'].map(v=>\`<option \${s.mental===v?'selected':''}>\${v}</option>\`).join('')}</select></div></div><div style="margin-top:12px"><label>틀린 문항별 오답 원인</label>\${rows}<button class="ghost" onclick="addItem('\${s.sid}');markClicked(event)">+ 문항 추가</button></div><div style="margin-top:12px"><label>매니저 수정/추가 메모</label><textarea class="memo" oninput="syncSubject('\${s.sid}')" placeholder="아래 옵션 태그를 눌러 자동 삽입 후 학생 상황에 맞게 수정하세요">\${esc(s.memo)}</textarea><div class="memo-tools"><b>빠른 메모 옵션</b><div class="quicktags"><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','reason')">오답원인 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','action')">핵심행동 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','range')">처리범위 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','items')">문항·단원 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','student')">학생용 한 줄 처방</span></div></div></div></div>\`}
 function openReasonModal(sid,idx){syncSubject(sid);modalTarget={sid,idx,temp:[...(state.subjects.find(s=>s.sid===sid).items[idx].reasons||[])]};let s=state.subjects.find(x=>x.sid===sid);$('reasonChips').innerHTML=(TAGS[s.subject]||[]).map(t=>\`<span class="chip \${modalTarget.temp.includes(t)?'active':''}" onclick="toggleModalReason('\${t.replace(/'/g,"\\\\'")}')">\${t}</span>\`).join('');$('reasonModal').style.display='flex'}
 function toggleModalReason(t){let arr=modalTarget.temp;modalTarget.temp=arr.includes(t)?arr.filter(x=>x!==t):[...arr,t];let s=state.subjects.find(x=>x.sid===modalTarget.sid);$('reasonChips').innerHTML=(TAGS[s.subject]||[]).map(tag=>\`<span class="chip \${modalTarget.temp.includes(tag)?'active':''}" onclick="toggleModalReason('\${tag.replace(/'/g,"\\\\'")}')">\${tag}</span>\`).join('')}
 function saveReasons(){let s=state.subjects.find(x=>x.sid===modalTarget.sid);s.items[modalTarget.idx].reasons=[...modalTarget.temp];closeReasonModal();renderSubjects();toast('오답원인을 저장했습니다.')}function clearModalReasons(){modalTarget.temp=[];toggleModalReason('__dummy__');modalTarget.temp=[];let s=state.subjects.find(x=>x.sid===modalTarget.sid);$('reasonChips').innerHTML=(TAGS[s.subject]||[]).map(tag=>\`<span class="chip" onclick="toggleModalReason('\${tag.replace(/'/g,"\\\\'")}')">\${tag}</span>\`).join('')}function closeReasonModal(){$('reasonModal').style.display='none';modalTarget=null}
-function addItem(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);s.items.push({no:'',unit:'',diff:'중',reasons:[],memo:''});renderSubjects()}function removeItem(sid,i){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);s.items.splice(i,1);if(!s.items.length)s.items.push({no:'',unit:'',diff:'중',reasons:[],memo:''});renderSubjects()}function removeSubject(sid){state.subjects=state.subjects.filter(s=>s.sid!==sid);renderSubjects();generate()}
+function addItem(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);s.items.push({no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false});renderSubjects()}function removeItem(sid,i){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);s.items.splice(i,1);if(!s.items.length)s.items.push({no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false});renderSubjects()}function removeSubject(sid){state.subjects=state.subjects.filter(s=>s.sid!==sid);renderSubjects();generate()}
 function difficultyEligible(s,i){
   let d=i.diff;
   if(s.processRange==='중하 난이도 정답률 집중') return ['하','중'].includes(d);
@@ -23516,7 +23525,7 @@ function validItems(s){return s.items.filter(i=>i.no&&i.unit&&(i.reasons||[]).le
 function excludedItems(s){return s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).filter(i=>exclusionReason(s,i))}
 function issues(s){let map={};validItems(s).forEach(i=>i.reasons.forEach(r=>{if(!map[r])map[r]={tag:r,count:0,items:[],units:[],memos:[],diffs:[]};map[r].count++;map[r].items.push(i.no);map[r].units.push(i.unit);if(i.memo)map[r].memos.push(i.memo);map[r].diffs.push(i.diff)}));return Object.values(map).sort((a,b)=>b.count-a.count)}
 function wrongCount(s){return +(s.wrongCount||0)||s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).length}function name(s){return \`\${SUBJECTS[s.subject]}\${s.detail?'('+s.detail+')':''}\`}function actionFor(s,tag){return ACTION_LIBRARY[s.subject]?.[tag]||\`\${SUBJECTS[s.subject]} \${tag} 원인은 다음 회차 전 유사 문항 3개로 재확인하고, 시험 중 같은 신호가 나오면 즉시 표시한다.\`}
-function scoreMission(s){let r=0;if(s.focus==='집중')r+=3;if(s.time==='심각'||s.mental!=='안정')r+=2;if(+s.targetScore&&+s.score&&(+s.targetScore-+s.score>=10))r+=2;if(issues(s).length)r+=2;return r}function focusedSubjects(){let limit=+$('focusLimit').value;return [...state.subjects].sort((a,b)=>scoreMission(b)-scoreMission(a)).slice(0,limit).map(s=>s.sid)}
+function scoreMission(s){let r=0;if(s.focus==='집중')r+=3;if(s.time==='심각'||s.mental!=='안정')r+=2;if(+s.targetScore&&+s.score&&(+s.targetScore-+s.score>=10))r+=2;if(issues(s).length)r+=2;return r}function focusedSubjects(){let raw=$('focusLimit').value;let limit=raw?+raw:state.subjects.length;return [...state.subjects].sort((a,b)=>scoreMission(b)-scoreMission(a)).slice(0,limit).map(s=>s.sid)}
 function selectedData(){let fs=focusedSubjects();let out=[];state.subjects.forEach(s=>{if(!fs.includes(s.sid))return;issues(s).slice(0,2).forEach(iss=>out.push({s,iss,action:actionFor(s,iss.tag)}))});return out}
 function countRank(v){let m={'0':0,'1~2':1,'3~5':2,'6개 이상':3};return m[v]??0}
 function inferSituation(s){
@@ -23553,6 +23562,40 @@ function inferSituation(s){
   };
   return {type,factor,progress,operation,actions:(map[type]||map['안정 수행형']).join('\\n'),criteria:nextCriteriaFor(type)};
 }
+const _SG_STUDENT_SITUATION_TYPES = ['진도 부족형','개념 미완성형','학습 후 인출 실패형','문제 적용 부족형','시간 배분 실패형','고난도 집착형','정확도·실수형','집중 회복 실패형','장시간 시험 체력형','과목 간 감정 전이형','미준비 과목 완주 부족형','복합 원인형','안정 수행형'];
+const _SG_PRIMARY_FACTOR_OPTIONS = ['미학습 범위','집중력 저하·회복 실패','후반 체력·집중력 저하','문제 전환 실패·시간 배분','학습 완료 범위의 개념 인출 부족','조건 해석·자료 적용·풀이 발상','조건·계산·선지 판단 실수','시간 배분·마무리 부족','진도 부족과 학습 완료 범위 오답','특별한 위험 요인 없음'];
+const _SG_ACTION_LIBRARY_BY_TYPE = {
+  '진도 부족형':['미학습 문항과 학습 완료 범위의 오답을 분리한다.','다음 회차 전 지정 단원의 개념과 기본 유형을 완료한다.','미학습 범위가 포함된 현재 점수를 전체 실력으로 단정하지 않는다.'],
+  '개념 미완성형':['오답 풀이 전에 해당 단원의 핵심 개념을 먼저 재점검한다.','핵심 개념을 설명하지 못하면 고난도 문제풀이로 넘어가지 않는다.'],
+  '문제 적용 부족형':['문제 조건과 사용 개념을 분리해 표시한다.','조건 변화에 따라 풀이가 어떻게 달라지는지 유사 문항과 비교한다.'],
+  '고난도 집착형':['풀이 진전이 없으면 과목별 제한시간 안에 표시 후 이동한다.','1차 풀이에서는 해결 가능한 문항을 먼저 확보한다.'],
+  '시간 배분 실패형':['과목별 중간 점검 시각과 종료 목표시각을 정한다.','마지막 구간은 신규 고난도보다 미완료·마킹 확인에 사용한다.'],
+  '집중 회복 실패형':['같은 문장이나 계산을 반복하면 즉시 10초 리셋을 실행한다.','요구 조건에 표시한 뒤 계속할지 이동할지 바로 결정한다.'],
+  '장시간 시험 체력형':['쉬는 시간에는 이전 과목을 채점하지 않고 회복 행동을 실시한다.','점심 식사량·수분·자세·시험 전 움직임을 일정하게 유지한다.'],
+  '정확도·실수형':['답을 확정하기 전 조건·단위·부호·범위를 한 번 확인한다.','고난도 추가 풀이보다 학습 완료 범위의 쉬운 문항 정확도를 우선한다.'],
+  '복합 원인형':['미학습 범위와 학습 완료 범위 오답을 별도로 분류한다.','진도 보완 1개와 시험 행동 교정 1개만 이번 회차 미션으로 확정한다.'],
+  '안정 수행형':['현재 풀이 순서와 시간 운영을 유지한다.','다음 회차에는 동일 전략의 재현 여부만 확인한다.'],
+  '학습 후 인출 실패형':['학습 완료 범위 오답을 우선 재점검하고 인출 연습을 반복한다.','같은 개념의 오답이 재발하면 즉시 별도로 표시한다.'],
+  '과목 간 감정 전이형':['이전 과목 결과를 다음 과목 시작 전에 정리하고 넘어간다.','과목이 바뀌면 이전 과목 채점을 하지 않는다.'],
+  '미준비 과목 완주 부족형':['준비도가 낮은 과목은 완주를 우선 목표로 한다.','고난도 문항보다 답안 마킹 완료를 우선한다.']
+};
+function computeStudentSituation(s){
+  const types = s.studentSituationTypes||[];
+  if(!types.length) return {type:'', actions:'', criteria:''};
+  const typeLabel = types.join(' · ');
+  const actionLines=[];
+  types.forEach(t=>{ (_SG_ACTION_LIBRARY_BY_TYPE[t]||[]).forEach(a=>{ if(actionLines.indexOf(a)===-1) actionLines.push(a); }); });
+  const criteriaList=[];
+  types.forEach(t=>{ const c=nextCriteriaFor(t); if(c && criteriaList.indexOf(c)===-1) criteriaList.push(c); });
+  return {type:typeLabel, actions:actionLines.join('\\n'), criteria:criteriaList.join(' / ')};
+}
+function recomputeSituation(sid){
+  syncSubject(sid);
+  const s=state.subjects.find(x=>x.sid===sid); if(!s) return;
+  const r=computeStudentSituation(s);
+  s.situationType=r.type; s.recommendedActions=r.actions; s.nextCriteria=r.criteria;
+  renderSubjects();
+}
 function nextCriteriaFor(type){const m={
  '진도 부족형':'미학습 문항 수 감소 / 지정 단원 학습 완료 / 준비 범위 정답률 유지',
  '개념 미완성형':'학습 완료 범위 오답 감소 / 핵심 개념 인출 여부 / 같은 개념 오답 재발 여부',
@@ -23568,9 +23611,17 @@ function recommendSituation(sid){syncSubject(sid);let s=state.subjects.find(x=>x
 function applySituationRecommendation(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);if(!s)return;if(!s.situationType)recommendSituation(sid),s=state.subjects.find(x=>x.sid===sid);s.managerSituationType=s.situationType;s.managerActions=s.recommendedActions;s.managerConfirmed='추천 그대로 적용';if(!s.nextCriteria)s.nextCriteria=nextCriteriaFor(s.situationType);renderSubjects();toast('추천 내용을 매니저 확정란에 적용했습니다.')}
 function ensureSituation(s){if(!s.situationType){let r=inferSituation(s);Object.assign(s,{situationType:r.type,primaryFactor:r.factor,progressImpact:r.progress,operationImpact:r.operation,recommendedActions:r.actions});if(!s.nextCriteria)s.nextCriteria=r.criteria}}
 function situationReport(s){ensureSituation(s);let finalType=s.managerSituationType||s.situationType;let finalActions=s.managerActions||s.recommendedActions;return \`<div class="report-card"><h4>\${name(s)} · 상황 분석 행동강령</h4><table><tr><th>추천 상황 유형</th><td>\${esc(s.situationType||'-')}</td><th>매니저 최종 유형</th><td>\${esc(finalType||'-')}</td></tr><tr><th>주요 요인</th><td>\${esc(s.primaryFactor||'-')}</td><th>확정 상태</th><td>\${esc(s.managerConfirmed||'미확정')}</td></tr><tr><th>진도 영향</th><td>\${esc(s.progressImpact||'-')}</td><th>시험 운영 영향</th><td>\${esc(s.operationImpact||'-')}</td></tr><tr><th>최종 행동강령</th><td colspan="3">\${esc(finalActions||'-').replace(/\\n/g,'<br>')}</td></tr><tr><th>다음 회차 확인</th><td colspan="3">\${esc(s.nextCriteria||'-')}</td></tr></table></div>\`}
-function progressInterpretation(s){let parts=[];if(s.unlearnedUnits)parts.push(\`미학습 범위: \${s.unlearnedUnits}\`);if(s.inProgressUnits)parts.push(\`학습 중: \${s.inProgressUnits}\`);if(s.weakUnits)parts.push(\`시험 후 부족 단원: \${s.weakUnits}\`);let base=s.scoreBasis||'점수 해석 기준 미입력';let detail=parts.join(' · ')||'세부 단원 미입력';return \`\${base}. \${detail}\`}
-function progressReport(s){return \`<div class="progress-report"><h4>\${name(s)} · 진도 보정 해석</h4><table><tr><th>준비도</th><td>\${esc(s.preparationLevel||'-')}</td><th>미학습 문항</th><td>\${esc(s.unlearnedCount||'0')}</td><th>학습범위 오답</th><td>\${esc(s.learnedErrorCount||'0')}</td></tr><tr><th>학습 완료</th><td colspan="2">\${esc(s.completedUnits||'-')}</td><th>학습 중</th><td colspan="2">\${esc(s.inProgressUnits||'-')}</td></tr><tr><th>미학습</th><td colspan="2">\${esc(s.unlearnedUnits||'-')}</td><th>부족 단원</th><td colspan="2">\${esc(s.weakUnits||'-')}</td></tr><tr><th>집중 붕괴</th><td>\${esc(s.concentrationBreak||'-')}</td><th>회복</th><td>\${esc(s.recoveryResult||'-')}</td><th>해석 기준</th><td>\${esc(s.scoreBasis||'-')}</td></tr></table><p><b>해석:</b> \${esc(progressInterpretation(s))}</p></div>\`}
-function generate(){syncAll();state.subjects.forEach(ensureSituation);renderSubjects();$('analysisBody').innerHTML=buildAnalysis();renderLong();renderShort();renderTrend();renderWeekly();toast('분석이 생성되었습니다.')}
+function _sgAutoScoreBasis(s){
+  // ★ 학습 완료/학습 중/미학습 단원 선택을 기준으로 점수 해석 문구를 자동 판단한다(별도 선택 없음).
+  const hasUnlearned = !!(s.unlearnedUnits && s.unlearnedUnits.trim());
+  const hasInProgress = !!(s.inProgressUnits && s.inProgressUnits.trim());
+  if(hasUnlearned) return '미학습 범위가 반영된 점수';
+  if(hasInProgress) return '학습 진행 중인 범위가 반영된 점수';
+  return '전 범위 학습 완료 상태의 점수';
+}
+function progressInterpretation(s){let parts=[];if(s.unlearnedUnits)parts.push(\`미학습 범위: \${s.unlearnedUnits}\`);if(s.inProgressUnits)parts.push(\`학습 중: \${s.inProgressUnits}\`);if(s.weakUnits)parts.push(\`시험 후 부족 단원: \${s.weakUnits}\`);let base=_sgAutoScoreBasis(s);let detail=parts.join(' · ')||'세부 단원 미입력';return \`\${base}. \${detail}\`}
+function progressReport(s){return \`<div class="progress-report"><h4>\${name(s)} · 진도 보정 해석</h4><table><tr><th>준비도</th><td>\${esc(s.preparationLevel||'-')}</td><th>미학습 문항</th><td>\${esc(s.unlearnedCount||'0')}</td><th>학습범위 오답</th><td>\${esc(s.learnedErrorCount||'0')}</td></tr><tr><th>학습 완료</th><td colspan="2">\${esc(s.completedUnits||'-')}</td><th>학습 중</th><td colspan="2">\${esc(s.inProgressUnits||'-')}</td></tr><tr><th>미학습</th><td colspan="2">\${esc(s.unlearnedUnits||'-')}</td><th>부족 단원</th><td colspan="2">\${esc(s.weakUnits||'-')}</td></tr><tr><th>집중 붕괴</th><td>\${esc(s.concentrationBreak||'-')}</td><th>회복</th><td>\${esc(s.recoveryResult||'-')}</td><th>해석 기준</th><td>\${esc(_sgAutoScoreBasis(s))}</td></tr></table><p><b>해석:</b> \${esc(progressInterpretation(s))}</p></div>\`}
+function generate(){syncAll();state.subjects.forEach(ensureSituation);renderSubjects();renderLong();renderShort();renderTrend();renderWeekly();toast('분석이 생성되었습니다.')}
 function buildAnalysis(){let tags=allTags().map(x=>\`\${x.tag}(\${x.count})\`).join(' · ')||'문항/단원/오답원인을 입력하면 표시됩니다.';let fs=focusedSubjects();return \`<div class="bar"><b>전체 반복 확인 근거</b><span>\${tags}</span></div><div class="bar"><b>이번 회차 집중 과목</b><span>\${state.subjects.filter(s=>fs.includes(s.sid)).map(name).join(', ')}</span></div>\`+state.subjects.map(s=>\`<div class="report-card"><h3>\${name(s)} \${fs.includes(s.sid)?'<span class="pill green">집중</span>':'<span class="pill">비집중</span>'}</h3><p><b>범위:</b> \${s.processRange} · <b>난이도:</b> \${s.difficultySelect} · <b>목표:</b> \${s.accuracyTarget} · <b>오답개수:</b> \${wrongCount(s)}</p>\${progressReport(s)}\${situationReport(s)}\${excludedItems(s).length?\`<div class="bar"><b>이번 미션 제외</b><span>\${excludedItems(s).map(i=>\`\${i.no||'-'}번(\${i.diff||'-'}): \${exclusionReason(s,i)}\`).join(' · ')}</span></div>\`:''}\${issues(s).map(iss=>\`<div class="issue selected"><h4>\${iss.tag}</h4><table><tr><th>문항</th><td>\${iss.items.join(', ')}</td><th>단원/유형</th><td>\${[...new Set(iss.units)].join(', ')}</td></tr><tr><th>행동강령</th><td colspan="3">\${actionFor(s,iss.tag)}</td></tr></table></div>\`).join('')||'<p class="muted">미션으로 올릴 문항은 문항번호·단원/유형·오답원인을 모두 입력해야 합니다.</p>'}</div>\`).join('')}
 function allTags(){let m={};state.subjects.forEach(s=>issues(s).forEach(i=>m[i.tag]=(m[i.tag]||0)+i.count));return Object.entries(m).map(([tag,count])=>({tag,count})).sort((a,b)=>b.count-a.count)}
 function cover(title){let d=($('testDate').value||'').slice(0,7).replace('-','.');
@@ -23613,6 +23664,10 @@ function stripCovers(markup){
     .replace(/<div class="premium-cover">[\\s\\S]*?<div class="cover-footer">[\\s\\S]*?<\\/div>\\s*<\\/div>/g,'')
     .replace(/<div class="cover">[\\s\\S]*?<\\/div>/g,'');
 }
+
+// ══════════════════════════════════════════════════
+// 실전 수행손실·교정가능점수 (CHALLENGER 4대 실전지표, V1)
+// ══════════════════════════════════════════════════
 function renderWeekly(){
   renderLong();
   renderShort();
@@ -23620,10 +23675,12 @@ function renderWeekly(){
   const longBody = stripCovers($('longReport').innerHTML);
   const shortBody = stripCovers($('shortReport').innerHTML);
   const trendBody = stripCovers($('trendReport').innerHTML);
+  const perfLossBody = renderPerfLoss();
   $('weeklyReport').innerHTML =
     cover('챌린저 상담 리포트 (상담용+처방전+누적 통합)')+
     \`<div class="weekly-part"><h2>PART 1. 상담용 분석 정밀 리포트</h2>\${longBody}</div>
      <div class="weekly-part"><h2>PART 2. 학생 실천 처방전</h2>\${shortBody}</div>
+     <div class="weekly-part"><h2>PART 2.5. 실전 수행손실 분석 · 행동강령 연계</h2>\${perfLossBody}</div>
      <div class="weekly-part"><h2>PART 3. 누적 변화 리포트</h2>\${trendBody}</div>\`;
 }
 function populateHistoryDropdown(){let sel=$('historyLoadSelect');if(!sel)return;let st=$('studentName').value;let list=state.history.filter(h=>h.student===st).sort((a,b)=>(a.date||'').localeCompare(b.date||''));if(!list.length){sel.innerHTML='<option value="">저장된 과거 회차 없음</option>';return;}sel.innerHTML=list.map((h,i)=>\`<option value="\${i}">\${h.date||'날짜없음'} · \${h.test||'회차명없음'}\${h.fullSubjects&&h.fullSubjects.length?'':' (요약만 저장됨)'}</option>\`).join('');const curDate=$('testDate').value,curTest=$('testName').value;let matchIdx=list.findIndex(h=>_sgTrim(h.date)===_sgTrim(curDate)&&_sgTrim(h.test)===_sgTrim(curTest));if(matchIdx<0)matchIdx=list.length-1;sel.value=String(matchIdx)}
@@ -24730,6 +24787,9 @@ function aarInfer(s,f){
     if(/빈칸|순서|삽입|고난도/.test(all)&&/시간|붙잡|지연/.test(all)){
       analysis='기본 독해보다 빈칸·순서·삽입 유형의 체류시간이 후반 문항 처리에 영향을 준 것으로 확인됩니다. 모든 고난도 문항을 끝까지 해결하려 하기보다 제한시간 안에서 선별적으로 접근해야 합니다.';
       action=action||'빈칸·순서·삽입 문항에 제한시간을 적용하고 방향이 잡히지 않으면 다음 문항으로 이동한다.';
+    }else if(/듣기|병행/.test(all)){
+      analysis='독해와 듣기를 동시에 처리하는 과정에서 집중이 분산되어 듣기 문항 손실로 이어진 것으로 확인됩니다. 듣기 중 독해 병행 범위를 미리 정해두지 않으면 같은 손실이 반복될 수 있습니다.';
+      action=action||'듣기 중 병행할 독해 범위를 미리 고정하고, 계획 밖 병행은 하지 않는다.';
     }else{
       analysis=\`이번 영어 결과는 \${weak||cause||'확인된 취약 유형'}에서 문장 구조와 논리 연결을 실제 문항에 적용하는 과정의 점검이 필요합니다.\`;
       action=action||'정답 선택 전 연결사·지시어·핵심 문장의 논리 방향을 확인한다.';
@@ -24756,7 +24816,7 @@ function aarRecordHtml(f){
 function aarSubjectReport(s){
   const f=aarParseMemo(s.memo), inf=aarInfer(s,f), record=aarRecordHtml(f);
   const wrong=f['전체 오답']||((s.items||[]).map(x=>x.no).filter(Boolean).join(', '));
-  return \`<div class="report-card"><h3>\${aarSubjectTitle(s)} 시험 직후 기록</h3><div class="bar"><b>점수</b><span>\${aarValid(s.score)?esc(s.score)+'점':'-'}</span><b>오답 수</b><span>\${esc(s.wrongCount||'0')}개</span>\${aarValid(wrong)?\`<b>전체 오답</b><span>\${esc(wrong)}</span>\`:''}</div>\${record}\${aarObjectiveSummary(s)}<div class="aar-analysis-box"><h4>\${aarSubjectTitle(s)} 분석</h4><p>\${esc(inf.analysis)}</p></div><div class="aar-action-box"><h4>\${aarSubjectTitle(s)} 행동강령</h4><p>\${esc(inf.action)}</p></div>\${aarValid(s.nextCriteria)?\`<div class="bar"><b>다음 회차 확인 기준</b><span>\${esc(s.nextCriteria)}</span></div>\`:''}</div>\`
+  return \`<div class="report-card"><h3>\${aarSubjectTitle(s)} 시험 직후 기록</h3><div class="bar"><b>점수</b><span>\${aarValid(s.score)?esc(s.score)+'점':'-'}</span><b>오답 수</b><span>\${esc(s.wrongCount||'0')}개</span>\${aarValid(wrong)?\`<b>전체 오답</b><span>\${esc(wrong)}</span>\`:''}</div>\${record}\${aarObjectiveSummary(s)}<div class="aar-analysis-box"><h4>\${aarSubjectTitle(s)} 분석</h4><p>\${esc(inf.analysis)}</p></div><div class="aar-action-box"><h4>\${aarSubjectTitle(s)} 행동강령</h4><p>\${esc(inf.action)}</p></div></div>\`
 }
 function aarSummaryTable(){
   const haveGrade=state.subjects.some(s=>aarValid(s.grade)), havePct=state.subjects.some(s=>aarValid(s.percentile));
@@ -24778,6 +24838,150 @@ function aarAssignment(s){
   return \`<div class="report-card"><h3>\${name(s)}</h3><div class="bar"><b>점수</b><span>\${aarValid(s.score)?esc(s.score)+'점':'-'}</span><b>전체 오답</b><span>\${aarValid(wrong)?esc(wrong):'채점 결과 확인'}</span></div>\${aarValid(f['핵심 원인'])?\`<p><b>시험 직후 확인된 원인:</b> \${esc(f['핵심 원인'])}</p>\`:''}<div class="aar-action-box"><b>다음 시험 행동강령</b><p>\${esc(inf.action)}</p></div><p><b>우선 분석 권장 문항:</b> \${suggested||'전체 오답 중 저오답률 또는 학습 완료 범위 문항 2개 선택'}</p><table class="aar-assignment-table"><tr><th>문항</th><th>전체 오답률</th><th>실제 원인</th><th>다시 풀기</th><th>행동강령 연결</th></tr><tr><td>____번</td><td>____%</td><td>□개념 □적용 □실수 □시간 □집중</td><td>□해결 □미해결</td><td>________________</td></tr><tr><td>____번</td><td>____%</td><td>□개념 □적용 □실수 □시간 □집중</td><td>□해결 □미해결</td><td>________________</td></tr></table></div>\`
 }
 function renderShort(){syncAll();$('shortReport').innerHTML=cover('CHALLENGER 1회차 오답 분석·실천 과제')+\`<h2>작성 방법</h2><div class="notice">전체 오답을 모두 길게 분석하지 않습니다. 과목별로 객관적 우선순위가 높은 문항 2개를 선택해 실제 원인을 확인하고, 다음 시험 행동강령과 연결합니다.</div>\${state.subjects.map(aarAssignment).join('')}\`}
+
+const _SG_CAUSE_LABEL={K:'학습·지식 부족',T:'시간 손실',M:'실수',J:'판단·집착',C:'집중 붕괴',U:'판정 보류'};
+const _SG_RECOVER_COEF={K:0,T:0.70,M:0.90,J:0.65,C:0.55,U:0};
+function _sgDiffCoef(diff){
+  const d=String(diff||'').trim();
+  if(d==='하')return 1.00;
+  if(d==='중')return 0.90;
+  if(d==='상')return 0.65;
+  if(d==='최상'||d==='킬러')return 0.40;
+  return 0.90; // 난이도 미입력 시 기본값(보통)
+}
+function computePerfLoss(s){
+  const items=(s.items||[]).filter(it=>String(it.no||'').trim());
+  let timeLoss=0,mistakeLoss=0,judgeLoss=0,concLoss=0,recoverable=0,guessedCnt=0;
+  items.forEach(it=>{
+    const pts=+it.points||0;
+    const cause=it.causePrimary||'U';
+    if(it.guessedTime)guessedCnt++;
+    if(cause==='T')timeLoss+=pts;
+    else if(cause==='M')mistakeLoss+=pts;
+    else if(cause==='J')judgeLoss+=pts;
+    else if(cause==='C')concLoss+=pts;
+    const rc=_SG_RECOVER_COEF[cause]||0;
+    const dc=_sgDiffCoef(it.diff);
+    recoverable+=pts*rc*dc;
+  });
+  const performanceLoss=mistakeLoss+judgeLoss+concLoss;
+  const totalLoss=timeLoss+mistakeLoss+judgeLoss+concLoss;
+  const totalCnt=+s.totalItemCount||0;
+  const completionRate=totalCnt>0?Math.max(0,Math.min(100,(totalCnt-guessedCnt)/totalCnt*100)):null;
+  const lossMap={T:timeLoss,M:mistakeLoss,J:judgeLoss,C:concLoss};
+  let primary=null,max=0;
+  Object.keys(lossMap).forEach(k=>{if(lossMap[k]>max){max=lossMap[k];primary=k}});
+  const primaryLabelMap={T:'시간 운영',M:'반복 실수',J:'판단·집착',C:'집중 관리'};
+  const primaryLabel=primary?primaryLabelMap[primary]:null;
+  return {timeLoss,mistakeLoss,judgeLoss,concLoss,performanceLoss,totalLoss,recoverable:Math.round(recoverable),completionRate,totalCnt,guessedCnt,normalCnt:Math.max(0,totalCnt-guessedCnt),primary,primaryLabel,itemCnt:items.length};
+}
+function _sgPerfLossInterpretSentence(primary){
+  const map={
+    T:'현재 가장 큰 실전 손실 요인은 시간 운영입니다. 전체 실전 수행손실 중 시간 관련 손실 비중이 가장 높아, 추가 학습보다 문제별 체류시간과 후반부 완주 전략의 교정이 우선적으로 필요합니다.',
+    M:'현재 가장 큰 실전 손실 요인은 반복 실수입니다. 학습한 내용을 실제 점수로 연결하는 과정에서 손실이 발생하고 있어, 조건 확인·답안 검토·마킹 절차의 교정이 필요합니다.',
+    J:'어려운 문제를 선별하고 넘어가는 판단 과정에서 점수 손실이 발생했습니다. 고난도 문제 해결력 자체보다 문제별 체류시간과 우선순위 판단 훈련이 우선됩니다.',
+    C:'시험 중 집중력 변화가 실제 점수 손실로 연결되고 있습니다. 집중이 흔들리는 구간과 시험 후반 운영방식을 중심으로 행동강령을 설정할 필요가 있습니다.'
+  };
+  return map[primary]||'이번 회차는 문항별 1차 원인(K/T/M/J/C/U)이 아직 입력되지 않아 손실원인을 판정할 수 없습니다. 틀린 문항 입력란에서 배점과 1차 원인을 채워주세요.';
+}
+function _sgPerfLossActionHint(primary){
+  const map={
+    T:['한 문항 최대 체류시간 설정','제한시간 초과 시 표시 후 이동','특정 시간까지 목표 문항 번호 도달','후반부 확보 시간 설정'],
+    M:['조건 체크','계산/마킹 검토','답안 옮기기 기준','마지막 검토시간 확보'],
+    J:['고난도 선별 기준','1차 풀이/2차 풀이 분리','문제 스킵 기준','특정 시간 이상 체류 금지'],
+    C:['집중 붕괴 시 행동규칙','지문 재독 제한','시험 후반 리셋 행동','특정 구간 집중 체크']
+  };
+  return map[primary]||[];
+}
+function perfLossCardHtml(s){
+  const items=(s.items||[]).filter(it=>String(it.no||'').trim());
+  if(!items.length)return '';
+  const hasPts=items.some(it=>+it.points>0);
+  const issuesHtml = issues(s).length?\`<div style="margin-top:10px">
+      <b class="small">오답원인별 세부 행동강령</b>
+      \${issues(s).map(iss=>\`<div class="issue selected" style="margin-top:6px"><h4>\${esc(iss.tag)}</h4><table><tr><th>문항</th><td>\${esc(iss.items.join(', '))}</td><th>단원/유형</th><td>\${esc([...new Set(iss.units)].join(', '))}</td></tr><tr><th>행동강령</th><td colspan="3">\${esc(actionFor(s,iss.tag))}</td></tr></table></div>\`).join('')}
+    </div>\`:'';
+  if(!hasPts){
+    return \`<div class="report-card"><h4>\${esc(name(s))} · 실전 수행손실 분석</h4><p class="small muted">틀린 문항 입력란에서 배점과 1차 원인(K/T/M/J/C/U)을 채우면 실질 완주율·손실점수·교정가능점수가 자동 계산됩니다.</p>\${issuesHtml}</div>\`;
+  }
+  const r=computePerfLoss(s);
+  const compRow=r.completionRate!=null
+    ? \`<tr><th>실질 완주율</th><td colspan="3"><b>\${r.completionRate.toFixed(0)}%</b> <span class="small muted">(정상풀이 \${r.normalCnt} / \${r.totalCnt}문항)</span></td></tr>\`
+    : \`<tr><th>실질 완주율</th><td colspan="3"><span class="small muted">과목 입력란의 "전체 문항 수"를 채우면 계산됩니다</span></td></tr>\`;
+  return \`<div class="report-card">
+    <h4>\${esc(name(s))} · 실전 수행손실 분석</h4>
+    <div class="small muted" style="margin-bottom:6px">현재 점수 \${esc(s.score)||'-'}점</div>
+    <table><tbody>
+      \${compRow}
+      <tr><th>시간 손실</th><td colspan="3"><b>\${r.timeLoss}점</b></td></tr>
+      <tr><th>수행 손실</th><td colspan="3"><b>\${r.performanceLoss}점</b> <span class="small muted">(실수 \${r.mistakeLoss} · 판단·집착 \${r.judgeLoss} · 집중 \${r.concLoss})</span></td></tr>
+      <tr><th>총 실전 수행손실</th><td colspan="3"><b>\${r.totalLoss}점</b></td></tr>
+      <tr><th>단기 교정가능점수</th><td colspan="3"><b>약 +\${r.recoverable}점</b></td></tr>
+    </tbody></table>
+    <p style="margin-top:8px"><b>핵심 손실원인:</b> \${r.primaryLabel?esc(r.primaryLabel):'해당 없음'}</p>
+    <p class="small">\${esc(_sgPerfLossInterpretSentence(r.primary))}</p>
+    \${r.primary?\`<p><b>연계 행동강령 예시:</b> \${_sgPerfLossActionHint(r.primary).map(esc).join(' / ')}</p>\`:''}
+    \${perfLossTrendTableHtml(s)}
+    \${issuesHtml}
+  </div>\`;
+}
+function renderPerfLoss(){
+  syncAll();
+  const cards=state.subjects.map(perfLossCardHtml).filter(Boolean).join('');
+  if(!cards)return \`<p class="small muted">틀린 문항 입력란에 배점과 1차 원인(K/T/M/J/C/U)을 입력하면 이 영역에 실전 수행손실 분석이 표시됩니다.</p>\`;
+  return cards+\`<p class="small muted" style="margin-top:10px">※ 단기 교정가능점수는 이번 시험의 오답 원인, 문항 배점 및 난이도를 기준으로 산출한 실전행동 교정 가능성 추정치입니다. 향후 시험 성적 또는 점수 상승을 보장하는 수치가 아닙니다.</p>\`;
+}
+
+
+// ── 13. 시스템 자동 오답원인 추천 (참고용 — 최종 판정은 매니저) ──
+function suggestCause(it){
+  if(it.guessedTime)return 'T';
+  const reasons=(it.reasons||[]).join(' ');
+  if(/실수|계산|마킹|조건|잘못\\s*읽/.test(reasons))return 'M';
+  if(/집중|멍|반복|재독/.test(reasons))return 'C';
+  if(/판단|못\\s*읽|시간|넘어가|미스|체류/.test(reasons))return 'J';
+  const d=String(it.diff||'').trim();
+  if(d==='최상'||d==='킬러')return 'K';
+  return '';
+}
+// ── 14. 행동강령 완전자동연결: 실전손실 1순위 원인을 매니저 최종 행동강령란에 반영 ──
+function applyPerfLossActions(sid){
+  syncSubject(sid);
+  const s=state.subjects.find(x=>x.sid===sid);
+  if(!s)return;
+  const r=computePerfLoss(s);
+  if(!r.primary){toast('아직 손실원인이 확정되지 않았습니다 (틀린 문항에 배점·1차원인을 입력해주세요)');return;}
+  const hints=_sgPerfLossActionHint(r.primary);
+  const text=\`[실전손실 기준] 핵심 손실원인: \${r.primaryLabel} (시간\${r.timeLoss}·실수\${r.mistakeLoss}·판단\${r.judgeLoss}·집중\${r.concLoss})\\n\`+hints.map(h=>'- '+h).join('\\n');
+  s.recommendedActions=((s.recommendedActions||'')+(s.recommendedActions?'\\n\\n':'')+text).trim();
+  renderSubjects();
+  toast('실전손실 분석 기준으로 행동강령을 반영했습니다.');
+}
+// ── 15. 회차별 변화 표: 같은 과목의 직전 회차와 비교 ──
+function perfLossTrendTableHtml(s){
+  const subjName=name(s);
+  const st=$('studentName').value;
+  const priorRounds=state.history.filter(h=>_sgTrim(h.student)===_sgTrim(st)).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  let prev=null;
+  for(let i=priorRounds.length-1;i>=0;i--){
+    const cand=(priorRounds[i].subjects||[]).find(x=>_sgNormSubj(_sgDisplayName(x.name))===_sgNormSubj(subjName));
+    if(cand&&(cand.items||[]).some(it=>+it.points>0)){prev=cand;break}
+  }
+  if(!prev)return '';
+  const prevR=computePerfLoss(prev),curR=computePerfLoss(s);
+  function d(cur,pv){const diff=cur-pv;return diff===0?'±0':(diff>0?'+':'')+diff}
+  const compRow=(curR.completionRate!=null&&prevR.completionRate!=null)
+    ?\`<tr><td>실질 완주율</td><td>\${prevR.completionRate.toFixed(0)}%</td><td>\${curR.completionRate.toFixed(0)}%</td><td>\${d(Math.round(curR.completionRate),Math.round(prevR.completionRate))}%p</td></tr>\`
+    :\`<tr><td>실질 완주율</td><td colspan="3" class="small muted">비교 불가(전체 문항 수 미입력)</td></tr>\`;
+  return \`<table style="margin-top:8px"><thead><tr><th>지표</th><th>이전 회차</th><th>이번 회차</th><th>변화</th></tr></thead><tbody>
+    \${compRow}
+    <tr><td>시간손실</td><td>\${prevR.timeLoss}</td><td>\${curR.timeLoss}</td><td>\${d(curR.timeLoss,prevR.timeLoss)}</td></tr>
+    <tr><td>실수손실</td><td>\${prevR.mistakeLoss}</td><td>\${curR.mistakeLoss}</td><td>\${d(curR.mistakeLoss,prevR.mistakeLoss)}</td></tr>
+    <tr><td>판단손실</td><td>\${prevR.judgeLoss}</td><td>\${curR.judgeLoss}</td><td>\${d(curR.judgeLoss,prevR.judgeLoss)}</td></tr>
+    <tr><td>집중손실</td><td>\${prevR.concLoss}</td><td>\${curR.concLoss}</td><td>\${d(curR.concLoss,prevR.concLoss)}</td></tr>
+    <tr><td>총 수행손실</td><td>\${prevR.totalLoss}</td><td>\${curR.totalLoss}</td><td>\${d(curR.totalLoss,prevR.totalLoss)}</td></tr>
+  </tbody></table>\`;
+}
 
 function init(){
   // ★ SG상담플랫폼 연동: 샘플 데이터 대신 SG에서 전달받은 학생 데이터로 초기화
@@ -25015,7 +25219,12 @@ loadSampleAnswerKey();
       if(/계산|부호|조건|실수/.test(all)) return '조건·부호 검산 1회 / 학습 완료 범위 오답 감소 / 마지막 검토 시간 확보';
       return '풀이 출발점 10초 내 결정 / 학습 완료 범위 정답 재현 / 전 문항 마킹 완료';
     }
-    if(subj==='ENG') return '고난도 유형 제한시간 준수 / 후반 급처리 문항 감소 / 전 문항 마킹 완료';
+    if(subj==='ENG'){
+      if(/빈칸|순서|삽입|고난도/.test(all)) return '빈칸·순서·삽입 제한시간 준수 / 고난도 유형 급처리 문항 감소 / 전 문항 마킹 완료';
+      if(/듣기|병행/.test(all)) return '듣기 중 독해 병행 범위 고정 / 듣기 문항 실수 0개 / 전 문항 마킹 완료';
+      if(/어휘|단어를 몰라/.test(all)) return '문장 방향·연결사 확인 후 판단 / 어휘 추론 근거 표시 / 전 문항 마킹 완료';
+      return '고난도 유형 제한시간 준수 / 후반 급처리 문항 감소 / 전 문항 마킹 완료';
+    }
     if(subj==='INQ'){
       if(/유전|가계도|유전자형/.test(all)) return '개념 문항 우선 완료 / 유전·가계도 제한시간 준수 / 미완료 문항 2개 이하';
       if(/도표|통계|자료|그래프|축|단위/.test(all)) return '그래프 축·단위 선확인 / 자료 문항 제한시간 준수 / 미완료 문항 감소';
@@ -25039,7 +25248,7 @@ loadSampleAnswerKey();
   window.aarSubjectReport=function(s){
     const f=aarParseMemo(s.memo), inf=aarInfer(s,f), record=aarRecordHtml(f);
     const wrong=f['전체 오답']||((s.items||[]).map(x=>x.no).filter(Boolean).join(', '));
-    const criteria=aarDynamicCriteria(s,f,inf.action), quality=completeness(f,s);
+    const quality=completeness(f,s);
     return \`<div class="report-card">
       <h3>\${aarSubjectTitle(s)} 실전 AAR</h3>
       <div class="bar"><b>점수</b><span>\${aarValid(s.score)?esc(s.score)+'점':'-'}</span><b>오답</b><span>\${esc(s.wrongCount||'0')}개</span>\${aarValid(wrong)?\`<b>문항</b><span>\${esc(wrong)}</span>\`:''}<b>기록 충실도</b><span class="pill \${quality==='충분'?'green':quality==='보통'?'amber':'red'}">\${quality}</span></div>
@@ -25048,7 +25257,6 @@ loadSampleAnswerKey();
       \${record}\${aarObjectiveSummary(s)}
       <div class="aar-analysis-box"><h4>무너진 원인과 점수 영향</h4><p>\${esc(inf.analysis)}</p></div>
       <div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>\${esc(inf.action)}</p></div>
-      <div class="v36-core-card"><h4>다음 회차 성공 판정</h4><p>\${esc(criteria)}</p></div>
     </div>\`;
   };
 
@@ -25399,11 +25607,11 @@ loadSampleAnswerKey();
     document.querySelectorAll('.subject-card').forEach(card=>{
       const label=[...card.querySelectorAll('label')].find(x=>x.textContent.includes('매니저 수정/추가 메모'));
       if(label){
-        label.textContent='자동 통합 메모 · SG 호환용 (필요 시만 수정)';
+        label.textContent='매니저 AAR 입력 메모 (필요시만 수정)';
         const memo=card.querySelector('.memo');if(memo)memo.placeholder='학생 입력과 구조화 필드에서 자동 생성됩니다. 매니저는 예외 상황만 추가하세요.';
         if(!card.querySelector('.ai-memo-btn')){
           const sid=card.dataset.sid;
-          label.insertAdjacentHTML('afterend',\`<button type="button" class="ghost ai-memo-btn" style="margin:6px 0" onclick="(function(){const s=state.subjects.find(x=>x.sid==='\${sid}');const d=(\${derive.toString()})(s);s.memo=(\${buildCompatMemo.toString()})(s,d);renderSubjects();toast('자동 통합 메모를 생성했습니다.');})()">현재 입력으로 자동 메모 생성</button>\`);
+          label.insertAdjacentHTML('afterend',\`<button type="button" class="ghost ai-memo-btn" style="margin:6px 0" onclick="(function(){const s=state.subjects.find(x=>x.sid==='\${sid}');const d=(\${derive.toString()})(s);s.memo=(\${buildCompatMemo.toString()})(s,d);renderSubjects();toast('자동 통합 메모를 생성했습니다.');})()">매니저 AAR 입력 내용(자동 생성)</button>\`);
         }
       }
     });
@@ -25625,7 +25833,8 @@ function __SG_doSendSave(){
         changes: $('changes')?.value || '',
         special: $('special')?.value || '',
         nextCheck: $('nextCheck')?.value || '',
-        compliance: $('compliance')?.value || ''
+        compliance: $('compliance')?.value || '',
+        focusLimit: $('focusLimit')?.value || ''
       }
     };
     window.parent.postMessage(payload, '*');
@@ -25672,12 +25881,13 @@ function __SG_initFromHost(data){
   if($('managerName')) $('managerName').value = data.managerName || '';
   if($('testDate')) $('testDate').value = data.lastTestDate || today();
   if($('testName')) $('testName').value = data.lastTestName || '';
-  if(data.meta){
-    if($('changes')) $('changes').value = data.meta.changes || '';
-    if($('special')) $('special').value = data.meta.special || '';
-    if($('nextCheck')) $('nextCheck').value = data.meta.nextCheck || '';
-    if($('compliance') && data.meta.compliance) $('compliance').value = data.meta.compliance;
-  }
+  // ★ 학생을 바꿔서 열거나(또는 결과일괄반영 재실행 시) data.meta에 값이 없으면
+  // 반드시 빈 값으로 채워서, 이전에 열었던 다른 학생/회차의 값이 화면에 남아있지 않게 한다.
+  if($('changes')) $('changes').value = (data.meta&&data.meta.changes) || '';
+  if($('special')) $('special').value = (data.meta&&data.meta.special) || '';
+  if($('nextCheck')) $('nextCheck').value = (data.meta&&data.meta.nextCheck) || '';
+  if($('compliance')) $('compliance').value = (data.meta&&data.meta.compliance) || '';
+  if($('focusLimit')) $('focusLimit').value = (data.meta&&data.meta.focusLimit) || '';
 
   // 누적 기록(history) 복원
   // ★ 과거에 중복 저장되어 있던 회차 기록이 있으면 정리(학생+날짜+회차명 기준, 나중 것 유지)
@@ -25913,15 +26123,13 @@ function __SG_initFromHost(data){
   window.aarSubjectReport=function(s){
     var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f), record=window.aarRecordHtml(f);
     var wrong=f['전체 오답']||((s.items||[]).map(function(x){return x.no;}).filter(Boolean).join(', '));
-    var criteria=aarDynamicCriteria(s,f,inf.action);
     return '<div class="report-card"><h3>'+aarSubjectTitle(s)+' 실전 AAR</h3>'+
       '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>오답</b><span>'+esc(s.wrongCount||'0')+'개</span>'+(v41Valid(wrong)?'<b>문항</b><span>'+esc(wrong)+'</span>':'')+'</div>'+
       v41ScoreRankHtml(s)+
       v41ItemUnitTableHtml(s)+
       v41RankingHtml(s)+record+window.aarObjectiveSummary(s)+v41StudentCauseStatus(s)+
       '<div class="aar-analysis-box"><h4>무너진 원인과 점수 영향</h4><p>'+esc(inf.analysis)+'</p></div>'+
-      '<div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div>'+
-      '<div class="v36-core-card"><h4>다음 회차 성공 판정</h4><p>'+esc(criteria)+'</p></div></div>';
+      '<div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div></div>';
   };
   window.aarAssignment=function(s){
     var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f);
@@ -26366,6 +26574,18 @@ MATH	미적분	28	7		"></textarea>
         <div id="cbr-question-images-status" style="font-size:12px;color:#0f766e;margin-top:6px;font-weight:600"></div>
       </div>
       <div style="margin-top:14px">
+        <div style="font-size:13px;font-weight:700;color:#0f172a">🖼️ (선택) 이번 회차 해설 이미지 업로드</div>
+        <p style="font-size:12px;color:#64748b;margin:4px 0 6px">
+          해설도 텍스트로 옮겨 적는 대신, 해설지를 캡처·스캔한 이미지 그대로 오답노트에 보여줄 수 있습니다.
+          파일명 규칙은 위 문제 이미지와 <b>완전히 동일</b>합니다: <code>과목코드_세부과목_시작-끝번호.jpg</code> (공통 문항은 세부과목 생략, 예: <code>KOR_1-3.jpg</code>).<br>
+          이미지가 있는 문항은 이미지가 우선 표시되고, 이미지가 없는 문항만 위 정답/해설 칸의 텍스트 해설로 대체됩니다.
+          한 구간이 여러 페이지에 걸쳐 있으면 <code>_p1</code>, <code>_p2</code>를 붙여 올리세요.
+        </p>
+        <input type="file" id="cbr-explanation-images" accept="image/*" multiple style="font-size:12px">
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px">파일을 선택하면 이름이 인식됐는지 여기 바로 아래에 표시되니, 업로드 후 꼭 확인하세요.</div>
+        <div id="cbr-explanation-images-status" style="font-size:12px;color:#0f766e;margin-top:6px;font-weight:600"></div>
+      </div>
+      <div style="margin-top:14px">
         <div style="font-size:13px;font-weight:700;color:#0f172a">📝 (선택) 학생별 매니저 AAR 메모 일괄 입력</div>
         <p style="font-size:12px;color:#64748b;margin:4px 0 6px">
           "12.매니저 AAR"에서 항목을 하나하나 입력하는 대신, 엑셀로 미리 정리해서 한 번에 반영할 수 있습니다.
@@ -26392,6 +26612,25 @@ MATH	미적분	28	7		"></textarea>
       _cbrImgInput.addEventListener('change', function(){
         const files=Array.from(_cbrImgInput.files||[]);
         const statusEl=document.getElementById('cbr-question-images-status');
+        if(!statusEl) return;
+        if(!files.length){ statusEl.textContent=''; return; }
+        const bad=files.filter(function(f){return !_cbrParseImageFilename(f.name);});
+        const okCount=files.length - bad.length;
+        let msg=okCount+'/'+files.length+'개 파일명 인식됨';
+        if(bad.length){
+          msg+=' · ⚠️ '+bad.length+'개는 규칙에 맞지 않음 (예: "'+bad[0].name+'") — 한글 파일명이 깨졌다면 압축을 다시 풀어보거나 영문 코드로 이름을 바꿔주세요.';
+        } else {
+          msg+=' — "📓 오답노트 일괄 출력" 누르면 반영됩니다.';
+        }
+        statusEl.textContent=msg;
+      });
+    }
+    // ★ 해설 이미지 입력도 문제 이미지와 완전히 같은 방식으로 즉시 검증한다
+    const _cbrExplainImgInput=document.getElementById('cbr-explanation-images');
+    if(_cbrExplainImgInput){
+      _cbrExplainImgInput.addEventListener('change', function(){
+        const files=Array.from(_cbrExplainImgInput.files||[]);
+        const statusEl=document.getElementById('cbr-explanation-images-status');
         if(!statusEl) return;
         if(!files.length){ statusEl.textContent=''; return; }
         const bad=files.filter(function(f){return !_cbrParseImageFilename(f.name);});
@@ -26603,7 +26842,7 @@ function _cbrParseItemMeta(){
     if(c.length<4) return;
     if(c[0]==='과목코드') return; // 헤더 행 걸러내기 (모든 형식 공통)
 
-    let subj, detail, no, unit, diff, answer='', explain='';
+    let subj, detail, no, unit, diff, answer='', explain='', points='';
     if(MASTER_DB_SUBJ_NAMES.includes(c[1])){
       // ★ 기존에 쓰던 마스터 문항 DB 형식도 그대로 인식한다:
       // 과목코드 / 과목명 / 선택과목 / 문항 / 대영역 / 세부단원 / 유형 / (배점) / (정답) / (해설)
@@ -26611,6 +26850,7 @@ function _cbrParseItemMeta(){
       detail=(c[2]==='공통'||!c[2])?'':c[2];
       no=c[3];
       unit=[c[4],c[5],c[6]].filter(Boolean).join(' · ');
+      points=c[7]||''; // ★ 실전손실·교정가능점수 계산용 문항 배점
       answer=c[8]||''; explain=c[9]||'';
     } else {
       // 기본 형식: 과목코드 / 세부과목(공통이면 비움) / 문항번호 / 단원유형 / 난이도(선택) / 정답(선택) / 해설(선택)
@@ -26622,10 +26862,10 @@ function _cbrParseItemMeta(){
       answer=c[5]||''; explain=c[6]||'';
     }
     if(!subj||!no) return;
-    if(!unit && !diff && !answer && !explain) return; // 아무 값도 없는 빈 줄이면 무시
+    if(!unit && !diff && !answer && !explain && !points) return; // 아무 값도 없는 빈 줄이면 무시
     const key=subj+'|'+detail;
     if(!map[key]) map[key]={};
-    map[key][no]={unit, diff, answer, explain};
+    map[key][no]={unit, diff, answer, explain, points};
   });
   return map;
 }
@@ -26764,6 +27004,47 @@ function _cbrLoadQuestionImages(){
     return map;
   });
 }
+// ★ 해설 이미지도 문제 이미지와 완전히 같은 파일명 규칙/로딩 방식을 그대로 재사용한다
+// (다른 input 칸에서 읽어올 뿐, 파싱·룩업 로직은 _cbrParseImageFilename/_cbrLookupQuestionImages를 공유)
+function _cbrLoadExplanationImages(){
+  const input=document.getElementById('cbr-explanation-images');
+  const files=input?Array.from(input.files||[]):[];
+  const statusEl=document.getElementById('cbr-explanation-images-status');
+  if(!files.length) return Promise.resolve({});
+  if(statusEl) statusEl.textContent='이미지 읽는 중... (0/'+files.length+')';
+  const map={};
+  let done=0;
+  const readers=files.map(function(f){
+    return new Promise(function(resolve){
+      const parsed=_cbrParseImageFilename(f.name);
+      const reader=new FileReader();
+      reader.onload=function(){
+        done++;
+        if(parsed){
+          const key=parsed.subj+'|'+parsed.detail;
+          if(!map[key]) map[key]=[];
+          map[key].push({start:parsed.start, end:parsed.end, dataUrl:reader.result, filename:f.name});
+        }
+        if(statusEl) statusEl.textContent='이미지 읽는 중... ('+done+'/'+files.length+')';
+        resolve();
+      };
+      reader.onerror=function(){ done++; resolve(); };
+      reader.readAsDataURL(f);
+    });
+  });
+  return Promise.all(readers).then(function(){
+    if(statusEl){
+      const bad=files.filter(function(f2){return !_cbrParseImageFilename(f2.name);});
+      const okCount=files.length - bad.length;
+      let msg='✅ 이미지 '+okCount+'장 인식 완료';
+      if(bad.length){
+        msg+=' · ⚠️ '+bad.length+'장은 파일명 규칙이 맞지 않아 제외됨 (예: '+bad.slice(0,3).map(function(b){return '"'+b.name+'"';}).join(', ')+')';
+      }
+      statusEl.textContent=msg;
+    }
+    return map;
+  });
+}
 function _cbrLookupQuestionImages(map, subjectCode, detail, no){
   if(!map) return [];
   const subj=String(subjectCode||'').toUpperCase();
@@ -26804,7 +27085,7 @@ function _cbrBuildAarMemo(aarText){
     const canon=_CBR_AAR_ALIASES[_cbrNormAarKey(label)]||label;
     lines.push(canon+': '+val);
   });
-  return lines.map((l,i)=>(i+1)+'. '+l).join('\n');
+  return lines.map((l,i)=>(i+1)+'. '+l).join('\\n');
 }
 function _cbrParseAarMemos(){
   const el=document.getElementById('cbr-aarmemo-input');
@@ -26832,6 +27113,18 @@ function _cbrLookupAarMemo(aarMemos, name, examDate, examName, subjectCode, deta
   );
   return found?found.memo:null;
 }
+// ★ 표준 수능 문항수 표 — 전체 문항 수 자동 채움의 1순위 출처.
+// 국어·수학은 세부과목(화작/언매, 확통/미적분/기하)이 "학생이 선택한 과목 표기"일 뿐,
+// 카드 자체는 공통+선택을 합친 그 과목 전체를 나타낸다 — 그래서 세부과목과 무관하게
+// 과목 전체 문항수(국어45/수학30)를 채운다. 탐구만 과목별로 별도 카드라 20 그대로.
+const SG_STANDARD_ITEM_COUNT = {
+  'KOR': 45,
+  'MATH': 30,
+  'ENG': 45,
+  'HIST': 20,
+  'INQ': 20,
+  'LANG': 30
+};
 function cbrConfirmApply(){
   if(!CBR_parsed) return;
   const { byStudent, rates, matchInfo } = CBR_parsed;
@@ -26917,6 +27210,22 @@ function cbrConfirmApply(){
       }
       existing.score = String(r.score||'');
       existing.wrongCount = String(r.wrongNos.length);
+      // ★ 전체 문항 수(실질완주율 계산용) — 국어/수학/영어/한국사/탐구처럼 문항수가
+      // 고정된 표준 과목은 항상 표준표 값을 신뢰해서 채운다(예전에 잘못 채워졌던 값도
+      // 다시 반영하면 이걸로 덮어써서 바로잡힌다). 표준표에 없는 과목만 매니저가 입력한
+      // 값을 보존하거나, 붙여넣은 문항DB의 문항 개수로 대신 채운다.
+      {
+        const _stdSubj = String(r.subjectCode||'').toUpperCase().indexOf('INQ')===0 ? 'INQ' : String(r.subjectCode||'').toUpperCase();
+        const _stdCount = SG_STANDARD_ITEM_COUNT[_stdSubj];
+        if(_stdCount){
+          existing.totalItemCount = String(_stdCount); // ★ 표준 수능 문항수는 항상 이 값으로 맞춘다(재반영 시 과거 오류값도 자동 교정)
+        } else if(!existing.totalItemCount){
+          // 표준표에 없는 과목(예: 제2외국어 등)만 붙여넣은 문항DB의 문항 개수로 대신 채운다
+          const _totalKey = String(r.subjectCode||'').toUpperCase()+'|'+(r.detail||'');
+          const _totalFromMeta = pastedItemMeta[_totalKey] ? Object.keys(pastedItemMeta[_totalKey]).length : 0;
+          if(_totalFromMeta > 0) existing.totalItemCount = String(_totalFromMeta);
+        }
+      }
       existing.items = r.wrongNos.map(no=>{
         const prev = (existing.items||[]).find(it=>String(it.no)===String(no));
         const qNo = parseInt(no,10);
@@ -26934,6 +27243,9 @@ function cbrConfirmApply(){
           explanation: (prev?.explanation) || _meta.explain || _ak.explain || '', // ★ 오답노트용 간단 해설
           question: (prev?.question) || _ak.question || '', // ★ 오답노트용 문제(지문+선택지) 원문 — 정답/해설 칸의 6번째 열
           reasons: prev?.reasons || [],
+          points: prev?.points || _meta.points || '', // ★ 실전손실·교정가능점수용 문항 배점 — 기존 문항DB(마스터 엑셀 8번째 열)에 배점이 있으면 자동 채움, 없으면 매니저가 입력
+          causePrimary: prev?.causePrimary || '', // ★ 오답 1차 원인(K/T/M/J/C/U)
+          guessedTime: prev?.guessedTime || false, // ★ 시간부족 찍음/미응답 여부
           memo: `전체 오답률 ${rt.toFixed(1)}% (일괄반영 ${todayStr})`
         };
       });
@@ -32143,7 +32455,7 @@ function jh_renderDbList(){var cnt=document.getElementById('jh-db-count');var li
 function jh_deleteUniv(id){if(!confirm('삭제하시겠습니까?'))return;JH_UNIV_DB=JH_UNIV_DB.filter(function(u){return u.id!==id;});jh_renderDbList();}
 function jh_addUniv(){var univ=(document.getElementById('jh-f-univ')||{}).value||'';var dept=(document.getElementById('jh-f-dept')||{}).value||'';var c50=parseFloat((document.getElementById('jh-f-cut50')||{}).value)||0;var c70=parseFloat((document.getElementById('jh-f-cut70')||{}).value)||0;if(!univ.trim()||!dept.trim()){alert('대학명과 학과는 필수입니다.');return;}if(!c50||!c70){alert('입결 50%, 70%는 필수입니다.');return;}JH_UNIV_DB.push({id:jh_nextId++,univ:univ.trim(),dept:dept.trim(),type:(document.getElementById('jh-f-type')||{}).value||'일반전형',recruit:(document.getElementById('jh-f-recruit')||{}).value||'',comp26:(document.getElementById('jh-f-comp26')||{}).value||'',fill:(document.getElementById('jh-f-fill')||{}).value||'',interview:(document.getElementById('jh-f-interview')||{}).value||'없음',intPct:parseInt((document.getElementById('jh-f-intpct')||{}).value)||0,docPct:parseInt((document.getElementById('jh-f-docpct')||{}).value)||100,csat:(document.getElementById('jh-f-csat')||{}).value||'없음',evalFocus:(document.getElementById('jh-f-evalfocus')||{}).value||'',methodNote:(document.getElementById('jh-f-method')||{}).value||'',note:(document.getElementById('jh-f-note')||{}).value||'',cut50:c50,cut70:c70,major:(document.getElementById('jh-f-major')||{}).value||''});jh_renderDbList();['jh-f-univ','jh-f-dept','jh-f-recruit','jh-f-comp26','jh-f-fill','jh-f-intpct','jh-f-docpct','jh-f-csat','jh-f-evalfocus','jh-f-method','jh-f-note','jh-f-cut50','jh-f-cut70'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});alert('✅ 추가 완료!');}
 function jh_importCsv(input){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){var lines=e.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(lines.length<2){alert('데이터가 없습니다.');return;}var header=lines[0].split(',').map(function(h){return h.trim().replace(/"/g,'');});var idx={};header.forEach(function(h,i){idx[h]=i;});var getv=function(row,k){return idx[k]!==undefined?(row[idx[k]]||'').replace(/"/g,''):'';};var added=0,skip=0;lines.slice(1).forEach(function(line){var row=line.split(',');var c50=parseFloat(getv(row,'입결50')),c70=parseFloat(getv(row,'입결70'));if(!getv(row,'대학명')||!getv(row,'학과')||!c50||!c70){skip++;return;}JH_UNIV_DB.push({id:jh_nextId++,univ:getv(row,'대학명'),dept:getv(row,'학과'),type:getv(row,'전형명')||'일반전형',recruit:getv(row,'모집인원'),comp26:getv(row,'경쟁률'),fill:getv(row,'충원율'),interview:getv(row,'면접유무')||'없음',intPct:parseInt(getv(row,'면접비중'))||0,docPct:parseInt(getv(row,'서류비중'))||100,csat:getv(row,'수능최저')||'없음',evalFocus:getv(row,'서류핵심요소'),methodNote:getv(row,'선발방법'),note:getv(row,'전형특징'),cut50:c50,cut70:c70,major:getv(row,'계열')});added++;});alert('✅ '+added+'개 추가 완료'+(skip?' ('+skip+'개 건너뜀)':''));jh_renderDbList();input.value='';};reader.readAsText(file,'UTF-8');}
-function jh_exportCsv(){var hdr='대학명,학과,전형명,모집인원,경쟁률,충원율,면접유무,면접비중,서류비중,수능최저,서류핵심요소,선발방법,전형특징,입결50,입결70,계열';var rows=JH_UNIV_DB.map(function(u){return [u.univ,u.dept,u.type,u.recruit||'',u.comp26||'',u.fill||'',u.interview||'없음',u.intPct||0,u.docPct||100,u.csat||'없음',u.evalFocus||'',u.methodNote||'',u.note||'',u.cut50,u.cut70,u.major||''].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');});var csv='\uFEFF'+hdr+'\n'+rows.join('\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='종합전형DB_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.csv';a.click();URL.revokeObjectURL(url);}
+function jh_exportCsv(){var hdr='대학명,학과,전형명,모집인원,경쟁률,충원율,면접유무,면접비중,서류비중,수능최저,서류핵심요소,선발방법,전형특징,입결50,입결70,계열';var rows=JH_UNIV_DB.map(function(u){return [u.univ,u.dept,u.type,u.recruit||'',u.comp26||'',u.fill||'',u.interview||'없음',u.intPct||0,u.docPct||100,u.csat||'없음',u.evalFocus||'',u.methodNote||'',u.note||'',u.cut50,u.cut70,u.major||''].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');});var csv='\uFEFF'+hdr+'\n'+rows.join('\\n');var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='종합전형DB_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.csv';a.click();URL.revokeObjectURL(url);}
 function jh_exportXls(sid){var s=ST.students.find(function(x){return String(x.id)===String(sid);});if(!jh_lastResults.length){alert('먼저 분석을 실행해주세요.');return;}function doExport(){
   // ★ 엑셀은 필터 무관하게 전체 jh_lastResults 사용 (면접일 누락 방지)
   var f=jh_lastResults.length?jh_lastResults:jh_getFiltered();
@@ -34249,7 +34561,7 @@ function generateReport() {
     }
     try{cw.__SG_initFromHost(original);}catch(e){}
 
-    var styles=Array.from(cd.querySelectorAll('style')).map(function(x){return x.outerHTML;}).join('\n');
+    var styles=Array.from(cd.querySelectorAll('style')).map(function(x){return x.outerHTML;}).join('\\n');
     var title='챌린저_'+(info.date||'회차')+'_전체학생_'+targets.length+'명_상담리포트_처방전';
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+title.replace(/[\\/:*?"<>|]/g,'')+'</title>'+styles+
       '<style>\nbody{margin:0!important;padding:0!important;background:#fff!important}.no-print{display:none!important}.batch-student{break-after:page;page-break-after:always}.batch-student:last-child{break-after:auto;page-break-after:auto}.batch-report{padding:0}.batch-short{break-before:page;page-break-before:always}\n/* v47 일괄 인쇄 DOM 적용 (v46보다 여백 완화 — 개인 출력 대비 지나치게 좁아 보이는 문제 대응) */\n.batch-long .report-card{margin-bottom:8px!important;padding-bottom:10px!important}\n.batch-long .aar-record-list{margin:4px 0!important;row-gap:3px!important;column-gap:10px!important}\n.batch-long .aar-record-item{padding:4px 8px!important;margin:0!important;line-height:1.32!important;min-height:0!important}\n.batch-long .aar-record-list + .aar-objective-box{margin-top:2px!important}\n.batch-long .aar-objective-box{margin:2px 0 6px!important;padding:7px 9px!important}\n.batch-long .aar-objective-box h4{margin:0 0 3px!important;line-height:1.2!important}\n.batch-long .aar-mini-stats{margin:3px 0!important;gap:5px!important}\n.batch-long .aar-mini-stat{padding:5px 6px!important}\n.batch-long .aar-mini-stat b{font-size:15px!important;line-height:1.1!important}\n.batch-long .aar-mini-stat span{font-size:9.5px!important;line-height:1.1!important}\n.batch-long .aar-objective-box p{margin:2px 0 0!important;line-height:1.32!important}\n@media print{.batch-student{width:100%}.batch-report{padding:0}.batch-long .aar-record-list{margin-bottom:0!important}.batch-long .aar-objective-box{margin-top:0!important}}\n</style></head><body>'+pieces.join('')+
@@ -34427,6 +34739,7 @@ function generateReport() {
       return;
     }
     var qImageMap=await _cbrLoadQuestionImages(); // ★ 인쇄 버튼을 누른 시점에만 파일을 읽는다
+    var eImageMap=await _cbrLoadExplanationImages(); // ★ 해설 이미지도 마찬가지로 이 시점에만 읽는다
 
     var pages=targets.map(function(stu){
       var subs=(stu.challengerData&&stu.challengerData.lastSubjects)||[];
@@ -34438,7 +34751,8 @@ function generateReport() {
           .slice().sort(function(a,b){return (parseInt(a.no,10)||0)-(parseInt(b.no,10)||0);});
         if(!items.length) return '';
         var rows=items.map(function(it){
-          var reasonTxt=[].concat(it.reasons||[]).join(', ')+(it.memo&&!/^전체 오답률/.test(it.memo)?(it.reasons&&it.reasons.length?' · ':'')+it.memo:'');
+          var _wnCauseLabel={K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'}[it.causePrimary]||'';
+          var reasonTxt=(_wnCauseLabel?'[1차] '+_wnCauseLabel+(((it.reasons||[]).length||it.memo)?' · ':''):'')+[].concat(it.reasons||[]).join(', ')+(it.memo&&!/^전체 오답률/.test(it.memo)?(it.reasons&&it.reasons.length?' · ':'')+it.memo:'');
           // ★ 문제 표시 우선순위: (1) 방금 업로드한 문항 이미지가 있으면 그걸 그대로 보여주고,
           // (2) 이미지가 없을 때만 정답/해설 칸의 6번째 열(question) 텍스트로 대체한다.
           var qImages=_cbrLookupQuestionImages(qImageMap, s.subject, s.detail, it.no);
@@ -34452,10 +34766,21 @@ function generateReport() {
           var questionHtml=qImages.length
             ? qBanner+'<div class="wn-question-imgs">'+qImages.map(function(im){return '<img class="wn-question-img" src="'+im.dataUrl+'">';}).join('')+'</div>'
             : (it.question?'<div class="wn-question">'+_wnEsc(it.question).replace(/⏎/g,'<br>')+'</div>':'');
-          var explainHtml=it.explanation
-            ? '<div class="wn-explain"><b class="wn-explain-label">해설 ('+_wnEsc(it.no)+'번)</b>'+_wnFormatExplanation(it.explanation)+'</div>'
-            : '<div class="wn-explain wn-blank-lines"><b class="wn-explain-label">해설 ('+_wnEsc(it.no)+'번)</b><span class="wn-blank">아직 해설이 입력되지 않았습니다.</span></div>';
-          var hasImg=qImages.length>0;
+          var explainHtml;
+          var eImages=_cbrLookupQuestionImages(eImageMap, s.subject, s.detail, it.no);
+          if(eImages.length){
+            var eRange=eImages[0];
+            var eBanner=(eRange && eRange.start!==eRange.end)
+              ? '<div class="wn-question-marker">🔎 아래 자료에서 이 문항만 확인하세요 → <b>'+_wnEsc(it.no)+'번</b></div>'
+              : '';
+            explainHtml='<div class="wn-explain"><b class="wn-explain-label">해설 ('+_wnEsc(it.no)+'번)</b>'+eBanner+
+              '<div class="wn-question-imgs">'+eImages.map(function(im){return '<img class="wn-question-img" src="'+im.dataUrl+'">';}).join('')+'</div></div>';
+          } else {
+            explainHtml=it.explanation
+              ? '<div class="wn-explain"><b class="wn-explain-label">해설 ('+_wnEsc(it.no)+'번)</b>'+_wnFormatExplanation(it.explanation)+'</div>'
+              : '<div class="wn-explain wn-blank-lines"><b class="wn-explain-label">해설 ('+_wnEsc(it.no)+'번)</b><span class="wn-blank">아직 해설이 입력되지 않았습니다.</span></div>';
+          }
+          var hasImg=qImages.length>0||eImages.length>0;
           var itemCls=(hasImg&&_wnAnyItemRendered)?'wn-item wn-item-break':'wn-item';
           _wnAnyItemRendered=true;
           return '<div class="'+itemCls+'">'+
