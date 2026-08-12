@@ -22636,7 +22636,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
 <div class="row"><h2>기본 정보</h2><button class="ghost right" onclick="loadStudent();markClicked(event)">학생정보 불러오기</button></div>
 <div class="grid g4">
 <div><label>학생명</label><input id="studentName" value="홍길동" onchange="populateHistoryDropdown()"></div><div><label>학교/학년</label><input id="studentSchool" value="합격고등학교 3학년"></div><div><label>응시일</label><input id="testDate" type="date"></div><div><label>시험명/회차</label><input id="testName" value="실전 모의고사 1회"></div>
-<div><label>담당 매니저</label><input id="managerName" value="에이스"></div><div><label>목표 대학/전공</label><input id="target" value="서울대학교 자유전공학부"></div><div><label>전체 이행률(%)</label><input id="compliance" type="number" value="" placeholder="예: 55"></div><div><label>이번 회차 필수 집중 과목 수</label><select id="focusLimit"><option value="">선택 안 함</option><option value="1">1개</option><option value="2">2개</option><option value="3">3개</option><option value="4">4개</option><option value="5">5개</option></select></div>
+<div><label>담당 매니저</label><input id="managerName" value="에이스"></div><div><label>목표 대학/전공</label><input id="target" value="서울대학교 자유전공학부"></div><div><label>전체 이행률(%)</label><input id="compliance" type="number" value="" placeholder="문항 배점/1차원인 입력 전엔 100" readonly title="문항별 찍음·미응답 체크를 기준으로 실질완주율과 동일하게 자동 계산됩니다"></div><div><label>이번 회차 필수 집중 과목 수</label><select id="focusLimit"><option value="">선택 안 함</option><option value="1">1개</option><option value="2">2개</option><option value="3">3개</option><option value="4">4개</option><option value="5">5개</option></select></div>
 </div>
 <div class="grid g3" style="margin-top:10px">
 <div><label>변경사항</label><input id="changes" value="수학은 고난도/킬러 제외, 중상 난도 정답률 회복 우선"><div class="quicktags"><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;고난도/킬러 제외 운영&#39;)">고난도/킬러 제외</span><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;집중 과목 변경&#39;)">집중 과목 변경</span><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;정답률 목표 상향&#39;)">정답률 목표 상향</span><span class="quicktag" onclick="appendField(&#39;changes&#39;,&#39;진도 범위 축소&#39;)">진도 범위 축소</span></div></div>
@@ -23493,7 +23493,7 @@ function appendSubjectMemo(sid,type){syncSubject(sid);let s=state.subjects.find(
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','weekly','aarPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR()}
 function loadStudent(){ $('studentName').value='홍길동';$('studentSchool').value='합격고등학교 3학년';$('target').value='서울대학교 자유전공학부';$('managerName').value='에이스';toast('학생정보를 불러왔습니다.')}
 function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid,subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'',focus:p.focus||'',processRange:p.processRange||'',difficultySelect:p.difficultySelect||'',accuracyTarget:p.accuracyTarget||'',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',totalItemCount:p.totalItemCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false}],preparationLevel:p.preparationLevel||'',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'',learnedErrorCount:p.learnedErrorCount||'',scoreBasis:p.scoreBasis||'',concentrationBreak:p.concentrationBreak||'',recoveryResult:p.recoveryResult||'',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',studentSituationTypes:p.studentSituationTypes||[],managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||'',aar:p.aar||{}});renderSubjects()}
-function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','totalItemCount','order','orderMemo','time','mental','preparationLevel','weakUnits','unlearnedCount','learnedErrorCount','concentrationBreak','recoveryResult','primaryFactor','progressImpact','operationImpact','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.value});['completedUnits','inProgressUnits','unlearnedUnits'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.multiple?[...e.selectedOptions].map(o=>o.value).join(', '):e.value});{let e=c.querySelector('.studentSituationTypes');if(e)s.studentSituationTypes=[...e.selectedOptions].map(o=>o.value);}s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value,points:(r.querySelector('.points')||{}).value||'',causePrimary:(r.querySelector('.causePrimary')||{}).value||'',guessedTime:!!(r.querySelector('.guessedTime')||{}).checked,answer:s.items[i]?.answer||'',explanation:s.items[i]?.explanation||'',question:s.items[i]?.question||''}))}
+function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','totalItemCount','order','orderMemo','time','mental','preparationLevel','weakUnits','unlearnedCount','learnedErrorCount','concentrationBreak','recoveryResult','primaryFactor','progressImpact','operationImpact','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.value});['completedUnits','inProgressUnits','unlearnedUnits'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.multiple?[...e.selectedOptions].map(o=>o.value).join(', '):e.value});{let e=c.querySelector('.studentSituationTypes');if(e)s.studentSituationTypes=[...e.selectedOptions].map(o=>o.value);}s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value,points:(r.querySelector('.points')||{}).value||'',causePrimary:(r.querySelector('.causePrimary')||{}).value||'',guessedTime:!!(r.querySelector('.guessedTime')||{}).checked,answer:s.items[i]?.answer||'',explanation:s.items[i]?.explanation||'',question:s.items[i]?.question||''}));updateOverallCompliance()}
 function syncAll(){state.subjects.forEach(s=>syncSubject(s.sid))}
 function renderSubjects(){$('subjects').innerHTML=state.subjects.map(card).join('')}
 const _SG_UNIT_LIST = {
@@ -23621,7 +23621,7 @@ function _sgAutoScoreBasis(s){
 }
 function progressInterpretation(s){let parts=[];if(s.unlearnedUnits)parts.push(\`미학습 범위: \${s.unlearnedUnits}\`);if(s.inProgressUnits)parts.push(\`학습 중: \${s.inProgressUnits}\`);if(s.weakUnits)parts.push(\`시험 후 부족 단원: \${s.weakUnits}\`);let base=_sgAutoScoreBasis(s);let detail=parts.join(' · ')||'세부 단원 미입력';return \`\${base}. \${detail}\`}
 function progressReport(s){return \`<div class="progress-report"><h4>\${name(s)} · 진도 보정 해석</h4><table><tr><th>준비도</th><td>\${esc(s.preparationLevel||'-')}</td><th>미학습 문항</th><td>\${esc(s.unlearnedCount||'0')}</td><th>학습범위 오답</th><td>\${esc(s.learnedErrorCount||'0')}</td></tr><tr><th>학습 완료</th><td colspan="2">\${esc(s.completedUnits||'-')}</td><th>학습 중</th><td colspan="2">\${esc(s.inProgressUnits||'-')}</td></tr><tr><th>미학습</th><td colspan="2">\${esc(s.unlearnedUnits||'-')}</td><th>부족 단원</th><td colspan="2">\${esc(s.weakUnits||'-')}</td></tr><tr><th>집중 붕괴</th><td>\${esc(s.concentrationBreak||'-')}</td><th>회복</th><td>\${esc(s.recoveryResult||'-')}</td><th>해석 기준</th><td>\${esc(_sgAutoScoreBasis(s))}</td></tr></table><p><b>해석:</b> \${esc(progressInterpretation(s))}</p></div>\`}
-function generate(){syncAll();state.subjects.forEach(ensureSituation);renderSubjects();renderLong();renderShort();renderTrend();renderWeekly();toast('분석이 생성되었습니다.')}
+function generate(){syncAll();state.subjects.forEach(ensureSituation);renderSubjects();updateOverallCompliance();renderLong();renderShort();renderTrend();renderWeekly();toast('분석이 생성되었습니다.')}
 function buildAnalysis(){let tags=allTags().map(x=>\`\${x.tag}(\${x.count})\`).join(' · ')||'문항/단원/오답원인을 입력하면 표시됩니다.';let fs=focusedSubjects();return \`<div class="bar"><b>전체 반복 확인 근거</b><span>\${tags}</span></div><div class="bar"><b>이번 회차 집중 과목</b><span>\${state.subjects.filter(s=>fs.includes(s.sid)).map(name).join(', ')}</span></div>\`+state.subjects.map(s=>\`<div class="report-card"><h3>\${name(s)} \${fs.includes(s.sid)?'<span class="pill green">집중</span>':'<span class="pill">비집중</span>'}</h3><p><b>범위:</b> \${s.processRange} · <b>난이도:</b> \${s.difficultySelect} · <b>목표:</b> \${s.accuracyTarget} · <b>오답개수:</b> \${wrongCount(s)}</p>\${progressReport(s)}\${situationReport(s)}\${excludedItems(s).length?\`<div class="bar"><b>이번 미션 제외</b><span>\${excludedItems(s).map(i=>\`\${i.no||'-'}번(\${i.diff||'-'}): \${exclusionReason(s,i)}\`).join(' · ')}</span></div>\`:''}\${issues(s).map(iss=>\`<div class="issue selected"><h4>\${iss.tag}</h4><table><tr><th>문항</th><td>\${iss.items.join(', ')}</td><th>단원/유형</th><td>\${[...new Set(iss.units)].join(', ')}</td></tr><tr><th>행동강령</th><td colspan="3">\${actionFor(s,iss.tag)}</td></tr></table></div>\`).join('')||'<p class="muted">미션으로 올릴 문항은 문항번호·단원/유형·오답원인을 모두 입력해야 합니다.</p>'}</div>\`).join('')}
 function allTags(){let m={};state.subjects.forEach(s=>issues(s).forEach(i=>m[i.tag]=(m[i.tag]||0)+i.count));return Object.entries(m).map(([tag,count])=>({tag,count})).sort((a,b)=>b.count-a.count)}
 function cover(title){let d=($('testDate').value||'').slice(0,7).replace('-','.');
@@ -24983,6 +24983,24 @@ function perfLossTrendTableHtml(s){
   </tbody></table>\`;
 }
 
+// ★ 전체 이행률(%) — 실질완주율과 동일한 계산식으로 전체 과목 평균을 자동 산출한다.
+// 문항 배점·1차원인이 아직 입력되지 않은 초기 상태에는 100%로 표시된다.
+function computeOverallCompliance(){
+  let totalItems=0, normalItems=0;
+  (state.subjects||[]).forEach(s=>{
+    const tc=+s.totalItemCount||0;
+    if(tc<=0) return;
+    const r=computePerfLoss(s);
+    totalItems+=tc;
+    normalItems+=r.normalCnt;
+  });
+  if(totalItems<=0) return 100;
+  return Math.round(normalItems/totalItems*100);
+}
+function updateOverallCompliance(){
+  const el=$('compliance');
+  if(el) el.value=computeOverallCompliance();
+}
 function init(){
   // ★ SG상담플랫폼 연동: 샘플 데이터 대신 SG에서 전달받은 학생 데이터로 초기화
   // SG 연동이 안 된 단독 실행 환경(테스트용)에서는 기존 샘플 데이터 표시
@@ -27258,6 +27276,23 @@ function cbrConfirmApply(){
       lastTestName: firstRow.examName || cd.lastTestName || '',
       _updatedAt: Date.now()
     });
+    // ★ 이번 회차도 결과일괄반영 즉시 "과거 저장 회차" 목록에 바로 나타나도록 자동 저장한다.
+    // (예전에는 다음 회차로 넘어가야만 history에 들어가서, 매니저가 "현재 회차 저장 후
+    // 누적 반영" 버튼을 학생마다 일일이 눌러줘야 했다 — 이제 결과일괄반영 자체가 자동저장이다.)
+    if(newChallengerData.lastTestDate && subjects.length){
+      const _histNow = Array.isArray(newChallengerData.history) ? newChallengerData.history.slice() : [];
+      const _idxNow = _histNow.findIndex(h=>String(h.date||'').trim()===String(newChallengerData.lastTestDate).trim() && String(h.test||'').trim()===String(newChallengerData.lastTestName||'').trim());
+      const _entryNow = {
+        date: newChallengerData.lastTestDate,
+        test: newChallengerData.lastTestName||'',
+        subjects: JSON.parse(JSON.stringify(subjects)),
+        fullSubjects: JSON.parse(JSON.stringify(subjects)),
+        savedAt: Date.now(),
+        archivedBy: '결과일괄반영(자동 저장)'
+      };
+      if(_idxNow>=0){ _histNow[_idxNow]=_entryNow; } else { _histNow.push(_entryNow); }
+      newChallengerData.history = _histNow;
+    }
     upd(Object.assign({}, stu, {challengerData: newChallengerData}));
     successCount++;
     updatedStudents.push({id, stu: Object.assign({}, stu, {challengerData: newChallengerData})});
