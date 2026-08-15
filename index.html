@@ -5958,6 +5958,9 @@ function gg_updateDeptSuggestions(){
     var matched = UNIV_DB.filter(function(u){ return _univMatch(u.univ, univ); });
     matched.forEach(function(u){
       var key = u.dept + '|' + u.type;
+      // 모집인원 0명(트랙 폐지·미선발) 학과는 검색결과에서 제외
+      var _rn = parseInt(String(u.recruit||'').replace(/[^0-9]/g,''), 10);
+      if(_rn===0) return;
       if(!seen[key]){
         seen[key] = true;
         _gg_deptCache.push({dept:u.dept, type:u.type, cut50:u.cut50, cut70:u.cut70, recruit:u.recruit, csat:u.csat, src:'교과'});
@@ -15692,7 +15695,7 @@ let UNIV_DB = [
   {id:9402,univ:'성균관대학교', dept:'철학과',                type:'학교장추천', recruit:'6명',  comp24:'',comp25:'',comp26:'7.42:1', fill:'26',  csat:'3합7', method:'이수단위 가중', cut50:1.74, cut70:1.75, score50:974.97, score70:974.08, major:'인문·사회', calcMode:'weighted'},
   {id:9403,univ:'성균관대학교', dept:'유학·동양학과',          type:'학교장추천', recruit:'15명', comp24:'',comp25:'',comp26:'7.17:1', fill:'11',  csat:'3합7', method:'이수단위 가중', cut50:1.73, cut70:1.76, score50:977.24, score70:977.24, major:'인문·사회', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 12명→15명 수정
   {id:9404,univ:'성균관대학교', dept:'국어국문학과',           type:'학교장추천', recruit:'6명', comp24:'',comp25:'',comp26:'5.5:1',  fill:'25',  csat:'3합7', method:'이수단위 가중', cut50:1.69, cut70:1.77, score50:975.97, score70:975.38, major:'인문·사회', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 12명→6명 수정
-  {id:9405,univ:'성균관대학교', dept:'사학과',                type:'학교장추천', recruit:'12명', comp24:'',comp25:'',comp26:'5.42:1', fill:'24',  csat:'3합7', method:'이수단위 가중', cut50:1.85, cut70:1.90, score50:969.66, score70:968.51, major:'인문·사회', calcMode:'weighted'},
+  {id:9405,univ:'성균관대학교', dept:'사학과',                type:'학교장추천', recruit:'6명', comp24:'',comp25:'',comp26:'5.42:1', fill:'24',  csat:'3합7', method:'이수단위 가중', cut50:1.85, cut70:1.90, score50:969.66, score70:968.51, major:'인문·사회', calcMode:'weighted'},
   {id:9406,univ:'성균관대학교', dept:'한문학과',              type:'학교장추천', recruit:'10명', comp24:'',comp25:'',comp26:'7.67:1', fill:'7',   csat:'3합7', method:'이수단위 가중', cut50:1.77, cut70:1.78, score50:973.39, score70:973.13, major:'인문·사회', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 12명→10명 수정
   // ─── 사회과학계열 ───
   {id:9407,univ:'성균관대학교', dept:'사회과학계열',           type:'학교장추천', recruit:'20명', comp24:'',comp25:'',comp26:'12.3:1', fill:'110', csat:'3합7', method:'이수단위 가중', cut50:1.54, cut70:1.58, score50:982.04, score70:980.48, major:'인문·사회', calcMode:'weighted'},
@@ -15726,18 +15729,18 @@ let UNIV_DB = [
   // ─── 공학계열 ───
   {id:9428,univ:'성균관대학교', dept:'공학계열',              type:'학교장추천', recruit:'54명', comp24:'',comp25:'',comp26:'9.9:1',  fill:'128', csat:'3합7', method:'이수단위 가중', cut50:1.47, cut70:1.48, score50:984.79, score70:984.12, major:'자연·공학', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 40명→54명 수정
   {id:9429,univ:'성균관대학교', dept:'전자전기정보공학부',       type:'학교장추천', recruit:'10명', comp24:'',comp25:'',comp26:'13.9:1', fill:'44',  csat:'3합6', method:'이수단위 가중', cut50:1.38, cut70:1.39, score50:987.73, score70:987.31, major:'자연·공학', calcMode:'weighted'},
-  {id:13,  univ:'성균관대학교', dept:'소프트웨어학과',          type:'학교장추천', recruit:'10명', comp24:'',comp25:'',comp26:'8.7:1',  fill:'39',  csat:'3합6', method:'이수단위 가중', cut50:1.55, cut70:1.60, score50:981.94, score70:980.25, major:'자연·공학', calcMode:'weighted'},
+  {id:13,  univ:'성균관대학교', dept:'소프트웨어학과',          type:'학교장추천', recruit:'0명', comp24:'',comp25:'',comp26:'8.7:1',  fill:'39',  csat:'3합6', method:'이수단위 가중', cut50:1.55, cut70:1.60, score50:981.94, score70:980.25, major:'자연·공학', calcMode:'weighted', note:'2027모집요강 확인: 지능형소프트웨어학과로 개편되며 학교장추천 트랙 폐지(0명)'},
   {id:9430,univ:'성균관대학교', dept:'반도체융합공학과',         type:'학교장추천', recruit:'7명',  comp24:'',comp25:'',comp26:'18.71:1',fill:'21',  csat:'3합6', method:'이수단위 가중', cut50:1.49, cut70:1.52, score50:984.78, score70:983.53, major:'자연·공학', calcMode:'weighted'},
   {id:9431,univ:'성균관대학교', dept:'에너지학과',             type:'학교장추천', recruit:'7명',  comp24:'',comp25:'',comp26:'15.71:1',fill:'13',  csat:'3합6', method:'이수단위 가중', cut50:1.58, cut70:1.58, score50:981.39, score70:981.06, major:'자연·공학', calcMode:'weighted'},
   // ─── 건설환경·건축 ───
   {id:9432,univ:'성균관대학교', dept:'건설환경공학부',          type:'학교장추천', recruit:'15명', comp24:'',comp25:'',comp26:'7.47:1', fill:'16',  csat:'3합7', method:'이수단위 가중', cut50:1.63, cut70:1.69, score50:978.23, score70:977.94, major:'자연·공학', calcMode:'weighted'},
-  {id:9433,univ:'성균관대학교', dept:'건축학과',              type:'학교장추천', recruit:'15명', comp24:'',comp25:'',comp26:'6.06:1', fill:'32',  csat:'3합7', method:'이수단위 가중', cut50:1.71, cut70:1.74, score50:975.91, score70:974.59, major:'자연·공학', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 17명→15명 수정
+  {id:9433,univ:'성균관대학교', dept:'건축학과(5년제)',        type:'학교장추천', recruit:'15명', comp24:'',comp25:'',comp26:'6.06:1', fill:'32',  csat:'3합7', method:'이수단위 가중', cut50:1.71, cut70:1.74, score50:975.91, score70:974.59, major:'자연·공학', calcMode:'weighted'}, // ★2027 공식그리드 확인: 건축학과→건축학과(5년제) 명칭정정
   // ─── 바이오 계열 ───
   {id:9434,univ:'성균관대학교', dept:'글로벌바이오메디컬공학과',  type:'학교장추천', recruit:'6명',  comp24:'',comp25:'',comp26:'13.8:1', fill:'6',   csat:'3합6', method:'이수단위 가중', cut50:1.47, cut70:1.50, score50:985.13, score70:984.00, major:'자연·공학', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 5명→6명 수정
-  {id:9435,univ:'성균관대학교', dept:'바이오신약·규제과학과',     type:'학교장추천', recruit:'5명',  comp24:'',comp25:'',comp26:'16.6:1', fill:'12',  csat:'3합7', method:'이수단위 가중', cut50:1.48, cut70:1.51, score50:984.06, score70:983.73, major:'자연·공학', calcMode:'weighted'},
+  {id:9435,univ:'성균관대학교', dept:'바이오신약·규제과학과',     type:'학교장추천', recruit:'5명',  comp24:'',comp25:'',comp26:'16.6:1', fill:'12',  csat:'3합6', method:'이수단위 가중', cut50:1.48, cut70:1.51, score50:984.06, score70:983.73, major:'자연·공학', calcMode:'weighted'}, // ★2027 공식 수능최저기준표 확인: 3합7→3합6 정정
   // ─── 학교장추천-계약학과 ───
   {id:9436,univ:'성균관대학교', dept:'배터리학과',             type:'학교장추천', recruit:'0명',  comp24:'',comp25:'',comp26:'14.8:1', fill:'13',  csat:'3합6', method:'이수단위 가중', cut50:1.35, cut70:1.36, score50:990.82, score70:988.13, major:'자연·공학', calcMode:'weighted'}, // ★2026.08 확인: 모집인원 5명→0명 수정
-  {id:9437,univ:'성균관대학교', dept:'컴퓨터공학과',           type:'학교장추천', recruit:'5명',  comp24:'',comp25:'',comp26:'',      fill:'',   csat:'3합7', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'}, // ★2026.08 신규 추가: 기존 DB 누락 학과(전년 입결 없음)
+  {id:9437,univ:'성균관대학교', dept:'컴퓨터공학과',           type:'학교장추천', recruit:'5명',  comp24:'',comp25:'',comp26:'',      fill:'',   csat:'3합6', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'}, // ★2027 공식 수능최저기준표 확인: 3합7→3합6 정정
   // 한양대 (학생부교과 추천형 / 수능최저: 국수영탐(1) 3합7)
   // ※ 2027학년도 모집요강 + 2026학년도 실입결 기준 (경쟁률·충원인원·입결 모두 실데이터)
   // ※ comp26=2026경쟁률, fill=충원인원(명), cut50/cut70=환산등급 실입결
@@ -15804,10 +15807,10 @@ let UNIV_DB = [
   // ─── 경영경제대학 ───
   {id:6024,univ:'중앙대학교', dept:'경영경제대학',            type:'지역균형', recruit:'52명', comp24:'',comp25:'',comp26:'7.37:1', fill:'95',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.69, cut70:1.72, score50:884.18, score70:883.59, major:'상경',     calcMode:'weighted'},
   {id:20,  univ:'중앙대학교', dept:'경영학부(경영학전공)',     type:'지역균형', recruit:'46명', comp24:'',comp25:'',comp26:'7.15:1', fill:'126', csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.74, cut70:1.75, score50:883.24, score70:882.46, major:'상경',     calcMode:'weighted'},
-  {id:6025,univ:'중앙대학교', dept:'경영학부(글로벌금융전공)', type:'지역균형', recruit:'7명',  comp24:'',comp25:'',comp26:'10.57:1',fill:'10',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.61, cut70:1.71, score50:885.64, score70:884.28, major:'상경',     calcMode:'weighted'},
+  {id:6025,univ:'중앙대학교', dept:'경영학부(글로벌금융전공)', type:'지역균형', recruit:'8명',  comp24:'',comp25:'',comp26:'10.57:1',fill:'10',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.61, cut70:1.71, score50:885.64, score70:884.28, major:'상경',     calcMode:'weighted'},
   // ─── 사범대학 ───
-  {id:6026,univ:'중앙대학교', dept:'영어교육과',              type:'지역균형', recruit:'11명', comp24:'',comp25:'',comp26:'8.09:1', fill:'30',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.75, cut70:1.79, score50:883.03, score70:882.39, major:'인문·사회', calcMode:'weighted'},
-  {id:6027,univ:'중앙대학교', dept:'유아교육과',              type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'13.83:1',fill:'5',   csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.89, cut70:1.89, score50:879.50, score70:878.71, major:'인문·사회', calcMode:'weighted'},
+  {id:6026,univ:'중앙대학교', dept:'영어교육과',              type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'8.09:1', fill:'30',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.75, cut70:1.79, score50:883.03, score70:882.39, major:'인문·사회', calcMode:'weighted'},
+  {id:6027,univ:'중앙대학교', dept:'유아교육과',              type:'지역균형', recruit:'8명',  comp24:'',comp25:'',comp26:'13.83:1',fill:'5',   csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.89, cut70:1.89, score50:879.50, score70:878.71, major:'인문·사회', calcMode:'weighted'},
   {id:6028,univ:'중앙대학교', dept:'교육학과',                type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'12.5:1', fill:'24',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.83, cut70:1.84, score50:880.61, score70:880.24, major:'인문·사회', calcMode:'weighted'},
   // ─── 자연과학대학 ───
   {id:6029,univ:'중앙대학교', dept:'자연과학대학',            type:'지역균형', recruit:'30명', comp24:'',comp25:'',comp26:'6.93:1', fill:'57',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.57, cut70:1.59, score50:887.23, score70:886.73, major:'자연·공학', calcMode:'weighted'},
@@ -15816,14 +15819,14 @@ let UNIV_DB = [
   {id:6031,univ:'중앙대학교', dept:'화학공학과',              type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'9.1:1',  fill:'31',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.41, cut70:1.44, score50:891.25, score70:890.66, major:'자연·공학', calcMode:'weighted'},
   {id:6032,univ:'중앙대학교', dept:'전자전기공학부',          type:'지역균형', recruit:'18명', comp24:'',comp25:'',comp26:'11.89:1',fill:'61',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.49, cut70:1.52, score50:889.26, score70:889.15, major:'자연·공학', calcMode:'weighted'},
   {id:6033,univ:'중앙대학교', dept:'기계공학부',              type:'지역균형', recruit:'20명', comp24:'',comp25:'',comp26:'10.3:1', fill:'38',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.54, cut70:1.56, score50:887.63, score70:887.36, major:'자연·공학', calcMode:'weighted'},
-  {id:6034,univ:'중앙대학교', dept:'융합공학부',              type:'지역균형', recruit:'36명', comp24:'',comp25:'',comp26:'9.56:1', fill:'77',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.54, cut70:1.56, score50:887.09, score70:886.96, major:'자연·공학', calcMode:'weighted'},
+  {id:6034,univ:'중앙대학교', dept:'융합공학부',              type:'지역균형', recruit:'23명', comp24:'',comp25:'',comp26:'9.56:1', fill:'77',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.54, cut70:1.56, score50:887.09, score70:886.96, major:'자연·공학', calcMode:'weighted'},
   // ─── 창의ICT공과대학 ───
-  {id:21,  univ:'중앙대학교', dept:'소프트웨어학부',          type:'지역균형', recruit:'14명', comp24:'',comp25:'',comp26:'7.43:1', fill:'40',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.60, cut70:1.63, score50:886.45, score70:885.65, major:'자연·공학', calcMode:'weighted'},
-  {id:6035,univ:'중앙대학교', dept:'AI학과',                 type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'13.8:1', fill:'15',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.56, cut70:1.60, score50:886.92, score70:886.59, major:'자연·공학', calcMode:'weighted'},
+  {id:21,  univ:'중앙대학교', dept:'소프트웨어학부',          type:'지역균형', recruit:'22명', comp24:'',comp25:'',comp26:'7.43:1', fill:'40',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.60, cut70:1.63, score50:886.45, score70:885.65, major:'자연·공학', calcMode:'weighted'},
+  {id:6035,univ:'중앙대학교', dept:'AI학과',                 type:'지역균형', recruit:'9명', comp24:'',comp25:'',comp26:'13.8:1', fill:'15',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.56, cut70:1.60, score50:886.92, score70:886.59, major:'자연·공학', calcMode:'weighted'},
   // ─── 약학대학 (수능최저 다름) ───
   {id:22,  univ:'중앙대학교', dept:'약학부',                 type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'20.2:1', fill:'15',  csat:'4합5+한국사4', method:'이수단위 가중', cut50:1.06, cut70:1.10, score50:898.84, score70:898.43, major:'의약학',   calcMode:'weighted'},
   // ─── 간호대학 ───
-  {id:6036,univ:'중앙대학교', dept:'간호학과',               type:'지역균형', recruit:'27명', comp24:'',comp25:'',comp26:'6.81:1', fill:'40',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.65, cut70:1.68, score50:884.73, score70:884.56, major:'의약학',   calcMode:'weighted'},
+  {id:6036,univ:'중앙대학교', dept:'간호학과',               type:'지역균형', recruit:'30명', comp24:'',comp25:'',comp26:'6.81:1', fill:'40',  csat:'3합7+한국사4', method:'이수단위 가중', cut50:1.65, cut70:1.68, score50:884.73, score70:884.56, major:'의약학',   calcMode:'weighted'},
   // ── 경희대학교 서울캠퍼스 (지역균형 / 2027모집요강+2026실입결) ──
   // 수능최저: 인문/자연(의예·한의예·치의예·약학 제외) → 2합5+한국사5
   //          의예·한의예(인문·자연)·치의예·약학 → 4합4+한국사5
@@ -15833,32 +15836,31 @@ let UNIV_DB = [
   {id:7001,univ:'경희대학교', dept:'국어국문학과',          type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'8.33:1', fill:'19',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.92, cut70:1.96, score50:679.13, score70:678.21, major:'인문·사회', calcMode:'weighted'},
   {id:7002,univ:'경희대학교', dept:'영어영문학과',           type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'7.0:1',  fill:'',   csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
   {id:7003,univ:'경희대학교', dept:'프랑스어학과',           type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'5.5:1',  fill:'1',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
-  {id:7004,univ:'경희대학교', dept:'스페인어학과',           type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'8.5:1',  fill:'0',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
-  {id:7005,univ:'경희대학교', dept:'러시아어학과',           type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'6.5:1',  fill:'1',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
-  {id:7006,univ:'경희대학교', dept:'중국어학과',             type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'7.0:1',  fill:'0',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
-  {id:7007,univ:'경희대학교', dept:'응용영어통번역학과',      type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'8.33:1', fill:'3',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
+  {id:7004,univ:'경희대학교', dept:'스페인어학과',           type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'8.5:1',  fill:'0',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
+  {id:7005,univ:'경희대학교', dept:'러시아어학과',           type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'6.5:1',  fill:'1',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
+  {id:7006,univ:'경희대학교', dept:'중국어학과',             type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'7.0:1',  fill:'0',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
+  {id:7007,univ:'경희대학교', dept:'응용영어통번역학과',      type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'8.33:1', fill:'3',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
   {id:7008,univ:'경희대학교', dept:'사학과',                type:'지역균형', recruit:'5명',  comp24:'',comp25:'',comp26:'7.6:1',  fill:'13', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.93, cut70:1.97, score50:680.06, score70:676.68, major:'인문·사회', calcMode:'weighted'},
   {id:7009,univ:'경희대학교', dept:'철학과',                type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'10.67:1',fill:'8',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'인문·사회', calcMode:'weighted'},
   // ─── 사회과학대학 ───
   {id:7010,univ:'경희대학교', dept:'정치외교학과',           type:'지역균형', recruit:'5명',  comp24:'',comp25:'',comp26:'7.2:1',  fill:'15', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.75, cut70:1.81, score50:683.48, score70:679.97, major:'인문·사회', calcMode:'weighted'},
-  {id:7011,univ:'경희대학교', dept:'행정학과',              type:'지역균형', recruit:'11명', comp24:'',comp25:'',comp26:'6.55:1', fill:'20', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.88, cut70:1.90, score50:680.69, score70:679.14, major:'인문·사회', calcMode:'weighted'},
-  {id:7012,univ:'경희대학교', dept:'사회학과',              type:'지역균형', recruit:'8명',  comp24:'',comp25:'',comp26:'8.13:1', fill:'24', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.72, cut70:1.76, score50:683.37, score70:683.04, major:'인문·사회', calcMode:'weighted'},
-  {id:7013,univ:'경희대학교', dept:'국제학과',              type:'지역균형', recruit:'8명',  comp24:'',comp25:'',comp26:'4.5:1',  fill:'10', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.90, cut70:1.91, score50:679.71, score70:678.99, major:'인문·사회', calcMode:'weighted'},
-  {id:7014,univ:'경희대학교', dept:'무역학과',              type:'지역균형', recruit:'13명', comp24:'',comp25:'',comp26:'7.0:1',  fill:'9',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.85, cut70:1.96, score50:680.07, score70:679.38, major:'상경',     calcMode:'weighted'},
-  {id:7015,univ:'경희대학교', dept:'미디어학과',            type:'지역균형', recruit:'12명', comp24:'',comp25:'',comp26:'12.58:1',fill:'28', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.81, cut70:1.83, score50:681.27, score70:680.69, major:'인문·사회', calcMode:'weighted'},
+  {id:7011,univ:'경희대학교', dept:'행정학과',              type:'지역균형', recruit:'12명', comp24:'',comp25:'',comp26:'6.55:1', fill:'20', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.88, cut70:1.90, score50:680.69, score70:679.14, major:'인문·사회', calcMode:'weighted'},
+  {id:7012,univ:'경희대학교', dept:'사회학과',              type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'8.13:1', fill:'24', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.72, cut70:1.76, score50:683.37, score70:683.04, major:'인문·사회', calcMode:'weighted'},
+  {id:7013,univ:'경희대학교', dept:'국제학과',              type:'지역균형', recruit:'10명',  comp24:'',comp25:'',comp26:'4.5:1',  fill:'10', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.90, cut70:1.91, score50:679.71, score70:678.99, major:'인문·사회', calcMode:'weighted'},
+  {id:7014,univ:'경희대학교', dept:'무역학과',              type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'7.0:1',  fill:'9',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.85, cut70:1.96, score50:680.07, score70:679.38, major:'상경',     calcMode:'weighted'},
+  {id:7015,univ:'경희대학교', dept:'미디어학과',            type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'12.58:1',fill:'28', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.81, cut70:1.83, score50:681.27, score70:680.69, major:'인문·사회', calcMode:'weighted'},
   // ─── 경영대학 ───
-  {id:7016,univ:'경희대학교', dept:'경영학과',              type:'지역균형', recruit:'13명', comp24:'',comp25:'',comp26:'6.77:1', fill:'11', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.93, cut70:1.93, score50:679.43, score70:677.31, major:'상경',     calcMode:'weighted'},
   {id:7017,univ:'경희대학교', dept:'경영회계계열',          type:'지역균형', recruit:'30명',    comp24:'',comp25:'',comp26:'7.37:1', fill:'108',csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.84, cut70:1.89, score50:681.70, score70:679.98, major:'상경',     calcMode:'weighted'}, // ★2026.08 확인: 기존 '회계·세무학과' 표기가 오류 — 2027학년도부터 경영회계계열(경영학과+회계학과 통합)로 개편, 입결 데이터 신규 반영
   {id:7018,univ:'경희대학교', dept:'경제학과',              type:'지역균형', recruit:'12명', comp24:'',comp25:'',comp26:'6.67:1', fill:'23', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.87, cut70:1.89, score50:680.88, score70:677.87, major:'상경',     calcMode:'weighted'},
   {id:7019,univ:'경희대학교', dept:'주거환경학과(인문)',      type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'8.25:1', fill:'0',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.90, cut70:1.90, score50:678.38, score70:678.38, major:'인문·사회', calcMode:'weighted'},
   {id:7020,univ:'경희대학교', dept:'관광·엔터테인먼트학부',   type:'지역균형', recruit:'8명',  comp24:'',comp25:'',comp26:'5.88:1', fill:'9',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:2.19, cut70:2.37, score50:669.95, score70:663.14, major:'인문·사회', calcMode:'weighted'},
-  {id:7021,univ:'경희대학교', dept:'미래정보디스플레이학부',   type:'지역균형', recruit:'7명',  comp24:'',comp25:'',comp26:'7.57:1', fill:'10', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.62, cut70:1.71, score50:687.14, score70:685.66, major:'인문·사회', calcMode:'weighted'},
+  {id:7021,univ:'경희대학교', dept:'미래정보디스플레이학부',   type:'지역균형', recruit:'5명',  comp24:'',comp25:'',comp26:'7.57:1', fill:'10', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.62, cut70:1.71, score50:687.14, score70:685.66, major:'인문·사회', calcMode:'weighted'},
   // ─── 자유전공학부 ───
   {id:7022,univ:'경희대학교', dept:'자율전공학부',           type:'지역균형', recruit:'49명', comp24:'',comp25:'',comp26:'8.61:1', fill:'114',csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.65, cut70:1.68, score50:686.06, score70:685.17, major:'인문·사회', calcMode:'weighted'}, // ★2026.08 확인: 기존 '자유전공학부' 표기가 오류 — 실제로는 자율전공학부(49명) 데이터였음. 진짜 자유전공학부(158명)는 별도 신규 추가
   {id:9201,univ:'경희대학교', dept:'자유전공학부',           type:'지역균형', recruit:'158명',comp24:'',comp25:'',comp26:'7.04:1', fill:'198',csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.69, cut70:1.73, score50:685.81, score70:684.80, major:'인문·사회', calcMode:'weighted'}, // ★2026.08 신규 추가: 자율전공학부와 별개인 대규모 자유전공학부(158명)
   // ─── 이과대학 ───
   {id:7023,univ:'경희대학교', dept:'수학과',                type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'6.33:1', fill:'8',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:2.00, cut70:2.10, score50:677.22, score70:675.90, major:'자연·공학', calcMode:'weighted'},
-  {id:7024,univ:'경희대학교', dept:'물리학과',              type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'7.33:1', fill:'7',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'자연·공학', calcMode:'weighted'},
+  {id:7024,univ:'경희대학교', dept:'물리학과',              type:'지역균형', recruit:'7명',  comp24:'',comp25:'',comp26:'7.33:1', fill:'7',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'자연·공학', calcMode:'weighted'},
   {id:7025,univ:'경희대학교', dept:'화학과',                type:'지역균형', recruit:'8명',  comp24:'',comp25:'',comp26:'5.5:1',  fill:'10', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.50, cut70:1.52, score50:689.51, score70:689.20, major:'자연·공학', calcMode:'weighted'},
   {id:7026,univ:'경희대학교', dept:'생물학과',              type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'5.3:1',  fill:'16', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.59, cut70:1.64, score50:688.12, score70:687.21, major:'자연·공학', calcMode:'weighted'},
   {id:7027,univ:'경희대학교', dept:'응용화학과',            type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'6.5:1',  fill:'3',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.71, cut70:1.79, score50:685.91, score70:685.59, major:'자연·공학', calcMode:'weighted'},
@@ -15879,12 +15881,12 @@ let UNIV_DB = [
   {id:7040,univ:'경희대학교', dept:'환경경조경디자인학과',    type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'11.0:1', fill:'2',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.50, cut70:1.50, score50:686.29, score70:686.29, major:'자연·공학', calcMode:'weighted'},
   {id:7041,univ:'경희대학교', dept:'아동가족학과',           type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'7.33:1', fill:'10', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.90, cut70:1.96, score50:679.05, score70:678.13, major:'인문·사회', calcMode:'weighted'},
   // ─── 의학계열 (수능최저 다름: 4합4+한국사5) ───
-  {id:23,  univ:'경희대학교', dept:'의예과',                type:'지역균형', recruit:'15명', comp24:'',comp25:'',comp26:'7.67:1', fill:'26', csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.00, cut70:1.00, score50:700.00, score70:700.00, major:'의약학',   calcMode:'weighted'},
+  {id:23,  univ:'경희대학교', dept:'의예과',                type:'지역균형', recruit:'11명', comp24:'',comp25:'',comp26:'7.67:1', fill:'26', csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.00, cut70:1.00, score50:700.00, score70:700.00, major:'의약학',   calcMode:'weighted'},
   {id:24,  univ:'경희대학교', dept:'한의예과(인문)',          type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'17.0:1', fill:'4',  csat:'4합4+한국사5', method:'이수단위 가중', cut50:0,    cut70:0,    score50:0,      score70:0,     major:'의약학',   calcMode:'weighted'},
   {id:7042,univ:'경희대학교', dept:'한의예과(자연)',          type:'지역균형', recruit:'5명',  comp24:'',comp25:'',comp26:'25.6:1', fill:'16', csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.12, cut70:1.22, score50:698.01, score70:695.99, major:'의약학',   calcMode:'weighted'},
-  {id:7043,univ:'경희대학교', dept:'치의예과',              type:'지역균형', recruit:'10명', comp24:'',comp25:'',comp26:'13.5:1', fill:'12', csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.16, cut70:1.20, score50:697.22, score70:696.22, major:'의약학',   calcMode:'weighted'},
+  {id:7043,univ:'경희대학교', dept:'치의예과',              type:'지역균형', recruit:'8명', comp24:'',comp25:'',comp26:'13.5:1', fill:'12', csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.16, cut70:1.20, score50:697.22, score70:696.22, major:'의약학',   calcMode:'weighted'},
   {id:25,  univ:'경희대학교', dept:'약학과',                type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'16.25:1',fill:'8',  csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.04, cut70:1.04, score50:699.21, score70:699.21, major:'의약학',   calcMode:'weighted'},
-  {id:7044,univ:'경희대학교', dept:'한약학과',              type:'지역균형', recruit:'5명',  comp24:'',comp25:'',comp26:'10.8:1', fill:'3',  csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.20, cut70:1.28, score50:695.60, score70:695.09, major:'의약학',   calcMode:'weighted'},
+  {id:7044,univ:'경희대학교', dept:'한약학과',              type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'10.8:1', fill:'3',  csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.20, cut70:1.28, score50:695.60, score70:695.09, major:'의약학',   calcMode:'weighted'},
   {id:7045,univ:'경희대학교', dept:'약과학과',              type:'지역균형', recruit:'6명',  comp24:'',comp25:'',comp26:'6.17:1', fill:'12', csat:'4합4+한국사5', method:'이수단위 가중', cut50:1.48, cut70:1.54, score50:690.87, score70:689.04, major:'의약학',   calcMode:'weighted'},
   {id:7046,univ:'경희대학교', dept:'간호학과',              type:'지역균형', recruit:'14명', comp24:'',comp25:'',comp26:'14.0:1', fill:'31', csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.74, cut70:1.77, score50:684.73, score70:683.39, major:'의약학',   calcMode:'weighted'},
   // ─── 체육 ───
@@ -15902,6 +15904,7 @@ let UNIV_DB = [
   {id:9211,univ:'경희대학교', dept:'지리학과(자연)',        type:'지역균형', recruit:'3명',  comp24:'',comp25:'',comp26:'7.0:1',  fill:'3',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'},
   {id:9212,univ:'경희대학교', dept:'원자력공학과',          type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'6.0:1',  fill:'-',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'},
   {id:9213,univ:'경희대학교', dept:'건축공학과',            type:'지역균형', recruit:'4명',  comp24:'',comp25:'',comp26:'6.5:1',  fill:'4',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:1.85, cut70:1.85, score50:683.95, score70:683.95, major:'자연·공학', calcMode:'weighted'},
+  {id:9250,univ:'경희대학교', dept:'건축학과(5년제)',       type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'',       fill:'',   csat:'2합5+한국사5', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted', note:'2027모집요강 반영(공식그리드상 건축공학과와 별도트랙), 2026실입결 자료 불명확하여 공란'}, // ★2027 공식그리드 확인: 건축공학과(4명)와 별도로 건축학과(5년제) 2명 트랙 존재, 기존 DB에 누락되어 신규추가
   {id:9214,univ:'경희대학교', dept:'환경학및환경공학과',    type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'9.0:1',  fill:'2',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'},
   {id:9215,univ:'경희대학교', dept:'전자공학부 반도체공학과',type:'지역균형',recruit:'2명',  comp24:'',comp25:'',comp26:'9.5:1',  fill:'2',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'},
   {id:9216,univ:'경희대학교', dept:'생체의공학과',          type:'지역균형', recruit:'2명',  comp24:'',comp25:'',comp26:'5.5:1',  fill:'1',  csat:'2합5+한국사5', method:'이수단위 가중', cut50:0, cut70:0, score50:0, score70:0, major:'자연·공학', calcMode:'weighted'},
@@ -20054,7 +20057,7 @@ let UNIV_DB = [
   // ── cut50/cut70=환산등급, score50/score70=환산점수(1000점 만점) ──
   // ══════════════════════════════════════════════════════════════════
   {id:975001,univ:'중앙대학교(다빈치)',dept:'생명공학대학',type:'지역균형전형[교과]',recruit:'65명',comp24:'',comp25:'',comp26:'3.37:1',fill:'106',csat:'없음',method:'학생부100%(교과90%+비교과출결10%)',cut50:2.49,cut70:2.67,score50:864.62,score70:861.7,note:'2027모집요강+2026실입결·다빈치캠',major:'자연·공학',calcMode:'weighted'},
-  {id:975002,univ:'중앙대학교(다빈치)',dept:'첨단소재공학과',type:'지역균형전형[교과]',recruit:'6명',comp24:'',comp25:'',comp26:'3.0:1',fill:'6',csat:'없음',method:'학생부100%(교과90%+비교과출결10%)',cut50:2.7,cut70:2.94,score50:854.44,score70:853.77,note:'2027모집요강+2026실입결·다빈치캠',major:'자연·공학',calcMode:'weighted'},
+  {id:975002,univ:'중앙대학교(다빈치)',dept:'첨단소재공학과',type:'지역균형전형[교과]',recruit:'8명',comp24:'',comp25:'',comp26:'3.0:1',fill:'6',csat:'없음',method:'학생부100%(교과90%+비교과출결10%)',cut50:2.7,cut70:2.94,score50:854.44,score70:853.77,note:'2027모집요강+2026실입결·다빈치캠',major:'자연·공학',calcMode:'weighted'},
   {id:975003,univ:'중앙대학교(다빈치)',dept:'예술공학부',type:'지역균형전형[교과]',recruit:'22명',comp24:'',comp25:'',comp26:'3.22:1',fill:'28',csat:'없음',method:'학생부100%(교과90%+비교과출결10%)',cut50:2.94,cut70:3.09,score50:852.61,score70:852.17,note:'2027모집요강+2026실입결·다빈치캠',major:'예체능',calcMode:'weighted'},
 ];
 
