@@ -1528,6 +1528,16 @@ async function chgArchiveRound(date, test, subjectsSnapshot){
   const cd=chgInit();
   if(!date||!test||!subjectsSnapshot||!subjectsSnapshot.length) return false;
   const fullCopy=JSON.parse(JSON.stringify(subjectsSnapshot));
+  // ★ 2026-08-15 성능 수정: 예전 수정(아래 주석)에서 subject/detail/score가 없어 등수 비교가
+  // 안 되는 문제를 고치면서, items(문항별 단원/해설/오답원인 등 무거운 배열) 전체까지
+  // subjects 필드에 통째로 중복 저장하게 됐다. 등수·회차 비교에는 subject/detail/score/
+  // wrongCount만 있으면 충분한데, 매 회차마다 문항 전체 텍스트를 fullSubjects와 subjects
+  // 양쪽에 중복 저장하다 보니 회차가 쌓일수록 학생 문서가 무거워져서, 관리자 쪽에서 학생별
+  // 모의고사 화면을 열 때 느려지거나 멈추는 원인이 됐다. subjects는 비교에 필요한 필드만
+  // 남긴 경량 버전으로 저장하고, 전체 데이터(items 포함)는 fullSubjects에서만 유지한다.
+  const slimCopy=fullCopy.map(function(s){
+    return {subject:s.subject, detail:s.detail||'', score:s.score, wrongCount:s.wrongCount};
+  });
   const rec={
     student: CU.name||'',
     date: date,
@@ -1536,7 +1546,7 @@ async function chgArchiveRound(date, test, subjectsSnapshot){
     // 쪽에서 같은 회차 다른 학생과 비교(등수 등)할 때 과목코드(subject)/세부과목(detail)이
     // 없어 못 찾는 문제가 있었다. 이제 admin의 아카이브 방식과 똑같이 subject/detail/score가
     // 살아있는 전체 데이터를 그대로 저장한다.
-    subjects: fullCopy,
+    subjects: slimCopy,
     fullSubjects: fullCopy
   };
   if(!Array.isArray(cd.history)) cd.history=[];
