@@ -27083,6 +27083,7 @@ function renderChallenger(s){
       <button onclick="window.__challengerLoadedFor=null;render();" style="margin-left:auto;background:#fff;color:#0f766e;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🔄 학생 입력 새로고침</button>
       <button onclick="openChallengerBulkReflect()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📋 결과 일괄반영</button>
       <button onclick="openChallengerDupCheck()" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🧹 중복 회차 검사</button>
+      <button onclick="openChallengerDataOptimize()" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">⚡ 회차 데이터 최적화</button>
       <span style="font-size:11px;color:#64748b">${esc(s.name)} 학생 데이터는 자동으로 SG에 저장 및 누적됩니다</span>
     </div>
     <div id="challenger-slot" style="width:100%;min-height:300px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px">⏳ 챌린저 불러오는 중...</div>
@@ -27177,6 +27178,95 @@ function cdcDeleteRound(gi, ri){
   alert('✅ 삭제했습니다.\n\n'+g.studentName+' · '+g.date+' · '+(r.test||'(시험명 없음)'));
 }
 
+// ══════════════════════════════════════════════════
+// ⚡ 챌린저 회차 데이터 최적화 (전체 학생 대상)
+// 과거 결과일괄반영/학생용 회차저장에서 history[].subjects에 fullSubjects와 동일하게
+// 문항 전체(items) 등 무거운 데이터가 중복 저장된 회차를 찾아, subjects만 경량 요약으로
+// 정리한다(fullSubjects는 그대로 유지 — 과거 회차 복원 기능에 필요). 회차가 많이 쌓인
+// 학생일수록 모의고사 화면 로딩이 느려지거나 멈추는 원인이 이 중복 데이터였다.
+// ══════════════════════════════════════════════════
+const CDO_SUBJ_KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
+function _cdoSlim(s){
+  const wrong = +(s.wrongCount||0) || (s.items||[]).filter(function(i){return i.no||i.unit||(i.reasons||[]).length||i.memo;}).length;
+  return {
+    name: s.name || (CDO_SUBJ_KOR[s.subject]||s.subject||'')+(s.detail?'('+s.detail+')':''),
+    score: +s.score||0,
+    wrong: wrong,
+    tags: s.tags||[]
+  };
+}
+let CDO_plan = [];
+function openChallengerDataOptimize(){
+  if(!document.getElementById('cdo-overlay')){
+    const div=document.createElement('div');
+    div.id='cdo-overlay';
+    div.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;align-items:center;justify-content:center;padding:20px';
+    div.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:720px;width:100%;max-height:85vh;overflow:auto;padding:20px">
+      <div style="display:flex;align-items:center;margin-bottom:8px">
+        <b style="font-size:16px;color:#7c3aed">⚡ 챌린저 회차 데이터 최적화 (전체 학생)</b>
+        <button onclick="document.getElementById('cdo-overlay').style.display='none'" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:#94a3b8">✕</button>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-top:0">일부 회차는 저장할 때 문항 전체(지문·해설·오답원인 등) 데이터가 두 군데에 중복으로 저장되어 있습니다. 회차가 쌓일수록 학생별 모의고사 화면이 느려지거나 멈추는 원인입니다. 아래 "전체 최적화 실행"을 누르면 중복된 부분만 정리하고, 과거 회차 복원에 필요한 전체 데이터(fullSubjects)는 그대로 보존합니다. 데이터가 삭제되는 작업이 아니라 중복만 정리하는 작업입니다.</p>
+      <div id="cdo-body" style="font-size:13px"></div>
+    </div>`;
+    document.body.appendChild(div);
+  }
+  const body=document.getElementById('cdo-body');
+  body.innerHTML='<div style="text-align:center;padding:20px 0;color:#94a3b8">검사 중...</div>';
+  document.getElementById('cdo-overlay').style.display='flex';
+  setTimeout(function(){
+    const plan=[];
+    let totalBytesBefore=0, totalBytesAfter=0;
+    (ST.students||[]).forEach(function(stu){
+      const hist=(stu.challengerData&&stu.challengerData.history)||[];
+      let bloatedCount=0;
+      const newHist=hist.map(function(r){
+        const hasHeavy = Array.isArray(r.subjects) && r.subjects.some(function(s){return Array.isArray(s.items)&&s.items.length;});
+        if(!hasHeavy) return r;
+        bloatedCount++;
+        return Object.assign({}, r, {subjects: (r.subjects||[]).map(_cdoSlim)});
+      });
+      if(bloatedCount>0){
+        const before=JSON.stringify(hist).length;
+        const after=JSON.stringify(newHist).length;
+        totalBytesBefore+=before; totalBytesAfter+=after;
+        plan.push({studentId:stu.id, studentName:stu.name, bloatedCount, newHist, before, after});
+      }
+    });
+    CDO_plan = plan;
+    if(!plan.length){
+      body.innerHTML='<div style="color:#0f766e;font-weight:700;padding:20px 0;text-align:center">✅ 정리할 중복 데이터가 없습니다. 이미 최적화된 상태입니다.</div>';
+      return;
+    }
+    const savedKb=Math.round((totalBytesBefore-totalBytesAfter)/1024);
+    body.innerHTML = `<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <b>${plan.length}명</b> 학생, 총 <b>${plan.reduce((a,p)=>a+p.bloatedCount,0)}개 회차</b>에서 중복 데이터 발견 — 정리하면 약 <b>${savedKb.toLocaleString()}KB</b> 절감됩니다.
+      </div>
+      <div style="max-height:320px;overflow:auto;margin-bottom:12px">
+        ${plan.map(p=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #f1f5f9;font-size:12.5px">
+          <span>${esc(p.studentName||'')}</span><span style="color:#94a3b8">${p.bloatedCount}개 회차 · ${Math.round((p.before-p.after)/1024)}KB 절감</span>
+        </div>`).join('')}
+      </div>
+      <button onclick="cdoRunAll()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer">⚡ 전체 최적화 실행 (${plan.length}명)</button>`;
+  }, 30);
+}
+function cdoRunAll(){
+  if(!CDO_plan.length) return;
+  if(!confirm(`${CDO_plan.length}명 학생의 회차 데이터를 정리합니다.\n\n전체 데이터(문항 상세)는 그대로 보존되고, 중복 저장된 부분만 정리됩니다.\n계속할까요?`)) return;
+  let done=0;
+  CDO_plan.forEach(function(p){
+    const stu=ST.students.find(x=>String(x.id)===String(p.studentId));
+    if(!stu) return;
+    const newChallengerData=Object.assign({}, stu.challengerData, {history: p.newHist, _updatedAt: Date.now()});
+    upd(Object.assign({}, stu, {challengerData:newChallengerData}));
+    const idx=ST.students.findIndex(x=>String(x.id)===String(p.studentId));
+    if(idx>-1) ST.students[idx]=Object.assign({}, stu, {challengerData:newChallengerData});
+    done++;
+  });
+  document.getElementById('cdo-overlay').style.display='none';
+  alert('✅ 최적화 완료\n\n'+done+'명 학생의 회차 데이터를 정리했습니다.');
+  CDO_plan=[];
+}
 
 function openChallengerBulkReflect(){
   if(!document.getElementById('cbr-overlay')){
@@ -27795,6 +27885,27 @@ const SG_STANDARD_ITEM_COUNT = {
 };
 function cbrConfirmApply(){
   if(!CBR_parsed) return;
+  // ★ 2026-08-15 성능 수정: history에 매 회차마다 문항 전체(지문/해설/오답원인 등)를 담은
+  // 무거운 subjects 배열을 "subjects" 필드와 "fullSubjects" 필드 두 군데에 완전히 동일하게
+  // 중복 저장하고 있었다(당초 설계는 subjects=차트용 경량 요약, fullSubjects=과거 회차 복원용
+  // 전체 데이터로 분리되어 있었는데, 결과일괄반영 코드에서 두 필드를 같은 값으로 채워버려
+  // 설계가 깨짐). 회차가 쌓일수록(특히 여러 명 일괄반영을 반복할수록) 학생 문서가 계속
+  // 커져서, 학생별 모의고사 화면을 열 때 이 무거운 history 전체를 iframe으로 전송·렌더링
+  // 하다가 오래 걸리거나 멈추는 원인이 된다. subjects는 차트/추이표가 실제로 쓰는 필드만
+  // 담은 경량 요약으로, fullSubjects는 기존처럼 전체 데이터를 유지해 과거 회차 복원 기능은
+  // 그대로 보존한다.
+  function _cbrSlimSubjects(list){
+    const SUBJ_KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
+    return (list||[]).map(function(s){
+      const wrong = +(s.wrongCount||0) || (s.items||[]).filter(function(i){return i.no||i.unit||(i.reasons||[]).length||i.memo;}).length;
+      return {
+        name: (SUBJ_KOR[s.subject]||s.subject||'')+(s.detail?'('+s.detail+')':''),
+        score: +s.score||0,
+        wrong: wrong,
+        tags: []
+      };
+    });
+  }
   const { byStudent, rates, matchInfo } = CBR_parsed;
   const pastedItemMeta = _cbrParseItemMeta();
   const aarMemos = _cbrParseAarMemos();
@@ -27836,7 +27947,7 @@ function cbrConfirmApply(){
         _hist.push({
           date: cd.lastTestDate,
           test: cd.lastTestName||'',
-          subjects: JSON.parse(JSON.stringify(cd.lastSubjects)), // 등수·오답률 비교에 필요한 subject/detail/score를 그대로 보존
+          subjects: _cbrSlimSubjects(cd.lastSubjects), // ★ 경량 요약(차트/추이표용) — 전체 데이터는 fullSubjects에
           fullSubjects: JSON.parse(JSON.stringify(cd.lastSubjects)),
           savedAt: Date.now(),
           archivedBy: '결과일괄반영(새 회차 전환)'
@@ -27935,7 +28046,7 @@ function cbrConfirmApply(){
       const _entryNow = {
         date: newChallengerData.lastTestDate,
         test: newChallengerData.lastTestName||'',
-        subjects: JSON.parse(JSON.stringify(subjects)),
+        subjects: _cbrSlimSubjects(subjects), // ★ 경량 요약(차트/추이표용) — 전체 데이터는 fullSubjects에
         fullSubjects: JSON.parse(JSON.stringify(subjects)),
         savedAt: Date.now(),
         archivedBy: '결과일괄반영(자동 저장)'
