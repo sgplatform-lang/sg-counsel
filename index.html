@@ -27186,14 +27186,20 @@ function cdcDeleteRound(gi, ri){
 // 학생일수록 모의고사 화면 로딩이 느려지거나 멈추는 원인이 이 중복 데이터였다.
 // ══════════════════════════════════════════════════
 const CDO_SUBJ_KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
+// ★ subject/detail/items 구조는 그대로 유지한다(v41SubjectKey 등 다른 기능이 이 필드들을
+// 그대로 필요로 하기 때문에, 구조 자체를 바꾸면 다른 기능이 깨질 수 있음이 확인됨).
+// 문항별 question(지문+선택지 원문)·explanation(해설)처럼 실제로 긴 텍스트를 담는
+// 필드만 골라서 지운다 — 이 두 필드가 회차마다 통째로 중복 저장되는 게 용량 증가의
+// 실제 원인이었고, 둘 다 "오답노트 인쇄"에서만 쓰이는데 과거 회차의 오답노트를 다시
+// 인쇄할 일은 거의 없으므로 history(지난 회차)에서는 지워도 안전하다. 최신 회차
+// (lastSubjects)는 이 최적화 대상이 아니라 그대로 둔다.
 function _cdoSlim(s){
-  const wrong = +(s.wrongCount||0) || (s.items||[]).filter(function(i){return i.no||i.unit||(i.reasons||[]).length||i.memo;}).length;
-  return {
-    name: s.name || (CDO_SUBJ_KOR[s.subject]||s.subject||'')+(s.detail?'('+s.detail+')':''),
-    score: +s.score||0,
-    wrong: wrong,
-    tags: s.tags||[]
-  };
+  const items=(s.items||[]).map(function(it){
+    const o=Object.assign({}, it);
+    delete o.question; delete o.explanation;
+    return o;
+  });
+  return Object.assign({}, s, {items:items});
 }
 let CDO_plan = [];
 function openChallengerDataOptimize(){
@@ -27221,7 +27227,7 @@ function openChallengerDataOptimize(){
       const hist=(stu.challengerData&&stu.challengerData.history)||[];
       let bloatedCount=0;
       const newHist=hist.map(function(r){
-        const hasHeavy = Array.isArray(r.subjects) && r.subjects.some(function(s){return Array.isArray(s.items)&&s.items.length;});
+        const hasHeavy = Array.isArray(r.subjects) && r.subjects.some(function(s){return Array.isArray(s.items)&&s.items.some(function(it){return it.question||it.explanation;});});
         if(!hasHeavy) return r;
         bloatedCount++;
         return Object.assign({}, r, {subjects: (r.subjects||[]).map(_cdoSlim)});
@@ -27885,27 +27891,6 @@ const SG_STANDARD_ITEM_COUNT = {
 };
 function cbrConfirmApply(){
   if(!CBR_parsed) return;
-  // ★ 2026-08-15 성능 수정: history에 매 회차마다 문항 전체(지문/해설/오답원인 등)를 담은
-  // 무거운 subjects 배열을 "subjects" 필드와 "fullSubjects" 필드 두 군데에 완전히 동일하게
-  // 중복 저장하고 있었다(당초 설계는 subjects=차트용 경량 요약, fullSubjects=과거 회차 복원용
-  // 전체 데이터로 분리되어 있었는데, 결과일괄반영 코드에서 두 필드를 같은 값으로 채워버려
-  // 설계가 깨짐). 회차가 쌓일수록(특히 여러 명 일괄반영을 반복할수록) 학생 문서가 계속
-  // 커져서, 학생별 모의고사 화면을 열 때 이 무거운 history 전체를 iframe으로 전송·렌더링
-  // 하다가 오래 걸리거나 멈추는 원인이 된다. subjects는 차트/추이표가 실제로 쓰는 필드만
-  // 담은 경량 요약으로, fullSubjects는 기존처럼 전체 데이터를 유지해 과거 회차 복원 기능은
-  // 그대로 보존한다.
-  function _cbrSlimSubjects(list){
-    const SUBJ_KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
-    return (list||[]).map(function(s){
-      const wrong = +(s.wrongCount||0) || (s.items||[]).filter(function(i){return i.no||i.unit||(i.reasons||[]).length||i.memo;}).length;
-      return {
-        name: (SUBJ_KOR[s.subject]||s.subject||'')+(s.detail?'('+s.detail+')':''),
-        score: +s.score||0,
-        wrong: wrong,
-        tags: []
-      };
-    });
-  }
   const { byStudent, rates, matchInfo } = CBR_parsed;
   const pastedItemMeta = _cbrParseItemMeta();
   const aarMemos = _cbrParseAarMemos();
@@ -27947,7 +27932,7 @@ function cbrConfirmApply(){
         _hist.push({
           date: cd.lastTestDate,
           test: cd.lastTestName||'',
-          subjects: _cbrSlimSubjects(cd.lastSubjects), // ★ 경량 요약(차트/추이표용) — 전체 데이터는 fullSubjects에
+          subjects: JSON.parse(JSON.stringify(cd.lastSubjects)), // 등수·오답률 비교에 필요한 subject/detail/score를 그대로 보존
           fullSubjects: JSON.parse(JSON.stringify(cd.lastSubjects)),
           savedAt: Date.now(),
           archivedBy: '결과일괄반영(새 회차 전환)'
@@ -28046,7 +28031,7 @@ function cbrConfirmApply(){
       const _entryNow = {
         date: newChallengerData.lastTestDate,
         test: newChallengerData.lastTestName||'',
-        subjects: _cbrSlimSubjects(subjects), // ★ 경량 요약(차트/추이표용) — 전체 데이터는 fullSubjects에
+        subjects: JSON.parse(JSON.stringify(subjects)),
         fullSubjects: JSON.parse(JSON.stringify(subjects)),
         savedAt: Date.now(),
         archivedBy: '결과일괄반영(자동 저장)'
