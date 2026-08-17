@@ -26583,6 +26583,10 @@ function __SG_initFromHost(data){
     const _seenSingle={};
     const _dedup=[];
     data.lastSubjects.forEach(sp=>{
+      // ★ 2026-08-17 수정: 과거 결과일괄반영에서 과목코드 'HIS'로 잘못 저장된 학생을
+      // 열람할 때도(재반영 없이) 즉시 '한국사'로 정상 표시되도록, 화면 복원 시점에만
+      // 별도 사본으로 보정한다(원본 저장 데이터는 건드리지 않음).
+      if(sp && sp.subject==='HIS') sp=Object.assign({},sp,{subject:'HIST'});
       if(_singleInstance.includes(sp.subject)){
         if(_seenSingle[sp.subject]!==undefined) return; // 이미 있으면 이후 중복은 무시(첫 번째 유지)
         _seenSingle[sp.subject]=true;
@@ -27919,7 +27923,11 @@ function cbrConfirmApply(){
   if(!ready.length){ alert('반영할 수 있는(매칭된) 학생이 없습니다.'); return; }
   if(!confirm(ready.length+'명 학생에게 챌린저 결과를 반영합니다.'+(notReady.length? '\n(매칭 안 된 '+notReady.length+'명은 이번에 제외됩니다: '+notReady.join(', ')+')':'')+'\n\n계속할까요?')){ return; }
 
-  const subjMap = {KOR:'KOR',MATH:'MATH',ENG:'ENG',HIST:'HIST',LANG:'LANG',INQ1:'INQ',INQ2:'INQ'};
+  // ★ 2026-08-17 수정: 결과일괄반영 엑셀의 과목코드가 'HIS'(한국사 3자리 축약)로 들어오면
+  // 기존엔 이 표에 없어 매칭 실패 → 과목 select에 일치하는 <option>이 없어 브라우저가
+  // 첫 번째 옵션(국어)을 화면에 그냥 보여주는 문제가 있었다(저장값 자체는 'HIS'로 어긋난 채
+  // 남아있고, 실제로 국어로 바뀐 것은 아니었음). 'HIS'를 'HIST'의 별칭으로 추가 인식한다.
+  const subjMap = {KOR:'KOR',MATH:'MATH',ENG:'ENG',HIST:'HIST',HIS:'HIST',LANG:'LANG',INQ1:'INQ',INQ2:'INQ'};
   let successCount = 0;
   const updatedStudents = [];
   const _prevLoadedFor = window.__challengerLoadedFor;
@@ -27959,6 +27967,10 @@ function cbrConfirmApply(){
       }
     }
     let subjects = (_sameRound && Array.isArray(cd.lastSubjects)) ? JSON.parse(JSON.stringify(cd.lastSubjects)) : [];
+    // ★ 2026-08-17 수정: 과거에 과목코드 'HIS'(→'HIST'여야 함)로 잘못 반영되어 이미 저장된
+    // 학생이 있을 수 있으므로, 이번 반영 시작 전에 기존 저장값도 함께 바로잡는다(신규 진입만
+    // 고치면 예전 'HIS' 항목이 'HIST' 항목과 별개로 중복 표시되는 문제가 생김).
+    subjects.forEach(s=>{ if(s && s.subject==='HIS') s.subject='HIST'; });
     // ★ 2026-07-25 안전장치: 반영 시작 전, 이미 저장돼있던 과목 목록에 단일과목(국/수/영/
     // 한국사/제2외국어) 중복이 있으면 먼저 정리한다(첫 번째만 유지). 정리 안 하면 아래
     // find()가 첫 번째 항목만 갱신하고, 뒤에 남은 예전 중복 항목이 화면에 다시 보여서
