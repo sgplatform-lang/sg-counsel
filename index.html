@@ -21066,7 +21066,10 @@ function gg_getFilteredResults(){
       '경상국립대':'경상국립대학교','제주대':'제주대학교'
     };
     var _qResolved=_univAliases[q]?_univAliases[q].toLowerCase():q;
-    if(q&&!r.univ.toLowerCase().includes(_qResolved)&&!r.univ.toLowerCase().includes(q)&&!r.dept.toLowerCase().includes(q)) return false;
+    var dEl=document.getElementById('gg-search-dept');
+    var dq=(dEl?dEl.value||'':'').toLowerCase().trim();
+    if(q&&!r.univ.toLowerCase().includes(_qResolved)&&!r.univ.toLowerCase().includes(q)) return false;
+    if(dq&&!r.dept.toLowerCase().includes(dq)) return false;
     return true;
   });
 }
@@ -21386,7 +21389,8 @@ function renderGyogwa(s){
   [['all','전체'],['서울','서울'],['수도권','수도권'],['지방국립','지방국립'],['지방사립','지방사립']].forEach(function(item){
     html+='<button data-gg-fregion="'+item[0]+'" onclick="gg_setRegionFilter(this.getAttribute(\'data-gg-fregion\'),this)" style="padding:4px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:'+(item[0]==='all'?'#2563eb':'#fff')+';color:'+(item[0]==='all'?'#fff':'#64748b')+';font-size:10px;font-weight:600;cursor:pointer">'+item[1]+'</button>';
   });
-  html+='<input id="gg-search-input" type="text" placeholder="대학/학과 검색..." oninput="gg_renderResult()" style="padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:11px;width:130px;margin-left:4px">';
+  html+='<input id="gg-search-input" type="text" placeholder="대학명 검색..." oninput="gg_renderResult()" style="padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:11px;width:110px;margin-left:4px">';
+  html+='<input id="gg-search-dept" type="text" placeholder="학과명 검색..." oninput="gg_renderResult()" style="padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:11px;width:110px">';
   html+='</div>';
 
   // 결과 테이블
@@ -21396,7 +21400,7 @@ function renderGyogwa(s){
     +'<span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span>'
     +'<span id="gg-result-count" style="font-size:11px;color:#94a3b8">'+(gg_lastResults.length?('('+gg_getFilteredResults().length+'개)'):'')+'</span>'
     +'</div>'
-    +'<div style="overflow-x:auto;max-height:580px;overflow-y:auto">'
+    +'<div style="overflow-x:auto;max-height:580px;overflow-y:auto;overflow-anchor:none">'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
     +'<thead><tr style="background:#1e3a8a;position:sticky;top:0;z-index:2">'
     +'<th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">☑</th>'
@@ -23343,10 +23347,12 @@ function ns_analyze() {
 
 function ns_getFiltered() {
   var q = ((document.getElementById('ns-search')||{}).value||'').toLowerCase().trim();
+  var dq = ((document.getElementById('ns-search-dept')||{}).value||'').toLowerCase().trim();
   var mf = ns_currentMajorFilter;
   var tf = ((document.getElementById('ns-type-sel')||{}).value||'');
   var f = ns_lastResults.filter(function(r) {
-    if (q && !r.univ.toLowerCase().includes(q) && !r.dept.toLowerCase().includes(q)) return false;
+    if (q && !r.univ.toLowerCase().includes(q)) return false;
+    if (dq && !r.dept.toLowerCase().includes(dq)) return false;
     if (mf && r.major !== mf) return false;
     if (tf && r.nulsulType !== tf) return false;
     if (ns_selectedChance.size && !ns_selectedChance.has(r.chance)) return false;
@@ -29080,11 +29086,12 @@ function renderNulsul(s) {
     var a=ns_selectedRegions.has(v);
     return '<button onclick="ns_toggleRegion(\''+v+'\')" style="padding:3px 10px;border-radius:15px;font-size:10px;font-weight:600;border:1.5px solid #94a3b8;cursor:pointer;background:'+(a?'#64748b':'transparent')+';color:'+(a?'#fff':'#64748b')+'">'+v+'</button>';
   }).join('')
-  +'<input id="ns-search" type="text" placeholder="대학·학과 검색..." oninput="ns_renderResult()" style="margin-left:auto;font-size:11px;border:1px solid #fca5a5;border-radius:8px;padding:4px 10px;width:140px">'
+  +'<input id="ns-search" type="text" placeholder="대학명 검색..." oninput="ns_renderResult()" style="margin-left:auto;font-size:11px;border:1px solid #fca5a5;border-radius:8px;padding:4px 10px;width:110px">'
+  +'<input id="ns-search-dept" type="text" placeholder="학과명 검색..." oninput="ns_renderResult()" style="font-size:11px;border:1px solid #fca5a5;border-radius:8px;padding:4px 10px;width:110px">'
   +'</div>'
 
   // ── 결과 테이블 ──
-  +'<div style="overflow-x:auto;max-height:600px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
+  +'<div style="overflow-x:auto;max-height:600px;overflow-y:auto;overflow-anchor:none"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
   +'<thead><tr style="background:#991b1b"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:11px;text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집단위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집인원</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">경쟁률(26)</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술유형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">시험시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">출제유형/범위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술반영</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술시험일/시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">지원경향 <span id="ns-result-count" style="font-size:9px;font-weight:400">(0개)</span></th></tr></thead>'
   +'<tbody id="ns-result-tbody"><tr><td colspan="13" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">✏</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
 
@@ -34707,6 +34714,7 @@ function jh_getFiltered(){
     '강원대':'강원대학교','단국대':'단국대학교','한림대':'한림대학교',
     '서울과기대':'서울과학기술대학교','명지대':'명지대학교'};
   var _qR=(_alias[q]||q).toLowerCase();
+  var dq=((document.getElementById('jh-search-dept')||{}).value||'').toLowerCase().trim();
   return jh_lastResults.filter(function(r){
     if(mf&&r.major!==mf)return false;
     if(jh_selectedChance.size>0&&!jh_selectedChance.has(r.chance))return false;
@@ -34716,7 +34724,8 @@ function jh_getFiltered(){
     if(jh_selectedInterview==='없음'&&(r.interview==='있음'))return false;
     if(jh_selectedInterview==='있음'&&(r.interview!=='있음'))return false;
     if(jh_selectedRegions.size>0&&!jh_selectedRegions.has(jh_getRegion(r.univ)))return false;
-    if(q&&!r.univ.toLowerCase().includes(_qR)&&!r.univ.toLowerCase().includes(q)&&!r.dept.toLowerCase().includes(q))return false;
+    if(q&&!r.univ.toLowerCase().includes(_qR)&&!r.univ.toLowerCase().includes(q))return false;
+    if(dq&&!r.dept.toLowerCase().includes(dq))return false;
     return true;
   });
 }
@@ -34774,12 +34783,13 @@ function renderJonghap(s){
     +'<span style="width:1px;height:14px;background:#e2e8f0"></span><span style="font-size:10px;font-weight:700;color:#64748b">면접</span>'+['all','없음','있음'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhfi="'+v+'" onclick="jh_setIntFilter(\''+v+'\',this)">'+(v==='all'?'전체':v==='없음'?'없음':'있음')+'</button>';}).join('')
     +'<span style="width:1px;height:14px;background:#e2e8f0"></span><span style="font-size:10px;font-weight:700;color:#64748b">지역</span>'+['all','서울','수도권','지방국립','지방사립'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhfr="'+v+'" onclick="jh_setRegionFilter(\''+v+'\',this)">'+(v==='all'?'전체':v)+'</button>';}).join('')
     +'<span style="width:1px;height:14px;background:#e2e8f0"></span>'
-    +'<input id="jh-search" type="text" placeholder="대학/학과 검색 (예: 한국외대)" oninput="jh_renderResult()" style="padding:4px 9px;border:1.5px solid #e2e8f0;border-radius:14px;font-size:11px;width:120px">'
+    +'<input id="jh-search" type="text" placeholder="대학명 검색 (예: 한국외대)" oninput="jh_renderResult()" style="padding:4px 9px;border:1.5px solid #e2e8f0;border-radius:14px;font-size:11px;width:110px">'
+    +'<input id="jh-search-dept" type="text" placeholder="학과명 검색" oninput="jh_renderResult()" style="padding:4px 9px;border:1.5px solid #e2e8f0;border-radius:14px;font-size:11px;width:100px">'
     +'<button onclick="jh_openDbModal()" style="margin-left:auto;background:#f5f3ff;color:#7c3aed;border:1.5px solid #c4b5fd;border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">+ 대학 관리</button>'
   +'</div>'
   +'<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">'
     +'<div style="padding:11px 16px;border-bottom:1px solid #e8eaf6;display:flex;align-items:center;gap:8px"><span style="font-size:14px">🎯</span><span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span><span id="jh-result-count" style="font-size:11px;color:#94a3b8"></span></div>'
-    +'<div style="overflow-x:auto;overflow-y:auto;min-height:400px"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px"><thead><tr style="background:#4c1d95;position:sticky;top:0;z-index:2"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">학과</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">모집</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">면접</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">선발방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">서류핵심요소</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">50%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">70%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">내신</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">대비</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;text-align:center">지원경향</th></tr></thead><tbody id="jh-result-tbody"><tr><td colspan="14" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">📚</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
+    +'<div style="overflow-x:auto;overflow-y:auto;min-height:400px;overflow-anchor:none"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px"><thead><tr style="background:#4c1d95;position:sticky;top:0;z-index:2"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">학과</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">모집</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">면접</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">선발방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">서류핵심요소</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">50%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">70%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">내신</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">대비</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;text-align:center">지원경향</th></tr></thead><tbody id="jh-result-tbody"><tr><td colspan="14" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">📚</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
   +'</div>'
   +'</div>'
   +'</div>'
