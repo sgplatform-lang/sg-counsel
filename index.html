@@ -3104,7 +3104,13 @@ function _renderGradeModal(sid){
           style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">
           + 과목 추가
         </button>
+        <button id="sg-saenggibu-btn" onclick="SG_openSaenggibuUpload(${sid})"
+          style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:7px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px">
+          📄 생기부 업로드로 자동 채우기
+        </button>
+        <input type="file" id="sg-saenggibu-file" accept="application/pdf" style="display:none" onchange="SG_handleSaenggibuFile(${sid},this)">
       </div>
+      <div id="sg-saenggibu-status" style="display:none;margin-bottom:10px;font-size:11px;padding:8px 12px;border-radius:8px"></div>
 
       <div style="overflow-x:auto;margin-bottom:16px" id="grade-table-wrap">
         <table class="tbl" style="min-width:380px" id="grade-detail-table">
@@ -3176,7 +3182,247 @@ window._removeExtraSubj = function(sid, extraIdx){
   _renderGradeModal(sid);
 };
 
+
+// ══════════════════════════════════════════════════
+// 생기부(학교생활기록부) PDF 업로드 → 교과학습발달상황 자동 파싱 → 성적입력 자동 채우기
+// ══════════════════════════════════════════════════
+function SG_openSaenggibuUpload(sid){
+  var inp=document.getElementById('sg-saenggibu-file');
+  if(inp) inp.click();
+}
+
+function SG_loadPdfJs(cb){
+  if(window.pdfjsLib){ cb(); return; }
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload=function(){
+    try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+    cb();
+  };
+  s.onerror=function(){ SG_saenggibuStatus('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.','#dc2626','#fef2f2'); };
+  document.head.appendChild(s);
+}
+
+function SG_saenggibuStatus(msg,color,bg){
+  var el=document.getElementById('sg-saenggibu-status');
+  if(!el) return;
+  el.style.display='block';
+  el.style.color=color||'#0f9d58';
+  el.style.background=bg||'#f0fdf4';
+  el.style.border='1px solid '+(color||'#0f9d58')+'40';
+  el.textContent=msg;
+}
+
+// PDF → 페이지별 텍스트를 y좌표 기준으로 행(row) 묶음으로 재구성
+function SG_extractPdfRows(arrayBuffer){
+  return window.pdfjsLib.getDocument({data:arrayBuffer}).promise.then(function(pdf){
+    var pagePromises=[];
+    for(var p=1;p<=pdf.numPages;p++){
+      pagePromises.push((function(pnum){
+        return pdf.getPage(pnum).then(function(page){
+          return page.getTextContent().then(function(tc){
+            var items=tc.items.map(function(it){return {str:it.str,x:it.transform[4],y:Math.round(it.transform[5])};}).filter(function(it){return it.str&&it.str.trim();});
+            items.sort(function(a,b){return b.y-a.y||a.x-b.x;});
+            var rows=[],curY=null,curRow=[];
+            items.forEach(function(it){
+              if(curY===null||Math.abs(it.y-curY)>3){
+                if(curRow.length) rows.push(curRow);
+                curRow=[it]; curY=it.y;
+              } else { curRow.push(it); }
+            });
+            if(curRow.length) rows.push(curRow);
+            return rows.map(function(r){return r.sort(function(a,b){return a.x-b.x;}).map(function(it){return it.str;}).join(' ');});
+          });
+        });
+      })(p));
+    }
+    return Promise.all(pagePromises).then(function(pagesRows){ return [].concat.apply([],pagesRows); });
+  });
+}
+
+// 교과학습발달상황 표 행 파서 (학기 추적 + 교과/과목/학점수/원점수/성취도/석차등급 분리)
+function SG_parseSaenggibuRows(rowTexts){
+  var results=[];
+  var curSem=null;
+  var scoreRe=/(\d{1,3})\s*\/\s*(\d{1,3}(?:\.\d+)?)\s*\(\s*(\d{1,3}(?:\.\d+)?)\s*\)/;
+  var achRe=/\b([A-E])\s*\(\s*(\d{1,4})\s*\)/;
+  var COMPOUND_KYOGWA=[
+    /^기술[・·]가정\s*\/\s*제2외국어\s*\/\s*한문\s*\/\s*교양/,
+    /^사회\s*\([^)]*\)/
+  ];
+  var SIMPLE_KYOGWA=['국어','수학','영어','한국사','과학','사회','도덕','체육','예술','미술','음악'];
+
+  function splitKyogwa(head){
+    for(var i=0;i<COMPOUND_KYOGWA.length;i++){
+      var m=head.match(COMPOUND_KYOGWA[i]);
+      if(m) return {kyogwa:m[0].replace(/\s+/g,''),rest:head.slice(m[0].length).trim()};
+    }
+    for(var j=0;j<SIMPLE_KYOGWA.length;j++){
+      var k=SIMPLE_KYOGWA[j];
+      if(head.indexOf(k)===0) return {kyogwa:k,rest:head.slice(k.length).trim()};
+    }
+    return {kyogwa:head,rest:''};
+  }
+
+  rowTexts.forEach(function(raw){
+    var line=raw.replace(/\s+/g,' ').trim();
+    if(!line) return;
+    if(line.indexOf('이수학점')>=0||line.indexOf('합계')>=0) return;
+    if(/^학기\s*교과\s*과목/.test(line)) return;
+
+    var m=line.match(/^([1-3])\s+(.+)$/);
+    if(m&&/[가-힣]/.test(m[2].slice(0,4))){
+      curSem=m[1];
+      line=m[2].trim();
+    }
+    if(curSem===null) return;
+
+    // P/Fail 과목 (예: 진로와 직업)
+    var pfM=line.match(/^(.*?)(\d{1,2})\s+P\s+P\s*$/);
+    if(pfM){
+      var sp=splitKyogwa(pfM[1].trim());
+      var gwamokP=sp.rest||sp.kyogwa;
+      results.push({sem:curSem,kyogwa:sp.kyogwa,gwamok:gwamokP,credit:+pfM[2],raw:null,rank:'P'});
+      return;
+    }
+
+    var scoreM=line.match(scoreRe);
+    var achM=line.match(achRe);
+    if(!scoreM) return;
+
+    var head=line.slice(0,scoreM.index).trim();
+    var credit=null;
+    var hm=head.match(/^(.*\S)\s+([1-8])$/);
+    if(hm){ head=hm[1].trim(); credit=+hm[2]; }
+    else{
+      var hm2=head.match(/^(.*\D)([1-8])$/);
+      if(hm2){ head=hm2[1].trim(); credit=+hm2[2]; }
+    }
+
+    var sp2=splitKyogwa(head);
+    var gwamok=sp2.rest||sp2.kyogwa;
+
+    var rank=null;
+    if(achM){
+      var tail=line.slice(achM.index+achM[0].length).trim();
+      var rm=tail.match(/^([1-9])\b/);
+      if(rm) rank=rm[1];
+    }
+
+    results.push({sem:curSem,kyogwa:sp2.kyogwa,gwamok:gwamok,credit:credit,raw:+scoreM[1],rank:rank});
+  });
+  return results;
+}
+
+// 파싱 결과 → 학년/학기(SEMS 인덱스) 매핑 + 성적입력 폼에 자동 채우기
+function SG_handleSaenggibuFile(sid,inputEl){
+  var file=inputEl.files&&inputEl.files[0];
+  if(!file) return;
+  SG_saenggibuStatus('📄 PDF를 분석하고 있습니다...','#0f9d58','#f0fdf4');
+  SG_loadPdfJs(function(){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      SG_extractPdfRows(e.target.result).then(function(rows){
+        var parsed=SG_parseSaenggibuRows(rows);
+        if(!parsed.length){
+          SG_saenggibuStatus('⚠️ 교과학습발달상황 표를 인식하지 못했습니다. PDF 형식이 예상과 다를 수 있습니다. 수동으로 입력해주세요.','#dc2626','#fef2f2');
+          return;
+        }
+        SG_applyParsedGrades(sid,parsed);
+      }).catch(function(err){
+        console.error(err);
+        SG_saenggibuStatus('⚠️ PDF 처리 중 오류가 발생했습니다: '+(err&&err.message||err),'#dc2626','#fef2f2');
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  });
+  inputEl.value='';
+}
+
+function SG_applyParsedGrades(sid,parsed){
+  var s=ST.students.find(function(x){return String(x.id)===String(sid);});
+  if(!s) return;
+  var SGRADE_SUBJS=getStudentGradeSubjs(s);
+
+  // 학기 "1","2" 반복 패턴에서 학년을 자동 추적 (1→2 다음 다시 1이 나오면 학년+1)
+  var year=1, lastSem=0;
+  var CORE_MAP={'국어':'korean','수학':'math','영어':'english'};
+  var coreFilled={}; // key: coreKey+'_'+semKey
+  var extraData={};  // label -> {semKey:{grade,raw}}
+  var semSet={};
+
+  parsed.forEach(function(row){
+    var semNum=+row.sem;
+    if(semNum!==lastSem){
+      if(semNum<lastSem) year++;
+      lastSem=semNum;
+    }
+    var semKey = semNum===1 ? (year-1)*2+1 : (year-1)*2+2;
+    var semLabel = SEMS[semKey-1];
+    if(!semLabel) return; // 3-2 등 범위 밖은 skip
+    semSet[semLabel]=true;
+
+    if(row.rank==='P'||row.rank===null) return; // 등급 없는(P/Fail 등) 행은 채우지 않음
+    var gradeNum=+row.rank;
+    if(isNaN(gradeNum)) return;
+
+    var coreKey=null;
+    if(CORE_MAP[row.kyogwa]) coreKey=CORE_MAP[row.kyogwa];
+    else if(row.kyogwa.indexOf('사회')===0) coreKey='social';
+    else if(row.kyogwa==='과학') coreKey='science';
+
+    if(coreKey){
+      var fk=coreKey+'_'+semLabel;
+      if(!coreFilled[fk]){
+        coreFilled[fk]={grade:gradeNum,raw:row.raw,sem:semLabel,key:coreKey};
+        return;
+      }
+      // 이미 해당 학기 core가 채워졌으면(같은 교과 내 2번째 과목) 추가과목으로
+    }
+    var label=row.gwamok||row.kyogwa;
+    if(!extraData[label]) extraData[label]={};
+    extraData[label][semLabel]={grade:gradeNum,raw:row.raw};
+  });
+
+  // extraSubjs 병합 (기존 목록과 중복 방지)
+  var newLabels=Object.keys(extraData).filter(function(lb){ return _gradeExtraSubjs.indexOf(lb)===-1; });
+  _gradeExtraSubjs=_gradeExtraSubjs.concat(newLabels);
+
+  _renderGradeModal(sid);
+
+  setTimeout(function(){
+    var filledCount=0, semCount=Object.keys(semSet).length;
+    // core 채우기
+    SGRADE_SUBJS.forEach(function(pair,idx){
+      var key=pair[0];
+      Object.keys(coreFilled).forEach(function(fk){
+        var cf=coreFilled[fk];
+        if(cf.key!==key) return;
+        var ge=document.getElementById('gd_'+idx+'_'+cf.sem+'_grade');
+        var re=document.getElementById('gd_'+idx+'_'+cf.sem+'_raw');
+        if(ge){ ge.value=cf.grade; filledCount++; }
+        if(re&&cf.raw!==null&&cf.raw!==undefined){ re.value=cf.raw; }
+      });
+    });
+    // extra 채우기
+    var allSubjs=SGRADE_SUBJS.map(function(p){return p[1];}).concat(_gradeExtraSubjs);
+    allSubjs.forEach(function(lb,idx){
+      if(idx<SGRADE_SUBJS.length) return;
+      var data=extraData[lb];
+      if(!data) return;
+      Object.keys(data).forEach(function(sem){
+        var ge=document.getElementById('gd_'+idx+'_'+sem+'_grade');
+        var re=document.getElementById('gd_'+idx+'_'+sem+'_raw');
+        if(ge){ ge.value=data[sem].grade; filledCount++; }
+        if(re&&data[sem].raw!==null&&data[sem].raw!==undefined){ re.value=data[sem].raw; }
+      });
+    });
+    SG_saenggibuStatus('✅ '+semCount+'개 학기, '+filledCount+'개 과목 데이터를 채웠습니다. 아래 표를 확인한 후 [💾 저장]을 눌러주세요. (P/Fail 과목·수능최저 무관 교양과목은 자동 입력에서 제외됨)','#0f9d58','#f0fdf4');
+  },80);
+}
+
 function saveGradeForm(sid){
+
   const s = ST.students.find(x=>String(x.id)===String(sid)); if(!s) return;
   const SGRADE_SUBJS = getStudentGradeSubjs(s); // 학생별 커스텀 과목명 (s 선언 후 사용)
 
@@ -20603,6 +20849,25 @@ let gg_lastResults = [];
 
 // ══ SG_crossPick: 교과분석/종합분석/논술분석 체크 자료를 탭 간 누적하여 통합 인쇄 ══
 let SG_crossPick = {gyogwa:{}, jonghap:{}, nulsul:{}};
+let SG_activeStudentId = null;
+let SG_pickStore = {}, SG_pickStoreLoaded = false;
+const SG_PICK_SK = 'sg_cross_pick_v1';
+function SG_loadAllPicks(){
+  if(SG_pickStoreLoaded) return;
+  var d = dbL(SG_PICK_SK);
+  SG_pickStore = (d && typeof d==='object') ? d : {};
+  SG_pickStoreLoaded = true;
+}
+function SG_savePicks(){ dbS(SG_PICK_SK, SG_pickStore); }
+function SG_switchStudentPicks(sid){
+  var sidStr = String(sid);
+  if(SG_activeStudentId === sidStr){ SG_crossPick = SG_pickStore[sidStr] || (SG_pickStore[sidStr]={gyogwa:{},jonghap:{},nulsul:{}}); return; }
+  SG_loadAllPicks();
+  SG_activeStudentId = sidStr;
+  if(!SG_pickStore[sidStr]) SG_pickStore[sidStr] = {gyogwa:{},jonghap:{},nulsul:{}};
+  SG_crossPick = SG_pickStore[sidStr];
+  SG_updatePickBadge();
+}
 function SG_pickCount(){ return Object.keys(SG_crossPick.gyogwa).length+Object.keys(SG_crossPick.jonghap).length+Object.keys(SG_crossPick.nulsul).length; }
 function SG_updatePickBadge(){
   var b=document.getElementById('sg-pick-badge'); if(b) b.textContent=SG_pickCount();
@@ -20616,26 +20881,28 @@ function SG_toggleGG(id){
   if(!r) return;
   var key='gg_'+id;
   if(SG_crossPick.gyogwa[key]) delete SG_crossPick.gyogwa[key]; else SG_crossPick.gyogwa[key]=r;
-  SG_updatePickBadge(); gg_renderResult();
+  SG_savePicks(); SG_updatePickBadge();
 }
 function SG_toggleJH(id){
   var r=jh_lastResults.find(function(x){return String(x.id)===String(id);});
   if(!r) return;
   var key='jh_'+id;
   if(SG_crossPick.jonghap[key]) delete SG_crossPick.jonghap[key]; else SG_crossPick.jonghap[key]=r;
-  SG_updatePickBadge(); jh_renderResult();
+  SG_savePicks(); SG_updatePickBadge();
 }
 function SG_toggleNS(id){
   var r=ns_lastResults.find(function(x){return String(x.id)===String(id);});
   if(!r) return;
   var key='ns_'+id;
   if(SG_crossPick.nulsul[key]) delete SG_crossPick.nulsul[key]; else SG_crossPick.nulsul[key]=r;
-  SG_updatePickBadge(); ns_renderResult();
+  SG_savePicks(); SG_updatePickBadge();
 }
 function SG_clearPicks(){
   if(!SG_pickCount()) return;
   if(!confirm('선택한 모든 자료('+SG_pickCount()+'건)를 초기화하시겠습니까?')) return;
   SG_crossPick={gyogwa:{},jonghap:{},nulsul:{}};
+  if(SG_activeStudentId) SG_pickStore[SG_activeStudentId]=SG_crossPick;
+  SG_savePicks();
   SG_updatePickBadge();
   if(typeof gg_renderResult==='function') gg_renderResult();
   if(typeof jh_renderResult==='function') jh_renderResult();
@@ -20956,6 +21223,7 @@ function gg_updateAvgDisplay(){
 }
 
 function renderGyogwa(s){
+  SG_switchStudentPicks(s.id);
   if(gg_currentStudentId!==String(s.id)){
     gg_currentStudentId=String(s.id);
     gg_grades={};
@@ -28723,6 +28991,7 @@ function cbrConfirmApply(){
 }
 
 function renderNulsul(s) {
+  SG_switchStudentPicks(s.id);
   if (ns_currentStudentId !== String(s.id)) {
     ns_currentStudentId = String(s.id);
     ns_grades = {};
@@ -34477,6 +34746,7 @@ function jh_exportXls(sid){var s=ST.students.find(function(x){return String(x.id
 function jh_loadStudentGrades(s){jh_grades={};if(!s||!s.subjects)return;var sub=s.subjects;var km={korean:'국어',math:'수학',english:'영어',history:'한국사',social:'사회',science:'과학'};Object.keys(km).forEach(function(sk){var jk=km[sk];var sv=sub[sk];if(!sv)return;jh_grades[jk]={s1:String(sv.s1||sv.grade||''),s2:String(sv.s2||''),credit:sv.credit||(JH_SUBJECTS.find(function(x){return x.key===jk;})||{credit:3}).credit};});}
 
 function renderJonghap(s){
+  SG_switchStudentPicks(s.id);
   if(jh_currentStudentId!==String(s.id)){jh_currentStudentId=String(s.id);jh_grades={};jh_quickMode={active:false,all:0,five:0,sci:0,hum:0};jh_lastResults=[];jh_selectedChance.clear();jh_selectedTypes.clear();jh_selectedRegions.clear();jh_selectedCsat='all';jh_selectedInterview='all';jh_loadStudentGrades(s);}
   setTimeout(function(){if(jh_lastResults.length){jh_renderResult();jh_updateStats();}jh_updateAvg();},50);
   var gr='';
