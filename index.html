@@ -16943,7 +16943,7 @@ let UNIV_DB = [
   {id:62, univ:'경희대학교(국제)',dept:'경영학과',         type:'지역균형',  recruit:'25명', comp24:'6.5:1', comp25:'6.7:1', comp26:'6.8:1',  fill:'158', csat:'없음',          method:'이수단위 가중', cut50:2.45, cut70:2.68, major:'상경',    calcMode:'weighted'},
   // ── 지방 거점 국립대 ──  {id:74, univ:'부산대학교',   dept:'의예과',             type:'지역균형',  recruit:'10명', comp24:'17.8:1',comp25:'18.2:1',comp26:'18.5:1', fill:'50',  csat:'3합5(과탐)',    method:'이수단위 가중', cut50:1.12, cut70:1.20, major:'의약학',  calcMode:'weighted'},  {id:78, univ:'전남대학교',   dept:'의예과',             type:'지역균형',  recruit:'10명', comp24:'15.5:1',comp25:'15.8:1',comp26:'16.2:1', fill:'58',  csat:'3합5(과탐)',    method:'이수단위 가중', cut50:1.18, cut70:1.28, major:'의약학',  calcMode:'weighted'},
   {id:79, univ:'전남대학교',   dept:'치과대학',           type:'지역균형',  recruit:'8명',  comp24:'10.8:1',comp25:'11.2:1',comp26:'11.5:1', fill:'70',  csat:'3합7(탐구1)',   method:'이수단위 가중', cut50:1.38, cut70:1.52, major:'의약학',  calcMode:'weighted'},
-  {id:80, univ:'전북대학교',   dept:'의예과',             type:'지역균형',  recruit:'8명',  comp24:'15.2:1',comp25:'15.5:1',comp26:'15.8:1', fill:'60',  csat:'3합5(과탐)',    method:'이수단위 가중', cut50:1.20, cut70:1.30, major:'의약학',  calcMode:'weighted'},
+  // (기존 전북대학교 의예과 임시데이터 id:80 → 아래 검증된 2027모집요강+2026실입결 데이터로 대체됨, 제거)
   // ── 충남대학교 (학생부교과 일반전형 / 2027모집요강+2026실입결) ──
   // 수능최저: 인문·사회과학·경상·생활과학·간호·사범(공학교육계열·기술교육) 등 → 상위3개 합12
   //           자연(수학·정보통계 외)·공과·AI대학 → 국영수과탐(1) 상위3개 합12
@@ -20509,12 +20509,153 @@ let UNIV_DB = [
   {id:991400,univ:'전남대학교',dept:'빅데이터융합학과',type:'지역인재전형[교과]',recruit:'15명',comp24:'',comp25:'',comp26:'13.47:1',fill:'11',csat:'없음',method:'학생부교과100%',cut50:3.41,cut70:3.56,score50:0,score70:0,note:'',major:'자연·공학',calcMode:'weighted'},
   {id:991401,univ:'전남대학교',dept:'자율전공학부(4년)',type:'지역인재전형[교과]',recruit:'11명',comp24:'',comp25:'',comp26:'6.78:1',fill:'16',csat:'없음',method:'학생부교과100%',cut50:3.2,cut70:3.22,score50:0,score70:0,note:'',major:'인문·사회',calcMode:'weighted'},
   {id:991402,univ:'전남대학교',dept:'자율전공학부(1년)',type:'지역인재전형[교과]',recruit:'24명',comp24:'',comp25:'',comp26:'6.63:1',fill:'27',csat:'없음',method:'학생부교과100%',cut50:2.53,cut70:2.63,score50:0,score70:0,note:'',major:'인문·사회',calcMode:'weighted'},
+  // ══ 전북대학교 2027학년도 학생부교과(일반학생전형/지역인재1유형-호남권/지역인재2유형-전북권) — 2027모집요강+2026실입결 반영, DB신규구축(기존 id:80 임시데이터 대체) ══
+  // recruit는 2027모집요강 모집단위별모집인원표 직접판독(열합계 검증: 일반학생 1419명/지역인재1유형 701명/지역인재2유형 124명 = 공식 합계행과 일치)
+  // 전형방법: 학생부(교과)100%(1,000점) 일괄합산 / 수능최저학력기준 전형유형별·모집단위별 적용(농어촌학생전형만 미적용)
+  {id:140001,univ:'전북대학교',dept:'이차전지공학과',type:'일반학생전형',recruit:'14명',comp24:'',comp25:'',comp26:'7.5:1',fill:'5',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:4.04,cut70:4.11,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140002,univ:'전북대학교',dept:'국어국문학과',type:'일반학생전형',recruit:'9명',comp24:'',comp25:'',comp26:'6.9:1',fill:'20',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.48,cut70:3.78,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140003,univ:'전북대학교',dept:'독일학과',type:'일반학생전형',recruit:'10명',comp24:'',comp25:'',comp26:'11.7:1',fill:'2',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.69,cut70:3.71,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140004,univ:'전북대학교',dept:'사학과',type:'일반학생전형',recruit:'12명',comp24:'',comp25:'',comp26:'5.8:1',fill:'20',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.5,cut70:3.55,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140005,univ:'전북대학교',dept:'고고문화인류학과',type:'일반학생전형',recruit:'10명',comp24:'',comp25:'',comp26:'7.4:1',fill:'18',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.53,cut70:3.54,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140006,univ:'전북대학교',dept:'문헌정보학과',type:'일반학생전형',recruit:'13명',comp24:'',comp25:'',comp26:'6.6:1',fill:'26',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.15,cut70:3.23,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140007,univ:'전북대학교',dept:'스페인·중남미학과',type:'일반학생전형',recruit:'9명',comp24:'',comp25:'',comp26:'6.3:1',fill:'10',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.64,cut70:3.68,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140008,univ:'전북대학교',dept:'영어영문학과',type:'일반학생전형',recruit:'12명',comp24:'',comp25:'',comp26:'5.5:1',fill:'21',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.3,cut70:3.35,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140009,univ:'전북대학교',dept:'중어중문학과',type:'일반학생전형',recruit:'11명',comp24:'',comp25:'',comp26:'8.2:1',fill:'16',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.6,cut70:3.67,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140010,univ:'전북대학교',dept:'국제이공학부',type:'일반학생전형',recruit:'2명',comp24:'',comp25:'',comp26:'8.5:1',fill:'0',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'자연·공학',calcMode:'weighted'},
+  {id:140011,univ:'전북대학교',dept:'프랑스·아프리카학과',type:'일반학생전형',recruit:'11명',comp24:'',comp25:'',comp26:'7.0:1',fill:'7',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.7,cut70:3.86,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140012,univ:'전북대학교',dept:'농업생명과학계열',type:'일반학생전형',recruit:'149명',comp24:'',comp25:'',comp26:'6.0:1',fill:'135',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.66,cut70:3.77,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 141명→2027 149명',major:'자연·공학',calcMode:'weighted'},
+  {id:140013,univ:'전북대학교',dept:'환경생명자원계열',type:'일반학생전형',recruit:'33명',comp24:'',comp25:'',comp26:'9.3:1',fill:'16',csat:'2개영역 합8',method:'학생부교과100%',cut50:4.42,cut70:4.5,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 31명→2027 33명',major:'자연·공학',calcMode:'weighted'},
+  {id:140014,univ:'전북대학교',dept:'융합자율전공학부1(전주캠퍼스)',type:'일반학생전형',recruit:'52명',comp24:'',comp25:'',comp26:'10.8:1',fill:'45',csat:'2개영역 합7',method:'학생부교과100%',cut50:3.44,cut70:3.47,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 50명→2027 52명',major:'인문·자연 통합',calcMode:'weighted'},
+  {id:140015,univ:'전북대학교',dept:'융합자율전공학부2(특성화캠퍼스)',type:'일반학생전형',recruit:'9명',comp24:'',comp25:'',comp26:'23.1:1',fill:'5',csat:'2개영역 합7',method:'학생부교과100%',cut50:4.0,cut70:4.09,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·자연 통합',calcMode:'weighted'},
+  {id:140016,univ:'전북대학교',dept:'자연과학계열2',type:'일반학생전형',recruit:'74명',comp24:'',comp25:'',comp26:'8.6:1',fill:'39',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.88,cut70:3.96,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 71명→2027 74명',major:'자연·공학',calcMode:'weighted'},
+  {id:140017,univ:'전북대학교',dept:'공학계열1',type:'일반학생전형',recruit:'294명',comp24:'',comp25:'',comp26:'4.1:1',fill:'366',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.37,cut70:3.49,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 278명→2027 294명',major:'자연·공학',calcMode:'weighted'},
+  {id:140018,univ:'전북대학교',dept:'자연과학계열1',type:'일반학생전형',recruit:'73명',comp24:'',comp25:'',comp26:'4.7:1',fill:'75',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.53,cut70:3.61,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 70명→2027 73명',major:'자연·공학',calcMode:'weighted'},
+  {id:140019,univ:'전북대학교',dept:'공학계열2',type:'일반학생전형',recruit:'244명',comp24:'',comp25:'',comp26:'4.5:1',fill:'232',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.57,cut70:3.66,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 241명→2027 244명',major:'자연·공학',calcMode:'weighted'},
+  {id:140020,univ:'전북대학교',dept:'첨단방위산업학과',type:'일반학생전형',recruit:'8명',comp24:'',comp25:'',comp26:'7.0:1',fill:'4',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.15,cut70:3.58,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140021,univ:'전북대학교',dept:'사회과교육계열',type:'일반학생전형',recruit:'17명',comp24:'',comp25:'',comp26:'7.0:1',fill:'55',csat:'2개영역 합8',method:'학생부교과100%',cut50:2.64,cut70:2.78,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 16명→2027 17명',major:'교육',calcMode:'weighted'},
+  {id:140022,univ:'전북대학교',dept:'철학과',type:'일반학생전형',recruit:'10명',comp24:'',comp25:'',comp26:'13.0:1',fill:'14',csat:'없음',method:'학생부교과100%',cut50:3.53,cut70:3.61,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140023,univ:'전북대학교',dept:'수의예과',type:'일반학생전형',recruit:'10명',comp24:'',comp25:'',comp26:'11.1:1',fill:'26',csat:'수학포함 3개영역 합7',method:'학생부교과100%',cut50:1.16,cut70:1.19,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140024,univ:'전북대학교',dept:'생활과학계열',type:'일반학생전형',recruit:'42명',comp24:'',comp25:'',comp26:'7.2:1',fill:'59',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.52,cut70:3.59,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 40명→2027 42명',major:'자연·공학',calcMode:'weighted'},
+  {id:140025,univ:'전북대학교',dept:'약학과',type:'일반학생전형',recruit:'5명',comp24:'',comp25:'',comp26:'12.3:1',fill:'4',csat:'수학포함 3개영역 합7',method:'학생부교과100%',cut50:1.04,cut70:1.04,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 4명→2027 5명',major:'의약학',calcMode:'weighted'},
+  {id:140026,univ:'전북대학교',dept:'간호학과',type:'일반학생전형',recruit:'13명',comp24:'',comp25:'',comp26:'11.3:1',fill:'14',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.12,cut70:2.23,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 10명→2027 13명',major:'의약학',calcMode:'weighted'},
+  {id:140027,univ:'전북대학교',dept:'치의예과',type:'일반학생전형',recruit:'3명',comp24:'',comp25:'',comp26:'15.3:1',fill:'7',csat:'수학포함 3개영역 합6',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'의약학',calcMode:'weighted'},
+  {id:140028,univ:'전북대학교',dept:'의예과',type:'일반학생전형',recruit:'21명',comp24:'',comp25:'',comp26:'18.7:1',fill:'12',csat:'수학포함 4개영역 합5(일반학생)',method:'학생부교과100%',cut50:1.21,cut70:1.24,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 19명→2027 21명',major:'의약학',calcMode:'weighted'},
+  {id:140029,univ:'전북대학교',dept:'스마트팜학과',type:'일반학생전형',recruit:'15명',comp24:'',comp25:'',comp26:'10.5:1',fill:'14',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.5,cut70:3.61,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 14명→2027 15명',major:'자연·공학',calcMode:'weighted'},
+  {id:140030,univ:'전북대학교',dept:'경상계열',type:'일반학생전형',recruit:'111명',comp24:'',comp25:'',comp26:'4.8:1',fill:'140',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.26,cut70:3.45,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 105명→2027 111명',major:'상경',calcMode:'weighted'},
+  {id:140031,univ:'전북대학교',dept:'일본학과',type:'일반학생전형',recruit:'13명',comp24:'',comp25:'',comp26:'7.8:1',fill:'20',csat:'없음',method:'학생부교과100%',cut50:3.43,cut70:3.51,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140032,univ:'전북대학교',dept:'수학교육과',type:'일반학생전형',recruit:'7명',comp24:'',comp25:'',comp26:'19.7:1',fill:'13',csat:'수학포함 2개영역 합7(수학 3등급이내 필수)',method:'학생부교과100%',cut50:2.72,cut70:2.92,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140033,univ:'전북대학교',dept:'과학교육학부',type:'일반학생전형',recruit:'17명',comp24:'',comp25:'',comp26:'6.1:1',fill:'37',csat:'수학·과학 포함 2개영역 합10(수학·과학만 반영, 필수응시)',method:'학생부교과100%',cut50:3.04,cut70:3.07,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 16명→2027 17명',major:'교육',calcMode:'weighted'},
+  {id:140034,univ:'전북대학교',dept:'영어교육과',type:'일반학생전형',recruit:'5명',comp24:'',comp25:'',comp26:'14.8:1',fill:'16',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.8,cut70:2.84,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140035,univ:'전북대학교',dept:'독어교육과',type:'일반학생전형',recruit:'3명',comp24:'',comp25:'',comp26:'9.3:1',fill:'4',csat:'2개영역 합8',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'교육',calcMode:'weighted'},
+  {id:140036,univ:'전북대학교',dept:'국어교육과',type:'일반학생전형',recruit:'5명',comp24:'',comp25:'',comp26:'9.4:1',fill:'8',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.72,cut70:3.04,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140037,univ:'전북대학교',dept:'교육학과',type:'일반학생전형',recruit:'4명',comp24:'',comp25:'',comp26:'24.0:1',fill:'7',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.11,cut70:3.11,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140038,univ:'전북대학교',dept:'사회과학계열',type:'일반학생전형',recruit:'68명',comp24:'',comp25:'',comp26:'5.2:1',fill:'90',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.23,cut70:3.38,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 64명→2027 68명',major:'인문·사회',calcMode:'weighted'},
+  {id:140039,univ:'전북대학교',dept:'국제학부',type:'일반학생전형',recruit:'1명',comp24:'',comp25:'',comp26:'14.0:1',fill:'0',csat:'2개영역 합8',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'인문·사회',calcMode:'weighted'},
+  {id:140040,univ:'전북대학교',dept:'국어국문학과',type:'지역인재1유형(호남권)[교과]',recruit:'9명',comp24:'',comp25:'',comp26:'5.8:1',fill:'13',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.45,cut70:3.55,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140041,univ:'전북대학교',dept:'독일학과',type:'지역인재1유형(호남권)[교과]',recruit:'7명',comp24:'',comp25:'',comp26:'9.4:1',fill:'4',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.72,cut70:3.83,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140042,univ:'전북대학교',dept:'사학과',type:'지역인재1유형(호남권)[교과]',recruit:'12명',comp24:'',comp25:'',comp26:'5.7:1',fill:'19',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.57,cut70:3.59,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140043,univ:'전북대학교',dept:'고고문화인류학과',type:'지역인재1유형(호남권)[교과]',recruit:'2명',comp24:'',comp25:'',comp26:'6.5:1',fill:'1',csat:'2개영역 합8',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'인문·사회',calcMode:'weighted'},
+  {id:140044,univ:'전북대학교',dept:'문헌정보학과',type:'지역인재1유형(호남권)[교과]',recruit:'6명',comp24:'',comp25:'',comp26:'13.0:1',fill:'11',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.05,cut70:3.25,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140045,univ:'전북대학교',dept:'스페인·중남미학과',type:'지역인재1유형(호남권)[교과]',recruit:'8명',comp24:'',comp25:'',comp26:'6.6:1',fill:'3',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.66,cut70:3.69,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140046,univ:'전북대학교',dept:'영어영문학과',type:'지역인재1유형(호남권)[교과]',recruit:'11명',comp24:'',comp25:'',comp26:'6.8:1',fill:'22',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.42,cut70:3.73,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140047,univ:'전북대학교',dept:'중어중문학과',type:'지역인재1유형(호남권)[교과]',recruit:'10명',comp24:'',comp25:'',comp26:'9.4:1',fill:'6',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.69,cut70:3.75,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140048,univ:'전북대학교',dept:'프랑스·아프리카학과',type:'지역인재1유형(호남권)[교과]',recruit:'6명',comp24:'',comp25:'',comp26:'8.0:1',fill:'3',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.93,cut70:4.06,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·사회',calcMode:'weighted'},
+  {id:140049,univ:'전북대학교',dept:'환경생명자원계열',type:'지역인재1유형(호남권)[교과]',recruit:'21명',comp24:'',comp25:'',comp26:'11.4:1',fill:'4',csat:'2개영역 합8',method:'학생부교과100%',cut50:4.58,cut70:4.61,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140050,univ:'전북대학교',dept:'융합자율전공학부1(전주캠퍼스)',type:'지역인재1유형(호남권)[교과]',recruit:'50명',comp24:'',comp25:'',comp26:'14.5:1',fill:'36',csat:'2개영역 합7',method:'학생부교과100%',cut50:3.51,cut70:3.57,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·자연 통합',calcMode:'weighted'},
+  {id:140051,univ:'전북대학교',dept:'융합자율전공학부2(특성화캠퍼스)',type:'지역인재1유형(호남권)[교과]',recruit:'9명',comp24:'',comp25:'',comp26:'24.2:1',fill:'0',csat:'2개영역 합7',method:'학생부교과100%',cut50:3.83,cut70:3.91,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'인문·자연 통합',calcMode:'weighted'},
+  {id:140052,univ:'전북대학교',dept:'자연과학계열2',type:'지역인재1유형(호남권)[교과]',recruit:'24명',comp24:'',comp25:'',comp26:'6.8:1',fill:'5',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.94,cut70:3.97,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 25명→2027 24명',major:'자연·공학',calcMode:'weighted'},
+  {id:140053,univ:'전북대학교',dept:'공학계열1',type:'지역인재1유형(호남권)[교과]',recruit:'184명',comp24:'',comp25:'',comp26:'4.2:1',fill:'202',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.33,cut70:3.43,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 186명→2027 184명',major:'자연·공학',calcMode:'weighted'},
+  {id:140054,univ:'전북대학교',dept:'자연과학계열1',type:'지역인재1유형(호남권)[교과]',recruit:'28명',comp24:'',comp25:'',comp26:'5.2:1',fill:'16',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.58,cut70:3.65,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 27명→2027 28명',major:'자연·공학',calcMode:'weighted'},
+  {id:140055,univ:'전북대학교',dept:'공학계열2',type:'지역인재1유형(호남권)[교과]',recruit:'72명',comp24:'',comp25:'',comp26:'4.7:1',fill:'36',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.54,cut70:3.67,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140056,univ:'전북대학교',dept:'첨단방위산업학과',type:'지역인재1유형(호남권)[교과]',recruit:'4명',comp24:'',comp25:'',comp26:'6.5:1',fill:'3',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.93,cut70:3.93,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140057,univ:'전북대학교',dept:'사회과교육계열',type:'지역인재1유형(호남권)[교과]',recruit:'4명',comp24:'',comp25:'',comp26:'10.3:1',fill:'7',csat:'2개영역 합8',method:'학생부교과100%',cut50:2.63,cut70:2.63,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140058,univ:'전북대학교',dept:'농업생명과학계열',type:'지역인재1유형(호남권)[교과]',recruit:'31명',comp24:'',comp25:'',comp26:'7.4:1',fill:'17',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.68,cut70:3.76,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140059,univ:'전북대학교',dept:'철학과',type:'지역인재1유형(호남권)[교과]',recruit:'7명',comp24:'',comp25:'',comp26:'6.5:1',fill:'1',csat:'없음',method:'학생부교과100%',cut50:3.6,cut70:3.66,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 8명→2027 7명',major:'인문·사회',calcMode:'weighted'},
+  {id:140060,univ:'전북대학교',dept:'수의예과',type:'지역인재1유형(호남권)[교과]',recruit:'5명',comp24:'',comp25:'',comp26:'15.4:1',fill:'20',csat:'수학포함 3개영역 합7',method:'학생부교과100%',cut50:1.23,cut70:1.23,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140061,univ:'전북대학교',dept:'생활과학계열',type:'지역인재1유형(호남권)[교과]',recruit:'10명',comp24:'',comp25:'',comp26:'6.0:1',fill:'17',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.94,cut70:4.05,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140062,univ:'전북대학교',dept:'약학과',type:'지역인재1유형(호남권)[교과]',recruit:'7명',comp24:'',comp25:'',comp26:'12.0:1',fill:'31',csat:'수학포함 3개영역 합7',method:'학생부교과100%',cut50:1.09,cut70:1.18,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140063,univ:'전북대학교',dept:'간호학과',type:'지역인재1유형(호남권)[교과]',recruit:'7명',comp24:'',comp25:'',comp26:'6.0:1',fill:'13',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.5,cut70:2.52,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140064,univ:'전북대학교',dept:'치의예과',type:'지역인재1유형(호남권)[교과]',recruit:'5명',comp24:'',comp25:'',comp26:'9.5:1',fill:'9',csat:'수학포함 3개영역 합6',method:'학생부교과100%',cut50:1.13,cut70:1.13,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 4명→2027 5명',major:'의약학',calcMode:'weighted'},
+  {id:140065,univ:'전북대학교',dept:'의예과',type:'지역인재1유형(호남권)[교과]',recruit:'14명',comp24:'',comp25:'',comp26:'10.2:1',fill:'5',csat:'수학포함 4개영역 합6',method:'학생부교과100%',cut50:1.23,cut70:1.27,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140066,univ:'전북대학교',dept:'스마트팜학과',type:'지역인재1유형(호남권)[교과]',recruit:'3명',comp24:'',comp25:'',comp26:'9.7:1',fill:'1',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'자연·공학',calcMode:'weighted'},
+  {id:140067,univ:'전북대학교',dept:'이차전지공학과',type:'지역인재1유형(호남권)[교과]',recruit:'6명',comp24:'',comp25:'',comp26:'6.8:1',fill:'1',csat:'수학포함 2개영역 합8(과탐1과목이상 응시시 1등급 하향적용)',method:'학생부교과100%',cut50:3.92,cut70:3.99,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'자연·공학',calcMode:'weighted'},
+  {id:140068,univ:'전북대학교',dept:'경상계열',type:'지역인재1유형(호남권)[교과]',recruit:'73명',comp24:'',comp25:'',comp26:'7.0:1',fill:'99',csat:'2개영역 합8',method:'학생부교과100%',cut50:3.3,cut70:3.36,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'상경',calcMode:'weighted'},
+  {id:140069,univ:'전북대학교',dept:'일본학과',type:'지역인재1유형(호남권)[교과]',recruit:'2명',comp24:'',comp25:'',comp26:'7.0:1',fill:'1',csat:'없음',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'인문·사회',calcMode:'weighted'},
+  {id:140070,univ:'전북대학교',dept:'수학교육과',type:'지역인재1유형(호남권)[교과]',recruit:'5명',comp24:'',comp25:'',comp26:'6.8:1',fill:'3',csat:'수학포함 2개영역 합7(수학 3등급이내 필수)',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 4명→2027 5명, 미제출(등록인원 3명 이하, 추가 안내자료 참고)',major:'교육',calcMode:'weighted'},
+  {id:140071,univ:'전북대학교',dept:'과학교육학부',type:'지역인재1유형(호남권)[교과]',recruit:'5명',comp24:'',comp25:'',comp26:'5.2:1',fill:'7',csat:'수학·과학 포함 2개영역 합10(수학·과학만 반영, 필수응시)',method:'학생부교과100%',cut50:2.72,cut70:3.08,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140072,univ:'전북대학교',dept:'영어교육과',type:'지역인재1유형(호남권)[교과]',recruit:'4명',comp24:'',comp25:'',comp26:'11.8:1',fill:'11',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.91,cut70:2.91,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140073,univ:'전북대학교',dept:'독어교육과',type:'지역인재1유형(호남권)[교과]',recruit:'2명',comp24:'',comp25:'',comp26:'9.0:1',fill:'0',csat:'2개영역 합8',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'교육',calcMode:'weighted'},
+  {id:140074,univ:'전북대학교',dept:'국어교육과',type:'지역인재1유형(호남권)[교과]',recruit:'4명',comp24:'',comp25:'',comp26:'9.8:1',fill:'11',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.53,cut70:2.53,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'교육',calcMode:'weighted'},
+  {id:140075,univ:'전북대학교',dept:'교육학과',type:'지역인재1유형(호남권)[교과]',recruit:'3명',comp24:'',comp25:'',comp26:'12.3:1',fill:'7',csat:'2개영역 합8',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',major:'교육',calcMode:'weighted'},
+  {id:140076,univ:'전북대학교',dept:'사회과학계열',type:'지역인재1유형(호남권)[교과]',recruit:'41명',comp24:'',comp25:'',comp26:'',fill:'',csat:'2개영역 합8',method:'학생부교과100%',cut50:0,cut70:0,score50:0,score70:0,note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',major:'인문·사회',calcMode:'weighted'},
+  // ── 지역인재2유형(전북권) ──
+  {id:140077,univ:'전북대학교',dept:'간호학과',type:'지역인재2유형(전북권)[교과]',recruit:'38명',comp24:'',comp25:'',comp26:'4.6:1',fill:'21',csat:'2개영역 합6',method:'학생부교과100%',cut50:2.27,cut70:2.41,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140078,univ:'전북대학교',dept:'수의예과',type:'지역인재2유형(전북권)[교과]',recruit:'15명',comp24:'',comp25:'',comp26:'8.2:1',fill:'7',csat:'수학포함 3개영역 합7',method:'학생부교과100%',cut50:1.42,cut70:1.46,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 17명→2027 15명',major:'의약학',calcMode:'weighted'},
+  {id:140079,univ:'전북대학교',dept:'약학과',type:'지역인재2유형(전북권)[교과]',recruit:'7명',comp24:'',comp25:'',comp26:'8.7:1',fill:'7',csat:'수학포함 3개영역 합7',method:'학생부교과100%',cut50:1.26,cut70:1.27,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
+  {id:140080,univ:'전북대학교',dept:'치의예과',type:'지역인재2유형(전북권)[교과]',recruit:'19명',comp24:'',comp25:'',comp26:'7.4:1',fill:'18',csat:'수학포함 3개영역 합6',method:'학생부교과100%',cut50:1.25,cut70:1.26,score50:0,score70:0,note:'2027모집요강+2026실입결, ★2026실입결 기준 모집인원 18명→2027 19명',major:'의약학',calcMode:'weighted'},
+  {id:140081,univ:'전북대학교',dept:'의예과',type:'지역인재2유형(전북권)[교과]',recruit:'45명',comp24:'',comp25:'',comp26:'10.0:1',fill:'5',csat:'수학포함 4개영역 합6',method:'학생부교과100%',cut50:1.37,cut70:1.65,score50:0,score70:0,note:'2027모집요강+2026실입결',major:'의약학',calcMode:'weighted'},
 ];
 
 // ── 상태 변수 ──
 let gg_grades = {};
 let gg_quickMode = {active:false, all:0, five:0, sci:0, hum:0};
 let gg_lastResults = [];
+
+// ══ SG_crossPick: 교과분석/종합분석/논술분석 체크 자료를 탭 간 누적하여 통합 인쇄 ══
+let SG_crossPick = {gyogwa:{}, jonghap:{}, nulsul:{}};
+function SG_pickCount(){ return Object.keys(SG_crossPick.gyogwa).length+Object.keys(SG_crossPick.jonghap).length+Object.keys(SG_crossPick.nulsul).length; }
+function SG_updatePickBadge(){
+  var b=document.getElementById('sg-pick-badge'); if(b) b.textContent=SG_pickCount();
+  var w=document.getElementById('sg-pick-btn-wrap'); if(w) w.style.display=SG_pickCount()>0?'flex':'none';
+}
+function SG_isPickedGG(id){ return !!SG_crossPick.gyogwa['gg_'+id]; }
+function SG_isPickedJH(id){ return !!SG_crossPick.jonghap['jh_'+id]; }
+function SG_isPickedNS(id){ return !!SG_crossPick.nulsul['ns_'+id]; }
+function SG_toggleGG(id){
+  var r=gg_lastResults.find(function(x){return String(x.id)===String(id);});
+  if(!r) return;
+  var key='gg_'+id;
+  if(SG_crossPick.gyogwa[key]) delete SG_crossPick.gyogwa[key]; else SG_crossPick.gyogwa[key]=r;
+  SG_updatePickBadge(); gg_renderResult();
+}
+function SG_toggleJH(id){
+  var r=jh_lastResults.find(function(x){return String(x.id)===String(id);});
+  if(!r) return;
+  var key='jh_'+id;
+  if(SG_crossPick.jonghap[key]) delete SG_crossPick.jonghap[key]; else SG_crossPick.jonghap[key]=r;
+  SG_updatePickBadge(); jh_renderResult();
+}
+function SG_toggleNS(id){
+  var r=ns_lastResults.find(function(x){return String(x.id)===String(id);});
+  if(!r) return;
+  var key='ns_'+id;
+  if(SG_crossPick.nulsul[key]) delete SG_crossPick.nulsul[key]; else SG_crossPick.nulsul[key]=r;
+  SG_updatePickBadge(); ns_renderResult();
+}
+function SG_clearPicks(){
+  if(!SG_pickCount()) return;
+  if(!confirm('선택한 모든 자료('+SG_pickCount()+'건)를 초기화하시겠습니까?')) return;
+  SG_crossPick={gyogwa:{},jonghap:{},nulsul:{}};
+  SG_updatePickBadge();
+  if(typeof gg_renderResult==='function') gg_renderResult();
+  if(typeof jh_renderResult==='function') jh_renderResult();
+  if(typeof ns_renderResult==='function') ns_renderResult();
+}
+(function(){
+  function ensureSGPickBtn(){
+    if(document.getElementById('sg-pick-btn-wrap')) return;
+    var d=document.createElement('div');
+    d.id='sg-pick-btn-wrap';
+    d.style.cssText='position:fixed;right:22px;bottom:22px;z-index:99999;display:none;gap:8px;align-items:center;background:#fff;border:2px solid #1e3a8a;border-radius:30px;padding:8px 10px 8px 16px;box-shadow:0 6px 20px rgba(30,58,138,.28)';
+    d.innerHTML='<span style="font-size:12px;font-weight:800;color:#1e3a8a;white-space:nowrap">📎 선택자료 <span id="sg-pick-badge">0</span>건</span>'
+      +'<button onclick="SG_printCombined()" style="background:#1e3a8a;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🖨️ 통합 인쇄</button>'
+      +'<button onclick="SG_clearPicks()" style="background:#fff;color:#dc2626;border:1.5px solid #fecaca;border-radius:20px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">초기화</button>';
+    document.body.appendChild(d);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ensureSGPickBtn);
+  else ensureSGPickBtn();
+})();
+
 let gg_currentFilter = 'all';
 let gg_selectedChance = new Set();
 let gg_currentTypeFilter = 'all';
@@ -20706,7 +20847,7 @@ function gg_renderResult(){
   var tbody=document.getElementById('gg-result-tbody');
   if(!tbody) return;
   if(!filtered.length){
-    tbody.innerHTML='<tr><td colspan="15" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="16" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';
     return;
   }
   var cs={도전:{bg:'#f5f3ff',color:'#7c3aed',label:'🔥 도전'},상향:{bg:'#fef2f2',color:'#dc2626',label:'⬆ 상향'},적정:{bg:'#fffbeb',color:'#d97706',label:'✓ 적정'},안정:{bg:'#eff6ff',color:'#2563eb',label:'🛡 안정'},하향:{bg:'#f0fdf4',color:'#059669',label:'⬇ 하향'},참고:{bg:'#f8fafc',color:'#94a3b8',label:'참고'}};
@@ -20718,6 +20859,7 @@ function gg_renderResult(){
     var fillTxt=(function(){if(!r.fill)return'—';var n=parseInt(r.recruit),f=parseInt(r.fill);if(!isNaN(n)&&!isNaN(f)&&n>0)return Math.round(f/n*100)+'%('+f+'명)';return r.fill+'명';})();
     var ggIntDT=(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+( r.interviewTime||'');var ggIntDateBadge=ggIntDT?'<div style="margin-top:3px"><span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">📅 '+ggIntDT+'</span></div>':'';
     return '<tr style="border-bottom:1px solid #f1f5f9;background:'+s.bg+'">'
+      +'<td style="padding:8px 6px;text-align:center"><input type="checkbox" onclick="SG_toggleGG(\''+r.id+'\')" '+(SG_isPickedGG(r.id)?'checked':'')+' style="width:15px;height:15px;cursor:pointer;accent-color:#1e3a8a"></td>'
       +'<td style="padding:8px 10px;font-weight:700;font-size:12px;white-space:nowrap">'+r.univ+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;color:#475569">'+r.dept+ggIntDateBadge+'</td>'
       +'<td style="padding:8px 10px;text-align:center"><span style="background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600">'+r.type+'</span></td>'
@@ -20989,12 +21131,13 @@ function renderGyogwa(s){
     +'<div style="overflow-x:auto;max-height:580px;overflow-y:auto">'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
     +'<thead><tr style="background:#1e3a8a;position:sticky;top:0;z-index:2">'
+    +'<th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">☑</th>'
     +['대학명','학과','전형','모집인원','경쟁률','충원율/인원','수능최저','내신반영','입결50%','입결70%','환산점수50%','환산점수70%','환산내신','50%대비','지원경향'].map(function(h){
       return '<th style="padding:9px 10px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1)">'+h+'</th>';
     }).join('')
     +'</tr></thead>'
     +'<tbody id="gg-result-tbody">'
-    +'<tr><td colspan="15" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">'
+    +'<tr><td colspan="16" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">'
     +(gg_lastResults.length?'필터를 조정하거나 분석 버튼을 클릭하세요':'내신 성적을 입력하고 [지원 가능 대학 분석] 버튼을 누르세요')
     +'</td></tr>'
     +'</tbody></table></div></div>';
@@ -22985,7 +23128,7 @@ function ns_renderResult(){
   var f=ns_getFiltered();
   if(cnt)cnt.textContent='('+f.length+'개)';
   if(!f.length){
-    tbody.innerHTML='<tr><td colspan="13" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';
+    tbody.innerHTML='<tr><td colspan="14" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';
     return;
   }
   var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb',참고:'#94a3b8'};
@@ -22994,6 +23137,7 @@ function ns_renderResult(){
     var hc=r.csat&&r.csat!=='없음';
     var cl=r.chance==='도전'?'🔥 도전':r.chance==='상향'?'⬆ 상향':r.chance==='적정'?'✓ 적정':r.chance==='안정'?'🛡 안정':r.chance;
     return '<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:8px 6px;text-align:center"><input type="checkbox" onclick="SG_toggleNS(\''+r.id+'\')" '+(SG_isPickedNS(r.id)?'checked':'')+' style="width:15px;height:15px;cursor:pointer;accent-color:#991b1b"></td>'
       +'<td style="padding:8px 10px;font-weight:800;font-size:12px;white-space:nowrap">'+r.univ+'</td>'
       +'<td style="padding:8px 6px;font-size:12px;font-weight:600">'+r.dept+((r.interviewDate||r.interviewTime)?'<div style="margin-top:3px"><span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">📅 '+(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+( r.interviewTime||'')+'</span></div>':'')+'</td>'
       +'<td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626">'+r.type+'</span></td>'
@@ -28672,8 +28816,8 @@ function renderNulsul(s) {
 
   // ── 결과 테이블 ──
   +'<div style="overflow-x:auto;max-height:600px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
-  +'<thead><tr style="background:#991b1b"><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:11px;text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집단위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집인원</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">경쟁률(26)</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술유형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">시험시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">출제유형/범위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술반영</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술시험일/시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">지원경향 <span id="ns-result-count" style="font-size:9px;font-weight:400">(0개)</span></th></tr></thead>'
-  +'<tbody id="ns-result-tbody"><tr><td colspan="12" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">✏</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
+  +'<thead><tr style="background:#991b1b"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:11px;text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집단위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집인원</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">경쟁률(26)</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술유형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">시험시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">출제유형/범위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술반영</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술시험일/시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">지원경향 <span id="ns-result-count" style="font-size:9px;font-weight:400">(0개)</span></th></tr></thead>'
+  +'<tbody id="ns-result-tbody"><tr><td colspan="13" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">✏</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
 
   // ── 안내 ──
   +'<div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 14px;font-size:11px;color:#713f12;line-height:1.7">'
@@ -33663,6 +33807,90 @@ var JH_UNIV_DB=[
   {id:125024,univ:'상명대학교(천안)',dept:'디자인학부 AR·VR미디어디자인전공',type:'상명인재전형',recruit:'4명',comp26:'21.50:1',fill:'5',csat:'없음',cut50:0,cut70:0,grade50:2.58,grade70:2.58,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'예체능'},
   {id:125025,univ:'상명대학교(천안)',dept:'그린스마트시티학과',type:'상명인재전형',recruit:'6명',comp26:'13.17:1',fill:'4',csat:'없음',cut50:0,cut70:0,grade50:4.73,grade70:4.22,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'인문'},
   {id:125026,univ:'상명대학교(천안)',dept:'경영공학과',type:'상명인재전형',recruit:'4명',comp26:'10.50:1',fill:'0',csat:'없음',cut50:0,cut70:0,grade50:5.06,grade70:5.06,method:'서류100% 일괄합산',note:'',calcMode:'jh',major:'자연·공학'},
+  // ══ 전북대학교 2027학년도 학생부종합(큰사람전형/SW인재전형) — 2027모집요강(모집단위별 모집인원표)+2026실입결(경쟁률/충원/환산등급) 반영, DB신규구축 ══
+  // 전형방법: 1단계 서류100%(3배수, 선발비율300%)→2단계 1단계성적80%(800점)+면접20%(200점)=100%(1,000점) / 단일단계(국가보훈·농어촌·기회균형·특수교육·만학도)는 서류100% 일괄합산
+  // 면접: 1인당 면접위원3인, 1단계 서류 기반 블라인드평가 약10분 내외 / 큰사람·SW인재·사회통합·특성화고졸업자·특성화고재직자 → 1일차 2026.11.26(목) [오전반 08:30예비소집/09:00면접, 오후반 13:30예비소집/14:00면접], 반편성 공지 11.20(금) 14:00 입학정보홈페이지
+  // 수능최저: 간호학과·수의예과·약학과·의예과·치의예과 5개 모집단위만 적용(등급합 미충족·미응시 시 불합격), 그 외 전 모집단위 수능최저 없음(수능 응시여부 무관 지원가능)
+  // 환산점수(cut50/70)는 공식 미제공(0.0)으로 비적용, 환산등급(grade50/70)만 사용 / 모집인원 3명 이하(또는 등록인원 3명 이하) 모집단위는 대학측 자료 미제출
+  {id:130001,univ:'전북대학교',dept:'이차전지공학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'10.3:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.49,grade70:4.49,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130002,univ:'전북대학교',dept:'사회과교육계열',type:'학생부종합(큰사람전형)',recruit:'15명',comp26:'10.9:1',fill:'22',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.1,grade70:3.26,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130003,univ:'전북대학교',dept:'농업생명과학계열',type:'학생부종합(큰사람전형)',recruit:'77명',comp26:'12.8:1',fill:'47',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.25,grade70:4.45,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130004,univ:'전북대학교',dept:'프랑스·아프리카학과',type:'학생부종합(큰사람전형)',recruit:'6명',comp26:'11.5:1',fill:'6',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.09,grade70:4.13,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130005,univ:'전북대학교',dept:'국어국문학과',type:'학생부종합(큰사람전형)',recruit:'3명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130006,univ:'전북대학교',dept:'독일학과',type:'학생부종합(큰사람전형)',recruit:'3명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130007,univ:'전북대학교',dept:'사학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'16.3:1',fill:'4',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(등록인원 3명 이하, 추가 안내자료 참고)',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130008,univ:'전북대학교',dept:'고고문화인류학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'11.5:1',fill:'5',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.28,grade70:4.28,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130009,univ:'전북대학교',dept:'문헌정보학과',type:'학생부종합(큰사람전형)',recruit:'3명',comp26:'17.3:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130010,univ:'전북대학교',dept:'스페인·중남미학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'11.8:1',fill:'2',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(등록인원 3명 이하, 추가 안내자료 참고)',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130011,univ:'전북대학교',dept:'환경생명자원계열',type:'학생부종합(큰사람전형)',recruit:'12명',comp26:'11.0:1',fill:'4',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.81,grade70:4.9,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130012,univ:'전북대학교',dept:'자연과학계열2',type:'학생부종합(큰사람전형)',recruit:'17명',comp26:'13.2:1',fill:'7',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.03,grade70:4.16,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130013,univ:'전북대학교',dept:'공학계열1',type:'학생부종합(큰사람전형)',recruit:'104명',comp26:'12.4:1',fill:'98',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.74,grade70:3.86,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130014,univ:'전북대학교',dept:'자연과학계열1',type:'학생부종합(큰사람전형)',recruit:'24명',comp26:'13.3:1',fill:'24',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.61,grade70:3.78,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130015,univ:'전북대학교',dept:'공학계열2',type:'학생부종합(큰사람전형)',recruit:'34명',comp26:'17.5:1',fill:'24',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.78,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, ★2027모집요강 확인: 2026실입결 기준 모집인원 20명→2027 34명으로 증원',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130016,univ:'전북대학교',dept:'첨단방위산업학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'12.3:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.91,grade70:3.91,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130017,univ:'전북대학교',dept:'영어영문학과',type:'학생부종합(큰사람전형)',recruit:'7명',comp26:'10.6:1',fill:'4',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.81,grade70:3.85,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130018,univ:'전북대학교',dept:'국제학부',type:'학생부종합(큰사람전형)',recruit:'18명',comp26:'10.9:1',fill:'6',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.07,grade70:4.28,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130019,univ:'전북대학교',dept:'경상계열',type:'학생부종합(큰사람전형)',recruit:'43명',comp26:'12.5:1',fill:'28',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.69,grade70:3.76,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'상경',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130020,univ:'전북대학교',dept:'수의예과',type:'학생부종합(큰사람전형)',recruit:'3명',comp26:'19.7:1',fill:'2',interview:'있음',intPct:20,docPct:80,csat:'수학포함 3개영역 합7',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130021,univ:'전북대학교',dept:'생활과학계열',type:'학생부종합(큰사람전형)',recruit:'13명',comp26:'16.2:1',fill:'4',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.98,grade70:4.15,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130022,univ:'전북대학교',dept:'약학과',type:'학생부종합(큰사람전형)',recruit:'2명',comp26:'12.5:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'수학포함 3개영역 합7',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130023,univ:'전북대학교',dept:'간호학과',type:'학생부종합(큰사람전형)',recruit:'7명',comp26:'22.7:1',fill:'2',interview:'있음',intPct:20,docPct:80,csat:'국어/수학 중 2개영역 합6(영어·한국사 응시 필수)',cut50:0,cut70:0,grade50:2.66,grade70:2.67,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130024,univ:'전북대학교',dept:'치의예과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'12.0:1',fill:'0',interview:'있음',intPct:20,docPct:80,csat:'수학포함 3개영역 합6',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(등록인원 3명 이하, 추가 안내자료 참고)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130025,univ:'전북대학교',dept:'의예과',type:'학생부종합(큰사람전형)',recruit:'5명',comp26:'15.8:1',fill:'3',interview:'있음',intPct:20,docPct:80,csat:'수학포함 4개영역 합6(탐구 2과목평균 절사)',cut50:0,cut70:0,grade50:1.26,grade70:1.27,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130026,univ:'전북대학교',dept:'스마트팜학과',type:'학생부종합(큰사람전형)',recruit:'3명',comp26:'16.0:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130027,univ:'전북대학교',dept:'사회과학계열',type:'학생부종합(큰사람전형)',recruit:'43명',comp26:'15.5:1',fill:'30',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.73,grade70:3.81,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130028,univ:'전북대학교',dept:'중어중문학과',type:'학생부종합(큰사람전형)',recruit:'7명',comp26:'11.3:1',fill:'2',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.42,grade70:4.72,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130029,univ:'전북대학교',dept:'국제이공학부',type:'학생부종합(큰사람전형)',recruit:'8명',comp26:'7.6:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.89,grade70:4.96,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130030,univ:'전북대학교',dept:'철학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'18.0:1',fill:'7',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.16,grade70:4.16,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130031,univ:'전북대학교',dept:'일본학과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'15.3:1',fill:'3',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.93,grade70:3.93,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130032,univ:'전북대학교',dept:'수학교육과',type:'학생부종합(큰사람전형)',recruit:'2명',comp26:'17.0:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130033,univ:'전북대학교',dept:'과학교육학부',type:'학생부종합(큰사람전형)',recruit:'21명',comp26:'7.0:1',fill:'25',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.57,grade70:3.77,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130034,univ:'전북대학교',dept:'영어교육과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'8.8:1',fill:'6',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:3.11,grade70:3.11,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130035,univ:'전북대학교',dept:'독어교육과',type:'학생부종합(큰사람전형)',recruit:'1명',comp26:'12.0:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130036,univ:'전북대학교',dept:'국어교육과',type:'학생부종합(큰사람전형)',recruit:'4명',comp26:'8.3:1',fill:'3',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:2.82,grade70:2.82,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130037,univ:'전북대학교',dept:'교육학과',type:'학생부종합(큰사람전형)',recruit:'3명',comp26:'14.0:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, 미제출(모집인원 3명 이하)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  // ── SW인재전형 ──
+  {id:130038,univ:'전북대학교',dept:'공학계열1',type:'학생부종합(SW인재전형)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 신규 배정, 2026실입결 자료없음',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  {id:130039,univ:'전북대학교',dept:'공학계열2',type:'학생부종합(SW인재전형)',recruit:'1명',comp26:'8.0:1',fill:'1',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:4.06,grade70:4.21,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강+2026실입결, ★2027모집요강 확인: 2026실입결 기준 모집인원 5명→2027 1명으로 감원',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.26(목)',interviewTime:'오전 09:00 또는 오후 14:00(반편성 공지 확인)'},
+  // ══ 전북대학교 2027학년도 학생부종합(지역인재1유형-호남권/지역인재2유형-전북권) — 2027모집요강(모집단위별 모집인원표) 반영, 신규추가 ══
+  // recruit 수치는 2027모집요강 그리드에서 직접 판독(열별 합계 검증: 지역인재1유형 합107명, 지역인재2유형 합11명 = 공식 '합계'행과 일치)
+  // 2026실입결(경쟁률/충원/환산등급) 자료는 미확보 상태 — 큰사람전형과 달리 별도 경쟁률표가 제공되지 않음, 추후 자료 확보시 반영 예정
+  // 전형방법: 1단계 서류100%(3배수)→2단계 1단계성적80%+면접20% / 면접 2일차 2026.11.28(토) 오전반만 운영(예비소집 08:30/면접 09:00)
+  // 수능최저: 간호학과·수의예과·약학과·의예과만 해당(치의예과는 이 두 전형에 모집이 없음), 그 외 없음
+  {id:130040,univ:'전북대학교',dept:'간호학과',type:'학생부종합(지역인재1유형-호남권)',recruit:'3명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'국어/수학 중 2개영역 합6(영어·한국사 응시 필수)',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130041,univ:'전북대학교',dept:'경상계열',type:'학생부종합(지역인재1유형-호남권)',recruit:'8명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'상경',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130042,univ:'전북대학교',dept:'공학계열1',type:'학생부종합(지역인재1유형-호남권)',recruit:'24명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130043,univ:'전북대학교',dept:'공학계열2',type:'학생부종합(지역인재1유형-호남권)',recruit:'20명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130044,univ:'전북대학교',dept:'농업생명과학계열',type:'학생부종합(지역인재1유형-호남권)',recruit:'11명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130045,univ:'전북대학교',dept:'스마트팜학과',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130046,univ:'전북대학교',dept:'교육학과',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130047,univ:'전북대학교',dept:'국어교육과',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130048,univ:'전북대학교',dept:'독어교육과',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130049,univ:'전북대학교',dept:'영어교육과',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130050,univ:'전북대학교',dept:'사회과교육계열',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130051,univ:'전북대학교',dept:'과학교육학부',type:'학생부종합(지역인재1유형-호남권)',recruit:'2명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'교육',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130052,univ:'전북대학교',dept:'사회과학계열',type:'학생부종합(지역인재1유형-호남권)',recruit:'6명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'인문·사회',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130053,univ:'전북대학교',dept:'생활과학계열',type:'학생부종합(지역인재1유형-호남권)',recruit:'3명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130054,univ:'전북대학교',dept:'약학과',type:'학생부종합(지역인재1유형-호남권)',recruit:'1명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'수학포함 3개영역 합7',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130055,univ:'전북대학교',dept:'자연과학계열1',type:'학생부종합(지역인재1유형-호남권)',recruit:'5명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130056,univ:'전북대학교',dept:'자연과학계열2',type:'학생부종합(지역인재1유형-호남권)',recruit:'4명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130057,univ:'전북대학교',dept:'환경생명자원계열',type:'학생부종합(지역인재1유형-호남권)',recruit:'2명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130058,univ:'전북대학교',dept:'의예과',type:'학생부종합(지역인재1유형-호남권)',recruit:'4명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'수학포함 4개영역 합6(탐구 2과목평균 절사)',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130059,univ:'전북대학교',dept:'융합자율전공학부1(전주캠퍼스)',type:'학생부종합(지역인재1유형-호남권)',recruit:'6명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'인문·자연 통합',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130060,univ:'전북대학교',dept:'융합자율전공학부2(특성화캠퍼스)',type:'학생부종합(지역인재1유형-호남권)',recruit:'2명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'인문·자연 통합',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  // ── 지역인재2유형(전북권) ──
+  {id:130061,univ:'전북대학교',dept:'수의예과',type:'학생부종합(지역인재2유형-전북권)',recruit:'2명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'수학포함 3개영역 합7',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130062,univ:'전북대학교',dept:'의예과',type:'학생부종합(지역인재2유형-전북권)',recruit:'4명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'수학포함 4개영역 합6(탐구 2과목평균 절사)',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'의약학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  {id:130063,univ:'전북대학교',dept:'공학계열2',type:'학생부종합(지역인재2유형-전북권)',recruit:'5명',comp26:'',fill:'',interview:'있음',intPct:20,docPct:80,csat:'없음',cut50:0,cut70:0,grade50:0,grade70:0,method:'1단계 서류100%(3배수)→2단계 1단계성적80%+면접20%',note:'2027모집요강 반영(모집단위별 모집인원표), 2026실입결 자료 미확보(추후 반영예정)',calcMode:'jh',major:'자연·공학',region:'지방국립',interviewDate:'2026.11.28(토)',interviewTime:'오전 08:30예비소집/09:00면접'},
+  // ══ 청주교육대학교 2027학년도 학생부종합(배움나눔인재전형/지역인재전형) — 2027모집요강+2026실입결 반영, DB신규구축 ══
+  // 배움나눔인재전형: 지원자격 고교졸업(예정)자 또는 법령상 동등학력 인정자(제한없음) / 서류평가100% 단독(0~1000점) / 수능최저 없음 / 면접 없음
+  //   학교폭력 조치사항 반영: 1~3호 서류점수(표준점수) 50점감점, 4~5호 75점감점, 6~7호 100점감점, 8~9호 결격
+  // 지역인재전형: 지원자격 충북·세종·대전 소재 고교에서 입학~졸업(예정)까지 전 교육과정 이수(학교생활기록부 제출 가능한 자) / 학교폭력 기재사항 있으면 지원 불가(결격, 감점 아님)
+  //   전형방법(단계별): 1단계 서류100%(2배수, 0~600점)→2단계 1단계서류60%(0~600점 그대로 반영)+면접40%(0~400점)=100%(0~1,000점) / 수능최저 없음
+  //   면접(10분 개별면접, 서류참조): 교직인적성40%+창의적탐구및리더십역량40%+의사소통역량20% / 세부일정 2026.11.24(화)까지 홈페이지 공지
+  // 서류평가 공통: 복수 입학사정관 정성종합평가, 교직인적성·창의적탐구역량·변화리더십 3개영역 균등비율 반영, 원점수→표준점수 변환 적용
+  {id:140100,univ:'청주교육대학교',dept:'초등교육학과',type:'학생부종합(배움나눔인재전형)',recruit:'42명',comp26:'19.9:1',fill:'93',interview:'없음',intPct:0,docPct:100,csat:'없음',cut50:0,cut70:0,grade50:2.61,grade70:2.75,method:'서류평가100% 단독(0~1,000점)',note:'2027모집요강+2026실입결, 학교폭력조치 1~3호50점감점/4~5호75점감점/6~7호100점감점/8~9호결격',calcMode:'jh',major:'교육',region:'수도권 외 국립'},
+  {id:140101,univ:'청주교육대학교',dept:'초등교육학과',type:'학생부종합(지역인재전형)',recruit:'132명',comp26:'4.44:1',fill:'79',interview:'있음',intPct:40,docPct:60,csat:'없음',cut50:0,cut70:0,grade50:3.23,grade70:3.42,method:'1단계 서류100%(2배수,600점)→2단계 1단계서류60%(600점 그대로 반영)+면접40%(400점)',note:'2027모집요강+2026실입결, 충북·세종·대전 소재고 전교육과정 이수자, 학교폭력 기재사항 있으면 지원불가',calcMode:'jh',major:'교육',region:'수도권 외 국립',interviewDate:'2026.11.24(화)까지 홈페이지 공지',interviewTime:'개별면접10분'},
 
   {id:996255,univ:'한밭대학교',dept:'건축공학과',type:'학생부종합(일반)',recruit:'8명',comp26:'11.13:1',fill:'6',interview:'없음',intPct:0,docPct:100,csat:'없음',cut50:410.5,cut70:395.5,grade50:4.69,grade70:4.78,method:'서류 100%',note:'',calcMode:'jh',major:'자연·공학',region:'충청'},
   {id:996256,univ:'한밭대학교',dept:'공공행정학과',type:'학생부종합(일반)',recruit:'7명',comp26:'15.67:1',fill:'5',interview:'없음',intPct:0,docPct:100,csat:'없음',cut50:325.5,cut70:321.0,grade50:3.97,grade70:3.7,method:'서류 100%',note:'',calcMode:'jh',major:'인문·사회',region:'충청'},
@@ -34223,7 +34451,7 @@ function jh_getFiltered(){
     return true;
   });
 }
-function jh_renderResult(){var tbody=document.getElementById('jh-result-tbody');var cnt=document.getElementById('jh-result-count');if(!tbody)return;var f=jh_getFiltered();if(cnt)cnt.textContent='('+f.length+'개)';if(!f.length){tbody.innerHTML='<tr><td colspan="13" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';return;}var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb',하향:'#059669',참고:'#64748b'};var BG={도전:'#f5f3ff',상향:'#fef2f2',적정:'#fffbeb',안정:'#eff6ff',하향:'#ecfdf5',참고:'#f8fafc'};tbody.innerHTML=f.map(function(r){var d50=r.myGrade>0?r.myGrade-r.cut50:null;var ds=d50===null?'—':(d50>0?'+'+d50.toFixed(2):d50.toFixed(2));var dc=d50===null?'#64748b':d50>0.1?'#dc2626':d50<-0.05?'#059669':'#d97706';var hc=r.csat&&r.csat!=='없음';var iP=r.intPct||0,dP=r.docPct||100;var fh=(r.evalFocus||'').split(',').map(function(f){return '<span style="display:inline-block;padding:1px 5px;background:#f5f3ff;color:#6d28d9;border-radius:4px;font-size:9px;font-weight:700;margin:1px">'+f.trim()+'</span>';}).join('');var cl=r.chance==='도전'?'🔥 도전':r.chance==='상향'?'⬆ 상향':r.chance==='적정'?'✓ 적정':r.chance==='안정'?'🛡 안정':r.chance==='하향'?'⬇ 하향':r.chance;return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:8px 10px;font-weight:800;font-size:12px;white-space:nowrap">'+r.univ+'<br><span style="font-size:9px;color:#94a3b8;font-weight:400">'+(r.major||'')+'</span></td><td style="padding:8px 6px;font-size:12px;font-weight:600">'+r.dept+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#ede9fe;color:#6d28d9">'+r.type+'</span></td><td style="padding:4px 6px;text-align:center;font-size:11px;font-weight:600">'+(r.recruit||'—')+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:10px;font-size:10px;font-weight:700;background:'+(r.interview==='있음'?'#fef3c7':'#f0fdf4')+';color:'+(r.interview==='있음'?'#92400e':'#065f46')+'">'+(r.interview==='있음'?'🎤 있음':'📄 없음')+'</span>'+((r.interviewDate||r.interviewTime)?'<div style="margin-top:3px"><span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">📅 '+(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+( r.interviewTime||'')+'</span></div>':'')+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;background:'+(hc?'#fff7ed':'#f0fdf4')+';color:'+(hc?'#9a3412':'#065f46')+'">'+(r.csat||'없음')+'</span></td><td style="padding:4px 6px;min-width:110px"><div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;height:5px;border-radius:3px;overflow:hidden"><div style="width:'+dP+'%;background:#7c3aed"></div>'+(iP?'<div style="width:'+iP+'%;background:#f59e0b"></div>':'')+'</div><div style="font-size:9px;color:#64748b">서류 '+dP+'%'+(iP?' · 면접 '+iP+'%':'')+'</div>'+(r.methodNote?'<div style="font-size:9px;color:#94a3b8;line-height:1.3">'+r.methodNote+'</div>':'')+'</div></td><td style="padding:4px 6px">'+fh+(r.note?'<div style="font-size:9px;color:#94a3b8;margin-top:2px">'+r.note+'</div>':'')+'</td><td style="padding:4px 6px;text-align:center;font-weight:700;font-size:12px">'+(r.cut50>0?r.cut50.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center;font-weight:600;font-size:12px;color:#64748b">'+(r.cut70>0?r.cut70.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center;font-weight:800;font-size:12px;color:#7c3aed">'+(r.myGrade>0?r.myGrade.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center"><span style="font-size:11px;font-weight:700;color:'+dc+'">'+ds+'</span></td><td style="padding:4px 8px;text-align:center"><span style="display:inline-block;padding:4px 9px;border-radius:10px;font-size:11px;font-weight:800;background:'+BG[r.chance]+';color:'+CL[r.chance]+'">'+cl+'</span>'+(r.corrected?'<div style="font-size:9px;color:#059669;font-weight:700">비교과보정</div>':'')+'</td></tr>';}).join('');}
+function jh_renderResult(){var tbody=document.getElementById('jh-result-tbody');var cnt=document.getElementById('jh-result-count');if(!tbody)return;var f=jh_getFiltered();if(cnt)cnt.textContent='('+f.length+'개)';if(!f.length){tbody.innerHTML='<tr><td colspan="14" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';return;}var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb',하향:'#059669',참고:'#64748b'};var BG={도전:'#f5f3ff',상향:'#fef2f2',적정:'#fffbeb',안정:'#eff6ff',하향:'#ecfdf5',참고:'#f8fafc'};tbody.innerHTML=f.map(function(r){var d50=r.myGrade>0?r.myGrade-r.cut50:null;var ds=d50===null?'—':(d50>0?'+'+d50.toFixed(2):d50.toFixed(2));var dc=d50===null?'#64748b':d50>0.1?'#dc2626':d50<-0.05?'#059669':'#d97706';var hc=r.csat&&r.csat!=='없음';var iP=r.intPct||0,dP=r.docPct||100;var fh=(r.evalFocus||'').split(',').map(function(f){return '<span style="display:inline-block;padding:1px 5px;background:#f5f3ff;color:#6d28d9;border-radius:4px;font-size:9px;font-weight:700;margin:1px">'+f.trim()+'</span>';}).join('');var cl=r.chance==='도전'?'🔥 도전':r.chance==='상향'?'⬆ 상향':r.chance==='적정'?'✓ 적정':r.chance==='안정'?'🛡 안정':r.chance==='하향'?'⬇ 하향':r.chance;return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:8px 6px;text-align:center"><input type="checkbox" onclick="SG_toggleJH(\''+r.id+'\')" '+(SG_isPickedJH(r.id)?'checked':'')+' style="width:15px;height:15px;cursor:pointer;accent-color:#4c1d95"></td><td style="padding:8px 10px;font-weight:800;font-size:12px;white-space:nowrap">'+r.univ+'<br><span style="font-size:9px;color:#94a3b8;font-weight:400">'+(r.major||'')+'</span></td><td style="padding:8px 6px;font-size:12px;font-weight:600">'+r.dept+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#ede9fe;color:#6d28d9">'+r.type+'</span></td><td style="padding:4px 6px;text-align:center;font-size:11px;font-weight:600">'+(r.recruit||'—')+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:10px;font-size:10px;font-weight:700;background:'+(r.interview==='있음'?'#fef3c7':'#f0fdf4')+';color:'+(r.interview==='있음'?'#92400e':'#065f46')+'">'+(r.interview==='있음'?'🎤 있음':'📄 없음')+'</span>'+((r.interviewDate||r.interviewTime)?'<div style="margin-top:3px"><span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">📅 '+(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+( r.interviewTime||'')+'</span></div>':'')+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;background:'+(hc?'#fff7ed':'#f0fdf4')+';color:'+(hc?'#9a3412':'#065f46')+'">'+(r.csat||'없음')+'</span></td><td style="padding:4px 6px;min-width:110px"><div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;height:5px;border-radius:3px;overflow:hidden"><div style="width:'+dP+'%;background:#7c3aed"></div>'+(iP?'<div style="width:'+iP+'%;background:#f59e0b"></div>':'')+'</div><div style="font-size:9px;color:#64748b">서류 '+dP+'%'+(iP?' · 면접 '+iP+'%':'')+'</div>'+(r.methodNote?'<div style="font-size:9px;color:#94a3b8;line-height:1.3">'+r.methodNote+'</div>':'')+'</div></td><td style="padding:4px 6px">'+fh+(r.note?'<div style="font-size:9px;color:#94a3b8;margin-top:2px">'+r.note+'</div>':'')+'</td><td style="padding:4px 6px;text-align:center;font-weight:700;font-size:12px">'+(r.cut50>0?r.cut50.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center;font-weight:600;font-size:12px;color:#64748b">'+(r.cut70>0?r.cut70.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center;font-weight:800;font-size:12px;color:#7c3aed">'+(r.myGrade>0?r.myGrade.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center"><span style="font-size:11px;font-weight:700;color:'+dc+'">'+ds+'</span></td><td style="padding:4px 8px;text-align:center"><span style="display:inline-block;padding:4px 9px;border-radius:10px;font-size:11px;font-weight:800;background:'+BG[r.chance]+';color:'+CL[r.chance]+'">'+cl+'</span>'+(r.corrected?'<div style="font-size:9px;color:#059669;font-weight:700">비교과보정</div>':'')+'</td></tr>';}).join('');}
 function jh_setFilter(v,el){if(v==='all'){jh_selectedChance.clear();document.querySelectorAll('[data-jhf]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');}else{var ab=document.querySelector('[data-jhf="all"]');if(ab)ab.classList.remove('act');if(jh_selectedChance.has(v)){jh_selectedChance.delete(v);el.classList.remove('act');}else{jh_selectedChance.add(v);el.classList.add('act');}if(!jh_selectedChance.size&&ab)ab.classList.add('act');}jh_renderResult();}
 function jh_setTypeFilter(v,el){if(v==='all'){jh_selectedTypes.clear();document.querySelectorAll('[data-jhft]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');}else{var ab=document.querySelector('[data-jhft="all"]');if(ab)ab.classList.remove('act');if(jh_selectedTypes.has(v)){jh_selectedTypes.delete(v);el.classList.remove('act');}else{jh_selectedTypes.add(v);el.classList.add('act');}if(!jh_selectedTypes.size&&ab)ab.classList.add('act');}jh_renderResult();}
 function jh_setCsatFilter(v,el){jh_selectedCsat=v;document.querySelectorAll('[data-jhfc]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');jh_renderResult();}
@@ -34281,7 +34509,7 @@ function renderJonghap(s){
   +'</div>'
   +'<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">'
     +'<div style="padding:11px 16px;border-bottom:1px solid #e8eaf6;display:flex;align-items:center;gap:8px"><span style="font-size:14px">🎯</span><span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span><span id="jh-result-count" style="font-size:11px;color:#94a3b8"></span></div>'
-    +'<div style="overflow-x:auto;overflow-y:auto;min-height:400px"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px"><thead><tr style="background:#4c1d95;position:sticky;top:0;z-index:2"><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">학과</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">모집</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">면접</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">선발방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">서류핵심요소</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">50%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">70%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">내신</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">대비</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;text-align:center">지원경향</th></tr></thead><tbody id="jh-result-tbody"><tr><td colspan="13" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">📚</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
+    +'<div style="overflow-x:auto;overflow-y:auto;min-height:400px"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px"><thead><tr style="background:#4c1d95;position:sticky;top:0;z-index:2"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">학과</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">모집</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">면접</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">선발방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">서류핵심요소</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">50%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">70%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">내신</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">대비</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;text-align:center">지원경향</th></tr></thead><tbody id="jh-result-tbody"><tr><td colspan="14" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">📚</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
   +'</div>'
   +'</div>'
   +'</div>'
@@ -34296,6 +34524,112 @@ function renderJonghap(s){
       +'</div>'
     +'</div>'
   +'</div>';
+}
+
+function SG_printCombined(){
+  var all=[].concat(
+    Object.keys(SG_crossPick.gyogwa).map(function(k){return {src:'교과',r:SG_crossPick.gyogwa[k]};}),
+    Object.keys(SG_crossPick.jonghap).map(function(k){return {src:'종합',r:SG_crossPick.jonghap[k]};}),
+    Object.keys(SG_crossPick.nulsul).map(function(k){return {src:'논술',r:SG_crossPick.nulsul[k]};})
+  );
+  if(!all.length){alert('선택된 자료가 없습니다. 교과분석/종합분석/논술분석에서 체크박스로 대학을 선택해주세요.');return;}
+  var sid=jh_currentStudentId||gg_currentStudentId||ns_currentStudentId||null;
+  var s=sid?ST.students.find(function(x){return String(x.id)===String(sid);}):null;
+  var stuName=s?s.name:'학생', stuSchool=s&&s.school||'', stuGrade=s&&s.grade||'';
+  var dateStr=new Date().toLocaleDateString('ko-KR');
+  var SRC_STYLE={교과:{color:'#1e3a8a',bg:'#eff6ff',border:'#bfdbfe',icon:'📋'},종합:{color:'#6d28d9',bg:'#f5f3ff',border:'#ddd6fe',icon:'📚'},논술:{color:'#991b1b',bg:'#fef2f2',border:'#fecaca',icon:'✏'}};
+  var CHANCE_STYLE={도전:{color:'#7c3aed',bg:'#f5f3ff',label:'🔥 도전'},상향:{color:'#dc2626',bg:'#fef2f2',label:'⬆ 상향'},적정:{color:'#d97706',bg:'#fffbeb',label:'✓ 적정'},안정:{color:'#2563eb',bg:'#eff6ff',label:'🛡 안정'},하향:{color:'#059669',bg:'#f0fdf4',label:'⬇ 하향'},참고:{color:'#94a3b8',bg:'#f8fafc',label:'참고'}};
+  function chip(label,val){
+    if(val===undefined||val===null||val==='') return '';
+    return '<div style="display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:9.5px;white-space:nowrap"><span style="color:#94a3b8;font-weight:600">'+label+'</span> <span style="color:#1e293b;font-weight:700">'+val+'</span></div>';
+  }
+  function fillTxt(r){
+    if(!r.fill) return '';
+    var n=parseInt(r.recruit),f=parseInt(r.fill);
+    if(!isNaN(n)&&!isNaN(f)&&n>0) return Math.round(f/n*100)+'%('+f+'명)';
+    return r.fill+'명';
+  }
+  function interviewTxt(r){
+    var dt=(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+(r.interviewTime||'');
+    return dt||'';
+  }
+  function cardFor(item){
+    var src=item.src, r=item.r;
+    var st=SRC_STYLE[src];
+    var cs=CHANCE_STYLE[r.chance]||{color:'#94a3b8',bg:'#f8fafc',label:r.chance||'—'};
+    var d50=(r.myGrade>0&&r.cut50>0)?(r.myGrade-r.cut50):null;
+    var dStr=d50===null?'':(d50>0?'+'+d50.toFixed(2):d50.toFixed(2));
+    var chips='';
+    chips+=chip('모집인원',r.recruit);
+    chips+=chip('경쟁률(26)',r.comp26||r.comp);
+    chips+=chip('충원',fillTxt(r));
+    chips+=chip('수능최저',r.csat&&r.csat!=='없음'?r.csat:(r.csat==='없음'?'없음':''));
+    if(src==='교과'){
+      chips+=chip('내신반영',r.method);
+      chips+=chip('입결50%컷',r.cut50>0?r.cut50.toFixed(2):'');
+      chips+=chip('입결70%컷',r.cut70>0?r.cut70.toFixed(2):'');
+      chips+=chip('환산점수50%',r.score50>0?r.score50.toFixed(2):'');
+      chips+=chip('환산점수70%',r.score70>0?r.score70.toFixed(2):'');
+      chips+=chip('환산내신',r.myGrade>0?r.myGrade.toFixed(2):'');
+      chips+=chip('50%대비',dStr);
+    } else if(src==='종합'){
+      chips+=chip('면접',r.interview);
+      chips+=chip('면접일정',interviewTxt(r));
+      chips+=chip('선발방법',r.methodNote||r.method);
+      chips+=chip('서류핵심요소',r.evalFocus);
+      chips+=chip('비고',r.note);
+      chips+=chip('입결50%컷',r.cut50>0?r.cut50.toFixed(2):'');
+      chips+=chip('입결70%컷',r.cut70>0?r.cut70.toFixed(2):'');
+      chips+=chip('내신',r.myGrade>0?r.myGrade.toFixed(2):'');
+      chips+=chip('50%대비',dStr);
+    } else if(src==='논술'){
+      chips+=chip('논술유형',r.nulsulType);
+      chips+=chip('시험시간',r.nulsulTime);
+      chips+=chip('출제유형/범위',r.nulsulSubject);
+      chips+=chip('논술반영',r.nulsulWeight);
+      chips+=chip('전형방법',r.evalMethod);
+      chips+=chip('논술시험일정',interviewTxt(r));
+      chips+=chip('비고',r.note);
+    }
+    return '<div style="border:1.5px solid '+st.border+';border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff;break-inside:avoid">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:'+st.bg+';color:'+st.color+'">'+st.icon+' '+src+'</span>'
+      +'<span style="font-size:13px;font-weight:800">'+r.univ+'</span>'
+      +'<span style="font-size:12px;color:#334155;font-weight:600">'+r.dept+'</span>'
+      +'<span style="display:inline-block;padding:1px 7px;border-radius:8px;font-size:9.5px;font-weight:700;background:'+st.bg+';color:'+st.color+';border:1px solid '+st.border+'">'+r.type+'</span>'
+      +'</div>'
+      +(r.chance?'<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:10.5px;font-weight:800;background:'+cs.bg+';color:'+cs.color+'">'+cs.label+'</span>':'')
+      +'</div>'
+      +'<div style="line-height:1.6">'+chips+'</div>'
+      +'</div>';
+  }
+  var counts={교과:0,종합:0,논술:0};
+  all.forEach(function(item){counts[item.src]++;});
+  var cardsHtml=all.map(cardFor).join('');
+  var win=window.open('','_sg_combined_print','width=1400,height=900');
+  win.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+stuName+' - 수시 통합 지원자료</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:\'Malgun Gothic\',\'Apple SD Gothic Neo\',sans-serif;font-size:11px;color:#1e293b;padding:16mm}'
+    +'.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1e3a8a;padding-bottom:10px;margin-bottom:14px}'
+    +'.hd h1{font-size:19px;font-weight:900;color:#1e3a8a}'
+    +'.hd .sub{font-size:11px;color:#64748b;margin-top:3px}'
+    +'.stu{font-size:12px;color:#1e293b;text-align:right}'
+    +'.cnts{display:flex;gap:8px;margin-bottom:12px}'
+    +'.cnt{padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700}'
+    +'@media print{body{padding:10mm}}'
+    +'</style></head><body>'
+    +'<div class="hd"><div><h1>📎 수시 지원 통합 자료</h1><div class="sub">교과분석 · 종합분석 · 논술분석 화면에 표시된 항목을 그대로 인쇄합니다</div></div>'
+    +'<div class="stu">'+stuName+(stuSchool?' · '+stuSchool:'')+(stuGrade?' · '+stuGrade:'')+'<br><span style="color:#94a3b8;font-size:10px">'+dateStr+' 발행</span></div></div>'
+    +'<div class="cnts">'
+    +(counts.교과?'<div class="cnt" style="background:#eff6ff;color:#1e3a8a">📋 교과분석 '+counts.교과+'개</div>':'')
+    +(counts.종합?'<div class="cnt" style="background:#f5f3ff;color:#6d28d9">📚 종합분석 '+counts.종합+'개</div>':'')
+    +(counts.논술?'<div class="cnt" style="background:#fef2f2;color:#991b1b">✏ 논술분석 '+counts.논술+'개</div>':'')
+    +'</div>'
+    +cardsHtml
+    +'<div style="margin-top:14px;font-size:9px;color:#94a3b8">※ 본 자료는 2027학년도 대입 참고 자료입니다. 각 대학 공식 입학처 발표 자료를 반드시 확인하세요.</div>'
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>'
+    +'</body></html>');
+  win.document.close();
 }
 
 function jh_print(sid){
