@@ -29136,6 +29136,7 @@ function cbrConfirmApply(){
 
   const subjMap = {KOR:'KOR',MATH:'MATH',ENG:'ENG',HIST:'HIST',LANG:'LANG',INQ1:'INQ',INQ2:'INQ'};
   let successCount = 0;
+  const archiveWarnings = []; // ★ 2026-08-22: 이전 회차가 비어있어 history에 자동저장되지 못한 학생을 추적
   const updatedStudents = [];
   const _prevLoadedFor = window.__challengerLoadedFor;
   ready.forEach(name=>{
@@ -29153,6 +29154,14 @@ function cbrConfirmApply(){
     // 같은 회차(응시일+시험명 동일)를 다시 반영하는 경우에만 기존 과목을 이어받아 갱신한다.
     const _sameRound = String(cd.lastTestDate||'').trim()===String(firstRow.examDate||'').trim()
       && String(cd.lastTestName||'').trim()===String(firstRow.examName||'').trim();
+    // ★ 2026-08-22: 회차가 바뀌는데(새 회차 반영) 이전 회차의 과목 데이터(lastSubjects)가
+    // 비어있으면, 아래 archive 로직이 아무것도 history에 못 넣고 그 이전 회차는 조용히
+    // 사라진다. 실제로 이런 사례(이유건/김대성/임준섭 등)가 발견되어, 발생 즉시 관리자가
+    // 알 수 있도록 경고를 수집한다(반영 자체는 막지 않음 — 데이터 유실 여부를 눈에 보이게).
+    if(!_sameRound && cd.lastTestDate && (!Array.isArray(cd.lastSubjects) || !cd.lastSubjects.length)){
+      archiveWarnings.push({name, lastTestDate: cd.lastTestDate, lastTestName: cd.lastTestName||''});
+      console.warn('[챌린저 결과일괄반영] 이전 회차 과목 데이터 없음 — history 저장 안 됨:', name, cd.lastTestDate, cd.lastTestName);
+    }
     // ★ 근본 수정: 예전에는 다른(새) 회차를 반영할 때 기존 lastSubjects를 그냥 버려서,
     // 그 학생의 지난 회차 데이터가 history에도 안 남고 통째로 사라졌다. 그래서 나중에
     // 다른 학생이 그 지난 회차를 아직 보고 있어도(예: 상담리포트의 "동일 회차 등수"),
@@ -29339,7 +29348,10 @@ function cbrConfirmApply(){
     }, '*');
   }
   // ★ 2026-07-25 추가: toast()는 놓치기 쉬워서, 명확한 완료 알림창을 별도로 띄운다.
-  alert('✅ 챌린저 결과 반영 완료\n\n'+successCount+'명 학생에게 반영했습니다.'+(_match?'\n(현재 보고 있는 '+_match.stu.name+' 학생 화면에도 바로 반영됐습니다)':''));
+  var _warnMsg = archiveWarnings.length
+    ? ('\n\n⚠️ 주의: 아래 '+archiveWarnings.length+'명은 이전 회차('+archiveWarnings.map(function(w){return w.name+' - '+w.lastTestDate+'/'+w.lastTestName;}).join(', ')+')의 과목 데이터가 비어있어 과거저장회차에 자동 저장되지 못했습니다.\n해당 회차 데이터가 필요하면 백업/복구 확인이 필요할 수 있습니다.')
+    : '';
+  alert('✅ 챌린저 결과 반영 완료\n\n'+successCount+'명 학생에게 반영했습니다.'+(_match?'\n(현재 보고 있는 '+_match.stu.name+' 학생 화면에도 바로 반영됐습니다)':'')+_warnMsg);
   render();
 }
 
