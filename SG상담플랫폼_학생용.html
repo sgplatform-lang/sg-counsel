@@ -1591,9 +1591,21 @@ function chgRemoveItem(sIdx,iIdx){
   render();
   chgScheduleSave();
 }
+// ★ 2026-08-22 탐구 세부과목 표기 통일: admin(관리자_수정중258.html)의 _cbrNormalizeDetail과
+// 동일 규칙. 학생이 직접 세부과목을 수정하는 이 입력 경로도 admin 결과일괄반영과 같은 표준
+// 표기로 저장되게 맞춰, 학생이 "화학 1"처럼 입력해도 admin에서 반영한 "화학Ⅰ"과 같은 과목으로
+// 인식되게 한다.
+function _cbrNormalizeDetail(v){
+  var s=String(v==null?'':v).trim();
+  if(!s) return s;
+  s=s.replace(/\s*(2|Ⅱ|II)$/,'Ⅱ');
+  s=s.replace(/\s*(1|Ⅰ|I)$/,'Ⅰ');
+  if(s==='사회·문화') s='사회문화';
+  return s;
+}
 function chgSetSubjField(sIdx,field,val){
   const cd=chgInit();
-  cd.lastSubjects[sIdx][field]=val;
+  cd.lastSubjects[sIdx][field]=(field==='detail')?_cbrNormalizeDetail(val):val;
   chgScheduleSave();
 }
 const CHG_TAGS={KOR:['문제를 잘못 읽음','끝까지 못읽어서','지문 독해 지연','선지 판단 미스','어휘 및 개념어 부족','고전 어려움','독서 특정제재 어려움','보기유형 이해부족','멘탈/집중력 저하'],MATH:['계산 실수','개념 이해 부족','공식이 떠오르지 않아서','문제 해석 오류','풀이 방법 몰라서','시간 부족','중반이후 마무리 부족','킬러 문항 포기','검산 안 함','멘탈 붕괴'],ENG:['어휘 몰라서','구문 해석 실패','빈칸 추론 실패','순서/삽입 실패','장문 시간 부족','주제/요지 오독','연결사 판단 실수','집중력 저하'],INQ:['개념 이해 부족','자료 해석 오류','시간 부족','암기 부족','계산 실수','문제 독해 실패','응용력 부족','집중력 저하'],HIST:['시대/시기 착각','사건 순서 오류','인물/사건 혼동','암기 부족','자료 해석 실패','시간 부족','문제 독해 실패','집중력 저하'],LANG:['어휘 몰라서','문법 이해 부족','듣기 못 들음','시간 부족','독해 실패','암기 부족','문화 이해 부족','집중력 저하']};
