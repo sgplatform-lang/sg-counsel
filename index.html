@@ -29172,6 +29172,9 @@ function cbrConfirmApply(){
       const _dup = _hist.some(h=>String(h.date||'').trim()===String(cd.lastTestDate).trim() && String(h.test||'').trim()===String(cd.lastTestName||'').trim());
       if(!_dup){
         _hist.push({
+          student: name, // ★ 2026-08-22: 이 필드가 없으면 populateHistoryDropdown/renderTrend의
+          // .student 일치 필터에 걸려 "과거 저장 회차" 목록과 누적 변화 리포트에서 안 보인다
+          // (실제로 저장은 됐는데 화면에만 안 나오던 문제 — 염민찬 사례로 확인).
           date: cd.lastTestDate,
           test: cd.lastTestName||'',
           subjects: JSON.parse(JSON.stringify(cd.lastSubjects)), // 등수·오답률 비교에 필요한 subject/detail/score를 그대로 보존
@@ -29271,6 +29274,8 @@ function cbrConfirmApply(){
       const _histNow = Array.isArray(newChallengerData.history) ? newChallengerData.history.slice() : [];
       const _idxNow = _histNow.findIndex(h=>String(h.date||'').trim()===String(newChallengerData.lastTestDate).trim() && String(h.test||'').trim()===String(newChallengerData.lastTestName||'').trim());
       const _entryNow = {
+        student: name, // ★ 2026-08-22: 위와 동일한 이유로 필요 — 이 필드 없으면 자동저장은 되지만
+        // 관리자 화면의 "과거 저장 회차" 목록/누적 변화 리포트에는 표시되지 않는다.
         date: newChallengerData.lastTestDate,
         test: newChallengerData.lastTestName||'',
         subjects: JSON.parse(JSON.stringify(subjects)),
