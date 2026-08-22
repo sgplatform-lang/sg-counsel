@@ -2312,17 +2312,25 @@ function doLogin(){
     if(org){
       ST.currentUser={id:'org_'+org.id,name:org.name+'(기관관리자)',role:'orgAdmin',teacherId:null};
       ST.currentOrg=org;
-      // 기관 데이터 필터
-      try{
-        const allStu=dbL(SK)||[];
-        ST.students=allStu.filter(s=>s.orgId===org.id);
-        const allTea=JSON.parse(localStorage.getItem(SKT)||'[]');
-        ST.teachers=allTea.filter(t=>t.orgId===org.id);
-      }catch(e){}
       sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:ST.currentOrg}));
-      ST.page='admin'; ST.adminTab='report'; render();
-      // ★ Firebase에서 기관 최신 데이터 로드 (기관관리자도 최신 동기화)
-      if(FB_USE()){ setTimeout(async()=>{ await fbLoadAll_all(); render(); startRealtimeSync(); },500); }
+      // ★ 2026-08-22: 예전엔 로그인 직후 localStorage 캐시(브라우저에 남아있던 이전
+      // 세션/다른 기관 데이터일 수 있음)로 먼저 화면을 그린 뒤 Firebase 최신 데이터로
+      // 바꿔치기해서, 로그인 순간 잠깐 엉뚱한 기관 데이터가 보이는 문제가 있었다.
+      // Firebase를 쓰는 경우엔 캐시를 아예 안 쓰고 실제 데이터가 올 때까지 빈 목록으로
+      // 대기한다(로딩 중으로 자연스럽게 보임, 잘못된 데이터가 보이는 것보다 안전).
+      if(FB_USE()){
+        ST.students=[]; ST.teachers=[];
+        ST.page='admin'; ST.adminTab='report'; render();
+        (async()=>{ await fbLoadAll_all(); render(); startRealtimeSync(); })();
+      } else {
+        try{
+          const allStu=dbL(SK)||[];
+          ST.students=allStu.filter(s=>s.orgId===org.id);
+          const allTea=JSON.parse(localStorage.getItem(SKT)||'[]');
+          ST.teachers=allTea.filter(t=>t.orgId===org.id);
+        }catch(e){}
+        ST.page='admin'; ST.adminTab='report'; render();
+      }
       return;
     }
   }catch(e){}
@@ -2362,31 +2370,36 @@ function doLogin(){
         const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
         const foundOrg=orgs.find(o=>o.id===found.orgId)||null;
         ST.currentOrg=foundOrg;
-        if(foundOrg){
-          // 기관 소속 학생/선생님만 로드 (localStorage 우선, Firebase로 최신화)
-          const allStudents=JSON.parse(localStorage.getItem(SK)||'[]');
-          const allTeachers=JSON.parse(localStorage.getItem(SKT)||'[]');
-          // 본인 기관 + 본인 담당 학생만
-          ST.students=allStudents.filter(s=>{
-            if(s.orgId!==foundOrg.id) return false;
-            const sc=[...(s.counselors||[])];
-            if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
-            return sc.includes(found.name);
-          });
-          ST.teachers=allTeachers.filter(t=>t.orgId===foundOrg.id);
-        }
-      }catch(e){ console.warn('기관 데이터 로드 오류:',e); }
+      }catch(e){ console.warn('기관 정보 로드 오류:',e); }
     } else {
       ST.currentOrg=null;
     }
     sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:ST.currentOrg}));
-    ST.page='main'; render();
-    // Firebase에서 최신 데이터로 갱신 (비동기)
+    // ★ 2026-08-22: 위 기관관리자 로그인과 동일한 이유로, Firebase 사용 시에는
+    // localStorage 캐시(다른 계정/기관의 이전 데이터일 수 있음)로 먼저 그리지 않고
+    // 실제 데이터가 도착할 때까지 빈 목록으로 대기한다.
     if(FB_USE()){
-      setTimeout(async()=>{
+      ST.students=[]; ST.teachers=[];
+      ST.page='main'; render();
+      (async()=>{
         const loaded = await fbLoadAll_all();
         if(loaded) render();
-      }, 500);
+      })();
+    } else {
+      try{
+        if(found.orgId && ST.currentOrg){
+          const allStudents=JSON.parse(localStorage.getItem(SK)||'[]');
+          const allTeachers=JSON.parse(localStorage.getItem(SKT)||'[]');
+          ST.students=allStudents.filter(s=>{
+            if(s.orgId!==ST.currentOrg.id) return false;
+            const sc=[...(s.counselors||[])];
+            if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
+            return sc.includes(found.name);
+          });
+          ST.teachers=allTeachers.filter(t=>t.orgId===ST.currentOrg.id);
+        }
+      }catch(e){ console.warn('기관 데이터 로드 오류:',e); }
+      ST.page='main'; render();
     }
     return;
   }
@@ -15017,6 +15030,32 @@ function init(){
     ST.currentOrg  = null;
   }
 
+  // ★ 2026-08-22: 바로 위에서 ST.students/ST.teachers를 localStorage 전체(모든 기관
+  // 통틀어)로 채워뒀는데, 그 상태 그대로 첫 render()가 호출되면 기관 필터링이 전혀
+  // 안 된 전체 학생 목록이 잠깐 화면에 보이는 문제가 있었다(새로고침 직후 "총 87명"처럼
+  // 다른 기관 데이터까지 섞여 보이는 증상). 세션 복원 후 역할에 맞게 즉시 좁혀준다 —
+  // Firebase에서 최신 데이터가 오면 어차피 다시 덮어써지므로 여기서는 화면 표시용
+  // 임시 필터링만 해두면 된다.
+  if(sessionRestored && ST.currentUser && ST.currentUser.role!=='admin'){
+    try{
+      const orgId = ST.currentOrg ? ST.currentOrg.id : (ST.currentUser.orgId||null);
+      if(orgId){
+        ST.students = (ST.students||[]).filter(s=>s.orgId===orgId);
+        ST.teachers = (ST.teachers||[]).filter(t=>t.orgId===orgId);
+        if(ST.currentUser.role==='teacher'){
+          const myName = ST.currentUser.name;
+          ST.students = ST.students.filter(s=>{
+            const sc=[...(s.counselors||[])];
+            if(s.counselor && !sc.includes(s.counselor)) sc.unshift(s.counselor);
+            return sc.includes(myName);
+          });
+        }
+      } else {
+        ST.students = []; ST.teachers = [];
+      }
+    }catch(e){ ST.students = []; ST.teachers = []; }
+  }
+
   // 로그인 화면 / 앱 화면 결정
   try{
     const _ls = document.getElementById('login-screen');
@@ -25388,7 +25427,7 @@ function exclusionReason(s,i){
 function validItems(s){return s.items.filter(i=>i.no&&i.unit&&(i.reasons||[]).length>0).filter(i=>difficultyEligible(s,i))}
 function excludedItems(s){return s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).filter(i=>exclusionReason(s,i))}
 function issues(s){let map={};validItems(s).forEach(i=>i.reasons.forEach(r=>{if(!map[r])map[r]={tag:r,count:0,items:[],units:[],memos:[],diffs:[]};map[r].count++;map[r].items.push(i.no);map[r].units.push(i.unit);if(i.memo)map[r].memos.push(i.memo);map[r].diffs.push(i.diff)}));return Object.values(map).sort((a,b)=>b.count-a.count)}
-function wrongCount(s){return +(s.wrongCount||0)||s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).length}function name(s){return \`\${SUBJECTS[s.subject]}\${s.detail?'('+s.detail+')':''}\`}function actionFor(s,tag){return ACTION_LIBRARY[s.subject]?.[tag]||\`\${SUBJECTS[s.subject]} \${tag} 원인은 다음 회차 전 유사 문항 3개로 재확인하고, 시험 중 같은 신호가 나오면 즉시 표시한다.\`}
+function wrongCount(s){return +(s.wrongCount||0)||s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).length}function name(s){return \`\${SUBJECTS[s.subject]}\${s.detail?'('+s.detail+')':''}\`}function _sgTrendLabel(s){return s&&s.name?_sgDisplayName(s.name):name(s);}function _sgTrendWrong(s){return (s&&s.wrong!=null)?s.wrong:((s&&s.wrongCount!=null)?s.wrongCount:'-');}function actionFor(s,tag){return ACTION_LIBRARY[s.subject]?.[tag]||\`\${SUBJECTS[s.subject]} \${tag} 원인은 다음 회차 전 유사 문항 3개로 재확인하고, 시험 중 같은 신호가 나오면 즉시 표시한다.\`}
 function scoreMission(s){let r=0;if(s.focus==='집중')r+=3;if(s.time==='심각'||s.mental!=='안정')r+=2;if(+s.targetScore&&+s.score&&(+s.targetScore-+s.score>=10))r+=2;if(issues(s).length)r+=2;return r}function focusedSubjects(){let raw=$('focusLimit').value;let limit=raw?+raw:state.subjects.length;return [...state.subjects].sort((a,b)=>scoreMission(b)-scoreMission(a)).slice(0,limit).map(s=>s.sid)}
 function selectedData(){let fs=focusedSubjects();let out=[];state.subjects.forEach(s=>{if(!fs.includes(s.sid))return;issues(s).slice(0,2).forEach(iss=>out.push({s,iss,action:actionFor(s,iss.tag)}))});return out}
 function countRank(v){let m={'0':0,'1~2':1,'3~5':2,'6개 이상':3};return m[v]??0}
@@ -25521,8 +25560,8 @@ function currentRecord(){return{student:$('studentName').value,date:$('testDate'
 function _sgTrim(v){return String(v==null?'':v).trim()}function _sgNormSubj(v){var s=String(v==null?'':v).replace(/\\s+/g,'');if(s.indexOf('영어')===0)return '영어';if(s.indexOf('수학')===0)return '수학';return s}function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';return s}
 var _SG_CODE2KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
 function _sgDisplayName(n){var s=String(n==null?'':n).trim();var m=s.match(/^(KOR|MATH|ENG|INQ|HIST|LANG)(\(.*\))?$/i);if(m){var code=m[1].toUpperCase();return (_SG_CODE2KOR[code]||code)+(m[2]||'')}return s}
-function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim($('studentName').value)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];let _seenSubjNorm={};let subjects=[];rows.flatMap(r=>r.subjects.map(s=>_sgDisplayName(s.name))).forEach(n=>{let k=_sgNormSubj(n);if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}});$('trendReport').innerHTML=cover('누적 변화 리포트')+subjects.map(sub=>\`<div class="chart">\${chart(rows,sub)}</div>\`).join('')+\`<table><thead><tr><th>회차</th><th>과목</th><th>성적</th><th>오답</th><th>태그</th></tr></thead><tbody>\${rows.flatMap(r=>r.subjects.map(s=>\`<tr><td>\${r.date}<br>\${r.test}</td><td>\${_sgDisplayName(s.name)}</td><td>\${s.score||'-'}</td><td>\${s.wrong}</td><td>\${(s.tags||[]).join(', ')}</td></tr>\`)).join('')}</tbody></table>\`}
-function chart(rows,sub){let data=rows.map((r,i)=>{let s=r.subjects.find(x=>_sgNormSubj(_sgDisplayName(x.name))===_sgNormSubj(sub));if(!s||s.score===undefined||s.score===null||s.score===''){return null}return {i,label:r.test||r.date,score:+s.score||0,wrong:+s.wrong||0}}).filter(d=>d!==null);if(!data.length){return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">아직 입력된 점수가 없습니다.</div>\`}let W=850,H=230,P=40,maxW=Math.max(20,...data.map(d=>d.wrong));let step=(W-2*P)/Math.max(1,data.length-1);let pts=data.map((d,i)=>({x:P+i*step,y:P+(100-d.score)*(H-2*P)/100,...d}));let bars=pts.map(p=>{let h=p.wrong*(H-2*P)/maxW;return \`<rect x="\${p.x-11}" y="\${H-P-h}" width="22" height="\${h}" rx="5" fill="#dbeafe"></rect>\`}).join('');let line=pts.map(p=>\`\${p.x},\${p.y}\`).join(' ');let noteHtml=data.length===1?'<div class="small muted">회차가 1개뿐이라 추이선 없이 이번 회차 점수만 표시됩니다. 다음 회차 점수가 입력되면 추이선이 나타납니다.</div>':'';return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">선=성적, 막대=오답 수</div>\${noteHtml}<svg viewBox="0 0 \${W} \${H}"><line x1="\${P}" y1="\${P}" x2="\${P}" y2="\${H-P}" stroke="#cbd5e1"/><line x1="\${P}" y1="\${H-P}" x2="\${W-P}" y2="\${H-P}" stroke="#cbd5e1"/>\${bars}<polyline fill="none" stroke="#0f766e" stroke-width="3" points="\${line}"/>\${pts.map(p=>\`<circle cx="\${p.x}" cy="\${p.y}" r="5" fill="#0f766e"/><text x="\${p.x}" y="\${p.y-8}" text-anchor="middle" font-size="12">\${p.score||'-'}</text><text x="\${p.x}" y="\${H-12}" text-anchor="middle" font-size="11">\${esc(p.label).slice(0,10)}</text>\`).join('')}</svg>\`}
+function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim($('studentName').value)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];let _seenSubjNorm={};let subjects=[];rows.flatMap(r=>r.subjects.map(s=>_sgTrendLabel(s))).forEach(n=>{let k=_sgNormSubj(n);if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}});$('trendReport').innerHTML=cover('누적 변화 리포트')+subjects.map(sub=>\`<div class="chart">\${chart(rows,sub)}</div>\`).join('')+\`<table><thead><tr><th>회차</th><th>과목</th><th>성적</th><th>오답</th><th>태그</th></tr></thead><tbody>\${rows.flatMap(r=>r.subjects.map(s=>\`<tr><td>\${r.date}<br>\${r.test}</td><td>\${_sgTrendLabel(s)}</td><td>\${s.score||'-'}</td><td>\${_sgTrendWrong(s)}</td><td>\${(s.tags||[]).join(', ')}</td></tr>\`)).join('')}</tbody></table>\`}
+function chart(rows,sub){let data=rows.map((r,i)=>{let s=r.subjects.find(x=>_sgNormSubj(_sgTrendLabel(x))===_sgNormSubj(sub));if(!s||s.score===undefined||s.score===null||s.score===''){return null}return {i,label:r.test||r.date,score:+s.score||0,wrong:+_sgTrendWrong(s)||0}}).filter(d=>d!==null);if(!data.length){return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">아직 입력된 점수가 없습니다.</div>\`}let W=850,H=230,P=40,maxW=Math.max(20,...data.map(d=>d.wrong));let step=(W-2*P)/Math.max(1,data.length-1);let pts=data.map((d,i)=>({x:P+i*step,y:P+(100-d.score)*(H-2*P)/100,...d}));let bars=pts.map(p=>{let h=p.wrong*(H-2*P)/maxW;return \`<rect x="\${p.x-11}" y="\${H-P-h}" width="22" height="\${h}" rx="5" fill="#dbeafe"></rect>\`}).join('');let line=pts.map(p=>\`\${p.x},\${p.y}\`).join(' ');let noteHtml=data.length===1?'<div class="small muted">회차가 1개뿐이라 추이선 없이 이번 회차 점수만 표시됩니다. 다음 회차 점수가 입력되면 추이선이 나타납니다.</div>':'';return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">선=성적, 막대=오답 수</div>\${noteHtml}<svg viewBox="0 0 \${W} \${H}"><line x1="\${P}" y1="\${P}" x2="\${P}" y2="\${H-P}" stroke="#cbd5e1"/><line x1="\${P}" y1="\${H-P}" x2="\${W-P}" y2="\${H-P}" stroke="#cbd5e1"/>\${bars}<polyline fill="none" stroke="#0f766e" stroke-width="3" points="\${line}"/>\${pts.map(p=>\`<circle cx="\${p.x}" cy="\${p.y}" r="5" fill="#0f766e"/><text x="\${p.x}" y="\${p.y-8}" text-anchor="middle" font-size="12">\${p.score||'-'}</text><text x="\${p.x}" y="\${H-12}" text-anchor="middle" font-size="11">\${esc(p.label).slice(0,10)}</text>\`).join('')}</svg>\`}
 function stripCovers(markup){
   return String(markup||'')
     .replace(/<div class="premium-cover">[\\s\\S]*?<div class="cover-footer">[\\s\\S]*?<\\/div>\\s*<\\/div>/g,'')
