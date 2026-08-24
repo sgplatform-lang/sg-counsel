@@ -37397,6 +37397,23 @@ function generateReport() {
     };
   }
 
+  // ★ 2026-08-24 추가: 회차 통계표(및 전체 일괄 출력)가 "같은 회차인데 응시일/시험명
+  // 문자열이 미세하게 달라 매칭에서 빠지는" 문제를 줄이기 위한 정규화 비교.
+  // 값 자체를 바꿔 저장하지 않고, 비교(===)할 때만 이 정규화된 값을 쓴다.
+  // ★ 2026-08-24(2차): 공백 정리만으로는 부족했음(예: 응시일이 "2026-08-22" vs
+  // "2026. 08. 22." vs "2026.8.22"처럼 구분자·자릿수 표기가 서로 달라도 실제로는
+  // 같은 날짜인 경우가 있었음) → 응시일은 숫자만 뽑아 8자리(YYYYMMDD)로, 시험명은
+  // 공백을 아예 다 제거하고 비교한다.
+  function _examDateNorm(v){
+    var digits=String(v==null?'':v).replace(/[^0-9]/g,'');
+    if(digits.length===8) return digits; // 이미 YYYYMMDD
+    var m=String(v==null?'':v).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    if(m) return m[1]+('0'+m[2]).slice(-2)+('0'+m[3]).slice(-2);
+    return digits;
+  }
+  function _examNameNorm(v){ return String(v==null?'':v).replace(/\s+/g,''); }
+  function _examKeyNorm(v){ return String(v==null?'':v).trim().replace(/\s+/g,' '); } // (구버전 호환용, 더는 매칭에 안 씀)
+
   function _batchTargets(liveDate,liveName,onlyCurrent){
     var cur=ST.sel||ST.adminSel;
     if(!cur) return {cur:null,targets:[],date:'',name:''};
@@ -37420,12 +37437,55 @@ function generateReport() {
     var base=(ST.students||[]).filter(function(s){
       return !cur.orgId || String(s.orgId||'')===String(cur.orgId||'');
     });
-    var targets=base.filter(function(s){
+    var _dateN=_examDateNorm(date), _nameN=_examNameNorm(name);
+    // ★ 2026-08-24(3차) 핵심 수정: 학생이 이번 회차보다 "더 최근" 회차를 이미 반영받은
+    // 경우, 그 학생의 challengerData.lastSubjects/lastTestDate는 이미 최신 회차로 바뀌어
+    // 있고 이번 회차 데이터는 challengerData.history[] 안으로 보관(archive)된 상태다.
+    // 지금까지는 lastSubjects/lastTestDate만 봤기 때문에, 상담리포트(과거 회차 불러오기로
+    // 정상 조회됨)와 달리 이 통계표/일괄출력에서는 그런 학생들이 전부 누락되고 있었다.
+    // → 현재 회차가 안 맞으면 history에서도 같은 응시일+시험명을 찾아서 그 데이터로
+    // 매칭한다(원본 학생 데이터는 건드리지 않고, 통계 생성용으로만 복제해서 쓴다).
+    function _histMatch(cd){
+      if(!Array.isArray(cd.history)) return null;
+      for(var i=cd.history.length-1;i>=0;i--){
+        var h=cd.history[i];
+        var hDate=_examDateNorm(h.date!=null?h.date:h.testDate);
+        var hName=_examNameNorm(h.test!=null?h.test:(h.testName!=null?h.testName:h.name));
+        if((!_dateN||hDate===_dateN)&&(!_nameN||hName===_nameN)) return h;
+      }
+      return null;
+    }
+    var _matchSrc={}; // 학생id -> 'current' | 'history'
+    var targets=[];
+    base.forEach(function(s){
       var cd=s.challengerData||{};
-      return Array.isArray(cd.lastSubjects)&&cd.lastSubjects.length>0
-        && (!date||String(cd.lastTestDate||'')===String(date))
-        && (!name||String(cd.lastTestName||'')===String(name));
+      if(Array.isArray(cd.lastSubjects)&&cd.lastSubjects.length>0
+        && (!_dateN||_examDateNorm(cd.lastTestDate)===_dateN)
+        && (!_nameN||_examNameNorm(cd.lastTestName)===_nameN)){
+        targets.push(s); _matchSrc[s.id]='current'; return;
+      }
+      var h=_histMatch(cd);
+      if(h){
+        var hSubs=h.subjects||h.fullSubjects||[];
+        if(hSubs.length){
+          var clone=Object.assign({}, s, {challengerData:Object.assign({}, cd, {
+            lastSubjects: hSubs,
+            lastTestDate: h.date!=null?h.date:h.testDate,
+            lastTestName: h.test!=null?h.test:(h.testName!=null?h.testName:h.name)
+          })});
+          targets.push(clone); _matchSrc[s.id]='history';
+        }
+      }
     });
+    // ★ 진단 로그: 이번 조직에 챌린저 데이터를 가진 학생 수보다 실제 매칭된 인원이
+    // 적으면(=여전히 못 찾은 학생이 있을 가능성) 콘솔에 원본 응시일/시험명을 그대로
+    // 나열한다. 실제 매칭 대상 자체는 바꾸지 않는다(다른 회차를 잘못 섞는 게 더 위험).
+    var _withData=base.filter(function(s){var cd=s.challengerData||{};return Array.isArray(cd.lastSubjects)&&cd.lastSubjects.length>0;});
+    if((_dateN||_nameN) && targets.length<_withData.length){
+      console.warn('[SG] 회차 통계표: 챌린저 데이터가 있는 학생('+_withData.length+'명) 중 '+targets.length+'명만 이번 회차와 일치했습니다(현재회차 매칭+지난회차 보관함 매칭 포함). 아래 목록에서 저장된 응시일/시험명 표기를 비교해보세요.',
+        {기준응시일:date, 기준응시일_정규화:_dateN, 기준시험명:name, 기준시험명_정규화:_nameN,
+         전체목록:_withData.map(function(s){var cd=s.challengerData||{};return {이름:s.name, 저장된응시일:cd.lastTestDate, 저장된시험명:cd.lastTestName, 매칭방식:_matchSrc[s.id]||'불일치', history보관건수:Array.isArray(cd.history)?cd.history.length:0};})});
+    }
     if(!targets.length){
       targets=base.filter(function(s){
         var cd=s.challengerData||{};
