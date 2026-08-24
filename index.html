@@ -28573,6 +28573,27 @@ function openChallengerBulkReflect(){
       </div>
       <p style="font-size:13px;color:#64748b;margin-top:0">엑셀의 '결과일괄반영용' 시트를 전체 선택해서 그대로 붙여넣으세요 (헤더 행이 포함돼도 자동으로 걸러집니다).</p>
       <textarea id="cbr-input" style="width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="학생번호	학생명	학교	학년	시험일	시험명/회차	담당매니저	과목코드	과목명	선택과목/세부과목	점수	전체오답번호	오답수	미응답번호	비고"></textarea>
+      <div style="margin-top:10px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
+        <div style="font-size:13px;font-weight:700;color:#166534">📥 (선택) 학원 원본 채점결과 파일 그대로 붙여넣기</div>
+        <p style="font-size:12px;color:#166534;margin:4px 0 8px">
+          시대인재 등 학원에서 받은 원본 채점결과(이름·점수·Q1~Qn, O/X(오답번호)/- 형태)를 <b>가공 없이 그대로</b> 복사해서 붙여넣으면, 위 칸(1번 박스) 형식으로 자동 변환해서 채워줍니다.
+          탐구(제1선택 과목·제2선택 과목 열이 있는 형태)는 과목을 자동 인식합니다 — 그 외 과목(국어/수학/영어/한국사/제2외국어)은 아래에서 선택해주세요.
+          점수 칸에 이미 점수가 있으면 그 값을 그대로 쓰고(탐구는 과목별로 나뉘어 있지 않아 배점표 기준으로 다시 계산합니다), 오답번호(X)와 미응답(-)은 모두 "오답"으로 처리됩니다.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <select id="cbr-raw-subj" style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px">
+            <option value="">과목 선택(탐구 형식이면 자동 인식돼 필요 없음)</option>
+            <option value="KOR">국어</option><option value="MATH">수학</option><option value="ENG">영어</option><option value="HIST">한국사</option><option value="LANG">제2외국어</option>
+          </select>
+          <input id="cbr-raw-date" placeholder="응시일 (예: 2026-08-17)" style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px;width:170px">
+          <input id="cbr-raw-name" placeholder="시험명/회차 (예: 시대인재 8월 전국모의평가)" style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px;width:260px">
+          <input id="cbr-raw-manager" placeholder="담당매니저(선택)" style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px;width:140px">
+        </div>
+        <textarea id="cbr-raw-input" style="width:100%;min-height:110px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="이름	점수	퍼센트	등수	상위%	Q1	Q2	Q3 ...
+황순현	72	0.72	21	마감 후 공개	O	X(5)	O ..."></textarea>
+        <button onclick="cbrConvertRawOX();markClicked(event)" style="margin-top:8px;background:#166534;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:700">⬇ 위 1번 박스 형식으로 변환해 채우기</button>
+        <div id="cbr-raw-status" style="font-size:12px;color:#166534;margin-top:6px;font-weight:600"></div>
+      </div>
       <div style="margin-top:14px">
         <div style="font-size:13px;font-weight:700;color:#0f172a">📚 (선택) 이번 회차 문항별 단원/유형</div>
         <p style="font-size:12px;color:#64748b;margin:4px 0 6px">
@@ -28726,7 +28747,168 @@ function cbrNormalizeDate(s){
   if(!m) return s;
   return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
 }
-function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';return s}
+// ★ 2026-08-24 추가: 학원 원본 채점결과(O/X 형태) 붙여넣기 → 결과일괄반영 1번 박스 형식으로
+// 변환. cbrParseRows/cbrConfirmApply(매칭·저장·AAR 보존·회차 병합) 로직은 전혀 건드리지
+// 않고, 그 앞단에서 같은 모양의 탭구분 텍스트를 만들어 1번 박스에 채워 넣기만 한다.
+function _rawCellStatus(v){
+  var s=String(v==null?'':v).trim();
+  if(!s) return null;
+  if(/^O\*?$/i.test(s)) return 'O';
+  if(s==='0') return 'O';             // ★ 일부 학원(대성 등) 채점결과는 정답을 문자 O 대신 숫자 0으로 표기 — 답안 선택지는 1~5뿐이라 0은 항상 정답 표시로 봐도 안전
+  if(/^X/i.test(s)) return 'X';       // X(2), X(2)* 등 — 오답 선택번호는 안 씀(전체오답번호 목록만 필요)
+  if(/^-+$/.test(s)) return 'U';      // 미응답
+  return null;
+}
+function cbrConvertRawOX(){
+  var rawEl=document.getElementById('cbr-raw-input');
+  var raw=rawEl?rawEl.value:'';
+  var statusEl=document.getElementById('cbr-raw-status');
+  function fail(msg){ if(statusEl){ statusEl.style.color='#b91c1c'; statusEl.textContent='⚠️ '+msg; } toast(msg); }
+  if(!raw||!raw.trim()){ fail('원본 표를 먼저 붙여넣어주세요'); return; }
+  var subjSel=(document.getElementById('cbr-raw-subj')||{}).value||'';
+  var examDate=cbrNormalizeDate(((document.getElementById('cbr-raw-date')||{}).value||'').trim());
+  var examName=((document.getElementById('cbr-raw-name')||{}).value||'').trim();
+  var manager=((document.getElementById('cbr-raw-manager')||{}).value||'').trim();
+  if(statusEl) statusEl.style.color='#166534';
+  if(!examDate||!examName){ fail('응시일과 시험명을 먼저 입력해주세요'); return; }
+
+  var rawLines=raw.split(/\r?\n/).filter(function(l){return l.trim().length;});
+  if(rawLines.length<2){ fail('헤더 행과 데이터 행이 모두 있는지 확인해주세요'); return; }
+  // ★ 2026-08-24(2차) 추가: 헤더 행이 맨 첫 줄이 아니거나(엑셀에서 범위 선택 시 헤더를
+  // 빼고 복사한 경우 등), 앞에 빈 줄/안내 줄이 섞여 붙여넣어진 경우까지 대비해, 첫 5줄
+  // 안에서 "이름" 또는 "제1선택 과목" 셀이 있는 줄을 헤더로 자동으로 찾는다.
+  var headerRowIdx=-1, header=null;
+  for(var hi=0; hi<Math.min(5, rawLines.length); hi++){
+    var cells=rawLines[hi].split('\t').map(function(x){return (x||'').trim();});
+    if(cells.indexOf('이름')>-1 || cells.indexOf('제1선택 과목')>-1){ headerRowIdx=hi; header=cells; break; }
+  }
+  if(headerRowIdx===-1){
+    fail('붙여넣은 내용 맨 위쪽에서 "이름"이 적힌 헤더(제목) 줄을 찾지 못했습니다. 엑셀에서 맨 위 제목 줄(이름/점수/Q1/Q2...)까지 포함해서 다시 복사·붙여넣기 해주세요.');
+    return;
+  }
+  var lines=[rawLines[headerRowIdx]].concat(rawLines.slice(headerRowIdx+1));
+  var idx={}, q1=[], q2=[];
+  header.forEach(function(h,i){
+    var t=(h||'').trim();
+    if(t==='이름') idx.name=i;
+    else if(t==='선택과목') idx.detail=i;
+    else if(t==='점수') idx.score=i;
+    else if(t==='제1선택 과목') idx.sel1=i;
+    else if(t==='제2선택 과목') idx.sel2=i;
+    var m1=t.match(/^제1선택\s*Q(\d+)$/);
+    var m2=t.match(/^제2선택\s*Q(\d+)$/);
+    var m0=t.match(/^Q(\d+)$/);
+    if(m1) q1.push({no:+m1[1], i:i});
+    else if(m2) q2.push({no:+m2[1], i:i});
+    else if(m0) q1.push({no:+m0[1], i:i});
+  });
+  q1.sort(function(a,b){return a.no-b.no;});
+  q2.sort(function(a,b){return a.no-b.no;});
+  var isPaired = idx.sel1!=null && idx.sel2!=null && q2.length>0;
+
+  if(idx.name==null || (!isPaired && !q1.length)){
+    fail('헤더에서 "이름"과 문항(Q1, Q2 ...) 열을 찾지 못했습니다. 원본 표 형식을 확인해주세요.');
+    return;
+  }
+  if(!isPaired && !subjSel){
+    fail('탐구(제1선택/제2선택 과목) 형식이 아닙니다. 과목을 선택해주세요.');
+    return;
+  }
+
+  var SUBJ_LABEL={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',LANG:'제2외국어'};
+  var itemMeta=_cbrParseItemMeta(); // 이미 2번 박스(문항단원DB)에 붙여넣어져 있으면 배점 등을 참조
+  function pointsFor(subjCode, detail, no){
+    var m=_cbrLookupItemMeta(itemMeta, subjCode, detail, no);
+    var p=m&&m.points?Number(m.points):NaN;
+    return isFinite(p)&&p>0?p:0;
+  }
+
+  var outLines=[], studentCnt=0, fallbackNote=false;
+  for(var r=1;r<lines.length;r++){
+    var c=lines[r].split('\t');
+    var name=(c[idx.name]||'').trim();
+    if(!name) continue;
+    studentCnt++;
+
+    (function buildAndPush(subjCode, subjName, detailRaw, qList, scoreCellIdx){
+      if(!qList.length) return;
+      var detail=_cbrNormalizeDetail(detailRaw||'');
+      var wrongNos=[], correctPoints=0, correctCount=0;
+      qList.forEach(function(q){
+        var st=_rawCellStatus(c[q.i]);
+        if(st==='X'||st==='U'){ wrongNos.push(String(q.no)); }
+        else if(st==='O'){ correctCount++; correctPoints+=pointsFor(subjCode, detail, String(q.no)); }
+      });
+      var score, note='';
+      var rawScoreVal = (!isPaired && scoreCellIdx!=null) ? String(c[scoreCellIdx]||'').trim() : '';
+      if(rawScoreVal){
+        score = rawScoreVal; // 원본에 이미 있는 점수를 그대로 신뢰(배점표 오차 문제 회피)
+      } else if(correctPoints>0){
+        score = String(correctPoints);
+      } else {
+        score = String(correctCount);
+        note = '배점표 미제공: 정답 문항 수로 대체(정확한 배점 점수 아님, 2번 박스에 배점을 채우면 자동으로 정확해집니다)';
+        fallbackNote = true;
+      }
+      outLines.push([studentCnt, name, '', '', examDate, examName, manager, subjCode, subjName, detail, score,
+        wrongNos.join(' '), String(wrongNos.length), '', note].join('\t'));
+    })(
+      isPaired ? 'INQ1' : subjSel,
+      isPaired ? _cbrNormalizeDetail((c[idx.sel1]||'').trim()) : (SUBJ_LABEL[subjSel]||subjSel),
+      isPaired ? (c[idx.sel1]||'') : (idx.detail!=null ? (c[idx.detail]||'') : ''),
+      isPaired ? q1 : q1,
+      idx.score
+    );
+    if(isPaired){
+      (function buildAndPush2(){
+        var subjCode='INQ2', detailRaw=(c[idx.sel2]||''), detail=_cbrNormalizeDetail(detailRaw), qList=q2;
+        var wrongNos=[], correctPoints=0, correctCount=0;
+        qList.forEach(function(q){
+          var st=_rawCellStatus(c[q.i]);
+          if(st==='X'||st==='U'){ wrongNos.push(String(q.no)); }
+          else if(st==='O'){ correctCount++; correctPoints+=pointsFor(subjCode, detail, String(q.no)); }
+        });
+        var score, note='';
+        if(correctPoints>0){ score=String(correctPoints); }
+        else { score=String(correctCount); note='배점표 미제공: 정답 문항 수로 대체(정확한 배점 점수 아님, 2번 박스에 배점을 채우면 자동으로 정확해집니다)'; fallbackNote=true; }
+        outLines.push([studentCnt, name, '', '', examDate, examName, manager, subjCode, detail, detail, score,
+          wrongNos.join(' '), String(wrongNos.length), '', note].join('\t'));
+      })();
+    }
+  }
+
+  if(!outLines.length){ fail('변환할 학생 데이터를 찾지 못했습니다.'); return; }
+
+  var ta=document.getElementById('cbr-input');
+  var sep = ta.value.trim() ? '\n' : '';
+  ta.value = ta.value + sep + outLines.join('\n');
+  var msg='✅ '+studentCnt+'명 변환 완료 — 위 1번 박스에 추가되었습니다. 아래 "🔍 분석하기"를 눌러 매칭을 확인하세요.'+(fallbackNote?' (일부 과목은 배점표가 없어 정답 문항 수를 점수로 대체했습니다 — 정확한 점수가 필요하면 2번 박스에 배점을 채워주세요.)':'');
+  if(statusEl){ statusEl.style.color='#166534'; statusEl.textContent=msg; }
+  toast(studentCnt+'명 변환 완료. 1번 박스 내용을 확인하고 분석하세요.');
+}
+// ★ 2026-08-24(3차) 보강: 기존엔 "사회·문화"→"사회문화" 한 가지 케이스와 로마숫자(Ⅰ/Ⅱ)
+// 표기만 통일했는데, "사회 문화"(띄어쓰기), "생활 과 윤리", "물리학 1"처럼 중간에 공백이나
+// 가운뎃점이 들어간 다른 변형은 다른 과목으로 취급되고 있었다. 탐구 18개 정식 과목명을
+// "공백/가운뎃점을 뺀 형태"를 키로 하는 표에 매핑해두고, 어떤 표기로 들어와도 이 앱에서
+// 이미 쓰고 있던 표준 표기(예: "생활과 윤리"는 띄어쓰기 유지, "사회문화"는 붙여쓰기 유지 —
+// 기존 저장 데이터와의 연속성을 위해 기존 표준 표기를 그대로 정답으로 삼음)로 맞춘다.
+// 국어/수학 세부과목(화법과작문/언어와매체/미적분/기하/확률과통계)처럼 표에 없는 값은
+// 원래 하던 대로 트림만 하고 그대로 둔다.
+var _SG_DETAIL_CANON = (function(){
+  var list = ['생활과 윤리','윤리와 사상','한국지리','세계지리','동아시아사','세계사','경제','정치와 법','사회문화',
+    '물리학Ⅰ','물리학Ⅱ','화학Ⅰ','화학Ⅱ','생명과학Ⅰ','생명과학Ⅱ','지구과학Ⅰ','지구과학Ⅱ'];
+  var m={};
+  list.forEach(function(name){ m[name.replace(/[·\s]+/g,'')] = name; });
+  return m;
+})();
+function _cbrNormalizeDetail(v){
+  var s=String(v==null?'':v).trim();
+  if(!s) return s;
+  s=s.replace(/\s*(2|Ⅱ|II)$/,'Ⅱ');
+  s=s.replace(/\s*(1|Ⅰ|I)$/,'Ⅰ');
+  var canon=_SG_DETAIL_CANON[s.replace(/[·\s]+/g,'')];
+  return canon || s;
+}
 function cbrParseRows(text){
   const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
   const rows = [];
