@@ -10603,6 +10603,34 @@ function printTab(sid,tab){
 // ══ 학생 등록/수정 폼 ══
 let _sfExtraSubjs = []; // 모달 내 임시 추가 과목
 
+// ★ 2026-08-24 추가: 학생용 앱 로그인 아이디 중복확인. 선생님 계정의 checkTeacherId와
+// 동일한 패턴 — ST.students 전체(관리자가 보고 있는 범위) 기준으로 검사한다.
+function checkStudentId(originalId, curId){
+  const input=document.getElementById('sf_lid');
+  const status=document.getElementById('sf_lid_status');
+  if(!input||!status) return;
+  const lid=input.value.trim();
+  if(!lid){ alert('아이디를 입력해주세요.'); return; }
+
+  if(lid===originalId){
+    status.textContent='✅ 사용 가능';
+    status.style.color='#0f9d58';
+    window._sLidChecked=true;
+    return;
+  }
+
+  const dup=(ST.students||[]).find(x=>String(x.studentLoginId||'').trim()===lid && String(x.id)!==String(curId||0));
+  if(dup){
+    status.textContent='❌ 이미 사용 중';
+    status.style.color='#e53935';
+    window._sLidChecked=false;
+    alert(`"${lid}"는 이미 "${dup.name}" 학생이 사용 중인 아이디입니다.\n다른 아이디를 입력해주세요.`);
+  } else {
+    status.textContent='✅ 사용 가능';
+    status.style.color='#0f9d58';
+    window._sLidChecked=true;
+  }
+}
 function openSForm(s){
   // s가 undefined/null이면 최신 ST.sel로 대체 (안전 처리)
   const target = s || null;
@@ -10611,6 +10639,7 @@ function openSForm(s){
 }
 
 function _renderSForm(s){
+  window._sLidChecked = s?.studentLoginId ? true : false; // 신규/아이디 변경은 false, 기존 아이디 그대로면 true
   document.querySelectorAll('.sform-overlay').forEach(e=>e.remove());
   // 기관 소속 선생님만 표시 (기관관리자/선생님 계정)
   const curFormOrg = ST.currentOrg?.id || ST.currentUser?.orgId || null;
@@ -10696,8 +10725,11 @@ function _renderSForm(s){
         <div style="font-size:11px;font-weight:700;color:#0f9d58;margin-bottom:8px">📱 학생용 앱 로그인 계정</div>
         <div class="g2">
           <div>
-            <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:4px">학생 아이디</div>
-            <input id="sf_lid" class="inp" placeholder="예: hong01 또는 숫자" value="${esc(s?.studentLoginId||'')}">
+            <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:4px">학생 아이디 <span id="sf_lid_status" style="font-size:10px;margin-left:4px"></span></div>
+            <div style="display:flex;gap:6px">
+              <input id="sf_lid" class="inp" placeholder="예: hong01 또는 숫자" value="${esc(s?.studentLoginId||'')}" style="flex:1" oninput="document.getElementById('sf_lid_status').textContent='';window._sLidChecked=false;">
+              <button onclick="checkStudentId('${esc(s?.studentLoginId||'')}', ${s?s.id:'null'})" style="background:#0f9d58;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">중복확인</button>
+            </div>
           </div>
           <div>
             <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:4px">학생 비밀번호</div>
@@ -10745,6 +10777,17 @@ window._saveSForm = function(sid){
   const school= document.getElementById('sf_s')?.value?.trim();
   if(!name||!school){alert('이름과 학교는 필수입니다.');return;}
   const existing = sid ? ST.students.find(x=>String(x.id)===String(sid)) : null;
+  // ★ 학생 아이디를 새로 입력했거나 변경한 경우, 저장 전에 중복확인을 먼저 하도록 강제
+  const _lidInput = document.getElementById('sf_lid')?.value?.trim()||'';
+  if(_lidInput && _lidInput!==(existing?.studentLoginId||'') && !window._sLidChecked){
+    alert('학생 아이디 중복확인을 먼저 진행해주세요.');
+    document.getElementById('sf_lid')?.focus();
+    return;
+  }
+  if(_lidInput){
+    const dupNow=(ST.students||[]).find(x=>String(x.studentLoginId||'').trim()===_lidInput && String(x.id)!==String(sid||0));
+    if(dupNow){ alert(`"${_lidInput}"는 이미 "${dupNow.name}" 학생이 사용 중인 아이디입니다.`); return; }
+  }
   // 추가 과목 이름 최신화
   const finalExtra = _sfExtraSubjs.map((lb,i)=>
     document.getElementById(`sf_extra_name_${i}`)?.value?.trim()||lb
