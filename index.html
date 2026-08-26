@@ -25590,9 +25590,9 @@ function nextCriteriaFor(type){const m={
  '정확도·실수형':'학습 완료 범위 실수 감소 / 조건 확인 실행 / 쉬운 문항 정답률',
  '복합 원인형':'미학습 문항 감소 / 학습 범위 오답 감소 / 지정 행동강령 이행',
  '안정 수행형':'동일 전략 재현 / 마킹 완료 / 붕괴 없이 완주'};return m[type]||'동일 위험 행동 재발 여부 / 행동강령 이행 여부'}
-function recommendSituation(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);if(!s)return;let r=inferSituation(s);Object.assign(s,{situationType:r.type,primaryFactor:r.factor,progressImpact:r.progress,operationImpact:r.operation,recommendedActions:r.actions});if(!s.nextCriteria)s.nextCriteria=r.criteria;renderSubjects();toast('상황 분석과 행동강령을 추천했습니다.')}
+function recommendSituation(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);if(!s)return;if(window._sgDerive){window._sgDerive(s);}else{let r=inferSituation(s);Object.assign(s,{situationType:r.type,primaryFactor:r.factor,progressImpact:r.progress,operationImpact:r.operation,recommendedActions:r.actions});if(!s.nextCriteria)s.nextCriteria=r.criteria;}renderSubjects();toast('상황 분석과 행동강령을 추천했습니다.')}
 function applySituationRecommendation(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);if(!s)return;if(!s.situationType)recommendSituation(sid),s=state.subjects.find(x=>x.sid===sid);s.managerSituationType=s.situationType;s.managerActions=s.recommendedActions;s.managerConfirmed='추천 그대로 적용';if(!s.nextCriteria)s.nextCriteria=nextCriteriaFor(s.situationType);renderSubjects();toast('추천 내용을 매니저 확정란에 적용했습니다.')}
-function ensureSituation(s){if(!s.situationType){let r=inferSituation(s);Object.assign(s,{situationType:r.type,primaryFactor:r.factor,progressImpact:r.progress,operationImpact:r.operation,recommendedActions:r.actions});if(!s.nextCriteria)s.nextCriteria=r.criteria}}
+function ensureSituation(s){if(!s.situationType){if(window._sgDerive){window._sgDerive(s);}else{let r=inferSituation(s);Object.assign(s,{situationType:r.type,primaryFactor:r.factor,progressImpact:r.progress,operationImpact:r.operation,recommendedActions:r.actions});if(!s.nextCriteria)s.nextCriteria=r.criteria;}}}
 function situationReport(s){ensureSituation(s);let finalType=s.managerSituationType||s.situationType;let finalActions=s.managerActions||s.recommendedActions;return \`<div class="report-card"><h4>\${name(s)} · 상황 분석 행동강령</h4><table><tr><th>추천 상황 유형</th><td>\${esc(s.situationType||'-')}</td><th>매니저 최종 유형</th><td>\${esc(finalType||'-')}</td></tr><tr><th>주요 요인</th><td>\${esc(s.primaryFactor||'-')}</td><th>확정 상태</th><td>\${esc(s.managerConfirmed||'미확정')}</td></tr><tr><th>진도 영향</th><td>\${esc(s.progressImpact||'-')}</td><th>시험 운영 영향</th><td>\${esc(s.operationImpact||'-')}</td></tr><tr><th>최종 행동강령</th><td colspan="3">\${esc(finalActions||'-').replace(/\\n/g,'<br>')}</td></tr><tr><th>다음 회차 확인</th><td colspan="3">\${esc(s.nextCriteria||'-')}</td></tr></table></div>\`}
 function _sgAutoScoreBasis(s){
   // ★ 학습 완료/학습 중/미학습 단원 선택을 기준으로 점수 해석 문구를 자동 판단한다(별도 선택 없음).
@@ -27522,6 +27522,13 @@ loadSampleAnswerKey();
     push('학생 선택 행동',s.studentSelectedAction);push('매니저 최종 행동강령',s.managerActions);
     return lines.join('\\n');
   }
+  // ★ 2026-08-26 추가: derive/buildCompatMemo는 이 IIFE 안에서만 보이는 지역 함수라,
+  // 바깥(전역 스코프)에 있는 예전 함수들(recommendSituation/applySituationRecommendation/
+  // ensureSituation — "상황 분석 추천"·"추천 행동강령 적용" 버튼과 자동 생성 버튼의 기반)이
+  // 접근하지 못해, 그쪽은 계속 1차원인을 안 읽는 예전 inferSituation()을 쓰고 있었다.
+  // window에 노출해서 그 함수들도 같은(고쳐진) 로직을 쓰도록 연결한다.
+  window._sgDerive=derive;
+  window._sgBuildCompatMemo=buildCompatMemo;
   function missing(s){
     const miss=[];
     if(!clean(s.preparationLevel))miss.push('준비도');
@@ -27636,13 +27643,27 @@ loadSampleAnswerKey();
     </div>\`;
   }
 
+  // ★ 2026-08-26 추가: 지금까지는 "무너진 원인과 점수 영향"/"다음 시험 행동강령" 문구가
+  // s.memo에 저장된 "굳은" 텍스트를 그대로 읽어서 보여줬기 때문에, 학생이 1차원인을
+  // 새로 입력해도 매니저가 "매니저 AAR 입력 내용(자동 생성)" 버튼을 눌러 s.memo를 다시
+  // 만들어주기 전까지는 리포트가 갱신되지 않았다. 리포트를 렌더링하는 시점마다 자동으로
+  // derive()+buildCompatMemo()를 돌려서 항상 최신 데이터 기준으로 보이게 한다 — 단, 매니저가
+  // "수정 후 확정"으로 직접 문구를 손댄 경우는 덮어쓰지 않고 그 값을 그대로 존중한다.
+  function _sgAutoRefreshAAR(s){
+    if(s.managerConfirmed==='수정 후 확정') return;
+    const d=derive(s);
+    s.memo=buildCompatMemo(s,d);
+  }
+
   const oldSubjectReport=window.aarSubjectReport;
   window.aarSubjectReport=function(s){
+    _sgAutoRefreshAAR(s);
     const base=oldSubjectReport(s);
     return base.replace('<div class="v36-post-note">',rationaleHtml(s)+'<div class="v36-post-note">');
   };
   const oldAssignment=window.aarAssignment;
   window.aarAssignment=function(s){
+    _sgAutoRefreshAAR(s);
     const base=oldAssignment(s);
     return base.replace('<p><b>시험 직후 확인된 핵심 원인:',rationaleHtml(s)+'<p><b>시험 직후 확인된 핵심 원인:');
   };
