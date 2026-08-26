@@ -28734,7 +28734,7 @@ function _sgItemMetaMapToText(map){
     const parts=key.split('|'); const subj=parts[0]; const detail=parts[1]||'';
     Object.keys(map[key]).forEach(function(no){
       const m=map[key][no];
-      lines.push([subj, detail, no, m.unit||'', m.diff||'', m.answer||'', m.explain||''].join('\t'));
+      lines.push([subj, detail, no, m.unit||'', m.diff||'', m.answer||'', m.explain||'', m.points||''].join('\t'));
     });
   });
   return lines.join('\n');
@@ -28764,9 +28764,10 @@ function _examcatRenderForm(){
     </div>
     <div style="margin-bottom:10px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">📚 문항별 단원/유형 (기존 문항 DB 엑셀 그대로 붙여넣기 가능)</div>
-      <textarea id="examcat-itemmeta" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)
-KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②	
-ENG		1	듣기 · 목적 파악	하	③	">${isEdit?esc(_sgItemMetaMapToText(e.itemMeta)):''}</textarea>
+      <p style="font-size:11.5px;color:#dc2626;margin:0 0 4px">맨 끝 배점(선택) 칸을 꼭 채워주세요 — 비워두면 학생이 오답원인을 다 입력해도 상담리포트의 실질완주율·손실점수가 계산되지 않습니다.</p>
+      <textarea id="examcat-itemmeta" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)	배점(선택)
+KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②		2
+ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(_sgItemMetaMapToText(e.itemMeta)):''}</textarea>
     </div>
     <div style="margin-bottom:12px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">✅ 문항별 정답/해설/문제 (선택 — 위 칸에 정답/해설 없을 때만 여기 따로)</div>
@@ -28867,13 +28868,14 @@ function openChallengerBulkReflect(){
           <b>세부과목</b> 칸은 국어(화작/언매)·수학(미적분/기하/확통)처럼 <b>선택문항이 과목마다 다른 경우</b>에만 채우고,
           공통문항처럼 세부과목 상관없이 똑같이 적용할 문항은 <b>세부과목 칸을 비워두세요.</b><br>
           이미 쓰고 계신 문항 DB 엑셀(과목코드·과목명·선택과목·문항·대영역·세부단원·유형·배점 형식)도 그대로 붙여넣으면 자동으로 인식합니다 — 다시 만드실 필요 없습니다.<br>
-          <b>정답/해설</b> 칸(선택)까지 채우면 "📓 오답노트 일괄 출력"에도 그대로 반영됩니다.
+          <b>정답/해설</b> 칸(선택)까지 채우면 "📓 오답노트 일괄 출력"에도 그대로 반영됩니다.<br>
+          <b style="color:#dc2626">맨 끝에 배점(선택) 칸을 채워두면</b> 학생이 오답 1차 원인만 입력해도 상담리포트의 "실질완주율·손실점수·교정가능점수"가 자동 계산됩니다 — 비워두면 이 계산이 나오지 않습니다.
         </p>
-        <textarea id="cbr-itemmeta-input" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)
-KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②	르페브르는 공간을 실천·표상·재현공간으로 구분했다...
-KOR	언어와매체	38	언어와매체 · 언어(문법)	상	④	
-MATH		13	수학Ⅰ · 삼각함수 · 삼각함수 그래프	상	①	
-MATH	미적분	22	미적분 · 도함수의 활용	최상	③	"></textarea>
+        <textarea id="cbr-itemmeta-input" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)	배점(선택)
+KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②	르페브르는 공간을 실천·표상·재현공간으로 구분했다...	2
+KOR	언어와매체	38	언어와매체 · 언어(문법)	상	④		3
+MATH		13	수학Ⅰ · 삼각함수 · 삼각함수 그래프	상	①		4
+MATH	미적분	22	미적분 · 도함수의 활용	최상	③		4"></textarea>
       </div>
       <div style="margin-top:14px">
         <div style="font-size:13px;font-weight:700;color:#0f172a">✅ (선택) 이번 회차 문항별 정답/해설/문제</div>
@@ -29390,13 +29392,15 @@ function _sgParseItemMetaText(text){
       points=c[7]||''; // ★ 실전손실·교정가능점수 계산용 문항 배점
       answer=c[8]||''; explain=c[9]||'';
     } else {
-      // 기본 형식: 과목코드 / 세부과목(공통이면 비움) / 문항번호 / 단원유형 / 난이도(선택) / 정답(선택) / 해설(선택)
+      // 기본 형식: 과목코드 / 세부과목(공통이면 비움) / 문항번호 / 단원유형 / 난이도(선택) / 정답(선택) / 해설(선택) / 배점(선택)
       subj=c[0].toUpperCase();
       detail=c[1];
       no=c[2];
       unit=c[3];
       diff=c[4]||'';
       answer=c[5]||''; explain=c[6]||'';
+      points=c[7]||''; // ★ 2026-08-26 추가: 기본 형식에도 배점(선택) 칸을 맨 끝에 추가 — 이게 없으면
+      // 학생이 1차 원인(K/T/M/J/C/U)을 다 채워도 실질완주율·손실점수가 절대 계산되지 않음(배점 0으로 간주)
     }
     if(!subj||!no) return;
     if(!unit && !diff && !answer && !explain && !points) return; // 아무 값도 없는 빈 줄이면 무시
