@@ -1181,12 +1181,13 @@ async function fbLoadAll_all(){
           .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
           .catch(e=>{ console.warn('FB load error(students scoped):', e.message); return null; })
       : fbLoadAll('students');
-    const [students, teachers, tests, config, orgs] = await Promise.all([
+    const [students, teachers, tests, config, orgs, examCatalog] = await Promise.all([
       _studentsPromise,
       fbLoadAll('teachers'),
       fbLoadAll('tests'),
       fbLoadAll('config'),
       fbLoadAll('orgs'),
+      fbLoadAll('examCatalog'),
     ]);
     if(students && students.length){
       const role = ST.currentUser?.role;
@@ -1317,6 +1318,7 @@ async function fbLoadAll_all(){
       if(localT && localT.length) ST.teachers = localT;
     }
     if(tests && tests.length) ST.tests = tests;
+    if(examCatalog && examCatalog.length) ST.examCatalog = examCatalog;
     if(config){
       const gs = config.find(c=>c.id==='grade_subjs');
       if(gs?.subjs) GRADE_SUBJS = gs.subjs;
@@ -1945,6 +1947,7 @@ var ST={
   tests:[],
   testTab:'list', testSel:null, testEditQ:null,
   _testFilterMonth:'', _testFilterClass:'',
+  examCatalog:[], // ★ 챌린저 시험 카탈로그(문항분석DB 사전등록) — 2026-08-26 신규
 
 };
 
@@ -28412,6 +28415,7 @@ function renderChallenger(s){
       <span style="font-size:15px;font-weight:800;color:#0f766e">🎯 챌린저 · 실전모의고사 정밀분석</span>
       <button onclick="window.__challengerLoadedFor=null;render();" style="margin-left:auto;background:#fff;color:#0f766e;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🔄 학생 입력 새로고침</button>
       <button onclick="openChallengerBulkReflect()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📋 결과 일괄반영</button>
+      <button onclick="openExamCatalog()" style="background:#fff;color:#0369a1;border:1.5px solid #0369a1;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📚 시험 카탈로그 관리</button>
       <button onclick="openChallengerDupCheck()" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🧹 중복 회차 검사</button>
       <button onclick="openChallengerDataOptimize()" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">⚡ 회차 데이터 최적화</button>
       <span style="font-size:11px;color:#64748b">${esc(s.name)} 학생 데이터는 자동으로 SG에 저장 및 누적됩니다</span>
@@ -28604,6 +28608,197 @@ function cdoRunAll(){
   CDO_plan=[];
 }
 
+// ══════════════════════════════════════════════════
+// 📚 챌린저 시험 카탈로그 (문항분석DB 사전 등록)
+// 2026-08-26 신규: 같은 시험(회차)의 문항 단원/유형/난이도/정답/해설을 한 번만
+// 등록해두면, 이후 결과일괄반영에서는 이 시험을 골라 학생 채점결과만 반복 입력하면
+// 됨(과거/미래 응시일 모두 자유롭게 선택). 저장 포맷은 기존 _sgParseItemMetaText/
+// _sgParseAnswerKeyText가 만드는 "과목코드|세부과목" → {문항번호:{...}} 맵을 그대로
+// 재사용해서, 결과일괄반영 모달과 호환되도록 한다(연동은 다음 단계에서 진행).
+// Firestore 컬렉션: examCatalog (문서 1개 = 시험 1개)
+// ══════════════════════════════════════════════════
+function _examcatId(){ return 'exam_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+
+function _examcatQuestionCount(entry){
+  const seen=new Set();
+  Object.values(entry.itemMeta||{}).forEach(byNo=>Object.keys(byNo).forEach(no=>seen.add(no)));
+  Object.values(entry.answerKey||{}).forEach(byNo=>Object.keys(byNo).forEach(no=>seen.add(no)));
+  return seen.size;
+}
+function _examcatSubjLabel(entry){
+  const SUBJ_LABEL={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',LANG:'제2외국어',INQ1:'탐구(제1선택)',INQ2:'탐구(제2선택)'};
+  const codes=new Set();
+  Object.keys(entry.itemMeta||{}).concat(Object.keys(entry.answerKey||{})).forEach(k=>{
+    const subj=k.split('|')[0]; if(subj) codes.add(subj);
+  });
+  return [...codes].map(c=>SUBJ_LABEL[c]||c).join(', ') || '(과목 미입력)';
+}
+
+async function examcatSaveEntry(entry){
+  entry.updatedAt = Date.now();
+  // ★ 2026-08-26 수정: Firestore는 undefined 필드가 하나라도 있으면 문서 저장을 통째로
+  // 거부한다(이번에 diff 필드 undefined로 실제 발생). JSON 왕복은 undefined 키를
+  // 자동으로 제거해주므로, 저장 직전 안전망으로 한 번 통과시킨다.
+  entry = JSON.parse(JSON.stringify(entry));
+  const idx = ST.examCatalog.findIndex(x=>x.id===entry.id);
+  if(idx>-1) ST.examCatalog[idx]=entry; else ST.examCatalog.push(entry);
+  if(FB_USE()){
+    try{ await window._fb.set('examCatalog', entry.id, entry); }
+    catch(e){
+      console.warn('examCatalog 저장 실패:', e.message);
+      alert('⚠️ 저장 중 오류가 발생해 서버에는 반영되지 못했습니다.\n\n오류 내용: '+e.message+'\n\n다시 시도해도 같은 문제가 반복되면 문의해주세요.');
+    }
+  }
+}
+async function examcatDeleteEntry(id){
+  ST.examCatalog = ST.examCatalog.filter(x=>x.id!==id);
+  if(FB_USE()){
+    try{ await window._fb.delete('examCatalog', id); }
+    catch(e){ console.warn('examCatalog 삭제 실패:', e.message); }
+  }
+}
+
+let EXAMCAT_editing = null; // 현재 등록/수정 폼에서 편집 중인 항목(신규면 null)
+
+function openExamCatalog(){
+  if(!document.getElementById('examcat-overlay')){
+    const div=document.createElement('div');
+    div.id='examcat-overlay';
+    div.style.cssText='display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:99999;align-items:center;justify-content:center;padding:20px';
+    div.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:900px;width:100%;max-height:90vh;overflow:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h2 style="margin:0;font-size:18px">📚 시험 카탈로그 관리</h2>
+        <button onclick="document.getElementById('examcat-overlay').style.display='none'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 10px;cursor:pointer">✕ 닫기</button>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-top:0">
+        같은 시험(회차)의 문항 단원/유형·정답/해설을 여기 한 번만 등록해두면, "📋 결과 일괄반영"에서 이 시험을 선택해 학생 채점결과만 반복 입력할 수 있습니다.
+        응시일은 여기서는 <b>기본값</b>만 정해두는 것이고, 실제 결과 반영 시 회차마다 자유롭게(과거 날짜도, 미래 날짜도) 다시 지정할 수 있습니다.
+      </p>
+      <div id="examcat-list"></div>
+      <div id="examcat-form" style="margin-top:16px"></div>
+    </div>`;
+    document.body.appendChild(div);
+  }
+  EXAMCAT_editing = null;
+  document.getElementById('examcat-overlay').style.display='flex';
+  _examcatRenderList();
+  _examcatRenderForm();
+}
+
+function _examcatRenderList(){
+  const el=document.getElementById('examcat-list');
+  if(!el) return;
+  const list=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  if(!list.length){
+    el.innerHTML='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
+    return;
+  }
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
+    const qc=_examcatQuestionCount(e);
+    const subj=_examcatSubjLabel(e);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:13.5px;color:#0f172a">${esc(e.examName||'(이름 없음)')}</div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:2px">기본 응시일 ${esc(e.defaultDate||'미지정')} · ${esc(subj)} · 문항 ${qc}개</div>
+      </div>
+      <button onclick="_examcatEdit('${e.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">✏ 수정</button>
+      <button onclick="_examcatDelete('${e.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">🗑 삭제</button>
+    </div>`;
+  }).join('')+`</div>`;
+}
+
+function _examcatEdit(id){
+  const e=(ST.examCatalog||[]).find(x=>x.id===id);
+  if(!e) return;
+  EXAMCAT_editing = e;
+  _examcatRenderForm();
+  const formEl=document.getElementById('examcat-form');
+  if(formEl) formEl.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function _examcatDelete(id){
+  const e=(ST.examCatalog||[]).find(x=>x.id===id);
+  if(!e) return;
+  if(!confirm(`정말 삭제하시겠습니까?\n\n${e.examName||'(이름 없음)'}\n\n이미 학생별로 반영된 결과에는 영향이 없고, 카탈로그 항목만 삭제됩니다. 되돌릴 수 없습니다.`)) return;
+  examcatDeleteEntry(id);
+  if(EXAMCAT_editing && EXAMCAT_editing.id===id){ EXAMCAT_editing=null; _examcatRenderForm(); }
+  _examcatRenderList();
+}
+
+// ★ 2026-08-26 추가: 맵({"SUBJ|DETAIL":{no:{...}}})을 다시 사람이 읽고 고칠 수 있는
+// 탭구분 텍스트로 되돌리는 함수 — 카탈로그 수정 폼과, 결과일괄반영 모달에 카탈로그
+// 내용을 불러올 때(examcatApplyToModal) 양쪽에서 재사용하므로 top-level로 뺀다.
+function _sgItemMetaMapToText(map){
+  const lines=[];
+  Object.keys(map||{}).forEach(function(key){
+    const parts=key.split('|'); const subj=parts[0]; const detail=parts[1]||'';
+    Object.keys(map[key]).forEach(function(no){
+      const m=map[key][no];
+      lines.push([subj, detail, no, m.unit||'', m.diff||'', m.answer||'', m.explain||''].join('\t'));
+    });
+  });
+  return lines.join('\n');
+}
+function _sgAnswerKeyMapToText(map){
+  const lines=[];
+  Object.keys(map||{}).forEach(function(key){
+    const parts=key.split('|'); const subj=parts[0]; const detail=parts[1]||'';
+    Object.keys(map[key]).forEach(function(no){
+      const m=map[key][no];
+      lines.push([subj, detail, no, m.answer||'', m.explain||'', m.question||''].join('\t'));
+    });
+  });
+  return lines.join('\n');
+}
+
+function _examcatRenderForm(){
+  const el=document.getElementById('examcat-form');
+  if(!el) return;
+  const e=EXAMCAT_editing;
+  const isEdit=!!e;
+  el.innerHTML=`<div style="border:1.5px solid ${isEdit?'#0369a1':'#e2e8f0'};border-radius:12px;padding:16px;background:${isEdit?'#f0f9ff':'#fafbfc'}">
+    <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:10px">${isEdit?'✏ 시험 수정: '+esc(e.examName||''):'➕ 새 시험 등록'}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="examcat-name" placeholder="시험명/회차 (예: 1회 고2 챌린저 모의고사_영어)" value="${isEdit?esc(e.examName||''):''}" style="flex:1;min-width:260px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px">
+      <input id="examcat-date" placeholder="기본 응시일 (예: 2026-08-26)" value="${isEdit?esc(e.defaultDate||''):''}" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;width:190px">
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">📚 문항별 단원/유형 (기존 문항 DB 엑셀 그대로 붙여넣기 가능)</div>
+      <textarea id="examcat-itemmeta" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)
+KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②	
+ENG		1	듣기 · 목적 파악	하	③	">${isEdit?esc(_sgItemMetaMapToText(e.itemMeta)):''}</textarea>
+    </div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">✅ 문항별 정답/해설/문제 (선택 — 위 칸에 정답/해설 없을 때만 여기 따로)</div>
+      <textarea id="examcat-answerkey" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	정답(선택)	해설(선택)	문제(선택, 줄바꿈은 ⏎ 로 표시)">${isEdit?esc(_sgAnswerKeyMapToText(e.answerKey)):''}</textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="_examcatSubmit()" style="background:#0369a1;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">${isEdit?'💾 수정 저장':'➕ 등록'}</button>
+      ${isEdit?'<button onclick="EXAMCAT_editing=null;_examcatRenderForm()" style="background:#f1f5f9;color:#555;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">취소</button>':''}
+    </div>
+  </div>`;
+}
+
+async function _examcatSubmit(){
+  const name=(document.getElementById('examcat-name')||{}).value?.trim();
+  const date=cbrNormalizeDate((document.getElementById('examcat-date')||{}).value?.trim()||'');
+  const itemMetaText=(document.getElementById('examcat-itemmeta')||{}).value||'';
+  const answerKeyText=(document.getElementById('examcat-answerkey')||{}).value||'';
+  if(!name){ alert('시험명을 입력해주세요.'); return; }
+  const itemMeta=_sgParseItemMetaText(itemMetaText);
+  const answerKey=_sgParseAnswerKeyText(answerKeyText);
+  if(!Object.keys(itemMeta).length && !Object.keys(answerKey).length){
+    if(!confirm('문항 단원/유형이나 정답/해설을 아직 입력하지 않았습니다. 이대로(시험명만) 등록할까요?\n(나중에 "수정"으로 언제든 추가할 수 있습니다)')) return;
+  }
+  const entry = EXAMCAT_editing ? Object.assign({}, EXAMCAT_editing) : {id:_examcatId(), createdAt:Date.now()};
+  entry.examName=name; entry.defaultDate=date; entry.itemMeta=itemMeta; entry.answerKey=answerKey;
+  await examcatSaveEntry(entry);
+  EXAMCAT_editing=null;
+  _examcatRenderForm();
+  _examcatRenderList();
+  toast(entry.createdAt===entry.updatedAt||!EXAMCAT_editing ? '✅ 시험을 등록했습니다.' : '✅ 수정했습니다.');
+}
+
 function openChallengerBulkReflect(){
   if(!document.getElementById('cbr-overlay')){
     const div = document.createElement('div');
@@ -28615,6 +28810,15 @@ function openChallengerBulkReflect(){
         <button onclick="closeChallengerBulkReflect()" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 10px;cursor:pointer">✕ 닫기</button>
       </div>
       <p style="font-size:13px;color:#64748b;margin-top:0">엑셀의 '결과일괄반영용' 시트를 전체 선택해서 그대로 붙여넣으세요 (헤더 행이 포함돼도 자동으로 걸러집니다).</p>
+      <div style="margin-bottom:14px;padding:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px">
+        <div style="font-size:13px;font-weight:700;color:#1d4ed8">📚 등록된 시험 카탈로그에서 불러오기 (선택)</div>
+        <p style="font-size:12px;color:#1e40af;margin:4px 0 8px">
+          시험을 선택하면 시험명/응시일과 아래 문항별 단원·정답·해설 칸이 자동으로 채워집니다. 응시일은 이 회차를 실제로 반영할 날짜(과거/미래 모두 가능)로 자유롭게 바꿔도 됩니다.
+        </p>
+        <select id="cbr-examcat-select" onchange="examcatApplyToModal(this.value)" style="border:1px solid #93c5fd;border-radius:8px;padding:7px 9px;font-size:12.5px;width:100%;max-width:420px">
+          <option value="">직접 입력 (카탈로그 사용 안 함)</option>
+        </select>
+      </div>
       <textarea id="cbr-input" style="width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="학생번호	학생명	학교	학년	시험일	시험명/회차	담당매니저	과목코드	과목명	선택과목/세부과목	점수	전체오답번호	오답수	미응답번호	비고"></textarea>
       <div style="margin-top:10px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
         <div style="font-size:13px;font-weight:700;color:#166534">📥 (선택) 학원 원본 채점결과 파일 그대로 붙여넣기</div>
@@ -28760,7 +28964,36 @@ MATH	미적분	28	7		"></textarea>
       });
     }
   }
+  // ★ 2026-08-26 추가: 카탈로그 선택 드롭다운은 열 때마다 최신 목록으로 다시 채운다
+  // (overlay div 자체는 최초 1회만 만들어지므로, 옵션 목록은 매번 갱신해야 함)
+  const _selEl=document.getElementById('cbr-examcat-select');
+  if(_selEl){
+    const cur=_selEl.value;
+    const list=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    _selEl.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
+      + list.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
+    if(list.some(e=>e.id===cur)) _selEl.value=cur;
+  }
   document.getElementById('cbr-overlay').style.display = 'flex';
+}
+// ★ 2026-08-26 추가: 카탈로그에서 시험을 선택하면 시험명/응시일(기본값)과 문항별
+// 단원·정답·해설 칸을 자동으로 채워준다. 응시일은 채워진 뒤에도 직접 수정 가능
+// (과거/미래 회차 모두 이 값을 바꿔서 그대로 반영할 수 있음). 학생 채점결과(1번 박스)는
+// 카탈로그와 무관하게 그대로 붙여넣으면 되고, 아래쪽 로직(cbrConvertRawOX/cbrAnalyze/
+// cbrConfirmApply)은 전혀 손대지 않았다 — 이 함수는 기존 입력칸을 미리 채워주기만 한다.
+function examcatApplyToModal(id){
+  if(!id) return; // "직접 입력" 선택 시 아무 것도 하지 않음(기존 값 유지)
+  const e=(ST.examCatalog||[]).find(x=>x.id===id);
+  if(!e) return;
+  const nameEl=document.getElementById('cbr-raw-name');
+  const dateEl=document.getElementById('cbr-raw-date');
+  const itemMetaEl=document.getElementById('cbr-itemmeta-input');
+  const answerKeyEl=document.getElementById('cbr-answerkey-input');
+  if(nameEl) nameEl.value = e.examName||'';
+  if(dateEl && !dateEl.value) dateEl.value = e.defaultDate||''; // 이미 입력해둔 응시일이 있으면 덮어쓰지 않음
+  if(itemMetaEl) itemMetaEl.value = _sgItemMetaMapToText(e.itemMeta);
+  if(answerKeyEl) answerKeyEl.value = _sgAnswerKeyMapToText(e.answerKey);
+  toast('✅ "'+ (e.examName||'') +'" 문항 정보를 불러왔습니다. 응시일은 필요하면 자유롭게 수정하세요.');
 }
 function closeChallengerBulkReflect(force){
   const inputEl = document.getElementById('cbr-input');
@@ -29109,6 +29342,11 @@ function _sgItemMeta(subjectCode, detail, no){
 function _cbrParseItemMeta(){
   const el=document.getElementById('cbr-itemmeta-input');
   const text=el?el.value.trim():'';
+  return _sgParseItemMetaText(text);
+}
+// ★ 2026-08-26 추가: 텍스트를 직접 받는 코어 파서로 분리 — 결과일괄반영 모달(cbr-itemmeta-input)과
+// 시험 카탈로그 등록 폼(examcat-itemmeta-input) 양쪽에서 동일 로직을 재사용하기 위함.
+function _sgParseItemMetaText(text){
   // key: "과목코드|세부과목" (세부과목을 비워두면 그 과목 전체 공통 적용 — 예: 수학 공통문항)
   const map={};
   if(!text) return map;
@@ -29119,7 +29357,7 @@ function _cbrParseItemMeta(){
     if(c.length<4) return;
     if(c[0]==='과목코드') return; // 헤더 행 걸러내기 (모든 형식 공통)
 
-    let subj, detail, no, unit, diff, answer='', explain='', points='';
+    let subj, detail, no, unit, diff='', answer='', explain='', points='';
     if(MASTER_DB_SUBJ_NAMES.includes(c[1])){
       // ★ 기존에 쓰던 마스터 문항 DB 형식도 그대로 인식한다:
       // 과목코드 / 과목명 / 선택과목 / 문항 / 대영역 / 세부단원 / 유형 / (배점) / (정답) / (해설)
@@ -29159,6 +29397,10 @@ function _cbrLookupItemMeta(pastedItemMeta, subjectCode, detail, no){
 function _cbrParseAnswerKey(){
   const el=document.getElementById('cbr-answerkey-input');
   const text=el?el.value.trim():'';
+  return _sgParseAnswerKeyText(text);
+}
+// ★ 2026-08-26 추가: 텍스트를 직접 받는 코어 파서로 분리(위 _sgParseItemMetaText와 동일한 이유)
+function _sgParseAnswerKeyText(text){
   const map={}; // key: "과목코드|세부과목" -> {문항번호: {answer, explain, question}}
   if(!text) return map;
   text.split(/\r?\n/).forEach(line=>{
