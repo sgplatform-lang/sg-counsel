@@ -27422,22 +27422,34 @@ loadSampleAnswerKey();
   function derive(s){
     const b=basicContext(s);
     const itemReasons=(s.items||[]).flatMap(i=>i.reasons||[]);
-    const raw=[s.rawCoreCause,s.memo,s.weakUnits,s.time,s.mental,itemReasons.join(' '),s.concentrationBreak,s.recoveryResult].join(' ');
+    // ★ 2026-08-26 발견/수정: 지금까지 이 분류 로직은 "오답원인 2차선택"(선택 입력, 자유
+    // 텍스트 태그)만 읽었고, 학생이 실제로 매번 채우는 "오답원인 1차선택"(K/T/M/J/C/U)은
+    // 전혀 반영하지 않았다. 그래서 2차선택을 안 채운 학생(대부분)은 문항별 원인을
+    // 아무리 다르게 입력해도 전부 같은 신호 없음 상태가 되어 '안정 수행형'으로만
+    // 분류되고, 그 결과 서로 다른 학생인데도 "무너진 원인과 점수 영향"·"다음 시험
+    // 행동강령" 문구가 동일하게 나왔다(오늘 보고된 현상의 진짜 원인). 1차선택 코드를
+    // 사람이 읽는 키워드로 변환해 raw 신호에 포함시키고, 점수 계산에도 직접 반영한다.
+    const _causeLabel={K:'지식부족 개념',T:'시간손실 급하게 전환',M:'실수 조건 선지',J:'판단 집착 붙잡',C:'집중 붕괴 회복',U:''};
+    const causeCounts={K:0,T:0,M:0,J:0,C:0,U:0};
+    (s.items||[]).forEach(i=>{ const c=i.causePrimary; if(c&&causeCounts[c]!=null) causeCounts[c]++; });
+    const causeText=(s.items||[]).map(i=>_causeLabel[i.causePrimary]||'').join(' ');
+    const raw=[s.rawCoreCause,s.memo,s.weakUnits,s.time,s.mental,itemReasons.join(' '),causeText,s.concentrationBreak,s.recoveryResult].join(' ');
     const progressScore=Math.min(100,
       (/거의 준비/.test(s.preparationLevel)?85:/개념 학습 진행/.test(s.preparationLevel)?70:/주요 단원/.test(s.preparationLevel)?58:/실전 연습 부족/.test(s.preparationLevel)?42:15)
-      + numBand(s.unlearnedCount)*8 + numBand(s.learnedErrorCount)*7
+      + numBand(s.unlearnedCount)*8 + numBand(s.learnedErrorCount)*7 + Math.min(72,causeCounts.K*18)
     );
     const operationScore=Math.min(100,
       (s.time==='심각'?55:s.time==='뚜렷함'?40:s.time==='약간'?20:0)
       +(s.mental==='안정'?0:25)
       +(s.concentrationBreak&&s.concentrationBreak!=='없음'?20:0)
       +(has(raw,/집착|붙잡|전환|미완료|급하게/)?25:0)
+      + Math.min(72,(causeCounts.T+causeCounts.J+causeCounts.C)*18)
     );
-    const accuracyScore=Math.min(100,numBand(s.learnedErrorCount)*18+(has(raw,/실수|조건|부호|선지|개념 혼동|인출/)?35:0));
+    const accuracyScore=Math.min(100,numBand(s.learnedErrorCount)*18+(has(raw,/실수|조건|부호|선지|개념 혼동|인출/)?35:0)+Math.min(45,causeCounts.M*15));
     let situation='안정 수행형', primary='특별한 위험 요인 없음';
     if(progressScore>=65&&operationScore>=55){situation='복합 원인형';primary='미학습·준비 부족과 시험 운영 실패가 함께 작용';}
     else if(progressScore>=65){situation=/개념/.test(raw)?'개념 미완성형':'진도 부족형';primary='미학습 범위와 준비도 부족';}
-    else if(operationScore>=65){situation=/집착|붙잡/.test(raw)?'고난도 집착형':/집중|멘탈|회복/.test(raw)?'집중 회복 실패형':'시간 배분 실패형';primary='제한시간·전환·집중 운영';}
+    else if(operationScore>=65){situation=causeCounts.J>0||/집착|붙잡/.test(raw)?'고난도 집착형':causeCounts.C>0||/집중|멘탈|회복/.test(raw)?'집중 회복 실패형':'시간 배분 실패형';primary='제한시간·전환·집중 운영';}
     else if(accuracyScore>=55){situation=/적용|자료|선지/.test(raw)?'문제 적용 부족형':'정확도·실수형';primary='학습 완료 범위의 인출·적용·정확도';}
     else if(/꺼내지|인출/.test(raw)){situation='학습 후 인출 실패형';primary='학습 내용의 제한시간 내 인출 실패';}
     let action='';
