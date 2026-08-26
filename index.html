@@ -28799,6 +28799,24 @@ async function _examcatSubmit(){
   toast(entry.createdAt===entry.updatedAt||!EXAMCAT_editing ? '✅ 시험을 등록했습니다.' : '✅ 수정했습니다.');
 }
 
+// ★ 2026-08-26 추가: 결과 일괄반영 모달을 열 때마다 지난 입력을 지우고 빈 화면으로
+// 시작하게 해주는 초기화 함수. cbr-overlay 안의 모든 입력칸(텍스트/셀렉트/파일)과
+// 분석 결과 영역을 비운다.
+function resetChallengerBulkReflectForm(){
+  const ids_text=['cbr-input','cbr-raw-input','cbr-raw-date','cbr-raw-name','cbr-raw-manager',
+    'cbr-itemmeta-input','cbr-answerkey-input','cbr-aarmemo-input'];
+  ids_text.forEach(function(id){ const el=document.getElementById(id); if(el) el.value=''; });
+  const ids_select=['cbr-raw-subj','cbr-examcat-select'];
+  ids_select.forEach(function(id){ const el=document.getElementById(id); if(el) el.value=''; });
+  const ids_file=['cbr-question-images','cbr-explanation-images'];
+  ids_file.forEach(function(id){ const el=document.getElementById(id); if(el) el.value=''; });
+  const ids_status=['cbr-raw-status','cbr-question-images-status','cbr-explanation-images-status'];
+  ids_status.forEach(function(id){ const el=document.getElementById(id); if(el) el.textContent=''; });
+  const resultEl=document.getElementById('cbr-result');
+  if(resultEl) resultEl.innerHTML='';
+  CBR_parsed = null;
+}
+
 function openChallengerBulkReflect(){
   if(!document.getElementById('cbr-overlay')){
     const div = document.createElement('div');
@@ -28968,12 +28986,16 @@ MATH	미적분	28	7		"></textarea>
   // (overlay div 자체는 최초 1회만 만들어지므로, 옵션 목록은 매번 갱신해야 함)
   const _selEl=document.getElementById('cbr-examcat-select');
   if(_selEl){
-    const cur=_selEl.value;
     const list=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
     _selEl.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
       + list.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
-    if(list.some(e=>e.id===cur)) _selEl.value=cur;
   }
+  // ★ 2026-08-26 추가: 이 모달은 overlay div를 최초 1회만 만들고 이후엔 재사용하기
+  // 때문에, "닫기"로 닫았다가 다시 열어도 지난번 입력값이 그대로 남아있던 문제가
+  // 있었다. 열 때마다 모든 입력칸을 빈 화면으로 초기화한다(반영 전 실수로 닫아서
+  // 데이터가 사라지는 걸 막는 닫기 시점의 확인창은 그대로 유지되므로, 사용자가
+  // "그래도 닫기"를 선택한 경우에만 다음에 열었을 때 빈 화면으로 시작하게 된다).
+  resetChallengerBulkReflectForm();
   document.getElementById('cbr-overlay').style.display = 'flex';
 }
 // ★ 2026-08-26 추가: 카탈로그에서 시험을 선택하면 시험명/응시일(기본값)과 문항별
