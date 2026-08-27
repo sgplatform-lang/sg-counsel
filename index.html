@@ -2008,15 +2008,28 @@ async function deleteStudent(sid){
   ST._savingIds.add(String(sid));  // 이 학생 onSnapshot 차단
   ST.students = ST.students.filter(x=>String(x.id)!==String(sid));
   ST.sel = null; ST.adminSel = null;
-  // localStorage 즉시 저장
-  try{ localStorage.setItem(SK, JSON.stringify(ST.students)); }catch(e){}
+  render(); // ★ 2026-08-27 추가: 삭제 시도 중임을 즉시 화면에 반영(성공/실패 무관하게 먼저 지운 화면을 보여줌)
   // Firebase에서 삭제
+  let _fbDeleteOk = true;
   if(FB_USE()){
     try{
       await window._fb.delete('students', sid);
-    }catch(e){ console.warn('Firebase 삭제 실패:', e); }
+    }catch(e){
+      _fbDeleteOk = false;
+      console.warn('Firebase 삭제 실패:', e);
+    }
   }
   if(ST._savingIds) ST._savingIds.delete(String(sid));
+  if(!_fbDeleteOk){
+    // ★ 2026-08-27 추가: 예전엔 삭제가 서버에서 실패해도 조용히 넘어가서, 화면에선
+    // 지워진 것처럼 보이다가 새로고침/실시간 동기화 시 서버에 남아있던 학생이 다시
+    // 나타나 "삭제가 안 된다"는 혼란을 줬다. 실패를 명확히 알리고, 화면 상태도
+    // 실제 서버 상태(=아직 존재함)와 일치하도록 목록에 다시 표시한다.
+    if(!ST.students.some(x=>String(x.id)===String(sid))) ST.students.push(s);
+    alert('⚠️ 서버 연결 문제로 [' + s.name + '] 학생이 실제로는 삭제되지 못했습니다.\n\n인터넷 연결을 확인하신 뒤 다시 시도해주세요. 계속 실패하면 페이지를 새로고침한 뒤 다시 시도해주세요.');
+  }
+  // localStorage 최종 저장(성공 시엔 삭제된 상태, 실패 시엔 복원된 상태)
+  try{ localStorage.setItem(SK, JSON.stringify(ST.students)); }catch(e){}
   render();
 }
 
