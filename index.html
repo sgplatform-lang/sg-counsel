@@ -259,7 +259,7 @@ input,select,textarea{font-size:16px!important}
   input,select,textarea{font-size:inherit!important}
 }
 
-</style><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script>
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script>
 // ★ Firebase 설정 ★
 try{
   firebase.initializeApp({
@@ -271,6 +271,7 @@ try{
     appId: "1:134794459070:web:a636cac4df344bd26e2bef"
   });
   const _db = firebase.firestore();
+  const _storage = firebase.storage(); // ★ 2026-08-27 추가: 문항 이미지 영구 저장용
   window._fb = {
     db: _db,
     collection: (col)=>_db.collection(col),
@@ -282,7 +283,10 @@ try{
     // 학생용과 동일한 API (연동용)
     set: (col,id,data)=>_db.collection(col).doc(String(id)).set({...data,_t:Date.now()},{merge:true}),
     getAll: (col)=>_db.collection(col).get().then(s=>s.docs.map(d=>({...d.data(),id:d.id}))),
-    delete: (col,id)=>_db.collection(col).doc(String(id)).delete()
+    delete: (col,id)=>_db.collection(col).doc(String(id)).delete(),
+    // ★ 2026-08-27 추가: Storage 업로드/삭제 — path 예: 'examCatalog/{examId}/q/21.png'
+    uploadBlob: (path, blob)=>_storage.ref(path).put(blob).then(snap=>snap.ref.getDownloadURL()),
+    deleteFile: (path)=>_storage.ref(path).delete().catch(e=>{ if(e && e.code!=='storage/object-not-found') throw e; }),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -28788,16 +28792,37 @@ async function examcatDeleteEntry(id){
 }
 
 let EXAMCAT_editing = null; // 현재 등록/수정 폼에서 편집 중인 항목(신규면 null)
+let EXAMCAT_fullscreen = false; // ★ 2026-08-27 추가: PDF 드래그 작업 시 좁아서 불편하다는 피드백으로,
+// 카탈로그 관리창을 화면 전체 크기로 넓혀볼 수 있는 토글 추가
+
+function _examcatToggleFullscreen(){
+  EXAMCAT_fullscreen = !EXAMCAT_fullscreen;
+  const panel = document.getElementById('examcat-panel');
+  const btn = document.getElementById('examcat-fullscreen-btn');
+  if(!panel) return;
+  if(EXAMCAT_fullscreen){
+    panel.style.maxWidth='calc(100vw - 40px)';
+    panel.style.maxHeight='calc(100vh - 40px)';
+    if(btn) btn.textContent='⛶ 원래 크기로';
+  } else {
+    panel.style.maxWidth='900px';
+    panel.style.maxHeight='90vh';
+    if(btn) btn.textContent='⛶ 전체화면';
+  }
+}
 
 function openExamCatalog(){
   if(!document.getElementById('examcat-overlay')){
     const div=document.createElement('div');
     div.id='examcat-overlay';
     div.style.cssText='display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:99999;align-items:center;justify-content:center;padding:20px';
-    div.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:900px;width:100%;max-height:90vh;overflow:auto;padding:24px">
+    div.innerHTML=`<div id="examcat-panel" style="background:#fff;border-radius:16px;max-width:900px;width:100%;max-height:90vh;overflow:auto;padding:24px;transition:max-width .15s,max-height .15s">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <h2 style="margin:0;font-size:18px">📚 시험 카탈로그 관리</h2>
-        <button onclick="document.getElementById('examcat-overlay').style.display='none'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 10px;cursor:pointer">✕ 닫기</button>
+        <div style="display:flex;gap:6px">
+          <button id="examcat-fullscreen-btn" onclick="_examcatToggleFullscreen()" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px">⛶ 전체화면</button>
+          <button onclick="document.getElementById('examcat-overlay').style.display='none'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 10px;cursor:pointer">✕ 닫기</button>
+        </div>
       </div>
       <p style="font-size:13px;color:#64748b;margin-top:0">
         같은 시험(회차)의 문항 단원/유형·정답/해설을 여기 한 번만 등록해두면, "📋 결과 일괄반영"에서 이 시험을 선택해 학생 채점결과만 반복 입력할 수 있습니다.
@@ -28902,11 +28927,277 @@ ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(_sgItemMetaMapToText(e.i
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">✅ 문항별 정답/해설/문제 (선택 — 위 칸에 정답/해설 없을 때만 여기 따로)</div>
       <textarea id="examcat-answerkey" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	정답(선택)	해설(선택)	문제(선택, 줄바꿈은 ⏎ 로 표시)">${isEdit?esc(_sgAnswerKeyMapToText(e.answerKey)):''}</textarea>
     </div>
+    ${isEdit?_examcatPdfSectionHtml():'<p style="font-size:11.5px;color:#94a3b8;margin:0 0 12px">💡 PDF에서 문항 이미지를 잘라 붙이는 기능은, 이 시험을 먼저 등록하신 뒤 "✏ 수정"으로 다시 열면 나타납니다.</p>'}
     <div style="display:flex;gap:8px">
       <button onclick="_examcatSubmit()" style="background:#0369a1;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">${isEdit?'💾 수정 저장':'➕ 등록'}</button>
       ${isEdit?'<button onclick="EXAMCAT_editing=null;_examcatRenderForm()" style="background:#f1f5f9;color:#555;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">취소</button>':''}
     </div>
   </div>`;
+  EXAMCAT_pdfStore = {q:null, e:null}; // ★ 2026-08-27 수정: 폼을 다시 그릴 때마다 두 PDF 상태 모두 초기화(이전 항목 화면과 캔버스가 섞이지 않도록)
+  EXAMCAT_pdfActiveMode = null;
+  if(isEdit) _examcatRenderSavedImageList();
+}
+
+// ══════════════════════════════════════════════════
+// 📄 2026-08-27 추가: PDF 문제지/해설지에서 문항 이미지를 드래그로 잘라
+// Firebase Storage에 영구 저장하는 기능. 시험 카탈로그에 한 번 등록해두면
+// 카탈로그가 저장돼 있는 한 계속 재사용된다(세션 업로드와 달리 매번 다시
+// 올릴 필요 없음). 지문 하나에 문항 여러 개가 걸리면 "21-23"처럼 범위로
+// 한 번만 잘라내면, 그 이미지가 21·22·23번 전부에서 재사용된다.
+// ══════════════════════════════════════════════════
+let EXAMCAT_pdfStore = {q:null, e:null}; // ★ 2026-08-27 수정: 문제지/해설지 PDF를 각각 따로 기억(전에는
+// 하나만 기억해서 서로 왔다갔다 하면 다시 올려야 했던 문제 — {doc, pageNum, numPages, dragging, rectStart, rectEnd, _pageImageData}
+let EXAMCAT_pdfActiveMode = null; // 'q'|'e'|null — 지금 화면에 보이는 쪽
+function _examcatCurPdf(){ return EXAMCAT_pdfActiveMode ? EXAMCAT_pdfStore[EXAMCAT_pdfActiveMode] : null; }
+
+function _examcatPdfSectionHtml(){
+  return `<div style="margin-bottom:14px;border:1.5px dashed #94a3b8;border-radius:10px;padding:14px;background:#fafafa">
+    <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:6px">📄 PDF에서 문항 이미지 만들기 (선택 — 지문이 길거나 그림·표가 있을 때 추천)</div>
+    <p style="font-size:11px;color:#64748b;margin:0 0 8px">문제지·해설지 PDF를 각각 올리고, 문항(또는 지문+문항 구간)을 마우스로 드래그해서 잘라내면 자동으로 영구 저장됩니다. 지문 하나에 여러 문항이 걸려있으면 "21-23"처럼 범위로 입력해서 한 번만 잘라내면, 세 문항 모두에서 그 이미지가 재사용됩니다.</p>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button type="button" id="examcat-mode-q-btn" onclick="_examcatSwitchMode('q')" style="flex:1;text-align:center;background:#fff;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:700">📄 문제지</button>
+      <button type="button" id="examcat-mode-e-btn" onclick="_examcatSwitchMode('e')" style="flex:1;text-align:center;background:#fff;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:700">📄 해설지</button>
+    </div>
+    <div style="margin-bottom:8px">
+      <label style="display:inline-block;background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155"><span id="examcat-file-label">📁 문제지 PDF 파일 선택</span><input type="file" id="examcat-file-input" accept="application/pdf" style="display:none" onchange="_examcatLoadPdf(this.files[0], EXAMCAT_pdfActiveMode||'q')"></label>
+    </div>
+    <div id="examcat-pdf-viewer" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <button type="button" onclick="_examcatPdfPage(-1)" style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">◀ 이전</button>
+        <span id="examcat-pdf-pagelabel" style="font-size:12px;color:#334155"></span>
+        <button type="button" onclick="_examcatPdfPage(1)" style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">다음 ▶</button>
+        <span style="font-size:11px;color:#64748b;margin-left:auto">마우스로 드래그해서 문항 영역을 선택하세요</span>
+      </div>
+      <div style="position:relative;border:1px solid #cbd5e1;overflow:auto;max-height:70vh;background:#e5e7eb">
+        <canvas id="examcat-pdf-canvas" style="display:block;cursor:crosshair"></canvas>
+      </div>
+      <div id="examcat-pdf-croppanel" style="display:none;margin-top:8px;padding:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="examcat-crop-no" placeholder="문항번호 (예: 21 또는 21-23)" style="flex:1;min-width:160px;border:1px solid #93c5fd;border-radius:6px;padding:6px 8px;font-size:12px">
+          <button type="button" onclick="_examcatSaveCrop()" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">✂ 이 영역 저장</button>
+          <button type="button" onclick="_examcatCancelCrop()" style="background:#f1f5f9;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">취소</button>
+        </div>
+      </div>
+    </div>
+    <div id="examcat-pdf-savedlist" style="margin-top:10px"></div>
+  </div>`;
+}
+
+async function _examcatLoadPdf(file, mode){
+  if(!file) return;
+  if(!EXAMCAT_editing){ alert('먼저 이 시험을 등록/저장한 뒤, 목록에서 "✏ 수정"으로 다시 열어서 PDF를 올려주세요.'); return; }
+  if(!window.pdfjsLib){ alert('PDF 라이브러리를 아직 불러오지 못했습니다. 잠시 후 다시 시도하거나 새로고침 해주세요.'); return; }
+  let buf;
+  try{ buf = await file.arrayBuffer(); }catch(e){ alert('파일을 읽는 데 실패했습니다: '+e.message); return; }
+  try{
+    const doc = await pdfjsLib.getDocument({data:buf}).promise;
+    EXAMCAT_pdfStore[mode] = {doc, pageNum:1, numPages:doc.numPages, dragging:false, rectStart:null, rectEnd:null, _pageImageData:null};
+    EXAMCAT_pdfActiveMode = mode;
+    _examcatUpdateModeUI();
+    const viewer=document.getElementById('examcat-pdf-viewer'); if(viewer) viewer.style.display='block';
+    await _examcatRenderPdfPage();
+  }catch(e){
+    alert('PDF를 여는 데 실패했습니다: '+e.message+'\n(파일이 손상됐거나 PDF 형식이 아닐 수 있습니다)');
+  }
+}
+
+function _examcatSwitchMode(mode){
+  // ★ 2026-08-27 추가: 문제지↔해설지 전환. 이미 그 쪽 PDF를 불러온 적이 있으면
+  // 다시 올릴 필요 없이 그 자리 그대로(같은 페이지·확대 상태) 이어서 보여준다.
+  EXAMCAT_pdfActiveMode = mode;
+  _examcatUpdateModeUI();
+  if(EXAMCAT_pdfStore[mode]){
+    const viewer=document.getElementById('examcat-pdf-viewer'); if(viewer) viewer.style.display='block';
+    _examcatRenderPdfPage();
+  } else {
+    const viewer=document.getElementById('examcat-pdf-viewer'); if(viewer) viewer.style.display='none';
+  }
+}
+
+function _examcatUpdateModeUI(){
+  const qBtn=document.getElementById('examcat-mode-q-btn'), eBtn=document.getElementById('examcat-mode-e-btn');
+  const label=document.getElementById('examcat-file-label');
+  [[qBtn,'q'],[eBtn,'e']].forEach(function(pair){
+    const btn=pair[0], m=pair[1];
+    if(!btn) return;
+    const active = EXAMCAT_pdfActiveMode===m;
+    btn.style.background = active ? '#0369a1' : '#fff';
+    btn.style.color = active ? '#fff' : '#334155';
+    btn.style.borderColor = active ? '#0369a1' : '#cbd5e1';
+  });
+  if(label){
+    const m = EXAMCAT_pdfActiveMode||'q';
+    const loaded = !!EXAMCAT_pdfStore[m];
+    label.textContent = (loaded?'📁 다른 '+(m==='q'?'문제지':'해설지')+' PDF로 바꾸기':'📁 '+(m==='q'?'문제지':'해설지')+' PDF 파일 선택');
+  }
+}
+
+async function _examcatRenderPdfPage(){
+  const cur = _examcatCurPdf();
+  if(!cur) return;
+  const canvas = document.getElementById('examcat-pdf-canvas');
+  if(!canvas) return;
+  let page;
+  try{ page = await cur.doc.getPage(cur.pageNum); }
+  catch(e){ alert('페이지를 불러오지 못했습니다: '+e.message); return; }
+  const viewport = page.getViewport({scale:1.6});
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+  await page.render({canvasContext:ctx, viewport}).promise;
+  cur._pageImageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const lbl=document.getElementById('examcat-pdf-pagelabel');
+  if(lbl) lbl.textContent = cur.pageNum+' / '+cur.numPages+'페이지';
+  _examcatAttachDragHandlers(canvas);
+}
+
+function _examcatPdfPage(delta){
+  const cur = _examcatCurPdf();
+  if(!cur) return;
+  const n = cur.pageNum + delta;
+  if(n<1 || n>cur.numPages) return;
+  cur.pageNum = n;
+  _examcatCancelCrop();
+  _examcatRenderPdfPage();
+}
+
+function _examcatAttachDragHandlers(canvas){
+  if(canvas._examcatBound) return; // 페이지 재렌더시 중복 바인딩 방지(캔버스 엘리먼트 자체는 재사용됨)
+  canvas._examcatBound = true;
+  canvas.addEventListener('mousedown', function(ev){
+    const cur=_examcatCurPdf(); if(!cur) return;
+    const r = canvas.getBoundingClientRect();
+    const x = (ev.clientX-r.left) * (canvas.width/r.width);
+    const y = (ev.clientY-r.top) * (canvas.height/r.height);
+    cur.dragging = true;
+    cur.rectStart = {x,y};
+    cur.rectEnd = {x,y};
+  });
+  canvas.addEventListener('mousemove', function(ev){
+    const cur=_examcatCurPdf(); if(!cur || !cur.dragging) return;
+    const r = canvas.getBoundingClientRect();
+    const x = (ev.clientX-r.left) * (canvas.width/r.width);
+    const y = (ev.clientY-r.top) * (canvas.height/r.height);
+    cur.rectEnd = {x,y};
+    _examcatDrawOverlay();
+  });
+  window.addEventListener('mouseup', function(){
+    const cur=_examcatCurPdf(); if(!cur || !cur.dragging) return;
+    cur.dragging = false;
+    if(cur.rectStart && cur.rectEnd){
+      const w = Math.abs(cur.rectEnd.x-cur.rectStart.x);
+      const h = Math.abs(cur.rectEnd.y-cur.rectStart.y);
+      if(w>15 && h>15){
+        const p=document.getElementById('examcat-pdf-croppanel'); if(p) p.style.display='block';
+        const noEl=document.getElementById('examcat-crop-no'); if(noEl) noEl.focus();
+      }
+    }
+  });
+}
+
+function _examcatDrawOverlay(){
+  const cur = _examcatCurPdf();
+  if(!cur) return;
+  const canvas = document.getElementById('examcat-pdf-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if(cur._pageImageData) ctx.putImageData(cur._pageImageData, 0, 0);
+  if(cur.rectStart && cur.rectEnd){
+    const x1=cur.rectStart.x, y1=cur.rectStart.y, x2=cur.rectEnd.x, y2=cur.rectEnd.y;
+    ctx.strokeStyle='#dc2626'; ctx.lineWidth=2;
+    ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+    ctx.fillStyle='rgba(220,38,38,0.08)';
+    ctx.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+  }
+}
+
+function _examcatCancelCrop(){
+  const cur=_examcatCurPdf();
+  if(cur){ cur.rectStart=null; cur.rectEnd=null; }
+  const p=document.getElementById('examcat-pdf-croppanel'); if(p) p.style.display='none';
+  const noEl=document.getElementById('examcat-crop-no'); if(noEl) noEl.value='';
+  if(cur && cur._pageImageData){
+    const canvas=document.getElementById('examcat-pdf-canvas');
+    if(canvas) canvas.getContext('2d').putImageData(cur._pageImageData,0,0);
+  }
+}
+
+function _examcatExpandRange(str){
+  str=(str||'').trim();
+  const m = str.match(/^(\d+)\s*-\s*(\d+)$/);
+  if(m){
+    const a=parseInt(m[1],10), b=parseInt(m[2],10);
+    if(isNaN(a)||isNaN(b)||b<a||b-a>19) return [];
+    const arr=[]; for(let i=a;i<=b;i++) arr.push(String(i));
+    return arr;
+  }
+  if(/^\d+$/.test(str)) return [str];
+  return [];
+}
+
+async function _examcatSaveCrop(){
+  const cur=_examcatCurPdf();
+  const mode=EXAMCAT_pdfActiveMode;
+  if(!cur || !cur.rectStart || !cur.rectEnd){ alert('먼저 영역을 드래그해서 선택해주세요.'); return; }
+  const noStr = (document.getElementById('examcat-crop-no')||{}).value?.trim();
+  if(!noStr){ alert('문항번호를 입력해주세요.'); return; }
+  const nums = _examcatExpandRange(noStr);
+  if(!nums.length){ alert('문항번호 형식을 확인해주세요 (예: 21 또는 21-23, 최대 20문항 범위)'); return; }
+  const canvas = document.getElementById('examcat-pdf-canvas');
+  const x1=Math.min(cur.rectStart.x, cur.rectEnd.x);
+  const y1=Math.min(cur.rectStart.y, cur.rectEnd.y);
+  const w=Math.abs(cur.rectEnd.x-cur.rectStart.x);
+  const h=Math.abs(cur.rectEnd.y-cur.rectStart.y);
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = w; cropCanvas.height = h;
+  cropCanvas.getContext('2d').drawImage(canvas, x1, y1, w, h, 0, 0, w, h);
+  const blob = await new Promise(function(res){ cropCanvas.toBlob(res, 'image/jpeg', 0.85); });
+  if(!blob){ alert('이미지 변환에 실패했습니다.'); return; }
+  if(!FB_USE() || !window._fb || !window._fb.uploadBlob){ alert('서버 연결이 되어있지 않아 저장할 수 없습니다.'); return; }
+  const examId = EXAMCAT_editing.id;
+  const rangeKey = nums[0]+(nums.length>1?('-'+nums[nums.length-1]):'');
+  const path = 'examCatalog/'+examId+'/'+(mode==='q'?'q':'e')+'/'+rangeKey+'_'+Date.now()+'.jpg';
+  try{
+    const url = await window._fb.uploadBlob(path, blob);
+    if(!EXAMCAT_editing.qImages) EXAMCAT_editing.qImages={};
+    if(!EXAMCAT_editing.eImages) EXAMCAT_editing.eImages={};
+    const targetMap = mode==='q' ? EXAMCAT_editing.qImages : EXAMCAT_editing.eImages;
+    nums.forEach(function(no){ targetMap[no] = {url:url, path:path, start:nums[0], end:nums[nums.length-1]}; });
+    await examcatSaveEntry(EXAMCAT_editing);
+    _examcatCancelCrop();
+    _examcatRenderSavedImageList();
+    toast('✅ '+rangeKey+'번 이미지가 저장됐습니다.');
+  }catch(e){
+    alert('업로드 중 오류가 발생했습니다: '+e.message+'\n\n인터넷 연결을 확인하고 다시 시도해주세요.');
+  }
+}
+
+async function _examcatDeleteImage(mode, no){
+  if(!EXAMCAT_editing) return;
+  const targetMap = mode==='q' ? EXAMCAT_editing.qImages : EXAMCAT_editing.eImages;
+  if(!targetMap || !targetMap[no]) return;
+  if(!confirm(no+'번 이미지를 삭제하시겠습니까?\n(같은 이미지를 여러 문항이 같이 쓰고 있었다면, 그 문항들에서도 함께 지워집니다)')) return;
+  const removedPath = targetMap[no].path;
+  // ★ 같은 파일(range 이미지 하나를 여러 문항이 공유)을 쓰는 다른 문항 항목도 같이 지운다
+  Object.keys(targetMap).forEach(function(k){ if(targetMap[k] && targetMap[k].path===removedPath) delete targetMap[k]; });
+  try{ if(removedPath && window._fb.deleteFile) await window._fb.deleteFile(removedPath); }
+  catch(e){ console.warn('Storage 파일 삭제 실패(무시하고 진행):', e.message); }
+  await examcatSaveEntry(EXAMCAT_editing);
+  _examcatRenderSavedImageList();
+}
+
+function _examcatRenderSavedImageList(){
+  const el=document.getElementById('examcat-pdf-savedlist');
+  if(!el || !EXAMCAT_editing) return;
+  function listFor(map, label, mode){
+    const nos = Object.keys(map||{}).sort(function(a,b){ return (+a)-(+b); });
+    if(!nos.length) return '';
+    return '<div style="margin-bottom:6px"><b style="font-size:11.5px;color:#0f172a">'+label+'</b><br>'+
+      nos.map(function(no){
+        return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;margin:3px 4px 0 0;font-size:11.5px">'+esc(no)+'번'+
+          '<button type="button" onclick="_examcatDeleteImage(\''+mode+'\',\''+esc(no)+'\')" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:11px;padding:0 2px">✕</button></span>';
+      }).join('')+'</div>';
+  }
+  el.innerHTML = listFor(EXAMCAT_editing.qImages,'📄 등록된 문항 이미지','q') + listFor(EXAMCAT_editing.eImages,'📄 등록된 해설 이미지','e');
 }
 
 async function _examcatSubmit(){
@@ -29727,6 +30018,17 @@ function _cbrLookupQuestionImages(map, subjectCode, detail, no){
   const pools=(map[subj+'|'+normDetail]||[]).concat(map[subj+'|']||[]);
   return pools.filter(function(e){return n>=e.start && n<=e.end;})
     .sort(function(a,b){return String(a.filename).localeCompare(String(b.filename));});
+}
+// ★ 2026-08-27 추가: 시험 카탈로그에 PDF 드래그로 영구 저장해둔 문항/해설 이미지를
+// 찾는 함수. 세션 업로드(_cbrLookupQuestionImages)와 반환 형태를 동일하게 맞춰서
+// (배열 안에 {dataUrl,start,end}) 오답노트 출력 코드를 그대로 재사용할 수 있게 한다.
+function _examcatLookupCatalogImages(examEntry, mode, no){
+  if(!examEntry) return [];
+  const map = mode==='q' ? examEntry.qImages : examEntry.eImages;
+  if(!map) return [];
+  const found = map[String(no)];
+  if(!found || !found.url) return [];
+  return [{dataUrl:found.url, start:+found.start||+no, end:+found.end||+no}];
 }
 
 // ★ 학생별 매니저 AAR 메모 일괄 입력 — 챌린저 iframe 안의 aarParseMemo()가 쓰는
@@ -38359,6 +38661,9 @@ function generateReport() {
     }
     var qImageMap=await _cbrLoadQuestionImages(); // ★ 인쇄 버튼을 누른 시점에만 파일을 읽는다
     var eImageMap=await _cbrLoadExplanationImages(); // ★ 해설 이미지도 마찬가지로 이 시점에만 읽는다
+    // ★ 2026-08-27 추가: 시험 카탈로그에 PDF 드래그로 영구 저장해둔 이미지도 찾을 수 있게,
+    // 이번 인쇄 대상 시험명과 일치하는 카탈로그 항목을 한 번만 찾아둔다.
+    var examCatEntry=(window.ST&&ST.examCatalog||[]).find(function(x){return x.examName===info.name;});
 
     var pages=targets.map(function(stu){
       var subs=(stu.challengerData&&stu.challengerData.lastSubjects)||[];
@@ -38375,6 +38680,7 @@ function generateReport() {
           // ★ 문제 표시 우선순위: (1) 방금 업로드한 문항 이미지가 있으면 그걸 그대로 보여주고,
           // (2) 이미지가 없을 때만 정답/해설 칸의 6번째 열(question) 텍스트로 대체한다.
           var qImages=_cbrLookupQuestionImages(qImageMap, s.subject, s.detail, it.no);
+          if(!qImages.length && examCatEntry) qImages=_examcatLookupCatalogImages(examCatEntry,'q',it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인
           // ★ 업로드한 이미지가 지문 하나에 문항 여러 개가 걸린 "구간" 이미지(예: [4~9] 한 장)라면,
           // 그 안에서 지금 카드가 다루는 문항이 몇 번인지 한눈에 보이도록 강조 배너를 붙인다.
           // 문항 하나만 딱 자른 이미지(start===end)라면 이미 명확하므로 배너를 붙이지 않는다.
@@ -38387,6 +38693,7 @@ function generateReport() {
             : (it.question?'<div class="wn-question">'+_wnEsc(it.question).replace(/⏎/g,'<br>')+'</div>':'');
           var explainHtml;
           var eImages=_cbrLookupQuestionImages(eImageMap, s.subject, s.detail, it.no);
+          if(!eImages.length && examCatEntry) eImages=_examcatLookupCatalogImages(examCatEntry,'e',it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인
           if(eImages.length){
             var eRange=eImages[0];
             var eBanner=(eRange && eRange.start!==eRange.end)
@@ -38435,20 +38742,20 @@ function generateReport() {
       '.wn-subject{margin-bottom:18px}'+
       '.wn-subject h3{font-size:14px;border-left:4px solid #0f766e;padding-left:8px;margin:14px 0 8px;break-after:avoid;page-break-after:avoid}'+
       '.wn-subject-meta{font-size:11px;color:#64748b;font-weight:500}'+
-      '.wn-item{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:8px}'+
+      '.wn-item{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:8px;break-inside:avoid;page-break-inside:avoid}'+
       '.wn-item-break{break-before:page;page-break-before:always}'+
       '.wn-item-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px}'+
       '.wn-no{background:#0f766e;color:#fff;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:800}'+
       '.wn-unit{font-size:12px;font-weight:700;flex:1;min-width:120px}'+
       '.wn-diff{font-size:10.5px;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px}'+
       '.wn-answer{font-size:11.5px;font-weight:700;color:#1d4ed8}'+
-      '.wn-question{font-size:11.5px;color:#1e293b;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:6px;line-height:1.6;white-space:normal}'+
+      '.wn-question{font-size:11.5px;color:#1e293b;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:6px;line-height:1.6;white-space:normal;break-inside:avoid;page-break-inside:avoid}'+
       '.wn-question-marker{font-size:11.5px;font-weight:800;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:5px 9px;margin-bottom:5px;display:inline-block}'+
       '.wn-question-imgs{margin-bottom:6px}'+
       '.wn-question-img{display:block;width:100%;height:auto;max-height:185mm;margin:0 0 4px;border:1px solid #e2e8f0;border-radius:6px}'+
       '@media print{.wn-question-img{max-height:170mm}}'+
       '.wn-reason{font-size:11px;color:#334155;margin-bottom:6px}'+
-      '.wn-explain{font-size:11px;color:#334155;background:#f8fafc;border-radius:6px;padding:6px 8px}'+
+      '.wn-explain{font-size:11px;color:#334155;background:#f8fafc;border-radius:6px;padding:6px 8px;break-inside:avoid;page-break-inside:avoid}'+
       '.wn-explain-label{display:block;font-size:10.5px;color:#0f766e;margin-bottom:3px}'+
       '.wn-exp-p{margin:0 0 5px;line-height:1.55}'+
       '.wn-exp-p:last-child{margin-bottom:0}'+
