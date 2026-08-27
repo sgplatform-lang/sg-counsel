@@ -1039,7 +1039,15 @@ async function fbSave(col, id, data){
       // consultations 보호 로직과 동일한 패턴: 서버 쪽 키 개수가 로컬보다 많으면
       // (=로컬이 스테일할 가능성) 서버 데이터를 기준으로 병합(로컬 값 있으면 우선).
       const _hasPlanData = data.weeklyPlan && typeof data.weeklyPlan==='object';
-      if(_riskStudent || _hasInspectData || _hasPlanData){
+      // ★ 2026-08-27 추가: crossPick(교과/종합/논술 선택자료)·pickReports(저장 리포트)
+      // 유실 방지 — 위와 완전히 같은 유형의 사고. 이 세션에서 학생을 열었을 때 crossPick을
+      // 건드리지 않은 채(=로컬 사본이 비어있거나 오래된 상태) 다른 화면(성적 등)만 저장해도
+      // ref.set()의 전체 문서 교체 특성상 서버에 저장돼 있던 실제 선택자료가 통째로
+      // 사라졌다(2026-08-27 실사용 중 발견 — 여승빈/염민찬 학생 사례). 로컬이 서버보다
+      // 항목이 적어 보이면(=로컬이 스테일할 가능성) 서버 쪽을 보존하며 병합한다.
+      const _cpCount = cp => cp ? (Object.keys(cp.gyogwa||{}).length+Object.keys(cp.jonghap||{}).length+Object.keys(cp.nulsul||{}).length) : 0;
+      const _hasCrossPickRisk = true; // crossPick은 언제 스테일해질지 예측 불가 → 매 저장마다 확인
+      if(_riskStudent || _hasInspectData || _hasPlanData || _hasCrossPickRisk){
         try{
           const snap = await ref.get();
           if(snap.exists){
@@ -1081,6 +1089,22 @@ async function fbSave(col, id, data){
                   }
                 }
               }
+            }
+            // ★ 2026-08-27 추가: crossPick/pickReports 유실 방지 — 서버가 로컬보다 많으면
+            // (=로컬이 이 세션에서 아직 크로스픽을 안 건드려 스테일할 가능성) 서버 쪽을
+            // 기준으로 병합(로컬에만 있는 항목은 보존, 서버에만 있는 항목도 보존).
+            const serverCp = serverData.crossPick;
+            if(serverCp && _cpCount(serverCp) > _cpCount(saveData.crossPick)){
+              saveData = {...saveData, crossPick: {
+                gyogwa: Object.assign({}, serverCp.gyogwa||{}, (saveData.crossPick&&saveData.crossPick.gyogwa)||{}),
+                jonghap: Object.assign({}, serverCp.jonghap||{}, (saveData.crossPick&&saveData.crossPick.jonghap)||{}),
+                nulsul: Object.assign({}, serverCp.nulsul||{}, (saveData.crossPick&&saveData.crossPick.nulsul)||{}),
+              }};
+            }
+            const serverReports = serverData.pickReports;
+            const localReports = saveData.pickReports;
+            if(Array.isArray(serverReports) && serverReports.length > (Array.isArray(localReports)?localReports.length:0)){
+              saveData = {...saveData, pickReports: serverReports};
             }
           }
         }catch(e){ console.warn('데이터 병합 확인 실패:', e.message); }
