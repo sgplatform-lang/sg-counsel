@@ -1563,7 +1563,7 @@ async function chgSaveRound(){
   if(!confirm(cd.lastTestDate+' · '+cd.lastTestName+' 회차를 저장할까요?\n(같은 응시일+시험명으로 이미 저장된 회차가 있으면 그 내용을 덮어씁니다)\n저장 후에는 응시일/시험명을 바꿔서 다음 회차를 이어서 입력하시면 됩니다.')) return;
   const ok=await chgArchiveRound(cd.lastTestDate, cd.lastTestName, cd.lastSubjects);
   if(!ok){ toast('회차 저장 중 오류가 발생했습니다'); return; }
-  toast(cd.lastTestDate+' · '+cd.lastTestName+' 회차가 저장되었습니다. 이제 다음 응시일/시험명을 입력하시면 됩니다.');
+  toast('✅ 입력이 완료됐습니다!');
   render();
 }
 function chgAddSubject(){
@@ -1839,7 +1839,7 @@ function chgGenerateAarMemo(sIdx){
   sub.memo=lines.join('\n');
   render();
   chgScheduleSave();
-  toast('AAR 입력 항목('+filled.length+'개)을 메모에 반영했습니다.');
+  toast('✅ 입력이 완료됐습니다!');
 }
 
 function renderChallengerInput(){
