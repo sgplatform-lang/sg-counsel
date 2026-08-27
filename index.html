@@ -21191,12 +21191,37 @@ function SG_loadAllPicks(){
 function SG_savePicks(){
   if(!SG_activeStudentRef) return;
   SG_activeStudentRef.crossPick = SG_crossPick;
-  upd(SG_activeStudentRef); // 학생 레코드 저장 (로컬+Firebase 동기화, save()/render() 포함)
+  // ★ 2026-08-27 수정: upd()는 항상 save()+render()로 화면 전체를 다시 그리는데,
+  // 체크박스 하나 누를 때마다 이게 실행되면서 교과/종합/논술 검색·필터 상태(대학명
+  // 검색어, 지원경향 등 DOM에만 있고 JS 상태로 안 남는 값들)가 다시 그려질 때 함께
+  // 초기화되어 "체크하면 화면이 전체 리스트로 돌아가는" 문제가 있었다. 체크박스
+  // 선택 저장은 화면을 다시 그릴 필요가 없는 작업이므로, 전체 렌더 없이 로컬
+  // 반영 + Firebase 저장만 하도록 분리한다(화면 갱신은 SG_updatePickBadge의
+  // 부분 DOM 업데이트로 충분).
+  if(!ST._savingIds) ST._savingIds=new Set();
+  ST._savingIds.add(String(SG_activeStudentRef.id));
+  ST.students = ST.students.map(x=>String(x.id)===String(SG_activeStudentRef.id)?SG_activeStudentRef:x);
+  if(String(ST.sel?.id)===String(SG_activeStudentRef.id)) ST.sel = SG_activeStudentRef;
+  if(String(ST.adminSel?.id)===String(SG_activeStudentRef.id)) ST.adminSel = SG_activeStudentRef;
+  if(FB_USE()) fbSave('students', SG_activeStudentRef.id, SG_activeStudentRef);
+  try{ localStorage.setItem(SK, JSON.stringify(ST.students)); }catch(e){}
+  if(typeof SG_updateReportBadge==='function') SG_updateReportBadge();
+  const _sid=String(SG_activeStudentRef.id);
+  setTimeout(()=>{if(ST._savingIds) ST._savingIds.delete(_sid);},5000);
 }
 function SG_switchStudentPicks(s){
   if(!s) return;
   var sidStr = String(s.id);
-  if(SG_activeStudentId === sidStr && SG_activeStudentRef === s){ SG_crossPick = s.crossPick || (s.crossPick={gyogwa:{},jonghap:{},nulsul:{}}); return; }
+  if(SG_activeStudentId === sidStr && SG_activeStudentRef === s){
+    SG_crossPick = s.crossPick || (s.crossPick={gyogwa:{},jonghap:{},nulsul:{}});
+    // ★ 2026-08-27 수정: 같은 학생을 다시 열 때(탭만 전환하는 경우)는 이 지름길로
+    // 바로 return했는데, 여기서 배지 갱신을 안 하다 보니 — 이 학생으로 처음
+    // 전환된 시점에 마침 배지가 아직 안 켜진 상태였다면(예: 렌더 순서상 교과분석
+    // 탭이 개요 탭보다 먼저 그려진 경우) "저장 리포트" 배지가 계속 꺼진 채로
+    // 남아있는 문제가 있었다. 지름길이어도 배지는 항상 다시 맞춰준다.
+    SG_updatePickBadge();
+    return;
+  }
   if(!s.crossPick || typeof s.crossPick!=='object') s.crossPick = {gyogwa:{},jonghap:{},nulsul:{}};
   // ★ 구버전 로컬스토리지에 남아있던 선택자료가 있으면 학생 레코드로 1회 이전
   SG_loadAllPicks();
