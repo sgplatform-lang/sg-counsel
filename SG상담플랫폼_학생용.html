@@ -1662,7 +1662,7 @@ function chgHistoryModalHtml(){
         <div style="font-size:15px;font-weight:900">📋 과거 회차 보기</div>
         <button class="btn-sm" onclick="chgCloseHistoryPicker()">닫기</button>
       </div>
-      ${!list.length ? `<p style="font-size:12px;color:#888;padding:20px 0;text-align:center">아직 저장된 회차가 없습니다.<br>과목 입력 후 "이번 회차 저장(확정)"을 눌러 회차를 남겨보세요.</p>` : `
+      ${!list.length ? `<p style="font-size:12px;color:#888;padding:20px 0;text-align:center">아직 저장된 회차가 없습니다.<br>과목 입력 후 "최종완료" 버튼을 눌러 회차를 남겨보세요.</p>` : `
       <p style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.5">불러올 회차를 선택하세요. 현재 화면 내용은 먼저 저장하지 않으면 사라집니다.</p>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${list.map((h,i)=>`<div onclick="chgLoadHistoryRound(${i})" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;cursor:pointer" onmousedown="this.style.background='#f4f6fb'">
@@ -1820,7 +1820,7 @@ function chgAarSectionHtml(sIdx,sub){
     <div style="font-size:13px;font-weight:800;margin-bottom:2px">🎯 시험 전·후 AAR (탭해서 선택)</div>
     ${block('시험 전', pre)}
     ${block('시험 직후', post)}
-    <button class="btn-sm" style="width:100%;margin-top:6px;background:#0f766e;color:#fff;font-weight:700" onclick="chgGenerateAarMemo(${sIdx})">✅ 이 내용으로 메모 생성</button>
+    <button class="btn-sm" style="width:100%;margin-top:6px;background:#3b5bdb;color:#fff;font-weight:700" onclick="chgGenerateAarMemo(${sIdx})">✅ 입력완료</button>
     ${sub.memo?`<div style="margin-top:8px;padding:8px;background:#f0fdfa;border-radius:8px;font-size:11px;color:#334155;white-space:pre-wrap;line-height:1.5">${esc(sub.memo)}</div>`:''}
   </div>`;
 }
@@ -1854,18 +1854,18 @@ function renderChallengerInput(){
         <div><label style="font-size:11px;color:#888">학생명</label><input value="${esc(s.name)}" readonly style="background:#f5f6fa;color:#888"></div>
         <div><label style="font-size:11px;color:#888">학교/학년</label><input value="${esc((s.school||'')+' '+(s.grade||''))}" readonly style="background:#f5f6fa;color:#888"></div>
         <div><label style="font-size:11px;color:#888">응시일</label><input type="date" value="${esc(cd.lastTestDate||'')}" onchange="chgSetMeta('lastTestDate',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">시험명/회차</label><div style="display:flex;gap:6px"><input style="flex:1" value="${esc(cd.lastTestName||'')}" placeholder="예: 6월 모의평가" oninput="chgSetMeta('lastTestName',this.value)"><button type="button" class="btn-sm" style="white-space:nowrap;padding:0 10px" onclick="chgOpenHistoryPicker()">📋 과거 회차</button></div></div>
-        <div style="grid-column:span 2"><label style="font-size:11px;color:#888">목표 대학/전공</label><input value="${esc((cd.meta&&cd.meta.target)||'')}" placeholder="예: OO대학교 OO학과" oninput="chgSetMeta('target',this.value)"></div>
+        <div><label style="font-size:11px;color:#888">목표 대학/전공</label><input value="${esc((cd.meta&&cd.meta.target)||'')}" placeholder="예: OO대학교 OO학과" oninput="chgSetMeta('target',this.value)"></div>
+        <div style="grid-column:span 2"><label style="font-size:11px;color:#888">시험명/회차</label><div style="display:flex;gap:6px"><input style="flex:1" value="${esc(cd.lastTestName||'')}" placeholder="예: 6월 모의평가" oninput="chgSetMeta('lastTestName',this.value)"><button type="button" class="btn-sm" style="white-space:nowrap;padding:0 10px" onclick="chgOpenHistoryPicker()">📋 과거 회차</button></div></div>
       </div>
     </div></div>
 
     <div style="margin:16px 0 8px">
-      <div class="stitle" style="margin:0">📚 이번 회차 과목별 입력</div>
+      <div class="stitle" style="margin:0">📚 이번 회차 과목별 입력 <span style="font-size:11px;color:#dc2626;font-weight:700">(AAR,오답체크 필수)</span></div>
     </div>
 
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px;font-weight:800;border:1.5px solid ${mode==='wrong'?'#3b5bdb':'#e2e8f0'};background:${mode==='wrong'?'#3b5bdb':'#fff'};color:${mode==='wrong'?'#fff':'#333'}" onclick="chgSetViewMode('wrong')">📝 챌린저 오답</button>
       <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px;font-weight:800;border:1.5px solid ${mode==='aar'?'#0f766e':'#e2e8f0'};background:${mode==='aar'?'#0f766e':'#fff'};color:${mode==='aar'?'#fff':'#333'}" onclick="chgSetViewMode('aar')">🎯 챌린저 AAR</button>
+      <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px;font-weight:800;border:1.5px solid ${mode==='wrong'?'#3b5bdb':'#e2e8f0'};background:${mode==='wrong'?'#3b5bdb':'#fff'};color:${mode==='wrong'?'#fff':'#333'}" onclick="chgSetViewMode('wrong')">📝 챌린저 오답</button>
     </div>
 
     ${cd.lastSubjects.length===0?`<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">입력된 과목이 없습니다</div><div class="empty-sub">아래 '+ 과목 추가'를 눌러 이번 회차 결과를 입력해보세요</div></div>`:''}
@@ -1876,9 +1876,9 @@ function renderChallengerInput(){
         <div style="font-size:13px;font-weight:700">과목 ${sIdx+1}</div>
         <button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveSubject(${sIdx})">삭제</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:${(sub.subject==='ENG'||sub.subject==='HIST')?'1fr':'1fr 1fr'};gap:8px 10px;margin-bottom:10px">
         <div><label style="font-size:11px;color:#888">과목</label><select onchange="chgSetSubjField(${sIdx},'subject',this.value);render()">${CHG_SUBJ_OPT.map(([v,l])=>`<option value="${v}" ${sub.subject===v?'selected':''}>${l}</option>`).join('')}</select></div>
-        <div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>
+        ${(sub.subject==='ENG'||sub.subject==='HIST')?'':`<div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>`}
       </div>
       ${mode==='wrong'?`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
@@ -1919,13 +1919,13 @@ function renderChallengerInput(){
       `:chgAarSectionHtml(sIdx,sub)}
     </div></div>`).join('')}
 
-    <button class="btn-sm" style="width:100%;min-height:46px;margin-bottom:12px;background:#3b5bdb;color:#fff;font-size:14px" onclick="chgAddSubject()">+ 과목 추가</button>
+    <button class="btn-sm" style="width:100%;min-height:42px;margin-bottom:12px;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;font-size:13px" onclick="chgAddSubject()">+ 과목 추가</button>
 
-    <button class="btn-sm" style="width:100%;min-height:50px;margin-bottom:12px;background:#0f766e;color:#fff;font-size:15px;font-weight:700" onclick="chgSaveRound()">✅ 이번 회차 저장(확정)</button>
+    <button class="btn-sm" style="width:100%;min-height:52px;margin-bottom:12px;background:#3b5bdb;color:#fff;font-size:16px;font-weight:800;box-shadow:0 2px 8px rgba(59,91,219,.35)" onclick="chgSaveRound()">✅ ${mode==='wrong'?'오답입력 최종완료':'최종 입력 완료'}</button>
 
     <div class="card"><div class="card-body">
       <p style="font-size:11px;color:#888;line-height:1.6">✏️ 입력한 내용은 자동으로 저장되며, 담당 선생님 화면(챌린저)에도 실시간으로 반영됩니다. 선생님이 내용을 수정하시면 이 화면도 함께 업데이트됩니다.<br>
-      ✅ <b>다음 회차(새로운 응시일/시험명)를 입력하기 전에는 반드시 위 "이번 회차 저장(확정)" 버튼을 먼저 눌러주세요.</b> 누르지 않고 응시일/시험명만 바꿔서 계속 입력하면 이전 회차 내용이 사라지고, 선생님이 회차별로 따로 불러볼 수 없습니다.
+      ✅ <b>다음 회차(새로운 응시일/시험명)를 입력하기 전에는 반드시 위 "${mode==='wrong'?'오답입력 최종완료':'최종 입력 완료'}" 버튼을 먼저 눌러주세요.</b> 누르지 않고 응시일/시험명만 바꿔서 계속 입력하면 이전 회차 내용이 사라지고, 선생님이 회차별로 따로 불러볼 수 없습니다.
       ${Array.isArray(cd.history)&&cd.history.length?('<br>📋 지금까지 저장된 회차: '+cd.history.length+'건 ('+cd.history.map(h=>h.date+' '+h.test).join(', ')+')'):''}</p>
     </div></div>
   </div>
