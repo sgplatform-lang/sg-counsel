@@ -28987,14 +28987,107 @@ function _examcatPdfSectionHtml(){
       </div>
       <div id="examcat-pdf-croppanel" style="display:none;margin-top:8px;padding:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="examcat-crop-subj" placeholder="과목코드 (예: KOR)" style="width:110px;border:1px solid #93c5fd;border-radius:6px;padding:6px 8px;font-size:12px">
+          <input id="examcat-crop-detail" placeholder="세부과목 (공통이면 비움, 예: 언어와매체)" style="width:180px;border:1px solid #93c5fd;border-radius:6px;padding:6px 8px;font-size:12px">
           <input id="examcat-crop-no" placeholder="문항번호 (예: 21 또는 21-23)" style="flex:1;min-width:160px;border:1px solid #93c5fd;border-radius:6px;padding:6px 8px;font-size:12px">
           <button type="button" onclick="_examcatSaveCrop()" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">✂ 이 영역 저장</button>
           <button type="button" onclick="_examcatCancelCrop()" style="background:#f1f5f9;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">취소</button>
         </div>
+        <p style="font-size:10.5px;color:#64748b;margin:6px 0 0">⚠️ 문항번호가 과목마다 겹치는 선택과목(화작/언매, 미적분/기하/확통, 탐구 제1선택/제2선택)은 과목코드·세부과목을 꼭 채워주세요 — 안 그러면 서로 다른 과목의 같은 번호끼리 이미지가 덮어써집니다. 공통 문항은 세부과목을 비워두세요.</p>
       </div>
     </div>
     <div id="examcat-pdf-savedlist" style="margin-top:10px"></div>
+    <div style="margin-top:16px;border-top:1px dashed #cbd5e1;padding-top:12px">
+      <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:6px">📁 문항 이미지 파일 직접 업로드 (선택 — 캡처 프로그램으로 미리 잘라둔 이미지가 있을 때)</div>
+      <p style="font-size:11px;color:#64748b;margin:0 0 8px">
+        PDF에서 마우스로 드래그하는 대신, 캡처 도구 등으로 미리 잘라둔 이미지 파일을 그대로 여러 장 골라서 올리면 자동으로 영구 저장됩니다.<br>
+        파일명 규칙: <code>과목코드_세부과목_시작-끝번호[_p순번].확장자</code> — 공통 문항은 세부과목 칸을 생략하세요 (예: <code>KOR_1-3.jpg</code>). 단독 문항은 시작=끝으로 (예: <code>KOR_5-5.jpg</code>).<br>
+        <b>⚠️ 화작/언매, 미적분/기하/확통, 탐구 제1선택/제2선택처럼 문항번호가 과목마다 겹치는 선택과목은 세부과목을 꼭 넣어주세요</b> (예: <code>KOR_화법과작문_35-37.jpg</code>, <code>KOR_언어와매체_35-37.jpg</code>) — 세부과목별로 완전히 분리해서 저장되므로 서로 덮어쓰지 않습니다.<br>
+        지문 하나가 여러 이미지로 나뉘어 있으면(지문이 길거나, 지문과 문제가 따로 떨어져 있는 경우) 같은 시작-끝번호 뒤에 <code>_p1</code>, <code>_p2</code>를 붙여서 여러 장을 한 번에 선택하세요 (예: <code>KOR_1-3_p1.jpg</code>, <code>KOR_1-3_p2.jpg</code>) — 오답노트에 그 순서 그대로 이어 붙여 표시됩니다.<br>
+        같은 시작-끝번호(예: 21-23)로 여러 문항을 한 번에 지정하면, 그 이미지가 21·22·23번 모두에서 재사용됩니다.
+      </p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px">
+          <label style="display:inline-block;background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155">📄 문항 이미지 파일 선택 (여러 장 가능)<input type="file" id="examcat-upload-q-input" accept="image/*" multiple style="display:none" onchange="_examcatUploadByFilename(this.files,'q')"></label>
+          <div id="examcat-upload-q-status" style="font-size:11.5px;color:#0f766e;margin-top:6px;font-weight:600"></div>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <label style="display:inline-block;background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155">📄 해설 이미지 파일 선택 (여러 장 가능)<input type="file" id="examcat-upload-e-input" accept="image/*" multiple style="display:none" onchange="_examcatUploadByFilename(this.files,'e')"></label>
+          <div id="examcat-upload-e-status" style="font-size:11.5px;color:#0f766e;margin-top:6px;font-weight:600"></div>
+        </div>
+      </div>
+    </div>
   </div>`;
+}
+
+// ★ 2026-08-28 추가: 카탈로그에 "파일명 규칙으로 잘라온 이미지"를 한꺼번에 여러 장 선택해
+// 영구 저장하는 기능. 기존 PDF 드래그 저장(_examcatSaveCrop)과 같은 저장소·같은 데이터
+// 구조(examEntry.qImages/eImages)를 공유하되, 지문이 여러 장(_p1/_p2...)으로 나뉜 경우를
+// 지원하기 위해 각 문항번호 항목에 pages 배열(여러 장의 {url,path})을 둔다. 예전에 드래그로
+// 저장된 항목(pages 없이 url/path만 있는 예전 데이터)도 그대로 읽을 수 있도록
+// _examcatLookupCatalogImages 쪽에서 하위호환을 맞춘다.
+async function _examcatUploadByFilename(fileList, mode){
+  const files = Array.from(fileList||[]);
+  const statusEl = document.getElementById(mode==='q'?'examcat-upload-q-status':'examcat-upload-e-status');
+  if(!files.length) return;
+  if(!EXAMCAT_editing){ alert('먼저 이 시험을 등록/저장한 뒤, 목록에서 "✏ 수정"으로 다시 열어서 올려주세요.'); return; }
+  if(!FB_USE() || !window._fb || !window._fb.uploadBlob){ alert('서버 연결이 되어있지 않아 저장할 수 없습니다.'); return; }
+  // 1) 파일명 파싱 → 같은 (과목코드+세부과목+시작-끝번호) 구간끼리 묶기
+  // (지문이 여러 장인 경우 _p1/_p2를 순서대로 정렬해서 한 그룹으로, 화작/언매처럼
+  // 세부과목이 다르면 번호가 같아도 서로 다른 그룹으로 분리한다)
+  const parsed = files.map(function(f){ return {file:f, meta:_cbrParseImageFilename(f.name)}; });
+  const bad = parsed.filter(function(p){ return !p.meta; });
+  const good = parsed.filter(function(p){ return !!p.meta; });
+  if(!good.length){
+    if(statusEl) statusEl.textContent='⚠️ 인식된 파일이 없습니다. 파일명 규칙(과목코드_세부과목_시작-끝번호[_p순번].확장자)을 확인해주세요.';
+    return;
+  }
+  const groups = {}; // key: "SUBJ|DETAIL|start-end" → {subj, detail, rangeKey, items:[{file,pageIdx}]}
+  good.forEach(function(p){
+    const rangeKey = p.meta.start+'-'+p.meta.end;
+    const groupKey = p.meta.subj+'|'+p.meta.detail+'|'+rangeKey;
+    if(!groups[groupKey]) groups[groupKey]={subj:p.meta.subj, detail:p.meta.detail, rangeKey:rangeKey, items:[]};
+    const pm = String(p.file.name).match(/_p(\d+)\s*\./i);
+    groups[groupKey].items.push({file:p.file, pageIdx: pm?parseInt(pm[1],10):1});
+  });
+  const groupKeys = Object.keys(groups);
+  if(statusEl) statusEl.textContent='업로드 중... (0/'+groupKeys.length+'개 구간)';
+  const examId = EXAMCAT_editing.id;
+  if(!EXAMCAT_editing.qImages) EXAMCAT_editing.qImages={};
+  if(!EXAMCAT_editing.eImages) EXAMCAT_editing.eImages={};
+  const rootMap = mode==='q' ? _examcatMigrateImageMap(EXAMCAT_editing.qImages) : _examcatMigrateImageMap(EXAMCAT_editing.eImages);
+  let doneGroups=0, failMsgs=[];
+  for(const gk of groupKeys){
+    const g = groups[gk];
+    const items = g.items.slice().sort(function(a,b){ return a.pageIdx-b.pageIdx; });
+    const groupId = gk+'_'+Date.now();
+    const nums = _examcatExpandRange(g.rangeKey);
+    if(!nums.length){ failMsgs.push(gk+' (구간 형식이 올바르지 않음)'); doneGroups++; continue; }
+    try{
+      const pages=[];
+      for(let i=0;i<items.length;i++){
+        const path = 'examCatalog/'+examId+'/'+(mode==='q'?'q':'e')+'/'+(g.subj?g.subj+'_':'')+(g.detail?g.detail+'_':'')+g.rangeKey+'_p'+(i+1)+'_'+groupId+'.jpg';
+        const url = await window._fb.uploadBlob(path, items[i].file);
+        pages.push({url:url, path:path});
+      }
+      const subjDetailKey = g.subj+'|'+g.detail;
+      if(!rootMap[subjDetailKey]) rootMap[subjDetailKey]={};
+      nums.forEach(function(no){
+        rootMap[subjDetailKey][no] = {url:pages[0].url, path:pages[0].path, start:nums[0], end:nums[nums.length-1], pages:pages, groupId:groupId};
+      });
+    }catch(e){
+      failMsgs.push(gk+' (오류: '+e.message+')');
+    }
+    doneGroups++;
+    if(statusEl) statusEl.textContent='업로드 중... ('+doneGroups+'/'+groupKeys.length+'개 구간)';
+  }
+  await examcatSaveEntry(EXAMCAT_editing);
+  _examcatRenderSavedImageList();
+  let msg = '✅ '+(groupKeys.length-failMsgs.length)+'개 구간 저장 완료';
+  if(bad.length) msg += ' · ⚠️ '+bad.length+'개 파일은 파일명 규칙이 맞지 않아 제외됨 (예: "'+bad[0].file.name+'")';
+  if(failMsgs.length) msg += ' · ❌ 실패: '+failMsgs.join(', ');
+  if(statusEl) statusEl.textContent=msg;
+  toast(msg.indexOf('❌')>-1 ? '⚠️ 일부 업로드에 문제가 있습니다. 아래 메시지를 확인해주세요.' : '✅ 이미지 업로드가 완료됐습니다.');
 }
 
 async function _examcatLoadPdf(file, mode){
@@ -29129,6 +29222,8 @@ function _examcatCancelCrop(){
   if(cur){ cur.rectStart=null; cur.rectEnd=null; }
   const p=document.getElementById('examcat-pdf-croppanel'); if(p) p.style.display='none';
   const noEl=document.getElementById('examcat-crop-no'); if(noEl) noEl.value='';
+  const subjEl=document.getElementById('examcat-crop-subj'); if(subjEl) subjEl.value='';
+  const detailEl=document.getElementById('examcat-crop-detail'); if(detailEl) detailEl.value='';
   if(cur && cur._pageImageData){
     const canvas=document.getElementById('examcat-pdf-canvas');
     if(canvas) canvas.getContext('2d').putImageData(cur._pageImageData,0,0);
@@ -29148,6 +29243,24 @@ function _examcatExpandRange(str){
   return [];
 }
 
+// ★ 2026-08-28 추가: qImages/eImages를 "과목코드|세부과목" 2단 구조로 바꾸면서, 그 이전
+// 버전(297.html 이하)에서 이미 저장된 데이터는 "문항번호 → 이미지" 1단 구조 그대로 남아있다.
+// 그 예전 데이터를 볼 때마다(조회/목록/삭제/추가 저장 직전) 한 번씩 통과시켜, 과목 구분이
+// 없던 예전 항목들을 전부 공통 그룹("|")으로 옮겨 넣는다 — 데이터 유실 없이 그대로 보이고
+// 계속 오답노트에도 반영된다. 이미 2단 구조인 항목은 건드리지 않는다(멱등).
+function _examcatMigrateImageMap(rootMap){
+  if(!rootMap) return rootMap;
+  Object.keys(rootMap).forEach(function(k){
+    const v = rootMap[k];
+    if(v && typeof v==='object' && (v.url || (v.pages&&v.pages.length)) && k.indexOf('|')===-1){
+      if(!rootMap['|']) rootMap['|']={};
+      rootMap['|'][k]=v;
+      delete rootMap[k];
+    }
+  });
+  return rootMap;
+}
+
 async function _examcatSaveCrop(){
   const cur=_examcatCurPdf();
   const mode=EXAMCAT_pdfActiveMode;
@@ -29156,6 +29269,10 @@ async function _examcatSaveCrop(){
   if(!noStr){ alert('문항번호를 입력해주세요.'); return; }
   const nums = _examcatExpandRange(noStr);
   if(!nums.length){ alert('문항번호 형식을 확인해주세요 (예: 21 또는 21-23, 최대 20문항 범위)'); return; }
+  // ★ 2026-08-28 추가: 과목코드+세부과목도 함께 받아서, 화작/언매·미적분/기하/확통·탐구
+  // 제1선택/제2선택처럼 문항번호가 과목마다 겹치는 경우에도 서로 다른 항목으로 저장되게 한다.
+  const subj = String((document.getElementById('examcat-crop-subj')||{}).value||'').trim().toUpperCase();
+  const detail = _cbrNormDetail((document.getElementById('examcat-crop-detail')||{}).value||'');
   const canvas = document.getElementById('examcat-pdf-canvas');
   const x1=Math.min(cur.rectStart.x, cur.rectEnd.x);
   const y1=Math.min(cur.rectStart.y, cur.rectEnd.y);
@@ -29175,32 +29292,48 @@ async function _examcatSaveCrop(){
   if(!FB_USE() || !window._fb || !window._fb.uploadBlob){ alert('서버 연결이 되어있지 않아 저장할 수 없습니다.'); return; }
   const examId = EXAMCAT_editing.id;
   const rangeKey = nums[0]+(nums.length>1?('-'+nums[nums.length-1]):'');
-  const path = 'examCatalog/'+examId+'/'+(mode==='q'?'q':'e')+'/'+rangeKey+'_'+Date.now()+'.jpg';
+  const path = 'examCatalog/'+examId+'/'+(mode==='q'?'q':'e')+'/'+(subj?subj+'_':'')+(detail?detail+'_':'')+rangeKey+'_'+Date.now()+'.jpg';
   try{
     const url = await window._fb.uploadBlob(path, blob);
     if(!EXAMCAT_editing.qImages) EXAMCAT_editing.qImages={};
     if(!EXAMCAT_editing.eImages) EXAMCAT_editing.eImages={};
-    const targetMap = mode==='q' ? EXAMCAT_editing.qImages : EXAMCAT_editing.eImages;
-    nums.forEach(function(no){ targetMap[no] = {url:url, path:path, start:nums[0], end:nums[nums.length-1]}; });
+    const rootMap = mode==='q' ? _examcatMigrateImageMap(EXAMCAT_editing.qImages) : _examcatMigrateImageMap(EXAMCAT_editing.eImages);
+    const groupKey = subj+'|'+detail;
+    if(!rootMap[groupKey]) rootMap[groupKey]={};
+    const targetMap = rootMap[groupKey];
+    nums.forEach(function(no){ targetMap[no] = {url:url, path:path, start:nums[0], end:nums[nums.length-1], pages:[{url:url,path:path}], groupId:rangeKey+'_'+Date.now()}; });
     await examcatSaveEntry(EXAMCAT_editing);
     _examcatCancelCrop();
     _examcatRenderSavedImageList();
-    toast('✅ '+rangeKey+'번 이미지가 저장됐습니다.');
+    toast('✅ '+(subj?subj+(detail?'('+detail+') ':' '):'')+rangeKey+'번 이미지가 저장됐습니다.');
   }catch(e){
     alert('업로드 중 오류가 발생했습니다: '+e.message+'\n\n인터넷 연결을 확인하고 다시 시도해주세요.');
   }
 }
 
-async function _examcatDeleteImage(mode, no){
+async function _examcatDeleteImage(mode, groupKey, no){
   if(!EXAMCAT_editing) return;
-  const targetMap = mode==='q' ? EXAMCAT_editing.qImages : EXAMCAT_editing.eImages;
+  const rootMap = mode==='q' ? _examcatMigrateImageMap(EXAMCAT_editing.qImages) : _examcatMigrateImageMap(EXAMCAT_editing.eImages);
+  const targetMap = rootMap && rootMap[groupKey];
   if(!targetMap || !targetMap[no]) return;
-  if(!confirm(no+'번 이미지를 삭제하시겠습니까?\n(같은 이미지를 여러 문항이 같이 쓰고 있었다면, 그 문항들에서도 함께 지워집니다)')) return;
-  const removedPath = targetMap[no].path;
-  // ★ 같은 파일(range 이미지 하나를 여러 문항이 공유)을 쓰는 다른 문항 항목도 같이 지운다
-  Object.keys(targetMap).forEach(function(k){ if(targetMap[k] && targetMap[k].path===removedPath) delete targetMap[k]; });
-  try{ if(removedPath && window._fb.deleteFile) await window._fb.deleteFile(removedPath); }
-  catch(e){ console.warn('Storage 파일 삭제 실패(무시하고 진행):', e.message); }
+  if(!confirm(no+'번 이미지를 삭제하시겠습니까?\n(지문을 같이 쓰는 다른 문항이 있었다면, 그 문항들에서도 함께 지워집니다)')) return;
+  const removedEntry = targetMap[no];
+  // ★ 2026-08-28 수정: 여러 페이지(pages 배열)로 저장된 항목도 지원하도록, "같은 구간을 공유하는지"
+  // 판단 기준을 파일 경로 1개 대신 groupId로 바꾼다(예전에 저장된 pages 없는 항목은 path로 대체 판단).
+  const removedGroupId = removedEntry.groupId;
+  const removedPath = removedEntry.path;
+  const sameGroup = function(entry){
+    if(!entry) return false;
+    if(removedGroupId && entry.groupId) return entry.groupId===removedGroupId;
+    return entry.path===removedPath; // 하위호환: groupId가 없던 예전 데이터
+  };
+  const toDeletePaths = (removedEntry.pages&&removedEntry.pages.length ? removedEntry.pages.map(function(p){return p.path;}) : [removedPath]).filter(Boolean);
+  Object.keys(targetMap).forEach(function(k){ if(sameGroup(targetMap[k])) delete targetMap[k]; });
+  if(!Object.keys(targetMap).length) delete rootMap[groupKey]; // 그룹이 비면 빈 껍데기로 남기지 않는다
+  for(const p of toDeletePaths){
+    try{ if(p && window._fb.deleteFile) await window._fb.deleteFile(p); }
+    catch(e){ console.warn('Storage 파일 삭제 실패(무시하고 진행):', e.message); }
+  }
   await examcatSaveEntry(EXAMCAT_editing);
   _examcatRenderSavedImageList();
 }
@@ -29208,16 +29341,25 @@ async function _examcatDeleteImage(mode, no){
 function _examcatRenderSavedImageList(){
   const el=document.getElementById('examcat-pdf-savedlist');
   if(!el || !EXAMCAT_editing) return;
-  function listFor(map, label, mode){
-    const nos = Object.keys(map||{}).sort(function(a,b){ return (+a)-(+b); });
-    if(!nos.length) return '';
+  // ★ 2026-08-28 수정: qImages/eImages가 "과목코드|세부과목" → {문항번호:{...}} 2단 구조로
+  // 바뀌었으므로, 그룹(과목·세부과목)별로 나누어 보여준다.
+  function listFor(rootMap, label, mode){
+    const groupKeys = Object.keys(rootMap||{}).filter(function(k){ return rootMap[k] && Object.keys(rootMap[k]).length; });
+    if(!groupKeys.length) return '';
+    groupKeys.sort();
     return '<div style="margin-bottom:6px"><b style="font-size:11.5px;color:#0f172a">'+label+'</b><br>'+
-      nos.map(function(no){
-        return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;margin:3px 4px 0 0;font-size:11.5px">'+esc(no)+'번'+
-          '<button type="button" onclick="_examcatDeleteImage(\''+mode+'\',\''+esc(no)+'\')" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:11px;padding:0 2px">✕</button></span>';
+      groupKeys.map(function(gk){
+        const parts=gk.split('|'); const subj=parts[0]||''; const detail=parts[1]||'';
+        const groupLabel = subj ? (subj+(detail?'('+detail+')':'(공통)')) : '(과목 미지정)';
+        const nos = Object.keys(rootMap[gk]).sort(function(a,b){ return (+a)-(+b); });
+        return '<div style="margin:4px 0"><span style="font-size:11px;font-weight:700;color:#0369a1">'+esc(groupLabel)+'</span> '+
+          nos.map(function(no){
+            return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;margin:3px 4px 0 0;font-size:11.5px">'+esc(no)+'번'+
+              '<button type="button" onclick="_examcatDeleteImage(\''+mode+'\',\''+esc(gk).replace(/'/g,"\\'")+'\',\''+esc(no)+'\')" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:11px;padding:0 2px">✕</button></span>';
+          }).join('')+'</div>';
       }).join('')+'</div>';
   }
-  el.innerHTML = listFor(EXAMCAT_editing.qImages,'📄 등록된 문항 이미지','q') + listFor(EXAMCAT_editing.eImages,'📄 등록된 해설 이미지','e');
+  el.innerHTML = listFor(_examcatMigrateImageMap(EXAMCAT_editing.qImages),'📄 등록된 문항 이미지','q') + listFor(_examcatMigrateImageMap(EXAMCAT_editing.eImages),'📄 등록된 해설 이미지','e');
 }
 
 async function _examcatSubmit(){
@@ -30042,13 +30184,22 @@ function _cbrLookupQuestionImages(map, subjectCode, detail, no){
 // ★ 2026-08-27 추가: 시험 카탈로그에 PDF 드래그로 영구 저장해둔 문항/해설 이미지를
 // 찾는 함수. 세션 업로드(_cbrLookupQuestionImages)와 반환 형태를 동일하게 맞춰서
 // (배열 안에 {dataUrl,start,end}) 오답노트 출력 코드를 그대로 재사용할 수 있게 한다.
-function _examcatLookupCatalogImages(examEntry, mode, no){
+function _examcatLookupCatalogImages(examEntry, mode, subjectCode, detail, no){
   if(!examEntry) return [];
-  const map = mode==='q' ? examEntry.qImages : examEntry.eImages;
-  if(!map) return [];
-  const found = map[String(no)];
-  if(!found || !found.url) return [];
-  return [{dataUrl:found.url, start:+found.start||+no, end:+found.end||+no}];
+  const rootMap = _examcatMigrateImageMap(mode==='q' ? examEntry.qImages : examEntry.eImages);
+  if(!rootMap) return [];
+  const subj=String(subjectCode||'').toUpperCase();
+  const normDetail=_cbrNormDetail(detail||'');
+  // ★ 2026-08-28 수정: qImages/eImages가 "과목코드|세부과목" 2단 구조로 바뀌었으므로,
+  // 세부과목이 정확히 일치하는 그룹을 먼저 찾고, 없으면 세부과목 없는 공통 그룹을 본다.
+  // (예전에 과목 구분 없이 저장된 데이터는 "|"(빈 과목빈 세부과목) 키에 남아있을 수 있어 마지막으로 확인)
+  const found = (rootMap[subj+'|'+normDetail]||{})[no] || (rootMap[subj+'|']||{})[no] || (rootMap['|']||{})[no];
+  if(!found) return [];
+  // ★ 다중 페이지(pages 배열)로 저장된 항목을 순서대로 모두 반환.
+  // pages가 없는 예전 데이터(드래그로 한 장만 저장)는 url 하나짜리로 그대로 처리(하위호환).
+  const pages = (found.pages && found.pages.length) ? found.pages : (found.url ? [{url:found.url}] : []);
+  if(!pages.length) return [];
+  return pages.map(function(p){ return {dataUrl:p.url, start:+found.start||+no, end:+found.end||+no}; });
 }
 
 // ★ 학생별 매니저 AAR 메모 일괄 입력 — 챌린저 iframe 안의 aarParseMemo()가 쓰는
@@ -38700,7 +38851,7 @@ function generateReport() {
           // ★ 문제 표시 우선순위: (1) 방금 업로드한 문항 이미지가 있으면 그걸 그대로 보여주고,
           // (2) 이미지가 없을 때만 정답/해설 칸의 6번째 열(question) 텍스트로 대체한다.
           var qImages=_cbrLookupQuestionImages(qImageMap, s.subject, s.detail, it.no);
-          if(!qImages.length && examCatEntry) qImages=_examcatLookupCatalogImages(examCatEntry,'q',it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인
+          if(!qImages.length && examCatEntry) qImages=_examcatLookupCatalogImages(examCatEntry,'q',s.subject,s.detail,it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인 (과목+세부과목 일치하는 것만)
           // ★ 업로드한 이미지가 지문 하나에 문항 여러 개가 걸린 "구간" 이미지(예: [4~9] 한 장)라면,
           // 그 안에서 지금 카드가 다루는 문항이 몇 번인지 한눈에 보이도록 강조 배너를 붙인다.
           // 문항 하나만 딱 자른 이미지(start===end)라면 이미 명확하므로 배너를 붙이지 않는다.
@@ -38713,7 +38864,7 @@ function generateReport() {
             : (it.question?'<div class="wn-question">'+_wnEsc(it.question).replace(/⏎/g,'<br>')+'</div>':'');
           var explainHtml;
           var eImages=_cbrLookupQuestionImages(eImageMap, s.subject, s.detail, it.no);
-          if(!eImages.length && examCatEntry) eImages=_examcatLookupCatalogImages(examCatEntry,'e',it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인
+          if(!eImages.length && examCatEntry) eImages=_examcatLookupCatalogImages(examCatEntry,'e',s.subject,s.detail,it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인 (과목+세부과목 일치하는 것만)
           if(eImages.length){
             var eRange=eImages[0];
             var eBanner=(eRange && eRange.start!==eRange.end)
@@ -38772,7 +38923,7 @@ function generateReport() {
       '.wn-question{font-size:11.5px;color:#1e293b;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:6px;line-height:1.6;white-space:normal;break-inside:avoid;page-break-inside:avoid}'+
       '.wn-question-marker{font-size:11.5px;font-weight:800;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:5px 9px;margin-bottom:5px;display:inline-block}'+
       '.wn-question-imgs{margin-bottom:6px}'+
-      '.wn-question-img{display:block;width:100%;height:auto;max-height:185mm;margin:0 0 4px;border:1px solid #e2e8f0;border-radius:6px}'+
+      '.wn-question-img{display:block;width:70%;height:auto;max-height:185mm;margin:0 auto 4px;border:1px solid #e2e8f0;border-radius:6px}'+
       '@media print{.wn-question-img{max-height:170mm}}'+
       '.wn-reason{font-size:11px;color:#334155;margin-bottom:6px}'+
       '.wn-explain{font-size:11px;color:#334155;background:#f8fafc;border-radius:6px;padding:6px 8px;break-inside:avoid;page-break-inside:avoid}'+
