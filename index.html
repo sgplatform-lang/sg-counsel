@@ -30103,11 +30103,11 @@ function _cbrLookupAnswerKey(map, subjectCode, detail, no){
 // 때 등), 압축파일을 주고받을 때는 영문 코드 쪽이 인코딩 문제에서 안전하다.
 const _CBR_IMG_DETAIL_ALIASES = {
   '공통':'', 'GONGTONG':'', 'COMMON':'',
-  '화작':'화법과작문', 'HWABAK':'화법과작문', 'HWA':'화법과작문',
-  '언매':'언어와매체', 'EONMAE':'언어와매체', 'EON':'언어와매체',
+  '화작':'화법과작문', 'HWABAK':'화법과작문', 'HWA':'화법과작문', '화법과 작문':'화법과작문',
+  '언매':'언어와매체', 'EONMAE':'언어와매체', 'EON':'언어와매체', '언어와 매체':'언어와매체',
   '미적분':'미적분', 'MICJEOK':'미적분', 'CALC':'미적분',
   '기하':'기하', 'GIHA':'기하', 'GEOM':'기하',
-  '확통':'확률과통계', 'HWAKTONG':'확률과통계', 'PROB':'확률과통계'
+  '확통':'확률과통계', 'HWAKTONG':'확률과통계', 'PROB':'확률과통계', '확률과 통계':'확률과통계'
 };
 function _cbrNormDetail(s){
   const raw=String(s||'').trim();
