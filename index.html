@@ -29953,24 +29953,40 @@ function _sgItemMeta(subjectCode, detail, no){
 // 이렇게 하면 사용자가 ⏎ 기호를 직접 타이핑하지 않고 엑셀에서 그대로 복사해 붙여넣어도
 // 해설 전체(정답풀이+오답풀이+접근법)가 안 잘리고 다 들어간다.
 function _sgSplitTsvRows(text){
-  text=String(text==null?'':text);
-  const rows=[]; let row=[]; let field=''; let inQuotes=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i];
-    if(inQuotes){
-      if(ch==='"'){
-        if(text[i+1]==='"'){ field+='"'; i++; }
-        else inQuotes=false;
-      } else field+=ch;
-    } else {
-      if(ch==='"' && field===''){ inQuotes=true; }
-      else if(ch==='\t'){ row.push(field); field=''; }
-      else if(ch==='\r'){ /* \n에서 처리 */ }
-      else if(ch==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
-      else field+=ch;
-    }
+  text=String(text==null?'':text).replace(/\r\n?/g,'\n');
+  // ★ 2026-08-28(2차) 수정: 엑셀에서 큰따옴표로 감싸서 복사한 경우(RFC4180 방식)뿐 아니라,
+  // 사람이 텍스트박스에 직접 여러 줄을 입력/붙여넣기한 경우(큰따옴표가 전혀 없는 경우)까지
+  // 함께 처리한다. "새 문항 줄"은 맨 앞에 짧은 토큰(과목코드) 뒤에 탭이 오는 줄로 판단하고,
+  // 그렇게 보이지 않는 줄(=해설 문단이 이어지는 줄)은 직전 문항 행의 마지막 칸에 줄바꿈으로
+  // 이어 붙인다. 큰따옴표로 감싸져 있으면 기존 방식대로 그 안의 줄바꿈도 전부 이어 붙는다.
+  const physLines=text.split('\n');
+  const rows=[]; let cur=null; let inQuotes=false;
+  function looksLikeNewRow(line){
+    const firstTab=line.indexOf('\t');
+    if(firstTab<0) return false; // 탭이 아예 없으면 새 문항 줄일 수 없음(이어붙임 대상)
+    const head=line.slice(0,firstTab);
+    return head.length>0 && head.length<=10 && !/\s/.test(head); // 과목코드는 보통 공백 없는 짧은 토큰
   }
-  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  function quoteCountOdd(s){ return ((s.match(/"/g)||[]).length % 2)===1; } // 큰따옴표가 홀수개면 그 줄에서 인용부호가 열린 채로 끝난 것
+  physLines.forEach(function(line){
+    if(inQuotes){
+      // 이전 줄에서 큰따옴표가 안 닫힌 채 끝났으면, 이 줄은 무조건 이어붙임 대상
+      const li=cur.length-1;
+      cur[li]=(cur[li]||'')+'\n'+line;
+      if(quoteCountOdd(line)) inQuotes=false; // 이 줄에서 닫히면 다시 정상 모드로
+      return;
+    }
+    if(looksLikeNewRow(line)){
+      if(cur) rows.push(cur);
+      const fields=line.split('\t').map(function(x){ return x.replace(/^"|"$/g,''); });
+      cur=fields;
+      if(quoteCountOdd(line)) inQuotes=true; // 이 줄 안에서 큰따옴표가 안 닫혔으면 다음 줄부터 이어붙임
+    } else if(cur){
+      const li=cur.length-1;
+      cur[li]=(cur[li]||'')+'\n'+line;
+    } // cur가 아직 없으면(맨 첫 줄부터 형식이 안 맞으면) 그 줄은 버린다
+  });
+  if(cur) rows.push(cur);
   return rows.map(function(r){ return r.map(function(x){ return String(x||'').trim(); }); })
              .filter(function(r){ return r.some(function(x){ return x!==''; }); });
 }
