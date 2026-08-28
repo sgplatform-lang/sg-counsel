@@ -29945,6 +29945,35 @@ function _sgItemMeta(subjectCode, detail, no){
   return (window.SG_ITEM_META[code]||{})[n]||null;
 }
 
+// ★ 2026-08-28 추가: 문항단원DB/정답·해설 붙여넣기 칸에서 "한 줄 = 한 문항"으로 단순히
+// 나누던 방식이, 엑셀에서 여러 줄(문단)짜리 해설 셀을 그대로 복사해 붙여넣으면 깨지는
+// 문제를 근본적으로 고친다. 엑셀은 셀 안에 줄바꿈이 있으면 그 셀을 큰따옴표로 감싸서
+// 복사하므로(RFC4180 CSV/TSV 규칙과 동일), 그 규칙을 그대로 해석해서 "큰따옴표로 열려
+// 있는 동안은 줄바꿈이 나와도 같은 칸(같은 문항) 안의 내용"으로 이어 붙인다.
+// 이렇게 하면 사용자가 ⏎ 기호를 직접 타이핑하지 않고 엑셀에서 그대로 복사해 붙여넣어도
+// 해설 전체(정답풀이+오답풀이+접근법)가 안 잘리고 다 들어간다.
+function _sgSplitTsvRows(text){
+  text=String(text==null?'':text);
+  const rows=[]; let row=[]; let field=''; let inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQuotes){
+      if(ch==='"'){
+        if(text[i+1]==='"'){ field+='"'; i++; }
+        else inQuotes=false;
+      } else field+=ch;
+    } else {
+      if(ch==='"' && field===''){ inQuotes=true; }
+      else if(ch==='\t'){ row.push(field); field=''; }
+      else if(ch==='\r'){ /* \n에서 처리 */ }
+      else if(ch==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else field+=ch;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  return rows.map(function(r){ return r.map(function(x){ return String(x||'').trim(); }); })
+             .filter(function(r){ return r.some(function(x){ return x!==''; }); });
+}
 function _cbrParseItemMeta(){
   const el=document.getElementById('cbr-itemmeta-input');
   const text=el?el.value.trim():'';
@@ -29957,9 +29986,7 @@ function _sgParseItemMetaText(text){
   const map={};
   if(!text) return map;
   const MASTER_DB_SUBJ_NAMES=['국어','수학','영어','한국사','탐구','제2외국어'];
-  text.split(/\r?\n/).forEach(line=>{
-    if(!line.trim()) return;
-    const c=line.split('\t').map(x=>(x||'').trim());
+  _sgSplitTsvRows(text).forEach(c=>{
     if(c.length<4) return;
     if(c[0]==='과목코드') return; // 헤더 행 걸러내기 (모든 형식 공통)
 
@@ -30011,9 +30038,7 @@ function _cbrParseAnswerKey(){
 function _sgParseAnswerKeyText(text){
   const map={}; // key: "과목코드|세부과목" -> {문항번호: {answer, explain, question}}
   if(!text) return map;
-  text.split(/\r?\n/).forEach(line=>{
-    if(!line.trim()) return;
-    const c=line.split('\t').map(x=>(x||'').trim());
+  _sgSplitTsvRows(text).forEach(c=>{
     if(c.length<3) return;
     if(c[0]==='과목코드') return; // 헤더 행 걸러내기
     const subj=c[0].toUpperCase();
@@ -30239,9 +30264,7 @@ function _cbrParseAarMemos(){
   const text=el?el.value.trim():'';
   const list=[];
   if(!text) return list;
-  text.split(/\r?\n/).forEach(line=>{
-    if(!line.trim()) return;
-    const c=line.split('\t').map(x=>(x||'').trim());
+  _sgSplitTsvRows(text).forEach(c=>{
     if(c.length<6) return;
     if(c[0]==='학생명') return; // 헤더 행 걸러내기
     const [name, examDate, examName, subjCodeRaw, detail, aarText] = c;
@@ -38779,7 +38802,9 @@ function generateReport() {
   // 이 규칙에 맞는 줄이 하나도 없으면(=기존 방식 그대로 한 문단만 넣은 경우) 예전과
   // 똑같이 문단 하나로 보인다 — 기존에 이미 채워둔 해설 데이터는 그대로 잘 나온다.
   function _wnFormatExplanation(raw){
-    var lines=String(raw||'').split('⏎');
+    // ★ 2026-08-28 수정: ⏎ 기호뿐 아니라 실제 줄바꿈(엑셀에서 그대로 복사해 붙여넣은 경우)도
+    // 같은 방식으로 문단을 나눠서 구조화한다 — 더 이상 ⏎를 꼭 직접 타이핑하지 않아도 된다.
+    var lines=String(raw||'').replace(/\r\n?/g,'\n').split(/⏎|\n/);
     var html=''; var bulletBuf=[];
     function flushBullets(){
       if(bulletBuf.length){
@@ -38861,7 +38886,7 @@ function generateReport() {
             : '';
           var questionHtml=qImages.length
             ? qBanner+'<div class="wn-question-imgs">'+qImages.map(function(im){return '<img class="wn-question-img" src="'+im.dataUrl+'">';}).join('')+'</div>'
-            : (it.question?'<div class="wn-question">'+_wnEsc(it.question).replace(/⏎/g,'<br>')+'</div>':'');
+            : (it.question?'<div class="wn-question">'+_wnEsc(it.question).replace(/⏎/g,'<br>').replace(/\n/g,'<br>')+'</div>':'');
           var explainHtml;
           var eImages=_cbrLookupQuestionImages(eImageMap, s.subject, s.detail, it.no);
           if(!eImages.length && examCatEntry) eImages=_examcatLookupCatalogImages(examCatEntry,'e',s.subject,s.detail,it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인 (과목+세부과목 일치하는 것만)
