@@ -29921,8 +29921,12 @@ function cbrAnalyze(){
     반영 시 각 학생의 <b>과목별 점수·오답 문항·문항별 전체 오답률</b>이 챌린저 "직전 회차 입력값"으로 저장됩니다.
     (시간상태·집중상태 등 체크리스트 항목과 회차 저장·누적 반영은 이 작업에 포함되지 않으며 기존처럼 별도로 진행합니다.)
   </div>`;
-  html += `<div style="margin-top:12px;display:flex;gap:8px">
+  html += `<div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <button onclick="cbrConfirmApply()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-weight:700">✅ 매칭된 학생 전체 반영</button>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#78350f;background:#fef3c7;border-radius:8px;padding:8px 12px;cursor:pointer">
+      <input type="checkbox" id="cbr-force-overwrite" style="width:16px;height:16px">
+      카탈로그 정답/해설/문제로 강제 덮어쓰기 (이미 저장된 값도 카탈로그 값으로 교체 — 예전에 잘못/불완전하게 저장된 해설을 고친 뒤 재반영할 때 체크)
+    </label>
   </div>`;
 
   document.getElementById('cbr-result').innerHTML = html;
@@ -30473,13 +30477,22 @@ function cbrConfirmApply(){
         const autoDiff = rt>=70?'최상':rt>=50?'상':rt>=30?'중상':rt>=15?'중':'하';
         const _meta=_cbrLookupItemMeta(pastedItemMeta, r.subjectCode, r.detail, no)||{};
         const _ak=_cbrLookupAnswerKey(pastedAnswerKey, r.subjectCode, r.detail, no)||{};
+        // ★ 2026-08-28 추가: 평소엔 학생이 이미 입력한 값을 항상 지키지만("빈 칸만 채움"),
+        // 매니저가 "카탈로그 값으로 강제 덮어쓰기"를 체크했을 때만 카탈로그(정답/해설/문제)
+        // 값이 있으면 그걸로 덮어쓴다 — 예전에 잘못/불완전하게 저장된 정답·해설을 고친
+        // 뒤 재반영으로 바로잡을 때 쓴다. 카탈로그 쪽 값이 비어 있으면 이 옵션을 켜도
+        // 기존 값을 그대로 둔다(값 삭제는 안 됨).
+        const _forceOverwrite = !!(document.getElementById('cbr-force-overwrite')||{}).checked;
+        const _catAnswer = _meta.answer || _ak.answer || '';
+        const _catExplain = _meta.explain || _ak.explain || '';
+        const _catQuestion = _ak.question || '';
         return {
           no: String(no),
           unit: (prev?.unit && prev.unit!=='단원정보 미입력' ? prev.unit : null) || _meta.unit || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).unit) || '단원정보 미입력',
           diff: prev?.diff || _meta.diff || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).diff) || autoDiff, // 기존 수동값 우선(단, '단원정보 미입력' 플레이스홀더는 값으로 치지 않음), 그다음 이번에 붙여넣은 값(세부과목 일치 우선, 없으면 공통), 그다음 범용 문항DB→오답률 기준
-          answer: (prev?.answer) || _meta.answer || _ak.answer || '', // ★ 오답노트용 정답 (문항별 단원/유형 칸 또는 정답/해설 전용 칸 어느 쪽이든 입력 가능)
-          explanation: (prev?.explanation) || _meta.explain || _ak.explain || '', // ★ 오답노트용 간단 해설
-          question: (prev?.question) || _ak.question || '', // ★ 오답노트용 문제(지문+선택지) 원문 — 정답/해설 칸의 6번째 열
+          answer: (_forceOverwrite && _catAnswer) ? _catAnswer : ((prev?.answer) || _catAnswer || ''), // ★ 오답노트용 정답 (문항별 단원/유형 칸 또는 정답/해설 전용 칸 어느 쪽이든 입력 가능)
+          explanation: (_forceOverwrite && _catExplain) ? _catExplain : ((prev?.explanation) || _catExplain || ''), // ★ 오답노트용 간단 해설
+          question: (_forceOverwrite && _catQuestion) ? _catQuestion : ((prev?.question) || _catQuestion || ''), // ★ 오답노트용 문제(지문+선택지) 원문 — 정답/해설 칸의 6번째 열
           reasons: prev?.reasons || [],
           points: prev?.points || _meta.points || '', // ★ 실전손실·교정가능점수용 문항 배점 — 기존 문항DB(마스터 엑셀 8번째 열)에 배점이 있으면 자동 채움, 없으면 매니저가 입력
           causePrimary: prev?.causePrimary || '', // ★ 오답 1차 원인(K/T/M/J/C/U)
