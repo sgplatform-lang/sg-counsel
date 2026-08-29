@@ -29616,8 +29616,8 @@ function examcatApplyToModal(id){
   const answerKeyEl=document.getElementById('cbr-answerkey-input');
   if(nameEl) nameEl.value = e.examName||'';
   if(dateEl && !dateEl.value) dateEl.value = e.defaultDate||''; // 이미 입력해둔 응시일이 있으면 덮어쓰지 않음
-  if(itemMetaEl) itemMetaEl.value = _sgItemMetaMapToText(e.itemMeta);
-  if(answerKeyEl) answerKeyEl.value = _sgAnswerKeyMapToText(e.answerKey);
+  if(itemMetaEl) itemMetaEl.value = (e.itemMetaRawText!=null ? e.itemMetaRawText : _sgItemMetaMapToText(e.itemMeta));
+  if(answerKeyEl) answerKeyEl.value = (e.answerKeyRawText!=null ? e.answerKeyRawText : _sgAnswerKeyMapToText(e.answerKey));
   toast('✅ "'+ (e.examName||'') +'" 문항 정보를 불러왔습니다. 응시일은 필요하면 자유롭게 수정하세요.');
 }
 function closeChallengerBulkReflect(force){
