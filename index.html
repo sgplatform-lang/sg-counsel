@@ -28768,15 +28768,26 @@ function _examcatId(){ return 'exam_'+Date.now()+'_'+Math.random().toString(36).
 
 function _examcatQuestionCount(entry){
   const seen=new Set();
-  Object.values(entry.itemMeta||{}).forEach(byNo=>Object.keys(byNo).forEach(no=>seen.add(no)));
-  Object.values(entry.answerKey||{}).forEach(byNo=>Object.keys(byNo).forEach(no=>seen.add(no)));
+  // ★ 2026-08-29 추가: 과목코드 자리에 숫자만 있는 것("18" 등)은 예전에 잘못 파싱되어
+  // 끼어든 찌꺼기 데이터이지 실제 과목이 아니므로 문항 수 집계에서 제외한다.
+  Object.entries(entry.itemMeta||{}).forEach(function(kv){
+    if(/^\d+\|/.test(kv[0])) return;
+    Object.keys(kv[1]).forEach(no=>seen.add(no));
+  });
+  Object.entries(entry.answerKey||{}).forEach(function(kv){
+    if(/^\d+\|/.test(kv[0])) return;
+    Object.keys(kv[1]).forEach(no=>seen.add(no));
+  });
   return seen.size;
 }
 function _examcatSubjLabel(entry){
   const SUBJ_LABEL={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',LANG:'제2외국어',INQ1:'탐구(제1선택)',INQ2:'탐구(제2선택)'};
   const codes=new Set();
   Object.keys(entry.itemMeta||{}).concat(Object.keys(entry.answerKey||{})).forEach(k=>{
-    const subj=k.split('|')[0]; if(subj) codes.add(subj);
+    const subj=k.split('|')[0];
+    // ★ 2026-08-29 추가: 과목코드가 숫자만으로 되어있으면(예전에 잘못 파싱된 찌꺼기 데이터)
+    // 실제 과목이 아니므로 걸러낸다 — 진짜 과목코드는 항상 영문/한글이다.
+    if(subj && !/^\d+$/.test(subj)) codes.add(subj);
   });
   return [...codes].map(c=>SUBJ_LABEL[c]||c).join(', ') || '(과목 미입력)';
 }
