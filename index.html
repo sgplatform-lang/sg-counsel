@@ -28935,11 +28935,11 @@ function _examcatRenderForm(){
       <p style="font-size:11.5px;color:#dc2626;margin:0 0 4px">맨 끝 배점(선택) 칸을 꼭 채워주세요 — 비워두면 학생이 오답원인을 다 입력해도 상담리포트의 실질완주율·손실점수가 계산되지 않습니다.</p>
       <textarea id="examcat-itemmeta" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)	배점(선택)
 KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②		2
-ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(_sgItemMetaMapToText(e.itemMeta)):''}</textarea>
+ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?e.itemMetaRawText:_sgItemMetaMapToText(e.itemMeta)):''}</textarea>
     </div>
     <div style="margin-bottom:12px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">✅ 문항별 정답/해설/문제 (선택 — 위 칸에 정답/해설 없을 때만 여기 따로)</div>
-      <textarea id="examcat-answerkey" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	정답(선택)	해설(선택)	문제(선택, 줄바꿈은 ⏎ 로 표시)">${isEdit?esc(_sgAnswerKeyMapToText(e.answerKey)):''}</textarea>
+      <textarea id="examcat-answerkey" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	정답(선택)	해설(선택)	문제(선택, 줄바꿈은 ⏎ 로 표시)">${isEdit?esc(e.answerKeyRawText!=null?e.answerKeyRawText:_sgAnswerKeyMapToText(e.answerKey)):''}</textarea>
     </div>
     ${isEdit?_examcatPdfSectionHtml():'<p style="font-size:11.5px;color:#94a3b8;margin:0 0 12px">💡 PDF에서 문항 이미지를 잘라 붙이는 기능은, 이 시험을 먼저 등록하신 뒤 "✏ 수정"으로 다시 열면 나타납니다.</p>'}
     <div style="display:flex;gap:8px">
@@ -29375,6 +29375,14 @@ async function _examcatSubmit(){
   }
   const entry = EXAMCAT_editing ? Object.assign({}, EXAMCAT_editing) : {id:_examcatId(), createdAt:Date.now()};
   entry.examName=name; entry.defaultDate=date; entry.itemMeta=itemMeta; entry.answerKey=answerKey;
+  // ★ 2026-08-29 추가: 예전엔 수정 화면을 다시 열 때마다 저장된 itemMeta/answerKey 객체를
+  // 텍스트로 "재조립"해서 보여줬는데, 이 재조립 결과가 처음 붙여넣은 원문과 100% 똑같다는
+  // 보장이 없어서(특히 여러 줄짜리 해설/단원 내용이 있을 때), 다시 열어보면 이상하게 섞이거나
+  // 예전 조각이 남아있는 것처럼 보이는 문제가 있었다. 이제는 사용자가 붙여넣은 원문 텍스트
+  // 그 자체를 그대로 저장해두고, 다음에 열 때도 그 원문을 그대로 보여준다 — 조립 과정이
+  // 아예 없으니 이런 불일치가 생길 수가 없다.
+  entry.itemMetaRawText = itemMetaText;
+  entry.answerKeyRawText = answerKeyText;
   await examcatSaveEntry(entry);
   EXAMCAT_editing=null;
   _examcatRenderForm();
