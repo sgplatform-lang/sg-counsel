@@ -1240,6 +1240,12 @@ async function _ensureExamCatalogLoaded(){
 // Firebase에서 전체 데이터 불러오기
 async function fbLoadAll_all(){
   if(!FB_USE()) return false;
+  // ★ 2026-08-29 추가: examCatalog를 제거한 뒤에도 여전히 로그인이 느리다는 보고가 있어,
+  // 더 이상 추측하지 않고 각 컬렉션이 실제로 몇 초씩 걸리는지 콘솔에 직접 찍는다.
+  // 다음에 느려지면 브라우저 콘솔(F12)에서 이 로그를 그대로 캡처해서 보내주면, 정확히
+  // 어느 컬렉션(학생/선생님/tests/config/orgs)이 병목인지 바로 알 수 있다.
+  const _loginLoadStart = performance.now();
+  console.log('[SG][로그인 로딩] 시작...');
   try{
     // ★ 비용 최적화: 초기 로딩 시에도 최종관리자만 전체 학생을 가져오고,
     // 기관관리자·선생님은 서버 단에서부터 본인 기관 학생만 요청한다.
@@ -1261,13 +1267,21 @@ async function fbLoadAll_all(){
           .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
           .catch(e=>{ console.warn('FB load error(teachers scoped):', e.message); return null; })
       : fbLoadAll('teachers');
+    function _timed(label, p){
+      const t0=performance.now();
+      return Promise.resolve(p).then(function(v){
+        console.log('[SG][로그인 로딩] '+label+': '+((performance.now()-t0)/1000).toFixed(2)+'초, '+(Array.isArray(v)?v.length+'건':(v===null?'실패/타임아웃':'-')));
+        return v;
+      });
+    }
     const [students, teachers, tests, config, orgs] = await Promise.all([
-      _studentsPromise,
-      _teachersPromise,
-      fbLoadAll('tests'),
-      fbLoadAll('config'),
-      fbLoadAll('orgs'),
+      _timed('학생(students)', _studentsPromise),
+      _timed('선생님(teachers)', _teachersPromise),
+      _timed('tests', fbLoadAll('tests')),
+      _timed('config', fbLoadAll('config')),
+      _timed('orgs', fbLoadAll('orgs')),
     ]);
+    console.log('[SG][로그인 로딩] 전체 완료: '+((performance.now()-_loginLoadStart)/1000).toFixed(2)+'초');
     if(students===null){
       // ★ 2026-08-29 추가: 15초 안에 응답이 없어 시간 초과로 실패한 경우, 화면단에서
       // "다시 시도" 버튼을 보여줄 수 있도록 표시해둔다(진짜로 학생이 0명인 경우와 구분).
@@ -1438,6 +1452,7 @@ async function fbLoadAll_all(){
     return true;
   }catch(e){
     console.warn('FB 전체 로드 실패:', e.message);
+    console.log('[SG][로그인 로딩] 실패까지 걸린 시간: '+((performance.now()-_loginLoadStart)/1000).toFixed(2)+'초');
     return false;
   }
 }
@@ -28260,7 +28275,7 @@ function __SG_initFromHost(data){
       // 응시자로 통합 집계하고, 35~45번 선택문항만 같은 선택과목(디테일)
       // 학생끼리로 좁혀서 집계한다 (cbrComputeItemRates와 동일 기준으로 통일).
       var isKor=s&&s.subject==='KOR';
-      var electivePeers=isKor?peers.filter(function(ps){return String(ps&&ps.detail||'').trim()===String(s.detail||'').trim();}):peers;
+      var electivePeers=isKor?peers.filter(function(ps){return _cbrNormalizeDetail(ps&&ps.detail||'')===_cbrNormalizeDetail(s.detail||'');}):peers;
       return (s.items||[]).map(function(it){
         var no=String(it.no||''); if(!no)return null;
         var qn=parseInt(no,10);
@@ -28278,7 +28293,7 @@ function __SG_initFromHost(data){
     var peers=v41PeerSubjects(s); if(peers.length<2) return '';
     // 탐구는 세부과목(선택과목)이 완전히 다른 시험이라, 점수 등수는 같은 세부과목끼리만 비교한다.
     if(s.subject==='INQ'){
-      var same=peers.filter(function(p){return String(p&&p.detail||'').trim()===String(s.detail||'').trim();});
+      var same=peers.filter(function(p){return _cbrNormalizeDetail(p&&p.detail||'')===_cbrNormalizeDetail(s.detail||'');});
       if(same.length>=2) peers=same; else return '';
     }
     var myScore=+s.score||0;
@@ -29880,6 +29895,16 @@ var _SG_DETAIL_CANON = (function(){
     '물리학Ⅰ','물리학Ⅱ','화학Ⅰ','화학Ⅱ','생명과학Ⅰ','생명과학Ⅱ','지구과학Ⅰ','지구과학Ⅱ'];
   var m={};
   list.forEach(function(name){ m[name.replace(/[·\s]+/g,'')] = name; });
+  // ★ 2026-08-29 추가: "사문"/"생윤"처럼 학생·매니저가 흔히 쓰는 탐구 과목 줄임말은
+  // 정식 명칭과 글자 자체가 겹치지 않아서(공백·가운뎃점 제거만으로는 매칭 안 됨) 위 표에
+  // 안 걸리고 있었다. 그래서 "사문"과 "사회문화"가 서로 다른 과목으로 취급되어 통계도
+  // 따로 나고, 상담리포트 누적현황에서도 같은 과목인데 갈라져서 나오는 문제가 있었다.
+  // 실제로 자주 쓰이는 8과목 줄임말을 전부 정식 명칭으로 매핑해둔다.
+  var aliases = {
+    '생윤':'생활과 윤리', '윤사':'윤리와 사상', '한지':'한국지리', '세지':'세계지리',
+    '동사':'동아시아사', '세사':'세계사', '정법':'정치와 법', '사문':'사회문화'
+  };
+  Object.keys(aliases).forEach(function(k){ m[k]=aliases[k]; });
   return m;
 })();
 function _cbrNormalizeDetail(v){
@@ -38863,12 +38888,18 @@ function generateReport() {
   };
 
   function _statGroupKey(subjCode,detail){
-    if(subjCode==='INQ') return 'INQ:'+(detail||'미상');
+    // ★ 2026-08-29 추가: 이미 저장돼 있는 학생 데이터에는 "사문"/"생윤" 같은 줄임말이
+    // 예전 방식 그대로 남아있을 수 있으므로, 통계를 묶을 때도(저장 시점이 아니라 여기서도)
+    // 한 번 더 표준 명칭으로 맞춘 뒤 그룹 키를 만든다 — 이렇게 해야 예전에 "사문"으로
+    // 저장된 학생과 "사회문화"로 저장된 학생이 통계에서 같은 과목으로 합쳐진다.
+    var normDetail=_cbrNormalizeDetail(detail||'');
+    if(subjCode==='INQ') return 'INQ:'+(normDetail||'미상');
     return subjCode;
   }
   function _statGroupLabel(subjCode,detail){
+    var normDetail=_cbrNormalizeDetail(detail||'');
     var base={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',LANG:'제2외국어'}[subjCode];
-    if(subjCode==='INQ') return detail||'탐구';
+    if(subjCode==='INQ') return normDetail||'탐구';
     return base||subjCode;
   }
   function _statEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
