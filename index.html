@@ -30464,11 +30464,19 @@ function cbrConfirmApply(){
     // 같은 회차(응시일+시험명 동일)를 다시 반영하는 경우에만 기존 과목을 이어받아 갱신한다.
     const _sameRound = String(cd.lastTestDate||'').trim()===String(firstRow.examDate||'').trim()
       && String(cd.lastTestName||'').trim()===String(firstRow.examName||'').trim();
+    // ★ 2026-08-29 추가: 매니저가 회차를 반드시 시간순으로 반영한다는 보장이 없다(예: 최근
+    // 회차를 먼저 입력해두고, 나중에 빠뜨렸던 과거 회차를 뒤늦게 채워 넣는 경우 등). 지금
+    // 반영하는 회차의 응시일이 기존에 저장된 최신 회차(lastTestDate)보다 "이전"이면, 이번
+    // 회차는 화면 표시(lastSubjects)를 바꾸지 않고 곧장 history 보관함으로만 들어가야 한다
+    // (아래에서 subjects는 기존 로직 그대로 정상적으로 만들되, 맨 끝에서 어디에 쓸지만
+    // 다르게 분기한다 — 자세한 내용은 함수 끝부분의 _newIsOlder 분기 참고).
+    const _newIsOlder = !_sameRound && cd.lastTestDate && firstRow.examDate
+      && String(firstRow.examDate).trim() < String(cd.lastTestDate).trim();
     // ★ 2026-08-22: 회차가 바뀌는데(새 회차 반영) 이전 회차의 과목 데이터(lastSubjects)가
     // 비어있으면, 아래 archive 로직이 아무것도 history에 못 넣고 그 이전 회차는 조용히
     // 사라진다. 실제로 이런 사례(이유건/김대성/임준섭 등)가 발견되어, 발생 즉시 관리자가
     // 알 수 있도록 경고를 수집한다(반영 자체는 막지 않음 — 데이터 유실 여부를 눈에 보이게).
-    if(!_sameRound && cd.lastTestDate && (!Array.isArray(cd.lastSubjects) || !cd.lastSubjects.length)){
+    if(!_sameRound && !_newIsOlder && cd.lastTestDate && (!Array.isArray(cd.lastSubjects) || !cd.lastSubjects.length)){
       archiveWarnings.push({name, lastTestDate: cd.lastTestDate, lastTestName: cd.lastTestName||''});
       console.warn('[챌린저 결과일괄반영] 이전 회차 과목 데이터 없음 — history 저장 안 됨:', name, cd.lastTestDate, cd.lastTestName);
     }
@@ -30477,7 +30485,7 @@ function cbrConfirmApply(){
     // 다른 학생이 그 지난 회차를 아직 보고 있어도(예: 상담리포트의 "동일 회차 등수"),
     // 이미 새 회차로 넘어간 학생들은 비교 대상에서 빠져 등수가 안 나오거나 표본이
     // 줄어드는 문제가 있었다. 새 회차로 넘어가기 직전에 지난 회차를 history에 보관한다.
-    if(!_sameRound && Array.isArray(cd.lastSubjects) && cd.lastSubjects.length && cd.lastTestDate){
+    if(!_sameRound && !_newIsOlder && Array.isArray(cd.lastSubjects) && cd.lastSubjects.length && cd.lastTestDate){
       const _hist = Array.isArray(cd.history) ? cd.history.slice() : [];
       const _dup = _hist.some(h=>String(h.date||'').trim()===String(cd.lastTestDate).trim() && String(h.test||'').trim()===String(cd.lastTestName||'').trim());
       if(!_dup){
@@ -30603,26 +30611,34 @@ function cbrConfirmApply(){
       if(pastedMemo) existing.memo = pastedMemo;
     });
     const newChallengerData = Object.assign({}, cd, {
-      lastSubjects: subjects,
-      lastTestDate: firstRow.examDate || cd.lastTestDate || '',
-      lastTestName: firstRow.examName || cd.lastTestName || '',
+      // ★ 2026-08-29 수정: 지금 반영하는 회차가 기존 저장된 최신 회차보다 날짜가 이전이면
+      // (_newIsOlder), 화면에 표시되는 "현재 회차"(lastSubjects/lastTestDate/lastTestName)는
+      // 그대로 최신 회차를 유지하고 건드리지 않는다. 이번에 반영한(과거) 회차 데이터는
+      // 바로 아래 자동저장 블록을 통해 history에는 정상적으로 들어간다.
+      lastSubjects: _newIsOlder ? cd.lastSubjects : subjects,
+      lastTestDate: _newIsOlder ? (cd.lastTestDate||'') : (firstRow.examDate || cd.lastTestDate || ''),
+      lastTestName: _newIsOlder ? (cd.lastTestName||'') : (firstRow.examName || cd.lastTestName || ''),
       _updatedAt: Date.now()
     });
     // ★ 이번 회차도 결과일괄반영 즉시 "과거 저장 회차" 목록에 바로 나타나도록 자동 저장한다.
     // (예전에는 다음 회차로 넘어가야만 history에 들어가서, 매니저가 "현재 회차 저장 후
     // 누적 반영" 버튼을 학생마다 일일이 눌러줘야 했다 — 이제 결과일괄반영 자체가 자동저장이다.)
-    if(newChallengerData.lastTestDate && subjects.length){
+    // ★ 2026-08-29 수정: 이 블록이 사용하는 응시일/시험명은 newChallengerData.lastTestDate가
+    // 아니라 firstRow.examDate/examName(지금 실제로 반영 중인 회차)이어야 한다 — _newIsOlder일
+    // 때 newChallengerData.lastTestDate는 위에서 "바뀌지 않은 기존 최신 회차" 값이 되므로,
+    // 그 값을 그대로 쓰면 이번에 반영한(과거) 회차가 엉뚱한 날짜로 history에 저장돼 버린다.
+    if(firstRow.examDate && subjects.length){
       const _histNow = Array.isArray(newChallengerData.history) ? newChallengerData.history.slice() : [];
-      const _idxNow = _histNow.findIndex(h=>String(h.date||'').trim()===String(newChallengerData.lastTestDate).trim() && String(h.test||'').trim()===String(newChallengerData.lastTestName||'').trim());
+      const _idxNow = _histNow.findIndex(h=>String(h.date||'').trim()===String(firstRow.examDate).trim() && String(h.test||'').trim()===String(firstRow.examName||'').trim());
       const _entryNow = {
         student: name, // ★ 2026-08-22: 위와 동일한 이유로 필요 — 이 필드 없으면 자동저장은 되지만
         // 관리자 화면의 "과거 저장 회차" 목록/누적 변화 리포트에는 표시되지 않는다.
-        date: newChallengerData.lastTestDate,
-        test: newChallengerData.lastTestName||'',
+        date: firstRow.examDate,
+        test: firstRow.examName||'',
         subjects: JSON.parse(JSON.stringify(subjects)),
         fullSubjects: JSON.parse(JSON.stringify(subjects)),
         savedAt: Date.now(),
-        archivedBy: '결과일괄반영(자동 저장)'
+        archivedBy: _newIsOlder ? '결과일괄반영(과거 회차 뒤늦게 입력)' : '결과일괄반영(자동 저장)'
       };
       // ★ 2026-08-17 데이터유실 버그 수정: 같은 (응시일+시험명) 조합으로 여러 번에
       // 나눠서(예: 오늘은 국/영/한국사만, 다음날 수학, 그 다음날 탐구) 결과일괄반영을
