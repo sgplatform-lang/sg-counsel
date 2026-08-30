@@ -30575,7 +30575,12 @@ function cbrConfirmApply(){
       const detailRateMap = rates[detailRateKey] || {};
       let existing = singleInstanceCodes.indexOf(subjCode) > -1
         ? subjects.find(s=>s.subject===subjCode)
-        : subjects.find(s=>s.subject===subjCode && (s.detail||'')===(r.detail||''));
+        // ★ 2026-08-30 추가: 저장돼 있던 예전 표기("생윤")와 이번에 새로 들어온 정규화된
+        // 표기("생활과 윤리")를 글자 그대로 비교하면, 서로 달라서 "새 과목"으로 잘못 인식해
+        // 기존 항목을 덮어쓰지 않고 따로 추가해버린다(예전 "탐구(생윤)"이 안 지워지고
+        // 새 "탐구(생활과 윤리)"와 나란히 남는 문제). 양쪽 다 정규화한 뒤 비교해야 같은
+        // 과목으로 인식해서 제대로 덮어쓴다.
+        : subjects.find(s=>s.subject===subjCode && _cbrNormalizeDetail(s.detail||'')===_cbrNormalizeDetail(r.detail||''));
       if(!existing){
         existing = {sid:'s'+(subjects.length+1), subject:subjCode, detail:r.detail||''};
         subjects.push(existing);
@@ -30681,7 +30686,7 @@ function cbrConfirmApply(){
         _entryNow.fullSubjects.forEach(function(ns){
           const idx = _singleInstanceCodes.indexOf(ns.subject) > -1
             ? _mergedSubjects.findIndex(function(s){return s.subject===ns.subject;})
-            : _mergedSubjects.findIndex(function(s){return s.subject===ns.subject && (s.detail||'')===(ns.detail||'');});
+            : _mergedSubjects.findIndex(function(s){return s.subject===ns.subject && _cbrNormalizeDetail(s.detail||'')===_cbrNormalizeDetail(ns.detail||'');});
           if(idx>=0){ _mergedSubjects[idx]=ns; } else { _mergedSubjects.push(ns); }
         });
         _entryNow.subjects = JSON.parse(JSON.stringify(_mergedSubjects));
