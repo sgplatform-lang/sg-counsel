@@ -1150,7 +1150,15 @@ async function fbSave(col, id, data){
 async function fbLoadAll(col){
   if(!FB_USE()) return null;
   try{
-    const snap = await window._fb.collection(col).get();
+    // ★ 2026-08-29 추가: 예전엔 여기서 네트워크가 느리거나 잠깐 끊기면 응답이 올 때까지
+    // 무한정 기다렸다 — 실패한 게 아니라 "그냥 계속 로딩 중"으로 멈춰버려서, 관리자
+    // 입장에서는 학생 목록이 영영 안 나오는 것처럼 보이고 재로그인(새로고침)밖에 할 수
+    // 있는 게 없었다. 15초 안에 응답이 없으면 실패로 간주하고 즉시 null을 반환해서,
+    // 화면에서 "다시 시도" 버튼을 보여줄 수 있게 한다.
+    const snap = await Promise.race([
+      window._fb.collection(col).get(),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: '+col+' 로딩이 15초 안에 끝나지 않았습니다')), 15000))
+    ]);
     return snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};});
   }catch(e){ console.warn('FB load error:', e.message); return null; }
 }
@@ -1210,6 +1218,17 @@ async function saveAll(){
   }
 }
 
+// ★ 2026-08-29 추가: examCatalog(시험 카탈로그)를 실제로 필요할 때만 불러온다.
+// ST.examCatalog가 이미 있으면 다시 불러오지 않고(같은 세션 안에서는 캐시 재사용),
+// 없을 때만 서버에서 한 번 가져와 채운다. openExamCatalog / openChallengerBulkReflect /
+// 오답노트 출력, 세 곳에서 모두 이 함수를 먼저 호출한다.
+async function _ensureExamCatalogLoaded(){
+  if(ST.examCatalog && ST.examCatalog.length) return ST.examCatalog;
+  if(!FB_USE()) return ST.examCatalog||[];
+  const examCatalog = await fbLoadAll('examCatalog');
+  if(examCatalog && examCatalog.length) ST.examCatalog = examCatalog;
+  return ST.examCatalog||[];
+}
 // Firebase에서 전체 데이터 불러오기
 async function fbLoadAll_all(){
   if(!FB_USE()) return false;
@@ -1219,18 +1238,35 @@ async function fbLoadAll_all(){
     const _initRole = ST.currentUser?.role;
     const _initOrgId = ST.currentOrg?.id || ST.currentUser?.orgId || null;
     const _studentsPromise = (_initRole!=='admin' && _initOrgId)
-      ? window._fb.collection('students').where('orgId','==',_initOrgId).get()
+      ? Promise.race([
+          window._fb.collection('students').where('orgId','==',_initOrgId).get(),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: students(scoped) 로딩이 15초 안에 끝나지 않았습니다')), 15000))
+        ])
           .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
           .catch(e=>{ console.warn('FB load error(students scoped):', e.message); return null; })
       : fbLoadAll('students');
-    const [students, teachers, tests, config, orgs, examCatalog] = await Promise.all([
+    const _teachersPromise = (_initRole!=='admin' && _initOrgId)
+      ? Promise.race([
+          window._fb.collection('teachers').where('orgId','==',_initOrgId).get(),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: teachers(scoped) 로딩이 15초 안에 끝나지 않았습니다')), 15000))
+        ])
+          .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
+          .catch(e=>{ console.warn('FB load error(teachers scoped):', e.message); return null; })
+      : fbLoadAll('teachers');
+    const [students, teachers, tests, config, orgs] = await Promise.all([
       _studentsPromise,
-      fbLoadAll('teachers'),
+      _teachersPromise,
       fbLoadAll('tests'),
       fbLoadAll('config'),
       fbLoadAll('orgs'),
-      fbLoadAll('examCatalog'),
     ]);
+    if(students===null){
+      // ★ 2026-08-29 추가: 15초 안에 응답이 없어 시간 초과로 실패한 경우, 화면단에서
+      // "다시 시도" 버튼을 보여줄 수 있도록 표시해둔다(진짜로 학생이 0명인 경우와 구분).
+      ST._authLoadFailed = true;
+    } else {
+      ST._authLoadFailed = false;
+    }
     if(students && students.length){
       const role = ST.currentUser?.role;
       const curOrgId = ST.currentOrg?.id || ST.currentUser?.orgId || null;
@@ -1360,7 +1396,11 @@ async function fbLoadAll_all(){
       if(localT && localT.length) ST.teachers = localT;
     }
     if(tests && tests.length) ST.tests = tests;
-    if(examCatalog && examCatalog.length) ST.examCatalog = examCatalog;
+    // ★ 2026-08-29 추가: examCatalog(시험 카탈로그)는 로그인할 때마다 무조건 통째로 가져오지
+    // 않는다 — 문항 이미지·긴 해설 텍스트가 쌓이면서 이 컬렉션 용량이 꽤 커졌는데, 정작
+    // 학생 목록 화면 자체에는 전혀 필요 없는 데이터라서, 로그인 속도만 깎아먹고 있었다.
+    // 이제 "시험 카탈로그 관리"·"결과 일괄반영"을 실제로 열 때, 또는 오답노트를 출력할
+    // 때만 그 순간에 한 번 불러온다(_ensureExamCatalogLoaded).
     if(config){
       const gs = config.find(c=>c.id==='grade_subjs');
       if(gs?.subjs) GRADE_SUBJS = gs.subjs;
@@ -2830,6 +2870,10 @@ function renderMain(){
         ${ST._authLoading?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 10px;color:#999;font-size:12px;gap:10px">
           <div style="width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite"></div>
           <div>학생 데이터를 불러오는 중입니다...</div>
+        </div>`:(ST._authLoadFailed&&!filt.length)?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 10px;color:#b45309;font-size:12px;gap:10px;text-align:center">
+          <div style="font-size:26px">⚠️</div>
+          <div>서버 응답이 늦어 학생 목록을 불러오지 못했습니다.<br>인터넷 연결을 확인한 뒤 다시 시도해주세요.</div>
+          <button class="btn-b" style="padding:7px 16px;font-size:12px" onclick="(async()=>{ST._authLoading=true;render();await fbLoadAll_all();ST._authLoading=false;render();})()">🔄 다시 시도</button>
         </div>`:filt.map(s=>{const a=gAvg(s.subjects);return`<div class="scard${String(ST.sel?.id)===String(s.id)?' act':''}" onclick="(function(){const _s=ST.students.find(x=>String(x.id)==='${s.id}');ST.sel=_s;ST.tab='overview';ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;ST._eraseMode=false;ST._stratSelKey=null;ST._inspSelKey=null;ST.jeongsi={mockSrc:'auto',mockTest:null,mockTests:[],areas:[],tier:'전체',계열:'전체',calc:null,manualScores:{},국어선택:'',수학선택:'',탐구1과목:'',탐구2과목:'',영어등급:''};render();})()">
           <div style="display:flex;gap:8px;align-items:center">
             <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0">${esc(s.avatar)}</div>
@@ -13485,6 +13529,10 @@ function renderAdminReport(){
         ${ST._authLoading?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 10px;color:#999;font-size:12px;gap:10px">
           <div style="width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite"></div>
           <div>학생 데이터를 불러오는 중입니다...</div>
+        </div>`:(ST._authLoadFailed&&!filt.length)?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 10px;color:#b45309;font-size:12px;gap:10px;text-align:center">
+          <div style="font-size:26px">⚠️</div>
+          <div>서버 응답이 늦어 학생 목록을 불러오지 못했습니다.<br>인터넷 연결을 확인한 뒤 다시 시도해주세요.</div>
+          <button class="btn-b" style="padding:7px 16px;font-size:12px" onclick="(async()=>{ST._authLoading=true;render();await fbLoadAll_all();ST._authLoading=false;render();})()">🔄 다시 시도</button>
         </div>`:filt.map(s=>{const a=gAvg(s.subjects);return`<div class="scard${String(ST.adminSel?.id)===String(s.id)?' act':''}" onclick="ST.adminSel=ST.students.find(x=>String(x.id)===String('${s.id}'));ST._stratSelKey=null;ST._inspSelKey=null;ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;ST.weekTab='tt';ST._mainScrollY=0;render()">
           <div style="display:flex;gap:8px;align-items:center">
             <div style="width:32px;height:32px;border-radius:8px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0">${esc(s.avatar)}</div>
@@ -28837,6 +28885,11 @@ function _examcatToggleFullscreen(){
 }
 
 function openExamCatalog(){
+  _ensureExamCatalogLoaded().then(function(){
+    _examcatRenderList();
+    const overlay=document.getElementById('examcat-overlay');
+    if(overlay && overlay.style.display==='flex') _examcatRenderForm(); // 로딩 중 이미 열려있었으면 목록만 갱신
+  });
   if(!document.getElementById('examcat-overlay')){
     const div=document.createElement('div');
     div.id='examcat-overlay';
@@ -29420,6 +29473,16 @@ function resetChallengerBulkReflectForm(){
 }
 
 function openChallengerBulkReflect(){
+  // ★ 2026-08-29 추가: 카탈로그 드롭다운을 채우려면 ST.examCatalog가 필요하므로, 아직
+  // 안 불러왔으면 이 모달을 여는 시점에 한 번 불러온다(로그인 시엔 더 이상 안 가져옴).
+  _ensureExamCatalogLoaded().then(function(){
+    const _selEl2=document.getElementById('cbr-examcat-select');
+    if(_selEl2){
+      const list2=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      _selEl2.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
+        + list2.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
+    }
+  });
   if(!document.getElementById('cbr-overlay')){
     const div = document.createElement('div');
     div.id = 'cbr-overlay';
@@ -38895,6 +38958,7 @@ function generateReport() {
     var onlyCurrent=!!(opts&&opts.onlyCurrent);
     var ifr=document.getElementById('challenger-iframe');
     if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
+    await _ensureExamCatalogLoaded(); // ★ 2026-08-29 추가: 로그인 시엔 카탈로그를 안 가져오므로, 출력 직전에 한 번 불러온다
     var cw=ifr.contentWindow, cd=cw.document;
     var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
     var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'', onlyCurrent);
@@ -38914,7 +38978,20 @@ function generateReport() {
       var _wnAnyItemRendered=false; // ★ 이 학생 리포트에서 지금까지 문항이 하나라도 나왔는지 추적 —
       // 맨 첫 문항은 페이지 상단에서 자연스럽게 이어지고, 그 다음부터는 "문제 이미지가 있는"
       // 문항만 새 페이지 맨 위에서 강제로 시작한다 (텍스트만 있는 짧은 문항은 계속 이어 붙인다)
-      var subjBlocks=subs.map(function(s){
+      // ★ 2026-08-29 추가: 한 학생이 2과목 이상일 때, 과목이 바뀌는 지점에 "구분 페이지"
+      // (과목명이 크게 적힌 표지 페이지)를 넣어 과목별로 오답노트를 한눈에 구분할 수 있게 한다.
+      // 첫 과목은 학생 헤더 바로 아래에 이어 붙이고(종이 절약), 두 번째 과목부터는 새 페이지에서
+      // 시작한다. 과목이 1개뿐인 학생에게는 구분 페이지를 넣지 않는다(불필요).
+      var _wnNonEmptySubs=subs.filter(function(x){return (x.items||[]).filter(function(it){return it&&it.no;}).length>0;});
+      function _wnSubjectDivider(s, items, allSubs, subjIdx){
+        if(_wnNonEmptySubs.length<=1) return '';
+        var isFirst=_wnNonEmptySubs[0]===s;
+        return '<div class="wn-subject-divider'+(isFirst?' wn-subject-divider-first':'')+'">'+
+          '<div class="wn-subject-divider-name">'+_wnEsc(_wnSubjLabel(s.subject,s.detail))+'</div>'+
+          '<div class="wn-subject-divider-sub">'+items.length+'문항 · '+_wnEsc(s.score||'-')+'점</div>'+
+        '</div>';
+      }
+      var subjBlocks=subs.map(function(s, subjIdx){
         var items=(s.items||[]).filter(function(it){return it&&it.no;})
           .slice().sort(function(a,b){return (parseInt(a.no,10)||0)-(parseInt(b.no,10)||0);});
         if(!items.length) return '';
@@ -38964,7 +39041,7 @@ function generateReport() {
             explainHtml+
           '</div>';
         }).join('');
-        return '<div class="wn-subject"><h3>'+_wnEsc(_wnSubjLabel(s.subject,s.detail))+' <span class="wn-subject-meta">('+items.length+'문항 · '+_wnEsc(s.score||'-')+'점)</span></h3>'+rows+'</div>';
+        return '<div class="wn-subject">'+_wnSubjectDivider(s, items, subs, subjIdx)+'<h3>'+_wnEsc(_wnSubjLabel(s.subject,s.detail))+' <span class="wn-subject-meta">('+items.length+'문항 · '+_wnEsc(s.score||'-')+'점)</span></h3>'+rows+'</div>';
       }).join('');
       return '<section class="wn-page"><div class="wn-head">'+
         '<div class="wn-title">오답노트</div>'+
@@ -38984,6 +39061,10 @@ function generateReport() {
       '.wn-title{font-size:20px;font-weight:900}'+
       '.wn-meta{font-size:12px;color:#64748b}'+
       '.wn-subject{margin-bottom:18px}'+
+      '.wn-subject-divider{page-break-before:always;break-before:page;page-break-after:always;break-after:page;min-height:220mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}'+
+      '.wn-subject-divider-first{page-break-before:avoid;break-before:avoid}'+
+      '.wn-subject-divider-name{font-size:34px;font-weight:900;color:#0f172a;letter-spacing:3px}'+
+      '.wn-subject-divider-sub{font-size:13px;color:#64748b;margin-top:10px}'+
       '.wn-subject h3{font-size:14px;border-left:4px solid #0f766e;padding-left:8px;margin:14px 0 8px;break-after:avoid;page-break-after:avoid}'+
       '.wn-subject-meta{font-size:11px;color:#64748b;font-weight:500}'+
       '.wn-item{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:8px;break-inside:avoid;page-break-inside:avoid}'+
