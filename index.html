@@ -1225,8 +1225,16 @@ async function saveAll(){
 async function _ensureExamCatalogLoaded(){
   if(ST.examCatalog && ST.examCatalog.length) return ST.examCatalog;
   if(!FB_USE()) return ST.examCatalog||[];
+  ST._examCatLoadFailed=false;
   const examCatalog = await fbLoadAll('examCatalog');
-  if(examCatalog && examCatalog.length) ST.examCatalog = examCatalog;
+  if(examCatalog && examCatalog.length){
+    ST.examCatalog = examCatalog;
+  } else if(examCatalog===null){
+    // ★ 2026-08-29 추가: 15초 타임아웃 등으로 진짜 실패한 경우("등록된 시험이 없다"와
+    // 구분)를 표시해둔다 — "가끔 시험 카탈로그가 안 보였다가 재로그인하면 나온다"는
+    // 증상이 바로 이 조용한 실패였다. 이제 화면에 "다시 시도" 버튼을 보여준다.
+    ST._examCatLoadFailed=true;
+  }
   return ST.examCatalog||[];
 }
 // Firebase에서 전체 데이터 불러오기
@@ -28922,7 +28930,16 @@ function _examcatRenderList(){
   if(!el) return;
   const list=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   if(!list.length){
-    el.innerHTML='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
+    // ★ 2026-08-29 추가: "진짜로 등록된 시험이 없는 것"과 "불러오다 실패한 것"을
+    // 구분해서 보여준다 — 실패인데 "등록된 시험이 없다"고만 나오면, 이미 만들어둔
+    // 카탈로그가 갑자기 사라진 것처럼 보여 당황스러울 수 있다(재로그인하면 다시 보이던
+    // 증상이 바로 이거였다). 실패했을 땐 재로그인 없이 바로 다시 시도할 수 있게 한다.
+    el.innerHTML = ST._examCatLoadFailed
+      ? '<div style="text-align:center;padding:24px;color:#b45309;font-size:13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px">'
+        + '⚠️ 서버 응답이 늦어 시험 카탈로그를 불러오지 못했습니다.<br>이미 등록해두신 시험이 사라진 게 아닙니다 — 다시 시도해주세요.<br>'
+        + '<button class="btn-b" style="margin-top:10px;padding:7px 16px;font-size:12px" onclick="(async()=>{ST.examCatalog=[];await _ensureExamCatalogLoaded();_examcatRenderList();})()">🔄 다시 시도</button>'
+        + '</div>'
+      : '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
     return;
   }
   el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
@@ -38671,26 +38688,7 @@ function generateReport() {
     // 회차(예: 마지막으로 저장된 회차)가 뜨고 그 기준으로 일괄 출력이 진행되는 문제가 있었다.
     var date=(liveDate!=null?liveDate:'')||ccd.lastTestDate||'';
     var name=(liveName!=null?liveName:'')||ccd.lastTestName||'';
-    // ★ onlyCurrent: 학생별 화면(챌린저 iframe 안)에서 누르는 오답노트 출력은 "지금 보고
-    // 있는 이 학생 한 명"만 나오면 되므로, 회차가 같은 모든 학생을 찾는 로직을 건너뛰고
-    // cur 한 명으로만 targets를 구성한다. 전체 학생 일괄 출력은 별도 버튼(관리자 화면 쪽)에서
-    // onlyCurrent 없이 이 함수를 호출한다.
-    if(onlyCurrent){
-      var ccd2=cur.challengerData||{};
-      var hasData=Array.isArray(ccd2.lastSubjects)&&ccd2.lastSubjects.length>0;
-      return {cur:cur, targets:hasData?[cur]:[], date:date, name:name};
-    }
-    var base=(ST.students||[]).filter(function(s){
-      return !cur.orgId || String(s.orgId||'')===String(cur.orgId||'');
-    });
     var _dateN=_examDateNorm(date), _nameN=_examNameNorm(name);
-    // ★ 2026-08-24(3차) 핵심 수정: 학생이 이번 회차보다 "더 최근" 회차를 이미 반영받은
-    // 경우, 그 학생의 challengerData.lastSubjects/lastTestDate는 이미 최신 회차로 바뀌어
-    // 있고 이번 회차 데이터는 challengerData.history[] 안으로 보관(archive)된 상태다.
-    // 지금까지는 lastSubjects/lastTestDate만 봤기 때문에, 상담리포트(과거 회차 불러오기로
-    // 정상 조회됨)와 달리 이 통계표/일괄출력에서는 그런 학생들이 전부 누락되고 있었다.
-    // → 현재 회차가 안 맞으면 history에서도 같은 응시일+시험명을 찾아서 그 데이터로
-    // 매칭한다(원본 학생 데이터는 건드리지 않고, 통계 생성용으로만 복제해서 쓴다).
     function _histMatch(cd){
       if(!Array.isArray(cd.history)) return null;
       for(var i=cd.history.length-1;i>=0;i--){
@@ -38701,6 +38699,45 @@ function generateReport() {
       }
       return null;
     }
+    // ★ onlyCurrent: 학생별 화면(챌린저 iframe 안)에서 누르는 오답노트 출력은 "지금 보고
+    // 있는 이 학생 한 명"만 나오면 되므로, 회차가 같은 모든 학생을 찾는 로직을 건너뛰고
+    // cur 한 명으로만 targets를 구성한다. 전체 학생 일괄 출력은 별도 버튼(관리자 화면 쪽)에서
+    // onlyCurrent 없이 이 함수를 호출한다.
+    // ★ 2026-08-29 수정: 예전엔 여기서 화면에 표시된 응시일/시험명과 무관하게 무조건
+    // challengerData.lastSubjects("이 학생이 가장 최근에 저장한 회차")를 그대로 썼다.
+    // 그래서 학생이 그 이후에 다른 회차(예: 하루 뒤 다른 과목 시험)를 반영받으면,
+    // 화면엔 이전 회차(예: 8/29 국어,수학)가 떠 있는데도 오답노트는 가장 최근 회차
+    // (예: 8/30 영어,탐구)로 인쇄되는 문제가 있었다. 전체 일괄 출력 쪽과 똑같이,
+    // 화면에 표시된(=요청된) 응시일/시험명과 실제로 일치하는지 먼저 확인하고,
+    // lastSubjects가 안 맞으면 history[] 보관함에서 그 회차를 찾아 쓰도록 통일한다.
+    if(onlyCurrent){
+      var isMatch=Array.isArray(ccd.lastSubjects)&&ccd.lastSubjects.length>0
+        && (!_dateN||_examDateNorm(ccd.lastTestDate)===_dateN)
+        && (!_nameN||_examNameNorm(ccd.lastTestName)===_nameN);
+      if(isMatch){
+        return {cur:cur, targets:[cur], date:date, name:name};
+      }
+      var h1=_histMatch(ccd);
+      if(h1){
+        var hSubs1=h1.subjects||h1.fullSubjects||[];
+        if(hSubs1.length){
+          var clone1=Object.assign({}, cur, {challengerData:Object.assign({}, ccd, {
+            lastSubjects: hSubs1,
+            lastTestDate: h1.date!=null?h1.date:h1.testDate,
+            lastTestName: h1.test!=null?h1.test:(h1.testName!=null?h1.testName:h1.name)
+          })});
+          return {cur:cur, targets:[clone1], date:date, name:name};
+        }
+      }
+      // 그래도 못 찾으면(예전 데이터 형식 등) 마지막 안전망으로 lastSubjects라도 보여준다
+      // (완전히 빈 오답노트보다는 낫다) — 다만 이 경우 화면에 경고를 남긴다.
+      var fallbackHas=Array.isArray(ccd.lastSubjects)&&ccd.lastSubjects.length>0;
+      if(fallbackHas) console.warn('[SG] 오답노트: 이 학생의 저장된 최신 회차('+ccd.lastTestDate+' · '+ccd.lastTestName+')가 화면에 표시된 회차('+date+' · '+name+')와 다릅니다. 일치하는 과거 회차를 찾지 못해 최신 회차로 대신 출력합니다.');
+      return {cur:cur, targets:fallbackHas?[cur]:[], date:date, name:name};
+    }
+    var base=(ST.students||[]).filter(function(s){
+      return !cur.orgId || String(s.orgId||'')===String(cur.orgId||'');
+    });
     var _matchSrc={}; // 학생id -> 'current' | 'history'
     var targets=[];
     base.forEach(function(s){
@@ -38959,6 +38996,17 @@ function generateReport() {
     var ifr=document.getElementById('challenger-iframe');
     if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
     await _ensureExamCatalogLoaded(); // ★ 2026-08-29 추가: 로그인 시엔 카탈로그를 안 가져오므로, 출력 직전에 한 번 불러온다
+    if(ST._examCatLoadFailed){
+      // ★ 2026-08-29 추가: 카탈로그 로딩이 실패한 채로 그냥 출력하면, 이미지·해설이
+      // 통째로 빠진 오답노트가 조용히 인쇄되어 버린다("가끔 오답 이미지가 안 나온다"는
+      // 증상의 원인). 출력 전에 미리 알려주고 재시도할 기회를 준다.
+      const retry=confirm('⚠️ 시험 카탈로그(문항 이미지·해설)를 서버에서 불러오지 못했습니다.\n\n이 상태로 계속하면 카탈로그에 등록해둔 이미지·해설이 오답노트에 빠질 수 있습니다.\n\n"확인"을 누르면 다시 한번 불러오기를 시도합니다. "취소"를 누르면 지금 상태로(이미지 없이) 계속 진행합니다.');
+      if(retry){
+        ST._examCatLoadFailed=false;
+        await _ensureExamCatalogLoaded();
+        if(ST._examCatLoadFailed){ alert('다시 시도했지만 여전히 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 다시 눌러주세요.'); return; }
+      }
+    }
     var cw=ifr.contentWindow, cd=cw.document;
     var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
     var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'', onlyCurrent);
@@ -38995,6 +39043,13 @@ function generateReport() {
         var items=(s.items||[]).filter(function(it){return it&&it.no;})
           .slice().sort(function(a,b){return (parseInt(a.no,10)||0)-(parseInt(b.no,10)||0);});
         if(!items.length) return '';
+        // ★ 2026-08-29 수정: "이 과목의 첫 문항"은 이 과목 소제목(h3) 바로 아래에 자연스럽게
+        // 이어져야 하는데, 이 플래그를 학생 전체 기준으로 한 번만 두고 있어서, 두 번째
+        // 과목부터는 그 과목의 첫 문항조차 "전체에서 처음이 아니다"로 취급되어 강제로
+        // 새 페이지로 넘어가 버렸다. 그 결과 소제목만 있고 문항은 다음 페이지로 넘어가면서
+        // 소제목 아래가 텅 빈 페이지가 생겼다. 과목이 바뀔 때마다 이 플래그를 초기화해서,
+        // 각 과목의 첫 문항은 항상 그 과목 소제목 바로 아래에서 자연스럽게 시작하게 한다.
+        _wnAnyItemRendered=false;
         var rows=items.map(function(it){
           var _wnCauseLabel={K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'}[it.causePrimary]||'';
           var reasonTxt=(_wnCauseLabel?'[1차] '+_wnCauseLabel+(((it.reasons||[]).length||it.memo)?' · ':''):'')+[].concat(it.reasons||[]).join(', ')+(it.memo&&!/^전체 오답률/.test(it.memo)?(it.reasons&&it.reasons.length?' · ':'')+it.memo:'');
