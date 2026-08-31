@@ -39390,11 +39390,18 @@ function generateReport() {
     var examEntry=(ST.examCatalog||[]).find(function(e){ return String(e.examName||'').trim()===String(window._sgAnsViewRoundName||cd.lastTestName||'').trim(); });
     if(!examEntry){ alert('⚠️ 이 시험의 카탈로그를 찾지 못해 재채점할 수 없습니다. 시험 카탈로그가 등록되어 있는지 확인해주세요.'); return; }
     var normDetail=_cbrNormalizeDetail(s.detail||'');
-    // ★ 2026-08-31 수정: 학생용과 동일한 이유로, 공통 문항과 선택 문항 정답을 문항 번호별로 병합해서 찾는다.
-    var akMapDetail=(examEntry.answerKey&&examEntry.answerKey[s.subject+'|'+normDetail])||{};
-    var akMapCommon=(examEntry.answerKey&&examEntry.answerKey[s.subject+'|'])||{};
-    var metaMapDetail=(examEntry.itemMeta&&examEntry.itemMeta[s.subject+'|'+normDetail])||{};
-    var metaMapCommon=(examEntry.itemMeta&&examEntry.itemMeta[s.subject+'|'])||{};
+    // ★ 2026-08-31 수정: 학생용과 동일한 이유로, 공통 문항과 선택 문항 정답을 문항 번호별로
+    // 병합해서 찾는다. 탐구는 카탈로그가 "INQ"/"INQ1"/"INQ2" 중 어느 표기로 저장됐을지
+    // 알 수 없으므로 셋 다 확인한다.
+    var codeAliases2 = s.subject==='INQ' ? ['INQ','INQ1','INQ2'] : [s.subject];
+    function _lookupBucket2(mapObj, codes, keySuffix){
+      for(var i=0;i<codes.length;i++){ var b=(mapObj&&mapObj[codes[i]+keySuffix]); if(b && Object.keys(b).length) return b; }
+      return {};
+    }
+    var akMapDetail=_lookupBucket2(examEntry.answerKey, codeAliases2, '|'+normDetail);
+    var akMapCommon=_lookupBucket2(examEntry.answerKey, codeAliases2, '|');
+    var metaMapDetail=_lookupBucket2(examEntry.itemMeta, codeAliases2, '|'+normDetail);
+    var metaMapCommon=_lookupBucket2(examEntry.itemMeta, codeAliases2, '|');
     var items=[]; var gotPoints=0, totalPoints=0;
     for(var no2=1;no2<=total;no2++){
       var ak=akMapDetail[no2]||akMapCommon[no2]||{}; var meta=metaMapDetail[no2]||metaMapCommon[no2]||{};
