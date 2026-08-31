@@ -39166,8 +39166,21 @@ function generateReport() {
         '</div>'+(subjBlocks||'<div class="wn-empty">🎉 이번 회차에는 기록된 오답 문항이 없습니다.<br><span>(해당 학생의 챌린저 오답 데이터가 아직 입력되지 않았을 수도 있습니다)</span></div>')+'</section>';
     }).join('');
 
+    // ★ 2026-08-30 추가: 개별 학생 출력일 때, 파일명 맨 끝에 실제 응시 과목명을 붙여준다
+    // (예: "..._오답노트_국어,수학.pdf") — 여러 학생 파일을 폴더에서 구분하기 쉽도록.
+    var _subjSuffix='';
+    if(onlyCurrent && targets[0]){
+      var _tSubs=(targets[0].challengerData&&targets[0].challengerData.lastSubjects)||[];
+      var _tLabels=[];
+      _tSubs.forEach(function(s){
+        if(!s||!(s.items&&s.items.length)) return; // 오답 문항이 있는 과목만 표시
+        var lbl=_wnSubjLabel(s.subject,s.detail);
+        if(lbl && _tLabels.indexOf(lbl)===-1) _tLabels.push(lbl);
+      });
+      if(_tLabels.length) _subjSuffix='_'+_tLabels.join(',');
+    }
     var title=onlyCurrent
-      ? '챌린저_'+(info.date||'회차')+'_'+(targets[0]&&targets[0].name||'')+'_오답노트'
+      ? '챌린저_'+(info.date||'회차')+'_'+(targets[0]&&targets[0].name||'')+'_오답노트'+_subjSuffix
       : '챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_오답노트';
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_wnEsc(title)+'</title>'+
       '<style>'+
