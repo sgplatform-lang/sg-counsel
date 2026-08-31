@@ -2145,14 +2145,21 @@ async function chgAnsGradeAndSave(){
     const detail=st.detail[x.slot]||'';
     const normDetail=_cbrNormalizeDetail(detail);
     const ans=st.answers[x.slot]||{};
-    const akMap=(examEntry.answerKey&&(examEntry.answerKey[x.code+'|'+normDetail]||examEntry.answerKey[x.code+'|']))||{};
-    const metaMap=(examEntry.itemMeta&&(examEntry.itemMeta[x.code+'|'+normDetail]||examEntry.itemMeta[x.code+'|']))||{};
+    // ★ 2026-08-31 수정: 국어·수학처럼 "공통 문항(세부과목 없음)"과 "선택 문항(세부과목
+    // 있음)"이 한 과목 안에 섞여 있는 경우, 카탈로그에는 두 묶음(예: "MATH|"와 "MATH|미적분")
+    // 으로 나뉘어 저장돼 있다. 예전엔 세부과목 묶음이 있으면 그것만 쓰고 공통 묶음을 통째로
+    // 무시해서, 공통 문항의 정답을 못 찾아 전부 "정답"으로 잘못 처리됐다. 이제 문항 번호
+    // 하나하나마다 "세부과목 묶음에 있으면 그걸, 없으면 공통 묶음에서" 찾도록 병합한다.
+    const akMapDetail=(examEntry.answerKey&&examEntry.answerKey[x.code+'|'+normDetail])||{};
+    const akMapCommon=(examEntry.answerKey&&examEntry.answerKey[x.code+'|'])||{};
+    const metaMapDetail=(examEntry.itemMeta&&examEntry.itemMeta[x.code+'|'+normDetail])||{};
+    const metaMapCommon=(examEntry.itemMeta&&examEntry.itemMeta[x.code+'|'])||{};
     const items=[];
     const rawAnswers={}; // ★ 채점 결과와 별개로, 학생이 실제로 고른 답 전체(정답 문항 포함)를 그대로 보존
     let gotPoints=0, totalPoints=0, foundAnswerCount=0;
     for(let no=1;no<=def.count;no++){
-      const ak=akMap[no]||{};
-      const meta=metaMap[no]||{};
+      const ak=akMapDetail[no]||akMapCommon[no]||{};
+      const meta=metaMapDetail[no]||metaMapCommon[no]||{};
       const points=(+ak.points)||(+meta.points)||(100/def.count);
       totalPoints+=points;
       const correctRaw=ak.answer||meta.answer||'';
