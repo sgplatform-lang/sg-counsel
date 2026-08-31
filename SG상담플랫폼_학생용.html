@@ -2141,7 +2141,7 @@ async function chgAnsGradeAndSave(){
     const metaMap=(examEntry.itemMeta&&(examEntry.itemMeta[x.code+'|'+normDetail]||examEntry.itemMeta[x.code+'|']))||{};
     const items=[];
     const rawAnswers={}; // ★ 채점 결과와 별개로, 학생이 실제로 고른 답 전체(정답 문항 포함)를 그대로 보존
-    let gotPoints=0, totalPoints=0;
+    let gotPoints=0, totalPoints=0, foundAnswerCount=0;
     for(let no=1;no<=def.count;no++){
       const ak=akMap[no]||{};
       const meta=metaMap[no]||{};
@@ -2155,14 +2155,27 @@ async function chgAnsGradeAndSave(){
         ? (correctRaw!=='' && _chgAnsNormMc(myRaw)===_chgAnsNormMc(correctRaw))
         : (correctRaw!=='' && String(myRaw==null?'':myRaw).trim()!=='' && String(myRaw).trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,''));
       if(!correctRaw){ continue; } // 카탈로그에 정답이 없는 문항은 채점 대상에서 제외
+      foundAnswerCount++;
       if(isCorrect){ gotPoints+=points; }
       else{
         items.push({no:String(no), unit:meta.unit||'', diff:meta.diff||'중', reasons:[], memo:'', causePrimary:'', guessedTime:!(String(myRaw||'').trim()),
           points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'', explanation:ak.explain||meta.explain||'', question:ak.question||''});
       }
     }
+    // ★ 2026-08-31 추가: 선택한 시험 카탈로그에 이 과목의 정답 데이터가 아예 없으면(예:
+    // "영어,탐구" 카탈로그를 선택해 놓고 수학 답안을 낸 경우), 예전엔 채점할 대상이 없다는
+    // 이유로 모든 문항을 "정답"으로 잘못 표시해버렸다. 이제는 그런 경우를 명확한 오류로
+    // 막고, 어떤 시험을 선택해야 하는지 안내한다 — 저장 자체를 하지 않는다.
+    if(foundAnswerCount===0){
+      alert('⚠️ 선택하신 시험("'+st.test+'")에는 '+(x.slot.indexOf('INQ')===0?'탐구('+detail+')':def.name)+' 과목의 정답 데이터가 등록되어 있지 않습니다.\n\n시험을 잘못 선택하지 않으셨는지 확인해주세요('+def.name+' 답안은 이 과목이 포함된 올바른 시험을 선택한 뒤에 입력해야 합니다).\n\n이 과목은 저장되지 않았습니다.');
+      return;
+    }
     newSubjects.push({
-      sid:'s'+(newSubjects.length+1), subject:x.code, detail:detail,
+      // ★ 2026-08-31 수정: sid를 "s1,s2..." 순번으로 매기면, 서로 다른 시점에 과목을 나눠
+      // 제출할 때마다 매번 s1부터 다시 시작해서 다른 과목끼리 sid가 겹치는 문제가 있었다
+      // (그 결과 하나를 펼치면 sid가 같은 다른 과목까지 같이 펼쳐짐). 과목코드+세부과목은
+      // 한 회차 안에서 항상 고유하므로, 이를 그대로 sid로 써서 절대 겹치지 않게 한다.
+      sid: x.code+'_'+(detail?detail.replace(/\s+/g,''):'common'), subject:x.code, detail:detail,
       score: totalPoints? +(gotPoints).toFixed(1) : '',
       totalItemCount: def.count, wrongCount: items.length,
       items: items,
