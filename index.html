@@ -39262,7 +39262,30 @@ function generateReport() {
     var cur=ST.sel||ST.adminSel;
     if(!cur){ alert('먼저 학생을 선택해주세요.'); return; }
     var cd=cur.challengerData||{};
-    var subs=(cd.lastSubjects||[]).filter(function(s){ return s && s._studentSelfInput; });
+    // ★ 2026-08-31 수정: 예전엔 이 학생의 "가장 최신" 회차(cd.lastSubjects)를 무조건
+    // 보여줬는데, 매니저가 "과거 회차 불러오기"로 다른 회차를 화면에 띄워놓은 상태에서
+    // 눌러도 화면과 다른(가장 최신) 회차가 나와 버리는 문제가 있었다. 이제 챌린저
+    // 화면(iframe)에 지금 실제로 표시된 응시일/시험명을 그대로 읽어서, 그 회차의 데이터를
+    // 찾아 보여준다 — lastSubjects가 그 회차와 일치하면 그걸, 아니면 history에서 찾는다.
+    var ifr=document.getElementById('challenger-iframe');
+    var liveDate='', liveName='';
+    if(ifr && ifr.contentWindow && ifr.contentWindow.document){
+      var idoc=ifr.contentWindow.document;
+      var dEl=idoc.getElementById('testDate'), nEl=idoc.getElementById('testName');
+      liveDate=dEl?dEl.value:''; liveName=nEl?nEl.value:'';
+    }
+    var subs;
+    var roundDate=liveDate, roundName=liveName;
+    if(liveDate && liveName && String(cd.lastTestDate||'').trim()===String(liveDate).trim() && String(cd.lastTestName||'').trim()===String(liveName).trim()){
+      subs=(cd.lastSubjects||[]).filter(function(s){ return s && s._studentSelfInput; });
+    } else if(liveDate && liveName){
+      var h=(cd.history||[]).find(function(x){ return String(x.date||'').trim()===String(liveDate).trim() && String(x.test||'').trim()===String(liveName).trim(); });
+      subs=((h&&(h.subjects||h.fullSubjects))||[]).filter(function(s){ return s && s._studentSelfInput; });
+    } else {
+      // 화면 값을 못 읽었으면(챌린저 화면 미로딩 등) 예전처럼 최신 회차로 대체
+      subs=(cd.lastSubjects||[]).filter(function(s){ return s && s._studentSelfInput; });
+      roundDate=cd.lastTestDate; roundName=cd.lastTestName;
+    }
     var overlay=document.getElementById('sg-ansview-overlay');
     if(!overlay){
       overlay=document.createElement('div');
@@ -39290,10 +39313,11 @@ function generateReport() {
           +'</span></div></div>';
       }).join('');
       body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:15px">🖊️ '+esc2(cur.name||'')+' 학생 답안</b><button onclick="document.getElementById(\'sg-ansview-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 닫기</button></div>'
-        +'<div style="font-size:11.5px;color:#888;margin-bottom:12px">'+esc2(cd.lastTestDate||'')+' · '+esc2(cd.lastTestName||'')+' — 학생이 직접 제출한 과목만 표시됩니다(✅). 클릭하면 문항별 답안을 볼 수 있습니다.</div>'
+        +'<div style="font-size:11.5px;color:#888;margin-bottom:12px">'+esc2(roundDate||'')+' · '+esc2(roundName||'')+' — 학생이 직접 제출한 과목만 표시됩니다(✅). 클릭하면 문항별 답안을 볼 수 있습니다.</div>'
         +rows+'<div id="sg-ansview-detail" style="margin-top:14px"></div>';
     }
     window._sgAnsViewSubs=subs; // 상세보기에서 참조
+    window._sgAnsViewRoundDate=roundDate; window._sgAnsViewRoundName=roundName; // ★ 재채점 시 올바른 시험 카탈로그를 찾기 위해 저장
     overlay.style.display='flex';
   };
   window._sgDeleteStudentAnswer=async function(idx){
@@ -39357,14 +39381,17 @@ function generateReport() {
     }
     // ★ 재채점을 위해 카탈로그(정답/해설/단원)를 다시 조회한다 — 이미 열려있으면 캐시 재사용.
     await _ensureExamCatalogLoaded();
-    var examEntry=(ST.examCatalog||[]).find(function(e){ return String(e.examName||'').trim()===String(cd.lastTestName||'').trim(); });
+    var examEntry=(ST.examCatalog||[]).find(function(e){ return String(e.examName||'').trim()===String(window._sgAnsViewRoundName||cd.lastTestName||'').trim(); });
     if(!examEntry){ alert('⚠️ 이 시험의 카탈로그를 찾지 못해 재채점할 수 없습니다. 시험 카탈로그가 등록되어 있는지 확인해주세요.'); return; }
     var normDetail=_cbrNormalizeDetail(s.detail||'');
-    var akMap=(examEntry.answerKey&&(examEntry.answerKey[s.subject+'|'+normDetail]||examEntry.answerKey[s.subject+'|']))||{};
-    var metaMap=(examEntry.itemMeta&&(examEntry.itemMeta[s.subject+'|'+normDetail]||examEntry.itemMeta[s.subject+'|']))||{};
+    // ★ 2026-08-31 수정: 학생용과 동일한 이유로, 공통 문항과 선택 문항 정답을 문항 번호별로 병합해서 찾는다.
+    var akMapDetail=(examEntry.answerKey&&examEntry.answerKey[s.subject+'|'+normDetail])||{};
+    var akMapCommon=(examEntry.answerKey&&examEntry.answerKey[s.subject+'|'])||{};
+    var metaMapDetail=(examEntry.itemMeta&&examEntry.itemMeta[s.subject+'|'+normDetail])||{};
+    var metaMapCommon=(examEntry.itemMeta&&examEntry.itemMeta[s.subject+'|'])||{};
     var items=[]; var gotPoints=0, totalPoints=0;
     for(var no2=1;no2<=total;no2++){
-      var ak=akMap[no2]||{}; var meta=metaMap[no2]||{};
+      var ak=akMapDetail[no2]||akMapCommon[no2]||{}; var meta=metaMapDetail[no2]||metaMapCommon[no2]||{};
       var points=(+ak.points)||(+meta.points)||(100/total);
       totalPoints+=points;
       var correctRaw=ak.answer||meta.answer||'';
@@ -39391,9 +39418,19 @@ function generateReport() {
     s.items = items;
     s.studentAnswers = newAnswers;
     s._editedByAdmin = true; // ★ 관리자가 수정했음을 표시(참고용)
-    // cd.lastSubjects 안의 실제 항목을 같은 sid로 찾아 교체
+    // ★ 2026-08-31 수정: 지금 보고 있는 회차가 "현재(lastSubjects)"가 아니라 과거 저장
+    // 회차(history)일 수도 있으므로, 두 군데 모두에서 같은 sid를 찾아 교체한다(찾은 곳에만
+    // 반영— 둘 다 있을 이유는 없지만 안전하게 둘 다 확인).
     var real=(cd.lastSubjects||[]).find(function(x){ return x.sid===s.sid; });
     if(real){ Object.assign(real, s); }
+    (cd.history||[]).forEach(function(h){
+      ['subjects','fullSubjects'].forEach(function(k){
+        if(Array.isArray(h[k])){
+          var hReal=h[k].find(function(x){ return x.sid===s.sid; });
+          if(hReal) Object.assign(hReal, s);
+        }
+      });
+    });
     if(FB_USE()){
       try{ await fbSave('students', cur.id, cur); }
       catch(e){ alert('저장 중 오류가 발생했습니다: '+e.message); return; }
