@@ -39327,20 +39327,26 @@ function generateReport() {
     var label=(s.subject==='INQ'?'탐구':(s.subject==='KOR'?'국어':s.subject==='MATH'?'수학':s.subject==='ENG'?'영어':s.subject==='HIST'?'한국사':s.subject))+(s.detail?'('+s.detail+')':'');
     if(!confirm(label+' 답안을 삭제하시겠습니까?\n삭제하면 이 과목의 채점 결과(정답/오답/점수)도 함께 사라지며, 되돌릴 수 없습니다.\n\n※ 학생은 다시 같은 시험으로 이 과목을 새로 제출할 수 있게 됩니다.')) return;
     var cd=cur.challengerData||{};
-    // 현재 회차(lastSubjects)에서 제거
-    cd.lastSubjects=(cd.lastSubjects||[]).filter(function(x){ return x.sid!==s.sid; });
+    // ★ 2026-08-31 수정: sid 하나만 보고 지우면, 예전(수정 전) 데이터 중 서로 다른 과목이
+    // 같은 sid를 갖고 있던 경우(과거 버그) 전부 같이 지워지는 사고가 날 수 있다. sid가
+    // 같아도 "과목코드+세부과목"까지 정확히 같은 것만 지우도록 이중으로 확인한다.
+    function _isSameSubject(x){
+      return x.sid===s.sid && x.subject===s.subject && _cbrNormalizeDetail(x.detail||'')===_cbrNormalizeDetail(s.detail||'');
+    }
+    var beforeCount=(cd.lastSubjects||[]).length;
+    cd.lastSubjects=(cd.lastSubjects||[]).filter(function(x){ return !_isSameSubject(x); });
     // ★ 과거 저장 회차(history)에도 같은 과목이 들어있으면 같이 지운다(안 지우면 "과거
     // 회차 불러오기"로 여전히 남아있는 것처럼 보일 수 있음).
     (cd.history||[]).forEach(function(h){
       ['subjects','fullSubjects'].forEach(function(k){
-        if(Array.isArray(h[k])) h[k]=h[k].filter(function(x){ return x.sid!==s.sid; });
+        if(Array.isArray(h[k])) h[k]=h[k].filter(function(x){ return !_isSameSubject(x); });
       });
     });
     if(FB_USE()){
       try{ await fbSave('students', cur.id, cur); }
       catch(e){ alert('삭제 중 오류가 발생했습니다: '+e.message); return; }
     }
-    toast('🗑 삭제되었습니다');
+    toast('🗑 '+label+'만 삭제되었습니다');
     window._sgOpenStudentAnswerView();
   };
   window._sgShowStudentAnswerDetail=function(idx){
@@ -39421,12 +39427,17 @@ function generateReport() {
     // ★ 2026-08-31 수정: 지금 보고 있는 회차가 "현재(lastSubjects)"가 아니라 과거 저장
     // 회차(history)일 수도 있으므로, 두 군데 모두에서 같은 sid를 찾아 교체한다(찾은 곳에만
     // 반영— 둘 다 있을 이유는 없지만 안전하게 둘 다 확인).
-    var real=(cd.lastSubjects||[]).find(function(x){ return x.sid===s.sid; });
+    // ★ 2026-08-31 수정: sid 충돌 가능성에 대비해 과목코드+세부과목까지 같이 확인해서
+    // 정확히 이 과목만 찾아 교체한다(삭제 기능과 동일한 이유).
+    function _isSameSubjectEdit(x){
+      return x.sid===s.sid && x.subject===s.subject && _cbrNormalizeDetail(x.detail||'')===_cbrNormalizeDetail(s.detail||'');
+    }
+    var real=(cd.lastSubjects||[]).find(_isSameSubjectEdit);
     if(real){ Object.assign(real, s); }
     (cd.history||[]).forEach(function(h){
       ['subjects','fullSubjects'].forEach(function(k){
         if(Array.isArray(h[k])){
-          var hReal=h[k].find(function(x){ return x.sid===s.sid; });
+          var hReal=h[k].find(_isSameSubjectEdit);
           if(hReal) Object.assign(hReal, s);
         }
       });
