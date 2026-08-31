@@ -1951,14 +1951,35 @@ function renderChallengerAnswerInput(){
       </div>
     </div></div>
     ${enabledSlots.map(x=>chgAnsSlotGridHtml(x)).join('')}
-    ${enabledSlots.length?`<button onclick="chgAnsGradeAndSave()" style="width:100%;padding:14px;background:#0f766e;color:#fff;border:none;border-radius:10px;font-size:14.5px;font-weight:700;margin:14px 0 30px;cursor:pointer">✅ 채점하고 저장하기</button>`:''}
+    ${enabledSlots.length?`<p style="font-size:11.5px;color:#e53935;text-align:center;font-weight:700;margin:14px 0 6px">⚠️ 답안 입력 후 저장하기를 누르면 답안 수정은 불가하오니 검토 후 입력바랍니다.</p>
+    <button onclick="chgAnsGradeAndSave()" style="width:100%;padding:14px;background:#0f766e;color:#fff;border:none;border-radius:10px;font-size:14.5px;font-weight:700;margin:0 0 30px;cursor:pointer">✅ 채점하고 저장하기</button>`:''}
   </div>`;
+}
+// ★ 2026-08-30 추가: 지금 선택된 시험(응시일+시험명)과 실제로 저장된 최신 회차가 같을 때만
+// "이미 제출한 과목"으로 취급한다(다른 회차의 과목을 여기 회차의 제출 내역으로 착각하지 않도록).
+function chgAnsLockedSubjectsForCurrentRound(){
+  const st=chgAnsInit(); const cd=chgInit();
+  if(!st.date||!st.test) return [];
+  if(String(cd.lastTestDate||'').trim()!==String(st.date).trim() || String(cd.lastTestName||'').trim()!==String(st.test).trim()) return [];
+  return (cd.lastSubjects||[]).filter(s=>s&&s._locked);
 }
 function chgAnsSlotToggleHtml(x){
   const st=chgAnsInit();
   const def=CHG_ANS_SUBJ_DEFS[x.code];
   const on=!!st.enabled[x.slot];
   const label = x.slot==='INQ1'?'탐구(제1선택)':x.slot==='INQ2'?'탐구(제2선택)':def.name;
+  // ★ KOR/MATH/ENG/HIST는 과목코드 하나뿐이라, 이미 제출(잠금)된 게 있으면 통째로 잠근다.
+  // 탐구는 세부과목을 골라야 알 수 있어 여기서는 잠그지 않고, 제출 시점에 따로 막는다.
+  const lockedMatch = (x.code!=='INQ') ? chgAnsLockedSubjectsForCurrentRound().find(s=>s.subject===x.code) : null;
+  if(lockedMatch){
+    return `<div style="border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:10px 12px;opacity:0.85">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:15px">🔒</span>
+        <span style="font-weight:700;font-size:13px;color:#475569">${label}</span>
+        <span style="font-size:11px;color:#94a3b8">— 이미 제출 완료 (점수 ${esc(lockedMatch.score)}, 오답 ${lockedMatch.wrongCount}개)</span>
+      </div>
+    </div>`;
+  }
   return `<div style="border:1px solid ${on?'#0f766e':'#e5e7eb'};background:${on?'#f0fdfa':'#fff'};border-radius:10px;padding:10px 12px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" ${on?'checked':''} onchange="chgAnsToggleSlot('${x.slot}')" style="width:18px;height:18px">
@@ -1970,6 +1991,8 @@ function chgAnsSlotToggleHtml(x){
         <option value="">세부과목 선택</option>
         ${def.details.map(d=>`<option value="${esc(d)}" ${st.detail[x.slot]===d?'selected':''}>${esc(d)}</option>`).join('')}
       </select>
+      ${x.code==='INQ' && st.detail[x.slot] && chgAnsLockedSubjectsForCurrentRound().some(s=>s.subject==='INQ'&&_cbrNormalizeDetail(s.detail||'')===_cbrNormalizeDetail(st.detail[x.slot]))
+        ? `<p style="font-size:11px;color:#e53935;margin-top:6px">⚠️ '${esc(st.detail[x.slot])}'은(는) 이 회차에 이미 제출된 과목입니다. 다른 과목을 선택해주세요.</p>` : ''}
     </div>`:''}
   </div>`;
 }
@@ -2011,10 +2034,19 @@ async function chgAnsGradeAndSave(){
     const def=CHG_ANS_SUBJ_DEFS[x.code];
     if(def.detailRequired && !st.detail[x.slot]){ toast((x.slot.indexOf('INQ')===0?'탐구':def.name)+'의 세부과목을 선택해주세요'); return; }
   }
+  // ★ 2026-08-30 추가: 탐구는 체크박스 자체를 잠그지 않으므로(세부과목을 골라야 알 수 있음),
+  // 제출 시점에 한 번 더 "이미 제출된 세부과목"인지 확인해서 중복 제출을 막는다.
+  const _lockedNow=chgAnsLockedSubjectsForCurrentRound();
+  for(const x of enabledSlots){
+    const detail=st.detail[x.slot]||'';
+    if(x.code==='INQ' && _lockedNow.some(s=>s.subject==='INQ'&&_cbrNormalizeDetail(s.detail||'')===_cbrNormalizeDetail(detail))){
+      toast('⚠️ \''+detail+'\'은(는) 이미 제출한 과목입니다.'); return;
+    }
+  }
+  // ★ 2026-08-30 추가: 제출 전 마지막 확인 — 제출 후에는 수정이 안 되므로 한 번 더 확인시킨다.
+  if(!confirm('제출하면 답안을 다시 수정할 수 없습니다.\n입력한 내용을 다시 한번 확인하셨나요?\n\n확인을 누르면 채점·저장이 진행됩니다.')) return;
   if(!FB()){ toast('서버에 연결되어 있지 않습니다'); return; }
   toast('채점 중입니다...', 4000);
-  // ★ 2026-08-30 수정: 시험명을 다시 입력받아 찾는 대신, 학생이 드롭다운에서 선택한
-  // 카탈로그 항목(catId)을 그대로 사용한다 — 표기 불일치로 못 찾는 경우가 원천적으로 없다.
   const examEntry=(_chgAnsCatalog||[]).find(e=>e.id===st.catId);
   if(!examEntry){ toast('⚠️ 선택된 시험 정보를 찾지 못했습니다. 시험을 다시 선택해주세요.'); return; }
   const newSubjects=[];
@@ -2026,7 +2058,8 @@ async function chgAnsGradeAndSave(){
     const akMap=(examEntry.answerKey&&(examEntry.answerKey[x.code+'|'+normDetail]||examEntry.answerKey[x.code+'|']))||{};
     const metaMap=(examEntry.itemMeta&&(examEntry.itemMeta[x.code+'|'+normDetail]||examEntry.itemMeta[x.code+'|']))||{};
     const items=[];
-    let correctCount=0, gotPoints=0, totalPoints=0;
+    const rawAnswers={}; // ★ 채점 결과와 별개로, 학생이 실제로 고른 답 전체(정답 문항 포함)를 그대로 보존
+    let gotPoints=0, totalPoints=0;
     for(let no=1;no<=def.count;no++){
       const ak=akMap[no]||{};
       const meta=metaMap[no]||{};
@@ -2034,37 +2067,65 @@ async function chgAnsGradeAndSave(){
       totalPoints+=points;
       const correctRaw=ak.answer||meta.answer||'';
       const myRaw=ans[no];
+      rawAnswers[no]=myRaw!=null?String(myRaw):'';
       const t=def.type(no);
       const isCorrect = t==='mc5'
         ? (correctRaw!=='' && _chgAnsNormMc(myRaw)===_chgAnsNormMc(correctRaw))
         : (correctRaw!=='' && String(myRaw==null?'':myRaw).trim()!=='' && String(myRaw).trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,''));
       if(!correctRaw){ continue; } // 카탈로그에 정답이 없는 문항은 채점 대상에서 제외
-      if(isCorrect){ correctCount++; gotPoints+=points; }
+      if(isCorrect){ gotPoints+=points; }
       else{
         items.push({no:String(no), unit:meta.unit||'', diff:meta.diff||'중', reasons:[], memo:'', causePrimary:'', guessedTime:!(String(myRaw||'').trim()),
           points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'', explanation:ak.explain||meta.explain||'', question:ak.question||''});
       }
     }
-    const label = x.slot==='INQ1'||x.slot==='INQ2' ? detail : def.name;
     newSubjects.push({
       sid:'s'+(newSubjects.length+1), subject:x.code, detail:detail,
       score: totalPoints? +(gotPoints).toFixed(1) : '',
       totalItemCount: def.count, wrongCount: items.length,
       items: items,
-      _studentSelfInput: true // ★ 학생이 직접 입력·채점한 회차임을 표시(참고용, 관리자 화면에서 구분 가능)
+      studentAnswers: rawAnswers, // ★ 문항별 원본 답안(정답/오답 상관없이 전체) — 관리자·본인 확인용
+      _studentSelfInput: true, // 학생이 직접 입력·채점한 과목임을 표시
+      _locked: true // ★ 2026-08-30 추가: 제출 후에는 학생이 다시 수정할 수 없도록 잠금
     });
   }
-  // 2) 기존 lastSubjects 중 이번에 입력 안 한 과목(다른 과목)은 그대로 두고, 이번에 입력한
-  //    과목만 교체한다(같은 과목코드+세부과목이면 덮어쓰기, 아니면 새로 추가) — 정규화 비교.
+  // ★ 2026-08-30 수정: "같은 회차(응시일+시험명)에 과목만 추가"와 "완전히 다른 회차"를
+  // 구분한다. 예전엔 이 구분 없이 기존 lastSubjects를 무조건 그대로 들고 와 병합해서,
+  // 전혀 다른 시험(예: 8/29 국어·수학)의 과목이 이번 시험(8/30 영어)에 섞여 들어가는
+  // 심각한 버그가 있었다. 관리자 결과일괄반영과 동일한 규칙을 그대로 적용한다:
+  // - 같은 회차면: 그 회차 안에서 과목만 교체/추가
+  // - 다른 회차면: 기존 회차는 먼저 history로 보관하고, 이번 회차는 새로 시작
+  //   (단, 이번 회차 날짜가 기존 lastTestDate보다 더 예전이면 화면 표시는 건드리지 않고
+  //   이번 회차만 history에 저장 — 관리자 쪽 "과거 회차 뒤늦게 입력" 규칙과 동일)
   const cd=chgInit();
-  const kept=(cd.lastSubjects||[]).filter(function(old){
-    return !newSubjects.some(function(ns){ return ns.subject===old.subject && _cbrNormalizeDetail(ns.detail||'')===_cbrNormalizeDetail(old.detail||''); });
-  });
-  cd.lastSubjects = kept.concat(newSubjects);
-  cd.lastTestDate = st.date;
-  cd.lastTestName = st.test;
-  const ok = await chgArchiveRound(st.date, st.test, cd.lastSubjects);
-  if(!ok){ toast('저장 중 오류가 발생했습니다'); return; }
+  const sameRound = String(cd.lastTestDate||'').trim()===String(st.date).trim() && String(cd.lastTestName||'').trim()===String(st.test).trim();
+  if(sameRound){
+    const kept=(cd.lastSubjects||[]).filter(function(old){
+      return !newSubjects.some(function(ns){ return ns.subject===old.subject && _cbrNormalizeDetail(ns.detail||'')===_cbrNormalizeDetail(old.detail||''); });
+    });
+    cd.lastSubjects = kept.concat(newSubjects);
+    cd.lastTestDate = st.date;
+    cd.lastTestName = st.test;
+    const ok = await chgArchiveRound(st.date, st.test, cd.lastSubjects);
+    if(!ok){ toast('저장 중 오류가 발생했습니다'); return; }
+  } else {
+    const newIsOlder = cd.lastTestDate && String(st.date).trim() < String(cd.lastTestDate).trim();
+    if(newIsOlder){
+      // 기존(더 최근) 회차는 화면에 그대로 두고, 이번(더 예전) 회차는 history에만 저장
+      const ok = await chgArchiveRound(st.date, st.test, newSubjects);
+      if(!ok){ toast('저장 중 오류가 발생했습니다'); return; }
+    } else {
+      // 기존 회차가 있었다면 먼저 보관함으로 옮겨두고(유실 방지), 이번 회차로 화면을 교체
+      if(cd.lastTestDate && (cd.lastSubjects||[]).length){
+        await chgArchiveRound(cd.lastTestDate, cd.lastTestName, cd.lastSubjects);
+      }
+      cd.lastSubjects = newSubjects;
+      cd.lastTestDate = st.date;
+      cd.lastTestName = st.test;
+      const ok = await chgArchiveRound(st.date, st.test, cd.lastSubjects);
+      if(!ok){ toast('저장 중 오류가 발생했습니다'); return; }
+    }
+  }
   chgScheduleSave();
   const totalWrong=newSubjects.reduce((a,s)=>a+s.wrongCount,0);
   toast('✅ 채점 완료! 총 '+totalWrong+'문항 오답 · 결과가 저장됐습니다', 3500);
