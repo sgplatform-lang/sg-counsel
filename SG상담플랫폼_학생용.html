@@ -191,7 +191,7 @@ function getWeekOfMonth(year, month, day){
 function fmtGrade(val){if(!val&&val!==0)return null;if(typeof val==='object')return val.grade??null;return +val;}
 function fmtGradeRaw(val){if(!val||typeof val!=='object')return null;return val.raw??null;}
 function fmtGradeDisplay(val){const g=fmtGrade(val);const r=fmtGradeRaw(val);if(!g&&!r)return'–';let s=g?String(g):'';if(r)s+=(s?'<br>':'')+`<small style="font-size:9px;color:#888">${r}점</small>`;return s||'–';}
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function gc(v){return v<=1.5?'#3b82f6':v<=2.5?'#10b981':v<=3.5?'#f59e0b':'#ef4444';}
 function pc(p){return p>=80?'#0f9d58':p>=60?'#f59e0b':'#e53935';}
 function pbg(p){return p>=80?'#f0fdf4':p>=60?'#fffbeb':'#fff5f5';}
@@ -2009,7 +2009,7 @@ function chgAnsSubmittedListHtml(){
       return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-top:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="chgAnsToggleDetail('${esc(key)}')">
           <span style="font-size:12.5px;font-weight:700">✅ ${esc(label)}</span>
-          <span style="font-size:11px;color:#666">점수 ${esc(s.score)} · 오답 ${s.wrongCount}개 · ${ansCount}/${s.totalItemCount||'-'}문항 <span style="color:#0f766e">${opened?'▲ 접기':'▶ 상세보기'}</span></span>
+          <span style="font-size:11px;color:#666">점수 ${esc(String(s.score!=null?s.score:''))} · 오답 ${s.wrongCount}개 · ${ansCount}/${s.totalItemCount||'-'}문항 <span style="color:#0f766e">${opened?'▲ 접기':'▶ 상세보기'}</span></span>
         </div>
         ${opened?chgAnsDetailGridHtml(s):''}
       </div>`;
@@ -2058,7 +2058,7 @@ function chgAnsSlotToggleHtml(x){
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:15px">🔒</span>
         <span style="font-weight:700;font-size:13px;color:#475569">${label}</span>
-        <span style="font-size:11px;color:#94a3b8">— 이미 제출 완료 (점수 ${esc(lockedMatch.score)}, 오답 ${lockedMatch.wrongCount}개)</span>
+        <span style="font-size:11px;color:#94a3b8">— 이미 제출 완료 (점수 ${esc(String(lockedMatch.score!=null?lockedMatch.score:''))}, 오답 ${lockedMatch.wrongCount}개)</span>
       </div>
     </div>`;
   }
