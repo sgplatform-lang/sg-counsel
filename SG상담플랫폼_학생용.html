@@ -359,7 +359,7 @@ function render(){
     ${renderHdr()}
     <div class="content" id="content">
       <div class="inner">
-        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='inspect'?renderPlanInspect():renderInfo()}
+        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?renderPlanInspect():renderInfo()}
       </div>
     </div>
     ${renderTabbar()}`;
@@ -445,7 +445,7 @@ function renderHdr(){
 }
 
 function renderTabbar(){
-  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}];
+  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'},{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}];
   return`<div class="tabbar">${tabs.map(t=>`<button class="tb-item ${curTab===t.id?'act':''}" onclick="curTab='${t.id}';render()">
     <span class="tb-icon">${t.icon}</span><span>${t.label}</span>
   </button>`).join('')}</div>`;
@@ -1840,6 +1840,237 @@ function chgGenerateAarMemo(sIdx){
   render();
   chgScheduleSave();
   toast('✅ 입력이 완료됐습니다!');
+}
+
+
+// ============================================================
+// ★ 2026-08-30 추가: "챌린저 답안" 탭 — 학생이 문항별로 실제 고른 답을 입력하면
+// 시험 카탈로그(examCatalog)의 정답과 자동으로 대조해 채점하고, 관리자 챌린저와
+// 완전히 동일한 형태(challengerData.lastSubjects/history)로 저장한다. 이 형태로
+// 저장되므로, 저장 즉시 관리자 화면의 상담리포트·오답노트에 그대로 반영된다.
+// ============================================================
+const CHG_ANS_SUBJ_DEFS = {
+  KOR: {name:'국어', count:45, details:['화법과 작문','언어와 매체'], detailRequired:true,
+    type:function(no){ return 'mc5'; }},
+  MATH: {name:'수학', count:30, details:['확률과 통계','미적분','기하'], detailRequired:true,
+    // 공통 1~15(객관식)·16~22(단답형), 선택 23~28(객관식)·29~30(단답형) — 표준 수능 구성 기준
+    type:function(no){ no=+no; return ((no>=1&&no<=15)||(no>=23&&no<=28)) ? 'mc5' : 'short'; }},
+  ENG: {name:'영어', count:45, details:[], detailRequired:false, type:function(){return 'mc5';}},
+  HIST:{name:'한국사', count:20, details:[], detailRequired:false, type:function(){return 'mc5';}},
+  INQ: {name:'탐구', count:20, detailRequired:true,
+    details:['사회문화','윤리와 사상','생활과 윤리','경제','정치와 법','한국지리','세계지리','세계사','동아시아사',
+      '물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ','물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ'],
+    type:function(){return 'mc5';}}
+};
+// 탐구는 제1선택/제2선택 두 슬롯을 각각 독립된 "가짜 과목코드"로 다룬다(관리자 쪽
+// "탐구(제1선택)"/"탐구(제2선택)" 표시 방식과 맞추기 위함). 실제 저장 시 subject는 'INQ'로,
+// slot 구분은 화면 입력에서만 쓰고 detail(세부과목)로 실제 과목이 구분된다.
+const CHG_ANS_SLOTS = [
+  {slot:'KOR', code:'KOR'}, {slot:'MATH', code:'MATH'}, {slot:'ENG', code:'ENG'}, {slot:'HIST', code:'HIST'},
+  {slot:'INQ1', code:'INQ'}, {slot:'INQ2', code:'INQ'}
+];
+let _chgAnsState = null;
+let _chgAnsCatalog = null; // ★ 2026-08-30 추가: 시험 카탈로그 목록(관리자가 등록한 응시일+시험명) 캐시
+function chgAnsInit(){
+  if(_chgAnsState) return _chgAnsState;
+  _chgAnsState = { date:'', test:'', catId:'', enabled:{}, detail:{}, answers:{} }; // answers[slot] = {no:value}
+  return _chgAnsState;
+}
+async function chgAnsLoadCatalog(){
+  if(_chgAnsCatalog) return _chgAnsCatalog;
+  if(!FB()) return [];
+  try{ _chgAnsCatalog = await window._fb.getAll('examCatalog'); }
+  catch(e){ console.warn('시험 카탈로그 로딩 실패:', e.message); _chgAnsCatalog=[]; }
+  return _chgAnsCatalog;
+}
+// ★ 2026-08-30 추가: 응시일/시험명을 학생이 직접 타이핑하면 관리자 카탈로그의 표기와
+// 한 글자라도 다를 때 자동채점이 조용히 실패했다(정답을 못 찾음). 이제 학생은 관리자가
+// 등록해 둔 시험 목록에서 "선택"만 하고, 응시일·시험명 값은 카탈로그에서 그대로 가져와
+// 화면엔 읽기 전용으로만 보여준다 — 표기가 어긋날 수가 없는 구조로 바꿨다.
+function chgAnsSelectCatalog(catId){
+  const st=chgAnsInit();
+  const entry=(_chgAnsCatalog||[]).find(e=>e.id===catId);
+  st.catId=catId;
+  st.date=entry?(entry.defaultDate||''):'';
+  st.test=entry?(entry.examName||''):'';
+  render();
+}
+function chgAnsToggleSlot(slot){
+  const st=chgAnsInit();
+  st.enabled[slot]=!st.enabled[slot];
+  if(st.enabled[slot] && !st.answers[slot]) st.answers[slot]={};
+  render();
+}
+function chgAnsSetDetail(slot,val){ chgAnsInit().detail[slot]=val; render(); }
+function chgAnsSetAnswer(slot,no,val){
+  const st=chgAnsInit();
+  if(!st.answers[slot]) st.answers[slot]={};
+  st.answers[slot][no]=val;
+  // 라디오 선택은 렌더를 다시 안 해도 되지만(성능), 진행률 표시를 위해 가볍게 갱신
+  const el=document.getElementById('chgans-progress-'+slot);
+  if(el){
+    const def=CHG_ANS_SUBJ_DEFS[CHG_ANS_SLOTS.find(x=>x.slot===slot).code];
+    const filled=Object.keys(st.answers[slot]).filter(k=>String(st.answers[slot][k]||'').trim()).length;
+    el.textContent=filled+' / '+def.count+'문항 입력됨';
+  }
+}
+// ★ 정답 표기(①~⑤, 1~5, ①-⑤ 등)를 숫자 1~5로 정규화해 채점 시 안전하게 비교
+function _chgAnsNormMc(v){
+  var s=String(v==null?'':v).trim();
+  var map={'①':'1','②':'2','③':'3','④':'4','⑤':'5'};
+  if(map[s]) return map[s];
+  var m=s.match(/^[①-⑤]/); if(m) return map[m[0]];
+  var n=s.replace(/[^\d]/g,'');
+  return n||s;
+}
+function renderChallengerAnswerInput(){
+  const st=chgAnsInit();
+  if(_chgAnsCatalog===null){
+    chgAnsLoadCatalog().then(function(){ if(curTab==='challengeranswer') render(); });
+    return `<div><div class="stitle">🖊️ 챌린저 답안 입력</div>
+      <div class="card"><div class="card-body" style="text-align:center;padding:30px;color:#999;font-size:13px">시험 목록을 불러오는 중입니다...</div></div>
+    </div>`;
+  }
+  const catalogList=(_chgAnsCatalog||[]).slice().sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
+  const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot]);
+  return `<div>
+    <div class="stitle">🖊️ 챌린저 답안 입력</div>
+    <p style="font-size:11.5px;color:#888;margin:-6px 0 12px">문항별로 실제 고른 답을 입력하고 채점하면, 결과가 자동으로 챌린저·오답노트에 반영됩니다.</p>
+    <div class="card"><div class="card-body">
+      <label style="font-size:11px;color:#666">시험 선택</label>
+      <select onchange="chgAnsSelectCatalog(this.value)" style="width:100%;padding:9px 8px;border:1px solid #ddd;border-radius:8px;font-size:13.5px;margin-top:4px">
+        <option value="">-- 시험을 선택해주세요 --</option>
+        ${catalogList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.defaultDate||'날짜 미지정')} · ${esc(e.examName||'(이름 없음)')}</option>`).join('')}
+      </select>
+      ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}
+      ${st.date&&st.test?`<div style="margin-top:10px;padding:9px 12px;background:#f0fdfa;border-radius:8px;font-size:12.5px;color:#0f766e"><b>${esc(st.date)}</b> · ${esc(st.test)}</div>`:''}
+      <p style="font-size:10.5px;color:#aaa;margin:8px 0 0">※ 응시일·시험명은 선생님이 등록한 정보 그대로 자동으로 채워지며, 직접 수정할 수 없습니다.</p>
+      <div style="font-size:12.5px;font-weight:700;margin:14px 0 6px">응시 과목 선택</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${CHG_ANS_SLOTS.map(x=>chgAnsSlotToggleHtml(x)).join('')}
+      </div>
+    </div></div>
+    ${enabledSlots.map(x=>chgAnsSlotGridHtml(x)).join('')}
+    ${enabledSlots.length?`<button onclick="chgAnsGradeAndSave()" style="width:100%;padding:14px;background:#0f766e;color:#fff;border:none;border-radius:10px;font-size:14.5px;font-weight:700;margin:14px 0 30px;cursor:pointer">✅ 채점하고 저장하기</button>`:''}
+  </div>`;
+}
+function chgAnsSlotToggleHtml(x){
+  const st=chgAnsInit();
+  const def=CHG_ANS_SUBJ_DEFS[x.code];
+  const on=!!st.enabled[x.slot];
+  const label = x.slot==='INQ1'?'탐구(제1선택)':x.slot==='INQ2'?'탐구(제2선택)':def.name;
+  return `<div style="border:1px solid ${on?'#0f766e':'#e5e7eb'};background:${on?'#f0fdfa':'#fff'};border-radius:10px;padding:10px 12px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" ${on?'checked':''} onchange="chgAnsToggleSlot('${x.slot}')" style="width:18px;height:18px">
+      <span style="font-weight:700;font-size:13px">${label}</span>
+      <span style="font-size:11px;color:#999">(${def.count}문항)</span>
+    </label>
+    ${on&&def.detailRequired?`<div style="margin-top:8px">
+      <select onchange="chgAnsSetDetail('${x.slot}',this.value)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:13px">
+        <option value="">세부과목 선택</option>
+        ${def.details.map(d=>`<option value="${esc(d)}" ${st.detail[x.slot]===d?'selected':''}>${esc(d)}</option>`).join('')}
+      </select>
+    </div>`:''}
+  </div>`;
+}
+function chgAnsSlotGridHtml(x){
+  const st=chgAnsInit();
+  const def=CHG_ANS_SUBJ_DEFS[x.code];
+  const label = x.slot==='INQ1'?'탐구(제1선택)':x.slot==='INQ2'?'탐구(제2선택)':def.name;
+  const detailLabel = st.detail[x.slot]?` · ${esc(st.detail[x.slot])}`:'';
+  const ans=st.answers[x.slot]||{};
+  const filled=Object.keys(ans).filter(k=>String(ans[k]||'').trim()).length;
+  const cells=[];
+  for(let no=1;no<=def.count;no++){
+    const t=def.type(no);
+    const v=ans[no]!=null?ans[no]:'';
+    cells.push(`<div style="display:flex;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid #f1f5f9">
+      <span style="width:26px;text-align:center;font-size:11.5px;font-weight:700;color:#555">${no}</span>
+      ${t==='mc5'
+        ? `<div style="display:flex;gap:4px;flex:1">${[1,2,3,4,5].map(function(n){
+            return `<button type="button" onclick="chgAnsSetAnswer('${x.slot}','${no}','${n}');this.parentElement.querySelectorAll('button').forEach(b=>{b.style.background='#fff';b.style.color='#333'});this.style.background='#0f766e';this.style.color='#fff'" style="flex:1;padding:7px 0;border:1px solid #ddd;border-radius:6px;font-size:12.5px;cursor:pointer;background:${String(v)===String(n)?'#0f766e':'#fff'};color:${String(v)===String(n)?'#fff':'#333'}">${n}</button>`;
+          }).join('')}</div>`
+        : `<input type="text" value="${esc(v)}" placeholder="답 입력(단답형)" onchange="chgAnsSetAnswer('${x.slot}','${no}',this.value)" style="flex:1;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:12.5px">`
+      }
+    </div>`);
+  }
+  return `<div class="card" style="margin-top:10px"><div class="card-body">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-weight:700;font-size:13px">${label}${detailLabel}</div>
+      <div id="chgans-progress-${x.slot}" style="font-size:11px;color:#888">${filled} / ${def.count}문항 입력됨</div>
+    </div>
+    <div>${cells.join('')}</div>
+  </div></div>`;
+}
+async function chgAnsGradeAndSave(){
+  const st=chgAnsInit();
+  if(!st.date||!st.test){ toast('시험을 먼저 선택해주세요'); return; }
+  const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot]);
+  if(!enabledSlots.length){ toast('과목을 최소 1개 선택해주세요'); return; }
+  for(const x of enabledSlots){
+    const def=CHG_ANS_SUBJ_DEFS[x.code];
+    if(def.detailRequired && !st.detail[x.slot]){ toast((x.slot.indexOf('INQ')===0?'탐구':def.name)+'의 세부과목을 선택해주세요'); return; }
+  }
+  if(!FB()){ toast('서버에 연결되어 있지 않습니다'); return; }
+  toast('채점 중입니다...', 4000);
+  // ★ 2026-08-30 수정: 시험명을 다시 입력받아 찾는 대신, 학생이 드롭다운에서 선택한
+  // 카탈로그 항목(catId)을 그대로 사용한다 — 표기 불일치로 못 찾는 경우가 원천적으로 없다.
+  const examEntry=(_chgAnsCatalog||[]).find(e=>e.id===st.catId);
+  if(!examEntry){ toast('⚠️ 선택된 시험 정보를 찾지 못했습니다. 시험을 다시 선택해주세요.'); return; }
+  const newSubjects=[];
+  for(const x of enabledSlots){
+    const def=CHG_ANS_SUBJ_DEFS[x.code];
+    const detail=st.detail[x.slot]||'';
+    const normDetail=_cbrNormalizeDetail(detail);
+    const ans=st.answers[x.slot]||{};
+    const akMap=(examEntry.answerKey&&(examEntry.answerKey[x.code+'|'+normDetail]||examEntry.answerKey[x.code+'|']))||{};
+    const metaMap=(examEntry.itemMeta&&(examEntry.itemMeta[x.code+'|'+normDetail]||examEntry.itemMeta[x.code+'|']))||{};
+    const items=[];
+    let correctCount=0, gotPoints=0, totalPoints=0;
+    for(let no=1;no<=def.count;no++){
+      const ak=akMap[no]||{};
+      const meta=metaMap[no]||{};
+      const points=(+ak.points)||(+meta.points)||(100/def.count);
+      totalPoints+=points;
+      const correctRaw=ak.answer||meta.answer||'';
+      const myRaw=ans[no];
+      const t=def.type(no);
+      const isCorrect = t==='mc5'
+        ? (correctRaw!=='' && _chgAnsNormMc(myRaw)===_chgAnsNormMc(correctRaw))
+        : (correctRaw!=='' && String(myRaw==null?'':myRaw).trim()!=='' && String(myRaw).trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,''));
+      if(!correctRaw){ continue; } // 카탈로그에 정답이 없는 문항은 채점 대상에서 제외
+      if(isCorrect){ correctCount++; gotPoints+=points; }
+      else{
+        items.push({no:String(no), unit:meta.unit||'', diff:meta.diff||'중', reasons:[], memo:'', causePrimary:'', guessedTime:!(String(myRaw||'').trim()),
+          points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'', explanation:ak.explain||meta.explain||'', question:ak.question||''});
+      }
+    }
+    const label = x.slot==='INQ1'||x.slot==='INQ2' ? detail : def.name;
+    newSubjects.push({
+      sid:'s'+(newSubjects.length+1), subject:x.code, detail:detail,
+      score: totalPoints? +(gotPoints).toFixed(1) : '',
+      totalItemCount: def.count, wrongCount: items.length,
+      items: items,
+      _studentSelfInput: true // ★ 학생이 직접 입력·채점한 회차임을 표시(참고용, 관리자 화면에서 구분 가능)
+    });
+  }
+  // 2) 기존 lastSubjects 중 이번에 입력 안 한 과목(다른 과목)은 그대로 두고, 이번에 입력한
+  //    과목만 교체한다(같은 과목코드+세부과목이면 덮어쓰기, 아니면 새로 추가) — 정규화 비교.
+  const cd=chgInit();
+  const kept=(cd.lastSubjects||[]).filter(function(old){
+    return !newSubjects.some(function(ns){ return ns.subject===old.subject && _cbrNormalizeDetail(ns.detail||'')===_cbrNormalizeDetail(old.detail||''); });
+  });
+  cd.lastSubjects = kept.concat(newSubjects);
+  cd.lastTestDate = st.date;
+  cd.lastTestName = st.test;
+  const ok = await chgArchiveRound(st.date, st.test, cd.lastSubjects);
+  if(!ok){ toast('저장 중 오류가 발생했습니다'); return; }
+  chgScheduleSave();
+  const totalWrong=newSubjects.reduce((a,s)=>a+s.wrongCount,0);
+  toast('✅ 채점 완료! 총 '+totalWrong+'문항 오답 · 결과가 저장됐습니다', 3500);
+  _chgAnsState=null; // 다음 회차를 위해 입력 상태 초기화
+  curTab='challenger';
+  render();
 }
 
 function renderChallengerInput(){
