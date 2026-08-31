@@ -39246,6 +39246,137 @@ function generateReport() {
     }
   };
 
+  // ★ 2026-08-30 추가: 학생이 "챌린저 답안" 페이지(학생용)에서 문항별로 직접 입력·채점한
+  // 결과를 관리자가 과목별로 한눈에 확인할 수 있는 화면. 실제 챌린저 입력 화면(iframe,
+  // 별도 파일)은 건드리지 않고, 바깥(이 파일)에서 학생 데이터(ST.students)를 직접 읽어
+  // 별도 모달로 보여준다 — 데이터 원본은 챌린저 iframe과 완전히 동일한 challengerData이므로
+  // 서로 어긋날 일이 없다.
+  var _SG_ANS_SLOT_DEFS=[
+    {label:'국어', match:function(s){return s.subject==='KOR';}},
+    {label:'수학', match:function(s){return s.subject==='MATH';}},
+    {label:'영어', match:function(s){return s.subject==='ENG';}},
+    {label:'한국사', match:function(s){return s.subject==='HIST';}},
+    {label:'탐구', match:function(s){return s.subject==='INQ';}}
+  ];
+  window._sgOpenStudentAnswerView=function(){
+    var cur=ST.sel||ST.adminSel;
+    if(!cur){ alert('먼저 학생을 선택해주세요.'); return; }
+    var cd=cur.challengerData||{};
+    var subs=(cd.lastSubjects||[]).filter(function(s){ return s && s._studentSelfInput; });
+    var overlay=document.getElementById('sg-ansview-overlay');
+    if(!overlay){
+      overlay=document.createElement('div');
+      overlay.id='sg-ansview-overlay';
+      overlay.style.cssText='display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;align-items:center;justify-content:center;padding:16px';
+      overlay.innerHTML='<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow:auto;padding:20px 22px" id="sg-ansview-body"></div>';
+      overlay.onclick=function(e){ if(e.target===overlay) overlay.style.display='none'; };
+      document.body.appendChild(overlay);
+    }
+    var body=document.getElementById('sg-ansview-body');
+    function esc2(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+    if(!subs.length){
+      body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b style="font-size:15px">🖊️ '+esc2(cur.name||'')+' 학생 답안</b><button onclick="document.getElementById(\'sg-ansview-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 닫기</button></div>'
+        +'<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 학생이 "챌린저 답안" 페이지에서 직접 제출한 과목이 아직 없습니다.</div>';
+    } else {
+      var rows=subs.map(function(s,idx){
+        var label=(s.subject==='INQ'?'탐구':(s.subject==='KOR'?'국어':s.subject==='MATH'?'수학':s.subject==='ENG'?'영어':s.subject==='HIST'?'한국사':s.subject))+(s.detail?'('+s.detail+')':'');
+        var ansCount=s.studentAnswers?Object.keys(s.studentAnswers).filter(function(k){return String(s.studentAnswers[k]||'').trim();}).length:0;
+        return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="window._sgShowStudentAnswerDetail(\''+idx+'\')">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<span style="font-weight:700;font-size:13.5px">✅ '+esc2(label)+'</span>'
+          +'<span style="font-size:11.5px;color:#666">점수 '+esc2(s.score)+' · 오답 '+s.wrongCount+'개 · 답안입력 '+ansCount+'/'+(s.totalItemCount||'-')+'문항 <span style="color:#0f766e">▶ 상세보기</span></span>'
+          +'</div></div>';
+      }).join('');
+      body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:15px">🖊️ '+esc2(cur.name||'')+' 학생 답안</b><button onclick="document.getElementById(\'sg-ansview-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 닫기</button></div>'
+        +'<div style="font-size:11.5px;color:#888;margin-bottom:12px">'+esc2(cd.lastTestDate||'')+' · '+esc2(cd.lastTestName||'')+' — 학생이 직접 제출한 과목만 표시됩니다(✅). 클릭하면 문항별 답안을 볼 수 있습니다.</div>'
+        +rows+'<div id="sg-ansview-detail" style="margin-top:14px"></div>';
+    }
+    window._sgAnsViewSubs=subs; // 상세보기에서 참조
+    overlay.style.display='flex';
+  };
+  window._sgShowStudentAnswerDetail=function(idx){
+    var s=(window._sgAnsViewSubs||[])[idx];
+    var det=document.getElementById('sg-ansview-detail');
+    if(!s||!det) return;
+    function esc2(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+    var wrongMap={}; (s.items||[]).forEach(function(it){ wrongMap[it.no]=it; });
+    var total=s.totalItemCount||Object.keys(s.studentAnswers||{}).length;
+    var cells=[];
+    for(var no=1;no<=total;no++){
+      var my=(s.studentAnswers||{})[no];
+      var w=wrongMap[no];
+      var isWrong=!!w;
+      // ★ 2026-08-30 추가: 관리자는 학생이 입력한 답을 직접 고칠 수 있어야 한다(학생은 제출
+      // 후 수정이 막혀 있으므로, 오입력 등을 바로잡을 방법이 관리자 쪽에만 남아있어야 함).
+      cells.push('<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;background:'+(isWrong?'#fff5f5':'#fff')+'">'
+        +'<span style="width:24px;font-weight:700;color:#555">'+no+'</span>'
+        +'<span style="display:flex;align-items:center;gap:5px;flex:1">학생 답: <input type="text" value="'+esc2(my||'')+'" id="sg-ansedit-'+no+'" style="width:70px;padding:3px 6px;border:1px solid #ccc;border-radius:5px;font-size:12px"></span>'
+        +(isWrong?'<span style="color:#e53935">정답: '+esc2(w.answer)+' (오답)</span>':'<span style="color:#16a34a">정답</span>')
+        +'</div>');
+    }
+    det.innerHTML='<div style="border-top:2px solid #0f766e;padding-top:10px"><b style="font-size:13px">문항별 답안 (관리자가 직접 수정할 수 있습니다)</b>'
+      +'<div style="max-height:320px;overflow:auto;margin-top:6px;border:1px solid #e2e8f0;border-radius:8px">'+cells.join('')+'</div>'
+      +'<button onclick="window._sgSaveEditedAnswers(\''+idx+'\')" style="margin-top:10px;width:100%;padding:10px;background:#0369a1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 수정 저장(재채점)</button>'
+      +'</div>';
+  };
+  window._sgSaveEditedAnswers=async function(idx){
+    var s=(window._sgAnsViewSubs||[])[idx];
+    var cur=ST.sel||ST.adminSel;
+    if(!s||!cur){ alert('오류: 학생 정보를 찾을 수 없습니다.'); return; }
+    var cd=cur.challengerData||{};
+    var total=s.totalItemCount||Object.keys(s.studentAnswers||{}).length;
+    var newAnswers={};
+    for(var no=1;no<=total;no++){
+      var el=document.getElementById('sg-ansedit-'+no);
+      if(el) newAnswers[no]=el.value;
+    }
+    // ★ 재채점을 위해 카탈로그(정답/해설/단원)를 다시 조회한다 — 이미 열려있으면 캐시 재사용.
+    await _ensureExamCatalogLoaded();
+    var examEntry=(ST.examCatalog||[]).find(function(e){ return String(e.examName||'').trim()===String(cd.lastTestName||'').trim(); });
+    if(!examEntry){ alert('⚠️ 이 시험의 카탈로그를 찾지 못해 재채점할 수 없습니다. 시험 카탈로그가 등록되어 있는지 확인해주세요.'); return; }
+    var normDetail=_cbrNormalizeDetail(s.detail||'');
+    var akMap=(examEntry.answerKey&&(examEntry.answerKey[s.subject+'|'+normDetail]||examEntry.answerKey[s.subject+'|']))||{};
+    var metaMap=(examEntry.itemMeta&&(examEntry.itemMeta[s.subject+'|'+normDetail]||examEntry.itemMeta[s.subject+'|']))||{};
+    var items=[]; var gotPoints=0, totalPoints=0;
+    for(var no2=1;no2<=total;no2++){
+      var ak=akMap[no2]||{}; var meta=metaMap[no2]||{};
+      var points=(+ak.points)||(+meta.points)||(100/total);
+      totalPoints+=points;
+      var correctRaw=ak.answer||meta.answer||'';
+      var myRaw=newAnswers[no2];
+      if(!correctRaw) continue;
+      // 5지선다/단답형 구분 없이, 정답 표기(①~⑤ 등)까지 정규화해서 비교(학생용 채점 로직과 동일 규칙)
+      var mcMap={'①':'1','②':'2','③':'3','④':'4','⑤':'5'};
+      function normMc(v){ var t=String(v==null?'':v).trim(); if(mcMap[t])return mcMap[t]; var mm=t.match(/^[①-⑤]/); if(mm)return mcMap[mm[0]]; var n=t.replace(/[^\d]/g,''); return n||t; }
+      var isMcLike=/^[①-⑤1-5]$/.test(String(correctRaw).trim());
+      var isCorrect=isMcLike
+        ? normMc(myRaw)===normMc(correctRaw)
+        : (String(myRaw||'').trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,'') && String(myRaw||'').trim()!=='');
+      if(isCorrect){ gotPoints+=points; }
+      else{
+        items.push({no:String(no2), unit:meta.unit||'', diff:meta.diff||'중', reasons:(function(){ var prevIt=(s.items||[]).find(function(x){return String(x.no)===String(no2);}); return prevIt?prevIt.reasons||[]:[]; })(),
+          memo:(function(){ var prevIt=(s.items||[]).find(function(x){return String(x.no)===String(no2);}); return prevIt?prevIt.memo||'':''; })(),
+          causePrimary:(function(){ var prevIt=(s.items||[]).find(function(x){return String(x.no)===String(no2);}); return prevIt?prevIt.causePrimary||'':''; })(),
+          guessedTime:!(String(myRaw||'').trim()), points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'',
+          explanation:ak.explain||meta.explain||'', question:ak.question||''});
+      }
+    }
+    s.score = totalPoints? +(gotPoints).toFixed(1) : '';
+    s.wrongCount = items.length;
+    s.items = items;
+    s.studentAnswers = newAnswers;
+    s._editedByAdmin = true; // ★ 관리자가 수정했음을 표시(참고용)
+    // cd.lastSubjects 안의 실제 항목을 같은 sid로 찾아 교체
+    var real=(cd.lastSubjects||[]).find(function(x){ return x.sid===s.sid; });
+    if(real){ Object.assign(real, s); }
+    if(FB_USE()){
+      try{ await fbSave('students', cur.id, cur); }
+      catch(e){ alert('저장 중 오류가 발생했습니다: '+e.message); return; }
+    }
+    alert('✅ 재채점 및 저장이 완료됐습니다.\n오답 '+items.length+'개 · 점수 '+s.score);
+    window._sgOpenStudentAnswerView();
+  };
+
   function _injectBatchButton(){
     var ifr=document.getElementById('challenger-iframe');
     if(!ifr||!ifr.contentDocument) return;
@@ -39274,6 +39405,17 @@ function generateReport() {
       b2.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
       b2.onclick=function(){window._gg_printExamStats();};
       nav.appendChild(b2);
+    }
+    if(!d.getElementById('sg-student-answer-view')){
+      var b2b=d.createElement('button');
+      b2b.id='sg-student-answer-view';
+      b2b.className='tab';
+      b2b.type='button';
+      b2b.textContent='🖊️ 학생답안';
+      b2b.title='학생이 "챌린저 답안" 페이지에서 직접 입력·제출한 답안을 과목별로 확인합니다';
+      b2b.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
+      b2b.onclick=function(){window._sgOpenStudentAnswerView();};
+      nav.appendChild(b2b);
     }
     if(!d.getElementById('sg-wrong-notes-print')){
       var b3=d.createElement('button');
