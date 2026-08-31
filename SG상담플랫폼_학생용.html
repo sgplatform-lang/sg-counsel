@@ -414,6 +414,14 @@ async function doLogin(){
   if(err)err.textContent='⏳ 로그인 중...';
   try{
     const students=await fbAll('students');
+    // ★ 2026-08-31 추가: 예전엔 네트워크 지연으로 학생 목록을 아예 못 불러와도(빈 배열)
+    // "아이디/비밀번호가 틀렸다"는 잘못된 메시지가 떴다 — 실제로는 서버 응답 지연이었는데
+    // 마치 계정 정보가 틀린 것처럼 보여 혼란을 줬다. 목록 자체가 비어 있으면(=진짜로 학생이
+    // 0명일 리는 없으므로) 네트워크 문제로 보고 정확한 메시지 + 재시도 버튼을 보여준다.
+    if(!students.length){
+      if(err)err.innerHTML='⚠️ 서버 응답이 늦어 학생 목록을 불러오지 못했습니다.<br>인터넷 연결을 확인한 뒤 다시 시도해주세요.<br><button onclick="doLogin()" style="margin-top:8px;padding:7px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:12.5px;cursor:pointer">🔄 다시 시도</button>';
+      return;
+    }
     const student=students.find(s=>String(s.studentLoginId||'').trim()===id&&String(s.studentPassword||'').trim()===pw);
     if(!student){if(err)err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';return;}
     const tests=await fbAll('tests');
