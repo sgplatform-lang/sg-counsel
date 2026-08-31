@@ -39281,11 +39281,13 @@ function generateReport() {
       var rows=subs.map(function(s,idx){
         var label=(s.subject==='INQ'?'탐구':(s.subject==='KOR'?'국어':s.subject==='MATH'?'수학':s.subject==='ENG'?'영어':s.subject==='HIST'?'한국사':s.subject))+(s.detail?'('+s.detail+')':'');
         var ansCount=s.studentAnswers?Object.keys(s.studentAnswers).filter(function(k){return String(s.studentAnswers[k]||'').trim();}).length:0;
-        return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="window._sgShowStudentAnswerDetail(\''+idx+'\')">'
+        return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
-          +'<span style="font-weight:700;font-size:13.5px">✅ '+esc2(label)+'</span>'
-          +'<span style="font-size:11.5px;color:#666">점수 '+esc2(s.score)+' · 오답 '+s.wrongCount+'개 · 답안입력 '+ansCount+'/'+(s.totalItemCount||'-')+'문항 <span style="color:#0f766e">▶ 상세보기</span></span>'
-          +'</div></div>';
+          +'<span style="font-weight:700;font-size:13.5px;cursor:pointer" onclick="window._sgShowStudentAnswerDetail(\''+idx+'\')">✅ '+esc2(label)+'</span>'
+          +'<span style="display:flex;align-items:center;gap:10px;font-size:11.5px;color:#666">'
+          +'<span style="cursor:pointer" onclick="window._sgShowStudentAnswerDetail(\''+idx+'\')">점수 '+esc2(String(s.score!=null?s.score:''))+' · 오답 '+s.wrongCount+'개 · 답안입력 '+ansCount+'/'+(s.totalItemCount||'-')+'문항 <span style="color:#0f766e">▶ 상세보기</span></span>'
+          +'<button onclick="window._sgDeleteStudentAnswer(\''+idx+'\')" style="border:1px solid #fca5a5;background:#fef2f2;color:#dc2626;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">🗑 삭제</button>'
+          +'</span></div></div>';
       }).join('');
       body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:15px">🖊️ '+esc2(cur.name||'')+' 학생 답안</b><button onclick="document.getElementById(\'sg-ansview-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 닫기</button></div>'
         +'<div style="font-size:11.5px;color:#888;margin-bottom:12px">'+esc2(cd.lastTestDate||'')+' · '+esc2(cd.lastTestName||'')+' — 학생이 직접 제출한 과목만 표시됩니다(✅). 클릭하면 문항별 답안을 볼 수 있습니다.</div>'
@@ -39293,6 +39295,29 @@ function generateReport() {
     }
     window._sgAnsViewSubs=subs; // 상세보기에서 참조
     overlay.style.display='flex';
+  };
+  window._sgDeleteStudentAnswer=async function(idx){
+    var s=(window._sgAnsViewSubs||[])[idx];
+    var cur=ST.sel||ST.adminSel;
+    if(!s||!cur) return;
+    var label=(s.subject==='INQ'?'탐구':(s.subject==='KOR'?'국어':s.subject==='MATH'?'수학':s.subject==='ENG'?'영어':s.subject==='HIST'?'한국사':s.subject))+(s.detail?'('+s.detail+')':'');
+    if(!confirm(label+' 답안을 삭제하시겠습니까?\n삭제하면 이 과목의 채점 결과(정답/오답/점수)도 함께 사라지며, 되돌릴 수 없습니다.\n\n※ 학생은 다시 같은 시험으로 이 과목을 새로 제출할 수 있게 됩니다.')) return;
+    var cd=cur.challengerData||{};
+    // 현재 회차(lastSubjects)에서 제거
+    cd.lastSubjects=(cd.lastSubjects||[]).filter(function(x){ return x.sid!==s.sid; });
+    // ★ 과거 저장 회차(history)에도 같은 과목이 들어있으면 같이 지운다(안 지우면 "과거
+    // 회차 불러오기"로 여전히 남아있는 것처럼 보일 수 있음).
+    (cd.history||[]).forEach(function(h){
+      ['subjects','fullSubjects'].forEach(function(k){
+        if(Array.isArray(h[k])) h[k]=h[k].filter(function(x){ return x.sid!==s.sid; });
+      });
+    });
+    if(FB_USE()){
+      try{ await fbSave('students', cur.id, cur); }
+      catch(e){ alert('삭제 중 오류가 발생했습니다: '+e.message); return; }
+    }
+    toast('🗑 삭제되었습니다');
+    window._sgOpenStudentAnswerView();
   };
   window._sgShowStudentAnswerDetail=function(idx){
     var s=(window._sgAnsViewSubs||[])[idx];
