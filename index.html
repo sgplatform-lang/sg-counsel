@@ -25801,8 +25801,34 @@ function currentRecord(){return{student:$('studentName').value,date:$('testDate'
 function _sgTrim(v){return String(v==null?'':v).trim()}function _sgNormSubj(v){var s=String(v==null?'':v).replace(/\\s+/g,'');if(s.indexOf('영어')===0)return '영어';if(s.indexOf('수학')===0)return '수학';return s}function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';return s}
 var _SG_CODE2KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
 function _sgDisplayName(n){var s=String(n==null?'':n).trim();var m=s.match(/^(KOR|MATH|ENG|INQ|HIST|LANG)(\(.*\))?$/i);if(m){var code=m[1].toUpperCase();return (_SG_CODE2KOR[code]||code)+(m[2]||'')}return s}
-function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim($('studentName').value)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];let _seenSubjNorm={};let subjects=[];rows.flatMap(r=>r.subjects.map(s=>_sgTrendLabel(s)).filter(n=>n)).forEach(n=>{let k=_sgNormSubj(n);if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}});$('trendReport').innerHTML=cover('누적 변화 리포트')+subjects.map(sub=>\`<div class="chart">\${chart(rows,sub)}</div>\`).join('')+\`<table><thead><tr><th>회차</th><th>과목</th><th>성적</th><th>오답</th><th>태그</th></tr></thead><tbody>\${rows.flatMap(r=>r.subjects.filter(s=>_sgTrendLabel(s)).map(s=>\`<tr><td>\${r.date}<br>\${r.test}</td><td>\${_sgTrendLabel(s)}</td><td>\${s.score||'-'}</td><td>\${_sgTrendWrong(s)}</td><td>\${(s.tags||[]).join(', ')}</td></tr>\`)).join('')}</tbody></table>\`}
-function chart(rows,sub){let data=rows.map((r,i)=>{let s=r.subjects.find(x=>_sgNormSubj(_sgTrendLabel(x))===_sgNormSubj(sub));if(!s||s.score===undefined||s.score===null||s.score===''){return null}return {i,label:r.test||r.date,score:+s.score||0,wrong:+_sgTrendWrong(s)||0}}).filter(d=>d!==null);if(!data.length){return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">아직 입력된 점수가 없습니다.</div>\`}let W=850,H=230,P=40,maxW=Math.max(20,...data.map(d=>d.wrong));let step=(W-2*P)/Math.max(1,data.length-1);let pts=data.map((d,i)=>({x:P+i*step,y:P+(100-d.score)*(H-2*P)/100,...d}));let bars=pts.map(p=>{let h=p.wrong*(H-2*P)/maxW;return \`<rect x="\${p.x-11}" y="\${H-P-h}" width="22" height="\${h}" rx="5" fill="#dbeafe"></rect>\`}).join('');let line=pts.map(p=>\`\${p.x},\${p.y}\`).join(' ');let noteHtml=data.length===1?'<div class="small muted">회차가 1개뿐이라 추이선 없이 이번 회차 점수만 표시됩니다. 다음 회차 점수가 입력되면 추이선이 나타납니다.</div>':'';return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">선=성적, 막대=오답 수</div>\${noteHtml}<svg viewBox="0 0 \${W} \${H}"><line x1="\${P}" y1="\${P}" x2="\${P}" y2="\${H-P}" stroke="#cbd5e1"/><line x1="\${P}" y1="\${H-P}" x2="\${W-P}" y2="\${H-P}" stroke="#cbd5e1"/>\${bars}<polyline fill="none" stroke="#0f766e" stroke-width="3" points="\${line}"/>\${pts.map(p=>\`<circle cx="\${p.x}" cy="\${p.y}" r="5" fill="#0f766e"/><text x="\${p.x}" y="\${p.y-8}" text-anchor="middle" font-size="12">\${p.score||'-'}</text><text x="\${p.x}" y="\${H-12}" text-anchor="middle" font-size="11">\${esc(p.label).slice(0,10)}</text>\`).join('')}</svg>\`}
+function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim($('studentName').value)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];let _seenSubjNorm={};let subjects=[];rows.flatMap(r=>r.subjects.map(s=>_sgTrendLabel(s)).filter(n=>n)).forEach(n=>{let k=_sgNormSubj(n);if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}});
+  // ★ 2026-09-01 수정: 회차를 한 줄씩 나열하던 표 대신, 과목별로 총 응시회차·평균/최고/최저
+  // 성적·오답원인 태그(빈도순 상위 4개)를 한 줄로 모아 보여주는 요약표로 변경. 태그는 각 회차
+  // 저장 시 문항별 "오답원인 선택"에서 고른 값을 빈도순으로 집계해 상위 4개까지 저장해둔
+  // 값(currentRecord의 tags)을 그대로 재사용한다.
+  let summaryRows=subjects.map(function(subLabel){
+    let subK=_sgNormSubj(subLabel);
+    let entries=[];
+    rows.forEach(function(r){(r.subjects||[]).forEach(function(s){let lbl=_sgTrendLabel(s);if(lbl&&_sgNormSubj(lbl)===subK){let sc=(s.score!==undefined&&s.score!==null&&s.score!=='')?+s.score:null;if(sc!=null&&!isNaN(sc))entries.push({score:sc,tags:(s.tags||[])});}});});
+    if(!entries.length)return '';
+    let scores=entries.map(function(e){return e.score;});
+    let avg=scores.reduce(function(a,b){return a+b;},0)/scores.length;
+    let avgTxt=Number.isInteger(avg)?String(avg):avg.toFixed(1);
+    let max=Math.max.apply(null,scores);
+    let min=Math.min.apply(null,scores);
+    let tagCount={};
+    entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(!t)return;tagCount[t]=(tagCount[t]||0)+1;});});
+    let topTags=Object.keys(tagCount).sort(function(a,b){return tagCount[b]-tagCount[a];}).slice(0,4);
+    return \`<tr><td>\${esc(subLabel)}</td><td>\${entries.length}회</td><td>\${avgTxt}</td><td>\${max}</td><td>\${min}</td><td>\${esc(topTags.join(', '))}</td></tr>\`;
+  }).join('');
+  $('trendReport').innerHTML=cover('누적 변화 리포트')+subjects.map(sub=>\`<div class="chart">\${chart(rows,sub)}</div>\`).join('')+\`<table><thead><tr><th>과목</th><th>총 응시회차</th><th>성적(평균)</th><th>최고 성적</th><th>최저 성적</th><th>태그</th></tr></thead><tbody>\${summaryRows}</tbody></table>\`}
+function chart(rows,sub){let allData=rows.map((r,i)=>{let s=r.subjects.find(x=>_sgNormSubj(_sgTrendLabel(x))===_sgNormSubj(sub));if(!s||s.score===undefined||s.score===null||s.score===''){return null}return {i,label:r.test||r.date,score:+s.score||0,wrong:+_sgTrendWrong(s)||0}}).filter(d=>d!==null);if(!allData.length){return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">아직 입력된 점수가 없습니다.</div>\`}
+  // ★ 2026-09-01 추가: 그래프는 화면 가독성을 위해 최근 6회차만 표시한다. 누적 변화 리포트의
+  // 요약표(총 응시회차/평균/최고/최저/태그)는 이 슬라이스와 무관하게 전체 회차를 그대로 쓰며,
+  // 여기서 자르는 건 그래프에 그려지는 점의 개수뿐이다 — 저장된 history 자체는 손대지 않는다.
+  let data=allData.length>6?allData.slice(-6):allData;
+  let titleSuffix=allData.length>6?\` (최근 6회차 · 전체 \${allData.length}회차 중)\`:'';
+  let W=850,H=230,P=40,maxW=Math.max(20,...data.map(d=>d.wrong));let step=(W-2*P)/Math.max(1,data.length-1);let pts=data.map((d,i)=>({x:P+i*step,y:P+(100-d.score)*(H-2*P)/100,...d}));let bars=pts.map(p=>{let h=p.wrong*(H-2*P)/maxW;return \`<rect x="\${p.x-11}" y="\${H-P-h}" width="22" height="\${h}" rx="5" fill="#dbeafe"></rect>\`}).join('');let line=pts.map(p=>\`\${p.x},\${p.y}\`).join(' ');let noteHtml=data.length===1?'<div class="small muted">회차가 1개뿐이라 추이선 없이 이번 회차 점수만 표시됩니다. 다음 회차 점수가 입력되면 추이선이 나타납니다.</div>':'';return \`<b>\${sub} 성적/오답 추이\${titleSuffix}</b><div class="small muted">선=성적, 막대=오답 수</div>\${noteHtml}<svg viewBox="0 0 \${W} \${H}"><line x1="\${P}" y1="\${P}" x2="\${P}" y2="\${H-P}" stroke="#cbd5e1"/><line x1="\${P}" y1="\${H-P}" x2="\${W-P}" y2="\${H-P}" stroke="#cbd5e1"/>\${bars}<polyline fill="none" stroke="#0f766e" stroke-width="3" points="\${line}"/>\${pts.map(p=>\`<circle cx="\${p.x}" cy="\${p.y}" r="5" fill="#0f766e"/><text x="\${p.x}" y="\${p.y-8}" text-anchor="middle" font-size="12">\${p.score||'-'}</text><text x="\${p.x}" y="\${H-12}" text-anchor="middle" font-size="11">\${esc(p.label).slice(0,10)}</text>\`).join('')}</svg>\`}
 function stripCovers(markup){
   return String(markup||'')
     .replace(/<div class="premium-cover">[\\s\\S]*?<div class="cover-footer">[\\s\\S]*?<\\/div>\\s*<\\/div>/g,'')
@@ -29543,6 +29569,10 @@ function openChallengerBulkReflect(){
         <select id="cbr-examcat-select" onchange="examcatApplyToModal(this.value)" style="border:1px solid #93c5fd;border-radius:8px;padding:7px 9px;font-size:12.5px;width:100%;max-width:420px">
           <option value="">직접 입력 (카탈로그 사용 안 함)</option>
         </select>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #93c5fd">
+          <div style="font-size:12.5px;color:#1e40af;margin-bottom:6px">위에서 시험을 선택하면, 학생들이 "챌린저 답안" 페이지에서 <b>직접 제출한</b> 답안(과목별 점수·오답번호·미응답번호)을 아래 1번 박스와 같은 형식의 CSV로 내려받을 수 있습니다. 엑셀에서 수정·보완한 뒤 다시 위 1번 박스에 붙여넣어 반영하세요.</div>
+          <button onclick="sgExportStudentSelfAnswers();markClicked(event)" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer">📤 학생 직접제출 답안 CSV로 내보내기</button>
+        </div>
       </div>
       <textarea id="cbr-input" style="width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="학생번호	학생명	학교	학년	시험일	시험명/회차	담당매니저	과목코드	과목명	선택과목/세부과목	점수	전체오답번호	오답수	미응답번호	비고"></textarea>
       <div style="margin-top:10px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
@@ -29924,6 +29954,67 @@ function _cbrNormalizeDetail(v){
   s=s.replace(/\s*(1|Ⅰ|I)$/,'Ⅰ');
   var canon=_SG_DETAIL_CANON[s.replace(/[·\s]+/g,'')];
   return canon || s;
+}
+// ★ 2026-09-01 추가: 학생이 "챌린저 답안" 페이지에서 직접 제출한 과목별 답안(점수/오답번호/
+// 미응답번호)을, 위 1번 박스(결과일괄반영)와 동일한 컬럼 형식의 CSV로 내려받는 기능.
+// 목적: 문항분석DB(정답만 있고 해설/단원이 아직 없는 상태)로 학생들이 시험 직후 가채점
+// 답안만 먼저 제출해두고, 나중에 해설/단원이 갖춰지면 이 CSV를 열어 필요한 내용을 보완한 뒤
+// 1번 박스에 그대로 붙여넣어 재반영하는 흐름을 위한 것. 기존 채점·저장 로직은 전혀 건드리지
+// 않고, 이미 저장된 데이터를 읽어서 파일로 뽑아내기만 한다.
+async function sgExportStudentSelfAnswers(){
+  var selEl = document.getElementById('cbr-examcat-select');
+  var catId = selEl && selEl.value;
+  if(!catId){ alert('먼저 위에서 내보낼 시험을 선택해주세요.'); return; }
+  await _ensureExamCatalogLoaded();
+  var entry = (ST.examCatalog||[]).find(function(e){ return e.id===catId; });
+  if(!entry){ alert('선택한 시험 정보를 찾지 못했습니다.'); return; }
+  var examDate = String(entry.defaultDate||'').trim();
+  var examName = String(entry.examName||'').trim();
+  var subjLabel = {KOR:'국어', MATH:'수학', ENG:'영어', HIST:'한국사', INQ:'탐구', INQ1:'탐구', INQ2:'탐구', LANG:'제2외국어'};
+  function _sameSub(a,b){
+    return a.sid===b.sid && a.subject===b.subject && _cbrNormalizeDetail(a.detail||'')===_cbrNormalizeDetail(b.detail||'');
+  }
+  var rows=[];
+  (ST.students||[]).forEach(function(s){
+    var cd = s.challengerData||{};
+    var subs=[];
+    if(String(cd.lastTestDate||'').trim()===examDate && String(cd.lastTestName||'').trim()===examName){
+      subs = (cd.lastSubjects||[]).filter(function(x){ return x && x._studentSelfInput; });
+    }
+    // ★ 화면에 보이는 "최신 회차"가 아니어도, 과거에 이 시험으로 제출해 history에 저장된
+    // 과목도 놓치지 않도록 함께 찾는다(회차를 나중에 반영해 최신 회차 자리가 바뀐 경우 대비).
+    (cd.history||[]).forEach(function(h){
+      if(String(h.date||'').trim()===examDate && String(h.test||'').trim()===examName){
+        var hs = (h.subjects||h.fullSubjects||[]).filter(function(x){ return x && x._studentSelfInput; });
+        hs.forEach(function(hx){
+          if(!subs.some(function(x){ return _sameSub(x,hx); })) subs.push(hx);
+        });
+      }
+    });
+    subs.forEach(function(sub){
+      var total = sub.totalItemCount || Object.keys(sub.studentAnswers||{}).length;
+      var wrongNos = (sub.items||[]).map(function(it){ return String(it.no); });
+      var omittedNos=[];
+      for(var no=1; no<=total; no++){
+        var v=(sub.studentAnswers||{})[no];
+        if(!String(v==null?'':v).trim()) omittedNos.push(String(no));
+      }
+      rows.push(['', s.name||'', s.school||'', s.grade||'', examDate, examName, s.counselor||'',
+        sub.subject||'', subjLabel[sub.subject]||sub.subject||'', sub.detail||'',
+        sub.score!=null?sub.score:'', wrongNos.join(','), String(wrongNos.length), omittedNos.join(','), '']);
+    });
+  });
+  if(!rows.length){ alert('이 시험으로 학생이 직접 제출한 답안이 아직 없습니다.'); return; }
+  var header=['학생번호','학생명','학교','학년','시험일','시험명/회차','담당매니저','과목코드','과목명','선택과목/세부과목','점수','전체오답번호','오답수','미응답번호','비고'];
+  function q(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }
+  var csv='\ufeff'+[header].concat(rows).map(function(r){ return r.map(q).join(','); }).join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='CHALLENGER_학생직접제출답안_'+(examName||'시험').replace(/[\\/:*?"<>|]/g,'_')+'_'+(examDate||'').replace(/[\\/:*?"<>|]/g,'_')+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('✅ '+rows.length+'건 내보내기 완료 (학생 수 기준 아님, 과목 제출 건수 기준)');
 }
 function cbrParseRows(text){
   const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
