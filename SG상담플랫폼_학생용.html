@@ -1621,6 +1621,11 @@ function _cbrNormalizeDetail(v){
   s=s.replace(/\s*(2|Ⅱ|II)$/,'Ⅱ');
   s=s.replace(/\s*(1|Ⅰ|I)$/,'Ⅰ');
   if(s==='사회·문화') s='사회문화';
+  // ★ 2026-09-01 추가: 수학 선택과목 표기(확통/확률과통계/확률과 통계)를 하나로 통일 —
+  // 카탈로그 쪽 정답/해설이 어느 표기로 등록돼 있어도 항상 매칭되도록(관리자_수정중302.html
+  // 이후 admin과 동일 규칙 적용, "오답노트에 확통·미적분·기하만 정답/해설이 안 나오는" 문제 수정).
+  var _k=s.replace(/[·\s]+/g,'');
+  if(_k==='확통' || _k==='확률과통계') s='확률과 통계';
   return s;
 }
 function chgSetSubjField(sIdx,field,val){
