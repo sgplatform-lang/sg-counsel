@@ -25798,7 +25798,7 @@ function summaryTable(){return \`<table><thead><tr><th>과목</th><th>성적</th
 function renderLong(){syncAll();let sel=selectedData();$('longReport').innerHTML=cover('챌린저 주간 분석 정밀 리포트')+\`<h2>1. 변경사항/특이사항</h2><table><tr><th>변경사항</th><td>\${esc($('changes').value)}</td></tr><tr><th>특이사항</th><td>\${esc($('special').value)}</td></tr><tr><th>다음 확인</th><td>\${esc($('nextCheck').value)}</td></tr></table><h2>2. 과목별 요약</h2>\${summaryTable()}<h2>3. 학습 진도·미학습 범위 보정</h2>\${state.subjects.map(progressReport).join('')}<h2>4. 상황 분석 · 행동강령 확정</h2>\${state.subjects.map(situationReport).join('')}<h2>5. 집중 미션 분석</h2>\${sel.map(d=>\`<div class="report-card"><h4>\${name(d.s)} · \${d.iss.tag}</h4><table><tr><th>문항</th><td>\${d.iss.items.join(', ')}</td><th>단원/유형</th><td>\${[...new Set(d.iss.units)].join(', ')}</td></tr><tr><th>난이도</th><td>\${[...new Set(d.iss.diffs)].join(', ')}</td><th>상황메모</th><td>\${[...new Set(d.iss.memos)].join(' / ')||'-'}</td></tr></table><p><b>처방 근거:</b> \${d.s.processRange}, \${d.s.difficultySelect}, \${d.s.accuracyTarget} 기준으로 이번 회차 필수 미션으로 선별했습니다.</p><p><b>행동강령:</b> \${d.action}</p>\${d.s.memo?\`<p><b>매니저 최종 메모:</b> \${esc(d.s.memo)}</p>\`:''}</div>\`).join('')||'<p>선택된 집중 미션이 없습니다.</p>'}\`}
 function renderShort(){syncAll();let sel=selectedData();let grouped={};sel.forEach(d=>{let n=name(d.s);if(!grouped[n])grouped[n]=[];grouped[n].push(d)});$('shortReport').innerHTML=cover('학생 실천 처방전')+\`<h2>이번 회차 반드시 끝낼 과목</h2><div class="bar"><b>집중 과목</b><span>\${Object.keys(grouped).join(', ')||'-'}</span></div><h2>점수 해석 참고</h2>\${state.subjects.map(s=>\`<div class="bar"><b>\${name(s)}</b><span>\${esc(progressInterpretation(s))}</span></div>\`).join('')}<h2>상황 분석 행동강령</h2>\${state.subjects.map(situationReport).join('')}<h2>과목별 실천 체크리스트</h2>\${Object.entries(grouped).map(([sub,list])=>\`<div class="report-card"><h3>\${sub}</h3><table><tr><th>문항</th><th>단원/유형</th><th>오답 원인</th><th>실천 행동</th></tr>\${list.map(d=>\`<tr><td>\${d.iss.items.join(', ')}</td><td>\${[...new Set(d.iss.units)].join(', ')}</td><td>\${d.iss.tag}</td><td>\${d.action}</td></tr>\`).join('')}</table><ul>\${[...new Set(list.flatMap(d=>[\`□ \${d.s.accuracyTarget} 달성 확인\`,\`□ \${d.s.difficultySelect} 범위만 완료\`,\`□ \${d.iss.tag} 재발 여부 표시\`]))].map(x=>\`<li>\${x}</li>\`).join('')}</ul></div>\`).join('')||'<p>선택된 집중 미션이 없습니다.</p>'}\`}
 function currentRecord(){return{student:$('studentName').value,date:$('testDate').value,test:$('testName').value,subjects:state.subjects.map(s=>({name:name(s),score:+s.score||0,wrong:wrongCount(s),tags:issues(s).slice(0,4).map(i=>i.tag),preparationLevel:s.preparationLevel||'',unlearnedUnits:s.unlearnedUnits||'',weakUnits:s.weakUnits||'',scoreBasis:s.scoreBasis||'',situationType:s.managerSituationType||s.situationType||'',progressImpact:s.progressImpact||'',operationImpact:s.operationImpact||'',nextCriteria:s.nextCriteria||''})),fullSubjects: JSON.parse(JSON.stringify(state.subjects))}}
-function _sgTrim(v){return String(v==null?'':v).trim()}function _sgNormSubj(v){var s=String(v==null?'':v).replace(/\\s+/g,'');if(s.indexOf('영어')===0)return '영어';if(s.indexOf('수학')===0)return '수학';return s}function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';return s}
+function _sgTrim(v){return String(v==null?'':v).trim()}function _sgNormSubj(v){var s=String(v==null?'':v).replace(/\\s+/g,'');if(s.indexOf('영어')===0)return '영어';if(s.indexOf('수학')===0)return '수학';return s}function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';var _k=s.replace(/[·\\s]+/g,'');if(_k==='확통'||_k==='확률과통계')s='확률과 통계';return s}
 var _SG_CODE2KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
 function _sgDisplayName(n){var s=String(n==null?'':n).trim();var m=s.match(/^(KOR|MATH|ENG|INQ|HIST|LANG)(\(.*\))?$/i);if(m){var code=m[1].toUpperCase();return (_SG_CODE2KOR[code]||code)+(m[2]||'')}return s}
 function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim($('studentName').value)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];let _seenSubjNorm={};let subjects=[];rows.flatMap(r=>r.subjects.map(s=>_sgTrendLabel(s)).filter(n=>n)).forEach(n=>{let k=_sgNormSubj(n);if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}});
@@ -29942,7 +29942,13 @@ var _SG_DETAIL_CANON = (function(){
   // 실제로 자주 쓰이는 8과목 줄임말을 전부 정식 명칭으로 매핑해둔다.
   var aliases = {
     '생윤':'생활과 윤리', '윤사':'윤리와 사상', '한지':'한국지리', '세지':'세계지리',
-    '동사':'동아시아사', '세사':'세계사', '정법':'정치와 법', '사문':'사회문화'
+    '동사':'동아시아사', '세사':'세계사', '정법':'정치와 법', '사문':'사회문화',
+    // ★ 2026-09-01 추가: 수학 선택과목 표기 통일. 문제이미지 조회(_cbrNormDetail/
+    // _CBR_IMG_DETAIL_ALIASES)는 이미 "확통"/"확률과 통계"/"확률과통계"를 전부 같은
+    // 것으로 인식하는데, 정답/해설(itemMeta·answerKey) 조회는 이 별칭 처리가 없어서
+    // 카탈로그에 "확통"으로 등록해두면 학생 쪽(항상 "확률과 통계"로 저장됨)과 매칭이
+    // 안 돼 정답/해설만 비어 보이는 문제가 있었다(문제이미지는 별도 로직이라 정상 표시).
+    '확통':'확률과 통계', '확률과통계':'확률과 통계'
   };
   Object.keys(aliases).forEach(function(k){ m[k]=aliases[k]; });
   return m;
@@ -30258,7 +30264,9 @@ function _sgParseItemMetaText(text){
     }
     if(!subj||!no) return;
     if(!unit && !diff && !answer && !explain && !points) return; // 아무 값도 없는 빈 줄이면 무시
-    const key=subj+'|'+detail;
+    // ★ 2026-09-01 수정: "확통"/"확률과통계"처럼 학생 쪽 표기("확률과 통계")와 다르게
+    // 입력해도 나중에 조회할 때 매칭되도록, 저장 키를 만들 때부터 정규화해둔다.
+    const key=subj+'|'+_cbrNormalizeDetail(detail);
     if(!map[key]) map[key]={};
     map[key][no]={unit, diff, answer, explain, points};
   });
@@ -30266,9 +30274,12 @@ function _sgParseItemMetaText(text){
 }
 function _cbrLookupItemMeta(pastedItemMeta, subjectCode, detail, no){
   const subj=String(subjectCode||'').toUpperCase();
+  // ★ 2026-09-01 수정: 세부과목 표기(확통/확률과 통계/확률과통계 등)가 저장 시점과 다르게
+  // 입력돼도 매칭되도록 정규화한 뒤 조회한다.
+  const nd=_cbrNormalizeDetail(detail||'');
   // 세부과목(선택과목)이 일치하는 항목을 먼저 찾고, 없으면 세부과목 구분 없는
   // 공통 매핑(예: 수학 공통문항)을 사용한다.
-  const exact=(pastedItemMeta[subj+'|'+(detail||'')]||{})[no];
+  const exact=(pastedItemMeta[subj+'|'+nd]||{})[no];
   if(exact) return exact;
   return (pastedItemMeta[subj+'|']||{})[no] || null;
 }
@@ -30302,7 +30313,9 @@ function _sgParseAnswerKeyText(text){
     const question=(c[5]||'').trim();
     if(!subj||!no) return;
     if(!answer && !explain && !question) return;
-    const key=subj+'|'+detail;
+    // ★ 2026-09-01 수정: itemMeta와 동일한 이유로, 정답/해설 저장 키도 세부과목 표기를
+    // 정규화해서 만든다(확통/확률과통계/확률과 통계가 전부 같은 키로 저장되게).
+    const key=subj+'|'+_cbrNormalizeDetail(detail);
     if(!map[key]) map[key]={};
     map[key][no]={answer, explain, question};
   });
@@ -30310,7 +30323,8 @@ function _sgParseAnswerKeyText(text){
 }
 function _cbrLookupAnswerKey(map, subjectCode, detail, no){
   const subj=String(subjectCode||'').toUpperCase();
-  const exact=(map[subj+'|'+(detail||'')]||{})[no];
+  const nd=_cbrNormalizeDetail(detail||'');
+  const exact=(map[subj+'|'+nd]||{})[no];
   if(exact) return exact;
   return (map[subj+'|']||{})[no] || null;
 }
