@@ -39371,8 +39371,8 @@ function generateReport() {
       if(_tLabels.length) _subjSuffix='_'+_tLabels.join(',');
     }
     var title=onlyCurrent
-      ? '챌린저_'+(info.date||'회차')+'_'+(targets[0]&&targets[0].name||'')+'_오답노트'+_subjSuffix
-      : '챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_오답노트';
+      ? '챌린저_'+(targets[0]&&targets[0].name||'')+'_오답노트'+_subjSuffix+'_'+(info.date||'회차')
+      : '챌린저_'+(info.name||'')+'_오답노트_'+(info.date||'회차');
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_wnEsc(title)+'</title>'+
       '<style>'+
       'body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;color:#1a1a1a;margin:0}'+
