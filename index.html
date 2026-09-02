@@ -25798,7 +25798,7 @@ function summaryTable(){return \`<table><thead><tr><th>과목</th><th>성적</th
 function renderLong(){syncAll();let sel=selectedData();$('longReport').innerHTML=cover('챌린저 주간 분석 정밀 리포트')+\`<h2>1. 변경사항/특이사항</h2><table><tr><th>변경사항</th><td>\${esc($('changes').value)}</td></tr><tr><th>특이사항</th><td>\${esc($('special').value)}</td></tr><tr><th>다음 확인</th><td>\${esc($('nextCheck').value)}</td></tr></table><h2>2. 과목별 요약</h2>\${summaryTable()}<h2>3. 학습 진도·미학습 범위 보정</h2>\${state.subjects.map(progressReport).join('')}<h2>4. 상황 분석 · 행동강령 확정</h2>\${state.subjects.map(situationReport).join('')}<h2>5. 집중 미션 분석</h2>\${sel.map(d=>\`<div class="report-card"><h4>\${name(d.s)} · \${d.iss.tag}</h4><table><tr><th>문항</th><td>\${d.iss.items.join(', ')}</td><th>단원/유형</th><td>\${[...new Set(d.iss.units)].join(', ')}</td></tr><tr><th>난이도</th><td>\${[...new Set(d.iss.diffs)].join(', ')}</td><th>상황메모</th><td>\${[...new Set(d.iss.memos)].join(' / ')||'-'}</td></tr></table><p><b>처방 근거:</b> \${d.s.processRange}, \${d.s.difficultySelect}, \${d.s.accuracyTarget} 기준으로 이번 회차 필수 미션으로 선별했습니다.</p><p><b>행동강령:</b> \${d.action}</p>\${d.s.memo?\`<p><b>매니저 최종 메모:</b> \${esc(d.s.memo)}</p>\`:''}</div>\`).join('')||'<p>선택된 집중 미션이 없습니다.</p>'}\`}
 function renderShort(){syncAll();let sel=selectedData();let grouped={};sel.forEach(d=>{let n=name(d.s);if(!grouped[n])grouped[n]=[];grouped[n].push(d)});$('shortReport').innerHTML=cover('학생 실천 처방전')+\`<h2>이번 회차 반드시 끝낼 과목</h2><div class="bar"><b>집중 과목</b><span>\${Object.keys(grouped).join(', ')||'-'}</span></div><h2>점수 해석 참고</h2>\${state.subjects.map(s=>\`<div class="bar"><b>\${name(s)}</b><span>\${esc(progressInterpretation(s))}</span></div>\`).join('')}<h2>상황 분석 행동강령</h2>\${state.subjects.map(situationReport).join('')}<h2>과목별 실천 체크리스트</h2>\${Object.entries(grouped).map(([sub,list])=>\`<div class="report-card"><h3>\${sub}</h3><table><tr><th>문항</th><th>단원/유형</th><th>오답 원인</th><th>실천 행동</th></tr>\${list.map(d=>\`<tr><td>\${d.iss.items.join(', ')}</td><td>\${[...new Set(d.iss.units)].join(', ')}</td><td>\${d.iss.tag}</td><td>\${d.action}</td></tr>\`).join('')}</table><ul>\${[...new Set(list.flatMap(d=>[\`□ \${d.s.accuracyTarget} 달성 확인\`,\`□ \${d.s.difficultySelect} 범위만 완료\`,\`□ \${d.iss.tag} 재발 여부 표시\`]))].map(x=>\`<li>\${x}</li>\`).join('')}</ul></div>\`).join('')||'<p>선택된 집중 미션이 없습니다.</p>'}\`}
 function currentRecord(){return{student:$('studentName').value,date:$('testDate').value,test:$('testName').value,subjects:state.subjects.map(s=>({name:name(s),score:+s.score||0,wrong:wrongCount(s),tags:issues(s).slice(0,4).map(i=>i.tag),preparationLevel:s.preparationLevel||'',unlearnedUnits:s.unlearnedUnits||'',weakUnits:s.weakUnits||'',scoreBasis:s.scoreBasis||'',situationType:s.managerSituationType||s.situationType||'',progressImpact:s.progressImpact||'',operationImpact:s.operationImpact||'',nextCriteria:s.nextCriteria||''})),fullSubjects: JSON.parse(JSON.stringify(state.subjects))}}
-function _sgTrim(v){return String(v==null?'':v).trim()}function _sgNormSubj(v){var s=String(v==null?'':v).replace(/\\s+/g,'');if(s.indexOf('영어')===0)return '영어';if(s.indexOf('수학')===0)return '수학';return s}function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';var _k=s.replace(/[·\\s]+/g,'');if(_k==='확통'||_k==='확률과통계')s='확률과 통계';return s}
+function _sgTrim(v){return String(v==null?'':v).trim()}function _sgNormSubj(v){var s=String(v==null?'':v).replace(/\\s+/g,'');if(s.indexOf('영어')===0)return '영어';if(s.indexOf('수학')===0)return '수학';return s}function _cbrNormalizeDetail(v){var s=String(v==null?'':v).trim();if(!s)return s;s=s.replace(/\\s*(2|Ⅱ|II)$/,'Ⅱ');s=s.replace(/\\s*(1|Ⅰ|I)$/,'Ⅰ');if(s==='사회·문화')s='사회문화';var _k=s.replace(/[·\\s]+/g,'');if(_k==='확통'||_k==='확률과통계')s='확률과 통계';else if(_k==='화법과작문')s='화법과 작문';else if(_k==='언어와매체')s='언어와 매체';else if(_k==='윤리와사상')s='윤리와 사상';else if(_k==='생활과윤리')s='생활과 윤리';else if(_k==='정치와법')s='정치와 법';return s}
 var _SG_CODE2KOR={KOR:'국어',MATH:'수학',ENG:'영어',INQ:'탐구',HIST:'한국사',LANG:'제2외국어'};
 function _sgDisplayName(n){var s=String(n==null?'':n).trim();var m=s.match(/^(KOR|MATH|ENG|INQ|HIST|LANG)(\(.*\))?$/i);if(m){var code=m[1].toUpperCase();return (_SG_CODE2KOR[code]||code)+(m[2]||'')}return s}
 function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim($('studentName').value)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];let _seenSubjNorm={};let subjects=[];rows.flatMap(r=>r.subjects.map(s=>_sgTrendLabel(s)).filter(n=>n)).forEach(n=>{let k=_sgNormSubj(n);if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}});
@@ -29948,7 +29948,19 @@ var _SG_DETAIL_CANON = (function(){
     // 것으로 인식하는데, 정답/해설(itemMeta·answerKey) 조회는 이 별칭 처리가 없어서
     // 카탈로그에 "확통"으로 등록해두면 학생 쪽(항상 "확률과 통계"로 저장됨)과 매칭이
     // 안 돼 정답/해설만 비어 보이는 문제가 있었다(문제이미지는 별도 로직이라 정상 표시).
-    '확통':'확률과 통계', '확률과통계':'확률과 통계'
+    '확통':'확률과 통계', '확률과통계':'확률과 통계',
+    // ★ 2026-09-02 추가: 국어 선택과목도 같은 문제 발생 확인 — 카탈로그에 "화법과작문"/
+    // "언어와매체"(띄어쓰기 없이)로 등록되면 학생 쪽("화법과 작문"/"언어와 매체", 띄어쓰기
+    // 있음)과 안 맞아 선택과목 11문항이 통째로 채점 대상에서 빠지는 사고가 실제로 발생함
+    // (오답 1개인데 점수가 74점으로 나온 사례로 확인).
+    '화법과작문':'화법과 작문', '언어와매체':'언어와 매체',
+    // ★ 2026-09-02(2차) 추가: 전 과목 전수 점검 — 학생 화면(CHG_ANS_SUBJ_DEFS)에 등록된
+    // 세부과목명 중 띄어쓰기가 있는 건 국어 2개·수학 1개(위에서 처리)와 탐구 3개뿐이다.
+    // 탐구 3개(윤리와 사상/생활과 윤리/정치와 법)도 카탈로그에 붙여쓰기로 등록되면 같은
+    // 사고가 날 수 있어 미리 막아둔다. 나머지 탐구 과목명(사회문화·경제·한국지리·세계지리·
+    // 세계사·동아시아사·물리학Ⅰ 등)과 수학 미적분·기하는 원래 띄어쓰기가 없는 이름이라
+    // 해당 없음. 영어·한국사는 세부과목 자체가 없어 위험 없음.
+    '윤리와사상':'윤리와 사상', '생활과윤리':'생활과 윤리', '정치와법':'정치와 법'
   };
   Object.keys(aliases).forEach(function(k){ m[k]=aliases[k]; });
   return m;
