@@ -38896,7 +38896,15 @@ function generateReport() {
       if(fallbackHas) console.warn('[SG] 오답노트: 이 학생의 저장된 최신 회차('+ccd.lastTestDate+' · '+ccd.lastTestName+')가 화면에 표시된 회차('+date+' · '+name+')와 다릅니다. 일치하는 과거 회차를 찾지 못해 최신 회차로 대신 출력합니다.');
       return {cur:cur, targets:fallbackHas?[cur]:[], date:date, name:name};
     }
+    // ★ 2026-09-01 수정: 최종관리자(전 기관을 볼 수 있는 계정)가 특정 기관 학생을 먼저
+    // 선택한 채로 "일괄 출력"을 누르면, 아래 필터가 "지금 선택된 학생(cur)의 소속 기관"만
+    // 남기고 있어서 같은 회차를 치른 다른 기관 학생들이 통째로 빠지는 문제가 있었다
+    // (예: 정파학습관 학생을 먼저 선택하고 열면 다른 기관 학생은 안 나옴). 최종관리자는
+    // 이 기관 필터를 적용하지 않고 전체 학생을 대상으로 한다 — 기관관리자·선생님 계정은
+    // 애초에 ST.students 자체가 자기 기관 학생으로만 채워져 있으므로 필터를 유지해도 안전하다.
+    var _isSuperAdmin = ST.currentUser && ST.currentUser.role==='admin';
     var base=(ST.students||[]).filter(function(s){
+      if(_isSuperAdmin) return true;
       return !cur.orgId || String(s.orgId||'')===String(cur.orgId||'');
     });
     var _matchSrc={}; // 학생id -> 'current' | 'history'
@@ -39199,11 +39207,42 @@ function generateReport() {
       // 시작한다. 과목이 1개뿐인 학생에게는 구분 페이지를 넣지 않는다(불필요).
       var _wnNonEmptySubs=subs.filter(function(x){return (x.items||[]).filter(function(it){return it&&it.no;}).length>0;});
       function _wnSubjectDivider(s, items, allSubs, subjIdx){
-        if(_wnNonEmptySubs.length<=1) return '';
+        // ★ 2026-09-02(3차) 수정: 예전엔 틀린 문항이 있는 과목이 1개뿐인 학생은 종이를
+        // 아끼려고 표지 자체를 생략했다. 그런데 지금은 표지에 학생명/학교/학년/시험명/
+        // 응시일까지 들어가 있어서, 과목이 1개뿐이라고 표지를 생략하면 오히려 "표지가
+        // 없는 학생과 있는 학생"이 뒤섞여 보이는 문제가 생긴다(기관과는 무관하게, 그
+        // 학생이 이번 회차에 틀린 문항이 있는 과목이 1개뿐이면 항상 이렇게 보였다).
+        // 이제 과목 수와 무관하게 표지를 항상 보여준다.
         var isFirst=_wnNonEmptySubs[0]===s;
+        // ★ 2026-09-02 수정: 텍스트 한 줄짜리 표지 대신, 상담 리포트 표지(cover())와
+        // 같은 프리미엄 디자인(로고·좌측 사이드바·금장 라인)을 과목마다 한 장씩 넣는다.
+        // 표지 안의 "학생 정보 표"(학생명/학교/시험명 등)는 매 과목마다 반복될 필요가
+        // 없어 빼고, 그 자리에 과목명·문항수·점수만 넣는다.
         return '<div class="wn-subject-divider'+(isFirst?' wn-subject-divider-first':'')+'">'+
-          '<div class="wn-subject-divider-name">'+_wnEsc(_wnSubjLabel(s.subject,s.detail))+'</div>'+
-          '<div class="wn-subject-divider-sub">'+items.length+'문항 · '+_wnEsc(s.score||'-')+'점</div>'+
+          '<div class="premium-cover">'+
+            '<div class="cover-side">PRECISION<br>ANALYSIS<br>ACHIEVES<br>EXCELLENCE</div>'+
+            '<div class="cover-side-list"><div>◎ 정밀 분석</div><div>✓ 실천 처방</div><div>↗ 누적 변화</div></div>'+
+            '<div class="cover-accent"></div>'+
+            '<div class="logo-zone">'+
+              '<div class="logo-mark"></div>'+
+              '<div class="logo-word">챌린저</div>'+
+              '<div class="logo-eng">CHALLENGER</div>'+
+            '</div>'+
+            '<div class="cover-rule"></div>'+
+            '<div class="cover-title"><h1>챌린저 실전모의고사<br>오답노트</h1></div>'+
+            '<div class="wn-subj-cover-meta">'+
+              '<div class="wn-subj-cover-name">'+_wnEsc(_wnSubjLabel(s.subject,s.detail))+'</div>'+
+              '<div class="wn-subj-cover-sub">'+items.length+'문항 · '+_wnEsc(s.score||'-')+'점</div>'+
+            '</div>'+
+            '<div class="wn-subj-cover-info">'+
+              '<div class="wn-subj-cover-info-row"><span class="wn-subj-cover-info-label">학생명</span><span class="wn-subj-cover-info-value">'+_wnEsc(stu.name||'')+'</span></div>'+
+              '<div class="wn-subj-cover-info-row"><span class="wn-subj-cover-info-label">학년</span><span class="wn-subj-cover-info-value">'+_wnEsc(stu.grade||'')+'</span></div>'+
+              '<div class="wn-subj-cover-info-row"><span class="wn-subj-cover-info-label">학교</span><span class="wn-subj-cover-info-value">'+_wnEsc(stu.school||'')+'</span></div>'+
+              '<div class="wn-subj-cover-info-row"><span class="wn-subj-cover-info-label">시험명</span><span class="wn-subj-cover-info-value">'+_wnEsc(info.name||'')+'</span></div>'+
+              '<div class="wn-subj-cover-info-row"><span class="wn-subj-cover-info-label">응시일</span><span class="wn-subj-cover-info-value">'+_wnEsc(info.date||'')+'</span></div>'+
+            '</div>'+
+            '<div class="cover-footer">실전 행동강령 기반 정밀 분석 시스템</div>'+
+          '</div>'+
         '</div>';
       }
       var subjBlocks=subs.map(function(s, subjIdx){
@@ -39296,10 +39335,60 @@ function generateReport() {
       '.wn-title{font-size:20px;font-weight:900}'+
       '.wn-meta{font-size:12px;color:#64748b}'+
       '.wn-subject{margin-bottom:18px}'+
-      '.wn-subject-divider{page-break-before:always;break-before:page;page-break-after:always;break-after:page;min-height:220mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}'+
+      '.wn-subject-divider{page-break-before:always;break-before:page;page-break-after:always;break-after:page}'+
       '.wn-subject-divider-first{page-break-before:avoid;break-before:avoid}'+
-      '.wn-subject-divider-name{font-size:34px;font-weight:900;color:#0f172a;letter-spacing:3px}'+
-      '.wn-subject-divider-sub{font-size:13px;color:#64748b;margin-top:10px}'+
+      // ★ 2026-09-02 추가: 상담 리포트 표지(cover())와 동일한 프리미엄 표지 CSS를
+      // 이 문서(오답노트, 별도 HTML)에도 그대로 옮겨온다 — 원본은 challenger-iframe
+      // 안에서만 쓰던 스타일이라 이 문서엔 없었다. page-break-after는 이미 위
+      // .wn-subject-divider가 담당하므로 여기서는 넣지 않는다(중복 페이지 방지).
+      '.premium-cover{position:relative;min-height:960px;overflow:hidden;'+
+        'background:radial-gradient(circle at 82% 18%, rgba(15,118,110,.10), transparent 24%),'+
+        'linear-gradient(135deg,#06213f 0%,#06213f 17%,#fdfaf3 17.2%,#fdfaf3 76%,#f6f0e5 100%);'+
+        'border:1px solid #d8c49a;padding:42px 58px 34px 165px;color:#081a33}'+
+      '.premium-cover:before{content:"";position:absolute;left:-120px;top:0;bottom:0;width:280px;'+
+        'background:linear-gradient(160deg,#041a32,#064b4d 70%,#0f766e);transform:skewX(-12deg);'+
+        'transform-origin:top;border-right:3px solid #c89b3c}'+
+      '.premium-cover:after{content:"";position:absolute;right:-90px;bottom:-40px;width:430px;height:430px;'+
+        'opacity:.13;background:repeating-radial-gradient(circle,#0f3d5a 0 1px,transparent 1px 22px),'+
+        'linear-gradient(45deg,transparent 0 60%,#0f3d5a 60% 61%,transparent 61%);border-radius:50%}'+
+      '.cover-side{position:absolute;left:28px;top:150px;width:118px;color:#f1d69a;z-index:2;'+
+        'font-size:13px;letter-spacing:1.8px;line-height:1.8;text-transform:uppercase}'+
+      '.cover-side-list{position:absolute;left:30px;bottom:118px;width:125px;color:#e6f6f2;z-index:2;font-size:13px;line-height:2.25}'+
+      '.cover-accent{position:absolute;right:48px;top:155px;width:230px;height:170px;opacity:.15;z-index:1;'+
+        'background:linear-gradient(to top, #0f766e 0 15%, transparent 15% 100%) 0 100%/28px 170px repeat-x}'+
+      '.logo-zone{text-align:center;position:relative;z-index:3;margin-top:8px}'+
+      '.logo-mark{width:96px;height:96px;margin:0 auto 10px;border-radius:24px 24px 28px 28px;'+
+        'background:linear-gradient(140deg,#061d38,#0f766e);border:3px solid #d9a84b;position:relative;'+
+        'box-shadow:0 12px 30px rgba(8,26,51,.18);clip-path:polygon(50% 0,92% 16%,82% 82%,50% 100%,18% 82%,8% 16%)}'+
+      '.logo-mark:before{content:"";position:absolute;left:23px;bottom:22px;width:54px;height:42px;'+
+        'border-left:8px solid #f8f1df;border-bottom:8px solid #f8f1df;transform:skew(-18deg) rotate(-28deg);border-radius:0 0 0 28px}'+
+      '.logo-mark:after{content:"";position:absolute;right:15px;top:22px;width:48px;height:48px;'+
+        'border-top:10px solid #d9a84b;border-right:10px solid #d9a84b;transform:rotate(12deg)}'+
+      '.logo-word{font-size:32px;font-weight:900;letter-spacing:5px;color:#061d38;line-height:1}'+
+      '.logo-eng{font-size:11px;letter-spacing:7px;color:#a8792a;margin-top:8px}'+
+      '.cover-rule{height:1px;background:linear-gradient(90deg,transparent,#bf9141,transparent);margin:24px auto;width:70%;position:relative}'+
+      '.cover-rule:after{content:"◆";position:absolute;left:50%;top:-10px;transform:translateX(-50%);color:#bf9141;background:#fdfaf3;padding:0 10px;font-size:13px}'+
+      '.cover-title{position:relative;z-index:3;text-align:center;margin-top:14px}'+
+      '.cover-title h1{font-size:45px;line-height:1.12;margin:0;color:#061d38;letter-spacing:-2px;font-weight:900}'+
+      '.cover-footer{position:absolute;left:0;right:0;bottom:0;background:#061d38;color:#f1d69a;'+
+        'text-align:center;padding:18px 30px;font-size:14px;letter-spacing:2px;z-index:3}'+
+      // ★ 학생 정보 표(cover-meta) 대신 들어가는 과목명·문항수·점수 블록
+      // ★ 학생 정보(학생명/학년/학교/시험명/응시일) 카드
+      '.wn-subj-cover-info{position:relative;z-index:3;margin:18px auto 0;max-width:420px;background:rgba(255,255,255,.82);'+
+        'border:1.5px solid #c89b3c;border-radius:14px;padding:6px 16px}'+
+      '.wn-subj-cover-info-row{border-bottom:1px solid rgba(200,155,60,.34);padding:5px 0;font-size:12px}'+
+      '.wn-subj-cover-info-row:last-child{border-bottom:0}'+
+      '.wn-subj-cover-info-label{display:inline-block;width:60px;font-weight:800;color:#16233a;margin-right:14px}'+
+      '.wn-subj-cover-info-value{font-weight:700;color:#111827}'+
+      '.wn-subj-cover-meta{position:relative;z-index:3;margin-top:20px;text-align:center}'+
+      '.wn-subj-cover-name{font-size:30px;font-weight:900;color:#061d38;letter-spacing:1px}'+
+      '.wn-subj-cover-sub{font-size:14px;color:#5b6b7a;margin-top:8px}'+
+      // ★ 2026-09-02(2차) 수정: 학생정보 카드가 추가된 뒤로 표지 한 장 분량이 실제 인쇄
+      // 페이지 높이를 넘어서면서, 표지 내용이 다음 페이지로 밀리고 하단 푸터 띠만 별도
+      // 페이지에 남는 문제가 있었다. 화면 뷰포트 기준인 vh는 인쇄 시 브라우저마다 페이지
+      // 높이와 다르게 계산될 수 있어 불안정하므로, 실제 인쇄 페이지(A4, 상하 여백 8mm×2)
+      // 안에 여유 있게 들어가는 고정 mm 값으로 바꾼다.
+      '@media print{.premium-cover{min-height:240mm;border:0;padding:24px 48px 22px 145px}.cover-title h1{font-size:34px}.cover-footer{font-size:11px;padding:11px}}'+
       '.wn-subject h3{font-size:14px;border-left:4px solid #0f766e;padding-left:8px;margin:14px 0 8px;break-after:avoid;page-break-after:avoid}'+
       '.wn-subject-meta{font-size:11px;color:#64748b;font-weight:500}'+
       '.wn-item{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:8px;break-inside:avoid;page-break-inside:avoid}'+
