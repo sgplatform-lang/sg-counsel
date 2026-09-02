@@ -29068,6 +29068,10 @@ function _examcatRenderForm(){
       <textarea id="examcat-itemmeta" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	단원/유형	난이도(선택)	정답(선택)	해설(선택)	배점(선택)
 KOR		5	독서 · 공간 생산/르페브르 · 개념 이해	상	②		2
 ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?e.itemMetaRawText:_sgItemMetaMapToText(e.itemMeta)):''}</textarea>
+      <div style="margin-top:6px">
+        <button type="button" onclick="_examcatPreviewDetailKeys();markClicked(event)" style="background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;border-radius:7px;padding:5px 11px;font-size:11.5px;cursor:pointer">🔍 지금 입력 내용으로 인식되는 세부과목 확인</button>
+        <div id="examcat-detail-preview" style="margin-top:6px;font-size:11.5px;color:#475569"></div>
+      </div>
     </div>
     <div style="margin-bottom:12px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">✅ 문항별 정답/해설/문제 (선택 — 위 칸에 정답/해설 없을 때만 여기 따로)</div>
@@ -29494,6 +29498,37 @@ function _examcatRenderSavedImageList(){
   el.innerHTML = listFor(_examcatMigrateImageMap(EXAMCAT_editing.qImages),'📄 등록된 문항 이미지','q') + listFor(_examcatMigrateImageMap(EXAMCAT_editing.eImages),'📄 등록된 해설 이미지','e');
 }
 
+// ★ 2026-09-02(3차) 추가: "국어 언어와매체 붙여쓰기 → 학생 쪽 채점 누락" 사고가 카탈로그를
+// 재저장한 뒤에도 재현된다는 보고가 있어, 코드 검토만으로는 원인을 못 좁혔다. 관리자가 직접
+// 눈으로 "지금 붙여넣은 내용이 실제로 어떤 세부과목 키로 인식되는지" 확인할 수 있게, 저장하지
+// 않고도 미리보기로 바로 보여주는 진단 도구를 추가한다 — "KOR|언어와매체"처럼 띄어쓰기 없이
+// 나오면 원인이 확실해지고, "KOR|언어와 매체"로 정상 나오는데도 문제가 계속되면 다른 원인
+// (재배포 안 됨, 캐시 등)이라는 것도 바로 구분할 수 있다.
+function _examcatPreviewDetailKeys(){
+  const itemMetaText=(document.getElementById('examcat-itemmeta')||{}).value||'';
+  const answerKeyText=(document.getElementById('examcat-answerkey')||{}).value||'';
+  const itemMeta=_sgParseItemMetaText(itemMetaText);
+  const answerKey=_sgParseAnswerKeyText(answerKeyText);
+  const box=document.getElementById('examcat-detail-preview');
+  if(!box) return;
+  function summarize(map, label){
+    const keys=Object.keys(map);
+    if(!keys.length) return '<b>'+label+'</b>: (입력된 내용 없음)';
+    const rows=keys.map(function(k){
+      const parts=k.split('|');
+      const subj=parts[0], detail=parts[1]||'(공통)';
+      const cnt=Object.keys(map[k]).length;
+      return '&nbsp;&nbsp;· '+esc(subj)+' / <b>"'+esc(detail)+'"</b> — '+cnt+'문항';
+    });
+    return '<b>'+label+'</b> (총 '+keys.length+'개 세부과목 인식됨):<br>'+rows.join('<br>');
+  }
+  box.innerHTML =
+    '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;line-height:1.7">'+
+    summarize(itemMeta,'📚 문항별 단원/유형 칸')+'<br><br>'+
+    summarize(answerKey,'✅ 정답/해설 칸')+
+    '<div style="margin-top:6px;color:#dc2626;font-size:11px">※ 여기 "..." 안에 나온 표기가 학생 화면의 세부과목 선택지(예: "화법과 작문", "언어와 매체", "확률과 통계", "윤리와 사상", "생활과 윤리", "정치와 법")와 띄어쓰기까지 정확히 같아야 정상 채점됩니다. 다르게 보이면 해당 줄의 세부과목 칸을 학생 화면과 똑같이 고쳐서 다시 저장해주세요.</div>'+
+    '</div>';
+}
 async function _examcatSubmit(){
   const name=(document.getElementById('examcat-name')||{}).value?.trim();
   const date=cbrNormalizeDate((document.getElementById('examcat-date')||{}).value?.trim()||'');
