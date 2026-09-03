@@ -24523,7 +24523,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   </div>
 </header>
 <nav class="tabs no-print">
-<button class="tab" onclick="showTab(&#39;omrAutomationPanel&#39;)">★ OMR 자동화</button><button class="tab active" onclick="showTab(&#39;input&#39;)">1. 기본 입력</button><button class="tab" onclick="showTab(&#39;answerKeyPanel&#39;)">2. 단일 자동채점</button><button class="tab" onclick="showTab(&#39;batchGradingPanel&#39;)">3. 다학생 일괄채점</button><button class="tab" onclick="showTab(&#39;qrAdminPanel&#39;)">4. QR 회차</button><button class="tab" onclick="showTab(&#39;studentReflectionPanel&#39;)">5. 학생 복기</button><button class="tab" onclick="showTab(&#39;reflectionApplyPanel&#39;)">6. 복기 반영</button><button class="tab" onclick="showTab(&#39;weekly&#39;)">7. 상담리포트</button><button class="tab" onclick="showTab(&#39;aarPanel&#39;)">8. 매니저 AAR</button>
+<button class="tab" onclick="showTab(&#39;omrAutomationPanel&#39;)">★ OMR 자동화</button><button class="tab active" onclick="showTab(&#39;input&#39;)">1. 기본 입력</button><button class="tab" onclick="showTab(&#39;answerKeyPanel&#39;)">2. 단일 자동채점</button><button class="tab" onclick="showTab(&#39;batchGradingPanel&#39;)">3. 다학생 일괄채점</button><button class="tab" onclick="showTab(&#39;qrAdminPanel&#39;)">4. QR 회차</button><button class="tab" onclick="showTab(&#39;studentReflectionPanel&#39;)">5. 학생 복기</button><button class="tab" onclick="showTab(&#39;reflectionApplyPanel&#39;)">6. 복기 반영</button><button class="tab" onclick="showTab(&#39;weekly&#39;)">7. 상담리포트</button><button class="tab" onclick="showTab(&#39;aarPanel&#39;)">8. 매니저 AAR</button><button class="tab" onclick="showTab(&#39;statsPanel&#39;)">📊 학생 통계</button>
 </nav>
 
 
@@ -25594,6 +25594,12 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
 <div id="aarBody"></div>
 </div></section>
 
+<section id="statsPanel" class="panel print-target"><div class="card">
+<div class="row no-print"><h2>10. 학생 통계 — 챌린저 누적 성적 현황</h2><button class="right" onclick="__SG_printSection(this)">인쇄/PDF</button></div>
+<p style="font-size:12px;color:#888;margin-bottom:10px">"1. 기본 입력"에 있는 학생명을 기준으로, 그 학생이 지금까지 치른 모든 챌린저 회차의 과목별 누적 성적과 회차별 상세 기록을 한 화면에서 볼 수 있습니다.</p>
+<div id="statsPanelBody"></div>
+</div></section>
+
 <div class="footer-clean-note">CHALLENGER AAR · 실전모의고사 정밀분석 시스템</div>
 </div>
 
@@ -25614,7 +25620,7 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function toast(msg){let t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500)}function markClicked(e){if(!e)return;e.currentTarget.classList.add('clicked');setTimeout(()=>e.currentTarget.classList.remove('clicked'),600)}
 function appendField(id,txt){let el=$(id);let cur=(el.value||'').trim();el.value=cur?cur+' / '+txt:txt;toast('입력란에 반영했습니다.')}
 function appendSubjectMemo(sid,type){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);let iss=issues(s);let txt='';if(type==='reason')txt=iss.map(i=>i.tag).join(' / ')||'오답원인 미선택';if(type==='action')txt=iss.slice(0,2).map(i=>actionFor(s,i.tag)).join(' / ')||'행동강령 생성 전';if(type==='range')txt=\`\${s.processRange} · \${s.difficultySelect} · \${s.accuracyTarget}\`;if(type==='items')txt=iss.map(i=>\`\${i.items.join(', ')}번 \${[...new Set(i.units)].join(', ')}\`).join(' / ')||'문항·단원 미입력';if(type==='student')txt=\`이번 회차는 \${name(s)}에서 \${s.difficultySelect} 범위만 완료하고 \${s.accuracyTarget} 달성을 확인한다.\`;s.memo=((s.memo||'')+(s.memo?'\\n':'')+txt).trim();renderSubjects();toast('매니저 메모에 반영했습니다.')}
-function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','weekly','aarPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR()}
+function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','weekly','aarPanel','statsPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR();if(id==='statsPanel')renderStatsPanel()}
 function loadStudent(){ $('studentName').value='홍길동';$('studentSchool').value='합격고등학교 3학년';$('target').value='서울대학교 자유전공학부';$('managerName').value='에이스';toast('학생정보를 불러왔습니다.')}
 function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid,subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'',focus:p.focus||'',processRange:p.processRange||'',difficultySelect:p.difficultySelect||'',accuracyTarget:p.accuracyTarget||'',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',totalItemCount:p.totalItemCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false}],preparationLevel:p.preparationLevel||'',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'',learnedErrorCount:p.learnedErrorCount||'',scoreBasis:p.scoreBasis||'',concentrationBreak:p.concentrationBreak||'',recoveryResult:p.recoveryResult||'',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',studentSituationTypes:p.studentSituationTypes||[],managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||'',aar:p.aar||{}});renderSubjects()}
 function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','totalItemCount','order','orderMemo','time','mental','preparationLevel','weakUnits','unlearnedCount','learnedErrorCount','concentrationBreak','recoveryResult','primaryFactor','progressImpact','operationImpact','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=(k==='detail')?_cbrNormalizeDetail(e.value):e.value});['completedUnits','inProgressUnits','unlearnedUnits'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.multiple?[...e.selectedOptions].map(o=>o.value).join(', '):e.value});{let e=c.querySelector('.studentSituationTypes');if(e)s.studentSituationTypes=[...e.selectedOptions].map(o=>o.value);}s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value,points:(r.querySelector('.points')||{}).value||'',causePrimary:(r.querySelector('.causePrimary')||{}).value||'',guessedTime:!!(r.querySelector('.guessedTime')||{}).checked,answer:s.items[i]?.answer||'',explanation:s.items[i]?.explanation||'',question:s.items[i]?.question||''}));updateOverallCompliance()}
@@ -25822,6 +25828,85 @@ function renderTrend(){syncAll();let cur=currentRecord();let rows=[...state.hist
     return \`<tr><td>\${esc(subLabel)}</td><td>\${entries.length}회</td><td>\${avgTxt}</td><td>\${max}</td><td>\${min}</td><td>\${esc(topTags.join(', '))}</td></tr>\`;
   }).join('');
   $('trendReport').innerHTML=cover('누적 변화 리포트')+subjects.map(sub=>\`<div class="chart">\${chart(rows,sub)}</div>\`).join('')+\`<table><thead><tr><th>과목</th><th>총 응시회차</th><th>성적(평균)</th><th>최고 성적</th><th>최저 성적</th><th>태그</th></tr></thead><tbody>\${summaryRows}</tbody></table>\`}
+// ★ 2026-09-02 추가: "10. 학생 통계" 탭. renderTrend의 과목별 누적 요약(총 응시회차/평균/
+// 최고/최저/태그) 계산 로직을 그대로 재사용하고, 그 위에 학생명/학교·학년을, 아래에는
+// 회차별 상세 기록(시험명·과목·성적·오답·태그)을 추가로 보여준다. 그래프는 그리지 않는다
+// (누적 변화 리포트에 이미 있으므로 중복 방지, 여기는 "표" 위주의 통계 화면).
+function renderStatsPanel(){
+  syncAll();
+  let cur=currentRecord();
+  let studentNameVal=$('studentName').value;
+  let rows=[...state.history.filter(h=>_sgTrim(h.student)===_sgTrim(studentNameVal)&&!(_sgTrim(h.date)===_sgTrim(cur.date)&&_sgTrim(h.test)===_sgTrim(cur.test))),cur];
+  let _seenSubjNorm={};
+  let subjects=[];
+  rows.flatMap(r=>r.subjects.map(s=>_sgTrendLabel(s)).filter(n=>n)).forEach(n=>{
+    let k=_sgNormSubj(n);
+    if(!_seenSubjNorm[k]){_seenSubjNorm[k]=true;subjects.push(n)}
+  });
+  let summaryRows=subjects.map(function(subLabel){
+    let subK=_sgNormSubj(subLabel);
+    let entries=[];
+    rows.forEach(function(r){
+      (r.subjects||[]).forEach(function(s){
+        let lbl=_sgTrendLabel(s);
+        if(lbl && _sgNormSubj(lbl)===subK){
+          let sc = s.score!=null && s.score!=='' ? +s.score : null;
+          if(sc!=null && !isNaN(sc)) entries.push({score:sc, tags:(s.tags||[])});
+        }
+      });
+    });
+    if(!entries.length) return '';
+    let scores=entries.map(function(e){return e.score;});
+    let avg=scores.reduce(function(a,b){return a+b;},0)/scores.length;
+    let avgTxt = Number.isInteger(avg) ? String(avg) : avg.toFixed(1);
+    let max=Math.max.apply(null,scores);
+    let min=Math.min.apply(null,scores);
+    let tagCount={};
+    entries.forEach(function(e){ (e.tags||[]).forEach(function(t){ if(!t) return; tagCount[t]=(tagCount[t]||0)+1; }); });
+    let topTags=Object.keys(tagCount).sort(function(a,b){return tagCount[b]-tagCount[a];}).slice(0,4);
+    return \`<tr><td>\${esc(subLabel)}</td><td>\${entries.length}회</td><td>\${avgTxt}</td><td>\${max}</td><td>\${min}</td><td>\${esc(topTags.join(', '))}</td></tr>\`;
+  }).join('');
+  // ★ 2026-09-02(2차) 수정: "회차별"(날짜순 나열) 대신 "과목별"로 묶어서 보여준다.
+  // 국어 → 수학 → 영어 → 탐구1(그 회차에서 첫 번째로 입력한 탐구) → 탐구2(두 번째) →
+  // 한국사 → 그 외(제2외국어 등) 순으로 묶고, 같은 과목 안에서는 최신 회차가 위로 오도록
+  // 정렬한다. 탐구1/탐구2는 과목명이 아니라 "그 회차에 입력한 순서"로 구분한다 — 같은
+  // 학생이 회차마다 다른 탐구 과목을 선택했더라도 항상 "1번째로 입력한 탐구"끼리,
+  // "2번째로 입력한 탐구"끼리 묶인다.
+  let flatEntries=[];
+  rows.forEach(function(r){
+    let inqSeen=0;
+    (r.subjects||[]).forEach(function(s){
+      let lbl=_sgTrendLabel(s);
+      if(!lbl) return;
+      let isInq = lbl.indexOf('탐구')===0;
+      let slot=0;
+      if(isInq){ inqSeen++; slot=inqSeen; }
+      let pri = lbl.indexOf('국어')===0?0 : lbl.indexOf('수학')===0?1 : lbl.indexOf('영어')===0?2 : isInq?3 : lbl.indexOf('한국사')===0?4 : 5;
+      flatEntries.push({r:r, s:s, lbl:lbl, pri:pri, slot:slot});
+    });
+  });
+  flatEntries.sort(function(a,b){
+    if(a.pri!==b.pri) return a.pri-b.pri;
+    if(a.slot!==b.slot) return a.slot-b.slot;
+    return _sgTrim(b.r.date).localeCompare(_sgTrim(a.r.date));
+  });
+  let detailRows = flatEntries.map(function(e){
+    return \`<tr><td>\${esc(e.lbl)}</td><td>\${esc(e.r.date||'')}<br>\${esc(e.r.test||'')}</td><td>\${esc(e.s.score||'-')}</td><td>\${_sgTrendWrong(e.s)}</td><td>\${esc((e.s.tags||[]).join(', '))}</td></tr>\`;
+  }).join('');
+  $('statsPanelBody').innerHTML =
+    \`<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">\`+
+      \`<div><span class="small muted">학생명</span><br><b style="font-size:15px">\${esc(studentNameVal||'-')}</b></div>\`+
+      \`<div><span class="small muted">학교/학년</span><br><b style="font-size:15px">\${esc($('studentSchool').value||'-')}</b></div>\`+
+    \`</div>\`+
+    \`<h3 style="margin:18px 0 8px">📚 과목별 누적 통계</h3>\`+
+    (summaryRows
+      ? \`<table><thead><tr><th>과목</th><th>총 응시회차</th><th>성적(평균)</th><th>최고 성적</th><th>최저 성적</th><th>태그</th></tr></thead><tbody>\${summaryRows}</tbody></table>\`
+      : \`<p class="small muted">아직 입력된 점수가 없습니다.</p>\`)+
+    \`<h3 style="margin:24px 0 8px">📖 과목별 상세 기록</h3>\`+
+    (detailRows
+      ? \`<table><thead><tr><th>과목</th><th>회차</th><th>성적</th><th>오답</th><th>태그</th></tr></thead><tbody>\${detailRows}</tbody></table>\`
+      : \`<p class="small muted">아직 입력된 회차가 없습니다.</p>\`);
+}
 function chart(rows,sub){let allData=rows.map((r,i)=>{let s=r.subjects.find(x=>_sgNormSubj(_sgTrendLabel(x))===_sgNormSubj(sub));if(!s||s.score===undefined||s.score===null||s.score===''){return null}return {i,label:r.test||r.date,score:+s.score||0,wrong:+_sgTrendWrong(s)||0}}).filter(d=>d!==null);if(!allData.length){return \`<b>\${sub} 성적/오답 추이</b><div class="small muted">아직 입력된 점수가 없습니다.</div>\`}
   // ★ 2026-09-01 추가: 그래프는 화면 가독성을 위해 최근 6회차만 표시한다. 누적 변화 리포트의
   // 요약표(총 응시회차/평균/최고/최저/태그)는 이 슬라이스와 무관하게 전체 회차를 그대로 쓰며,
@@ -28006,14 +28091,23 @@ function __SG_printSection(btn){
   try{
     const section = btn.closest('section.panel');
     if(!section){ window.print(); return; }
-    const reportEl = section.querySelector('[id$="Report"]') || section;
+    const reportEl = section.querySelector('[id$="Report"]') || section.querySelector('[id$="PanelBody"]') || section;
     const reportTitle = section.querySelector('h2')?.textContent || '챌린저 리포트';
     // ★ 학생명 + 응시일을 파일명에 포함 (브라우저 PDF저장 시 title이 기본 파일명이 됨)
     const studentName = ($('studentName')?.value || '').trim();
-    const testDate = ($('testDate')?.value || '').trim();
-    const testName = ($('testName')?.value || '').trim();
-    const titleParts = [studentName, testDate, testName, reportTitle].filter(Boolean);
-    const title = titleParts.join('_').replace(/[\\\\\\\\/:*?"<>|]/g, ''); // 파일명에 쓸 수 없는 문자 제거
+    let titleParts;
+    if(section.id==='statsPanel'){
+      // ★ 2026-09-03 추가: "학생 통계"는 특정 회차 하나가 아니라 그 학생의 전체 누적
+      // 기록을 보여주는 화면이라, 그 회차 입력칸의 응시일·시험명을 파일명에 넣는 게
+      // 맞지 않는다. 대신 "이 통계를 언제 뽑았는지" 기준으로 오늘 날짜를 넣는다.
+      const todayStr=new Date().toISOString().slice(0,10);
+      titleParts=[studentName, '챌린저 누적 성적 현황', '학생 통계', todayStr];
+    } else {
+      const testDate = ($('testDate')?.value || '').trim();
+      const testName = ($('testName')?.value || '').trim();
+      titleParts=[studentName, testDate, testName, reportTitle];
+    }
+    const title = titleParts.filter(Boolean).join('_').replace(/[\\\\\\\\/:*?"<>|]/g, ''); // 파일명에 쓸 수 없는 문자 제거
     const styleEl = document.querySelector('style');
     const printWin = window.open('', '_blank', 'width=900,height=1000');
     if(!printWin){
