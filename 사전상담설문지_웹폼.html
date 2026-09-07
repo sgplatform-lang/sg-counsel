@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상담 사전 설문지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#F7F7F4;
+    --surface:#FFFFFF;
+    --ink:#1E2A44;
+    --body-text:#33394A;
+    --muted:#7A8093;
+    --line:#DADCE2;
+    --accent:#8B3A3A;
+    --accent-soft:#F3E7E7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--body-text);
+    font-family:'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    line-height:1.6;
+  }
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--body-text)}
+  .sheet{
+    max-width:760px;
+    margin:0 auto;
+    background:var(--surface);
+    padding:56px 64px 72px;
+  }
+  @media (max-width:600px){
+    .sheet{padding:32px 22px 48px;}
+  }
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:8px;
+  }
+  .masthead .org{
+    font-size:13px;
+    letter-spacing:0.02em;
+    color:var(--muted);
+  }
+  .masthead .date-field{
+    font-size:13px;
+    color:var(--muted);
+    text-align:right;
+  }
+  h1{
+    font-family:'Noto Serif KR', serif;
+    font-weight:700;
+    font-size:28px;
+    color:var(--ink);
+    margin:26px 0 6px;
+  }
+  .lede{
+    font-size:14.5px;
+    color:var(--muted);
+    max-width:56ch;
+    margin-bottom:24px;
+  }
+  .level-toggle{
+    display:flex;
+    gap:8px;
+    margin-bottom:38px;
+  }
+  .level-btn{
+    flex:1;
+    text-align:center;
+    padding:12px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    font-size:14px;
+    font-weight:600;
+    color:var(--muted);
+    cursor:pointer;
+    background:#fff;
+    transition:all .15s;
+  }
+  .level-btn.active{
+    border-color:var(--ink);
+    background:var(--ink);
+    color:#fff;
+  }
+  .section{
+    margin-bottom:38px;
+  }
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:8px;
+    margin-bottom:18px;
+  }
+  .section-num{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--accent);
+    min-width:20px;
+  }
+  .section-title{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:18px;
+    color:var(--ink);
+  }
+  .section-hint{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-left:auto;
+  }
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px 24px;
+  }
+  .grid3{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:16px 20px;
+  }
+  @media (max-width:600px){
+    .grid2, .grid3{grid-template-columns:1fr;}
+  }
+  .field label{
+    display:block;
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    border:none;
+    border-bottom:1px solid var(--line);
+    padding:4px 2px 6px;
+    background:transparent;
+    outline:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    border-bottom-color:var(--accent);
+  }
+  .field textarea{resize:vertical;min-height:30px;line-height:1.6}
+  .score-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13.5px;
+    margin-top:6px;
+  }
+  .score-table th, .score-table td{
+    border:1px solid var(--line);
+    padding:6px 6px;
+    text-align:center;
+  }
+  .score-table th{
+    background:#FAFAF8;
+    color:var(--muted);
+    font-weight:500;
+    font-size:12.5px;
+  }
+  .score-table td{
+    height:34px;
+  }
+  .score-table td select, .score-table td input{
+    width:100%;
+    border:none;
+    text-align:center;
+    background:transparent;
+    outline:none;
+    font-size:13px;
+  }
+  .checklist{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 22px;
+  }
+  .check-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .check-item input[type=checkbox]{
+    width:16px;height:16px;flex-shrink:0;accent-color:var(--ink);cursor:pointer;
+  }
+  .curiosity-grid{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .note-box{
+    background:var(--accent-soft);
+    border-left:3px solid var(--accent);
+    padding:14px 18px;
+    font-size:13px;
+    color:#5A2E2E;
+    margin-top:6px;
+  }
+  .field-highlight{
+    background:var(--accent-soft);
+    border:1px solid var(--accent);
+    border-radius:8px;
+    padding:12px 14px 10px;
+  }
+  .field-highlight label{
+    color:var(--accent);
+    font-weight:700;
+  }
+  .field-highlight input{
+    border-bottom-color:var(--accent);
+  }
+  .submit-btn{
+    width:100%;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:18px;
+    font-size:16px;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+    margin-top:10px;
+  }
+  .submit-btn:active{ opacity:.85; }
+  .submit-btn:disabled{ background:#aab; cursor:default; }
+  footer{
+    margin-top:24px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    justify-content:space-between;
+  }
+  .done-screen{
+    display:none;
+    text-align:center;
+    padding:80px 20px;
+  }
+  .done-screen .mark{ font-size:52px; margin-bottom:18px; }
+  .done-screen h2{ font-family:'Noto Serif KR', serif; font-size:22px; color:var(--ink); margin-bottom:10px; }
+  .done-screen p{ color:var(--muted); font-size:14px; }
+  .err-box{
+    display:none;
+    background:#fdecea;
+    border-left:3px solid #c0392b;
+    padding:12px 16px;
+    font-size:13px;
+    color:#7a2c22;
+    margin-bottom:20px;
+  }
+  @media print{
+    body{background:#fff; line-height:1.35;}
+    .sheet{padding:8px 8px;}
+    .submit-btn, .level-toggle, #printBtn{display:none;}
+    .section{page-break-inside:avoid; break-inside:avoid; margin-bottom:10px;}
+    .page-break-print{ page-break-before: always; break-before: page; }
+    h1{font-size:19px; margin:8px 0 2px;}
+    .lede{font-size:10.5px; margin-bottom:6px; line-height:1.4;}
+    .masthead{padding-bottom:5px; margin-bottom:2px;}
+    .masthead .org, .masthead .date-field{font-size:11px;}
+    .level-toggle{margin-bottom:10px;}
+    .section-head{padding-bottom:3px; margin-bottom:7px;}
+    .section-num{font-size:13px; min-width:16px;}
+    .section-title{font-size:14.5px;}
+    .section-hint{font-size:10.5px;}
+    .grid2, .grid3{gap:8px 12px;}
+    .field label{font-size:10.5px; margin-bottom:3px;}
+    .field input, .field select, .field textarea{font-size:11px; padding:5px 0 4px;}
+    .checklist{gap:5px 12px;}
+    .check-item{font-size:11.5px;}
+    .curiosity-grid{gap:4px;}
+    .score-table{font-size:11px; margin-top:3px;}
+    .score-table th, .score-table td{padding:3px 4px;}
+    .score-table td{height:22px;}
+    .note-box{padding:7px 10px; font-size:10.5px; margin-top:3px;}
+    footer{margin-top:8px; padding-top:6px; font-size:9.5px;}
+  }
+</style>
+</head>
+<body>
+<div class="sheet" id="formSheet">
+
+  <div class="masthead">
+    <div class="org">SG상담플랫폼 · 입시 컨설팅</div>
+    <div class="date-field" id="todayField"></div>
+  </div>
+
+  <h1>상담 사전 설문지</h1>
+  <p class="lede">상담 시간을 학생 개개인에게 온전히 쓰기 위해, 일반적인 설명 대신 이 자료를 먼저 검토한 뒤 맞춤 분석으로 상담을 시작합니다. 아는 범위 내에서 편하게 작성해 주세요.</p>
+
+  <div class="level-toggle">
+    <div class="level-btn active" id="levelBtnMS" onclick="setLevel('MS')">중학생</div>
+    <div class="level-btn" id="levelBtnHS" onclick="setLevel('HS')">고등학생</div>
+  </div>
+
+  <div class="err-box" id="errBox"></div>
+
+  <form id="surveyForm" onsubmit="return submitSurvey(event)">
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">1</span>
+      <span class="section-title">학생 기본 정보</span>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>학생 이름 *</label><input id="f_name" required></div>
+      <div class="field"><label>학교명</label><input id="f_school" placeholder="예: 강남고등학교"></div>
+      <div class="field"><label>학년</label><select id="f_grade"></select></div>
+      <div class="field"><label>학생 연락처</label><input id="f_studentPhone" type="tel" placeholder="예: 010-1234-5678"></div>
+      <div class="field"><label>학부모 연락처</label><input id="f_parentPhone" type="tel" placeholder="예: 010-1234-5678"></div>
+      <div class="field"><label>계열</label>
+        <select id="f_track">
+          <option value="">전체</option>
+          <option value="인문·사회">인문·사회</option>
+          <option value="상경">상경</option>
+          <option value="자연·공학" selected>자연·공학</option>
+          <option value="의약학">의약학</option>
+          <option value="교육">교육</option>
+          <option value="예체능">예체능</option>
+        </select>
+      </div>
+      <div class="field"><label>희망 학과 (1순위)</label><input id="f_dept1" placeholder="예: 화학공학과"></div>
+      <div class="field"><label>희망 학과 (2순위)</label><input id="f_dept2" placeholder="예: 신소재공학과"></div>
+      <div class="field" style="grid-column:1/-1"><label>희망 대학군 (예: 서울권/수도권 등)</label><input id="f_univGroup" placeholder="예: 서울권"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">2</span>
+      <span class="section-title">내신 성적 (과목별 · 전 학기)</span>
+      <span class="section-hint">아는 학기까지만 기입해도 됩니다</span>
+    </div>
+    <p id="semHint" style="font-size:11.5px;color:#888;margin:-4px 0 10px">중학생 — 국어·영어·수학·사회·과학 학기별 성적을 점수 또는 A~E로 입력합니다. 입력하면 "현재 내신 전체 평균"이 자동 계산됩니다.</p>
+    <table class="score-table">
+      <thead>
+        <tr><th></th><th>1학년 1학기</th><th>1학년 2학기</th><th>2학년 1학기</th><th>2학년 2학기</th><th>3학년 1학기</th><th>3학년 2학기</th></tr>
+      </thead>
+      <tbody id="semGridBody"></tbody>
+    </table>
+    <div class="grid2" style="margin-top:14px">
+      <div class="field field-highlight" id="curOverallWrap"><label id="curOverallLabel">현재 내신 전체 평균 (5등급제 기준) — 자동계산</label><input type="number" id="f_curOverallDirect" min="1" max="5" step="0.01" placeholder="예: 2.3"></div>
+      <div class="field field-highlight"><label id="curMainLabel">현재 내신 주요과목 평균 (5등급제 기준)</label><input type="number" id="f_curMainDirect" min="1" max="5" step="0.01" placeholder="예: 2.1"></div>
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-top:6px">※ 위 표에 과목별 성적을 입력하면 자동으로 평균이 계산되어 채워집니다(중학생→전체 평균, 고등학생→주요과목 평균). 표에 아무것도 입력하지 않으면 직접 입력한 값이 그대로 사용됩니다.</div>
+  </div>
+
+  <div class="section page-break-print">
+    <div class="section-head">
+      <span class="section-num">3</span>
+      <span class="section-title">자신 있는 과목 / 보완이 필요한 과목</span>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>자신 있는 과목</label><input id="f_strongSubj" placeholder="예: 수학, 영어"></div>
+      <div class="field"><label>보완이 필요한 과목</label><input id="f_weakSubj" placeholder="예: 국어, 과학"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">4</span>
+      <span class="section-title">모의고사 성적 (최근 응시, 등급 1~9)</span>
+    </div>
+    <table class="score-table" style="table-layout:fixed">
+      <colgroup><col style="width:16.66%"><col style="width:16.66%"><col style="width:16.66%"><col style="width:16.66%"><col style="width:16.66%"><col style="width:16.66%"></colgroup>
+      <thead>
+        <tr><th>국어</th><th>수학</th><th>영어</th><th>통합사회</th><th>통합과학</th><th>한국사</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="number" id="f_mock_kor" min="1" max="9" step="1"></td>
+          <td><input type="number" id="f_mock_math" min="1" max="9" step="1"></td>
+          <td><input type="number" id="f_mock_eng" min="1" max="9" step="1"></td>
+          <td><input type="number" id="f_mock_soc" min="1" max="9" step="1"></td>
+          <td><input type="number" id="f_mock_sci" min="1" max="9" step="1"></td>
+          <td><input type="number" id="f_mock_hist" min="1" max="9" step="1"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">5</span>
+      <span class="section-title">학생부 관련 활동</span>
+    </div>
+    <div class="grid2" style="margin-bottom:16px">
+      <div class="field"><label>동아리명</label><input id="f_club" placeholder="예: 화학동아리"></div>
+      <div class="field"><label>교과세특 준비도</label>
+        <select id="f_seduk">
+          <option value="매우우수">매우우수</option>
+          <option value="우수">우수</option>
+          <option value="보통" selected>보통</option>
+          <option value="미흡">미흡</option>
+          <option value="매우미흡">매우미흡</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:16px"><label>최근 관심주제 또는 관심 키워드</label><textarea id="f_activities" rows="3" placeholder="예: 청소년 카페인 섭취, 동물 약리학"></textarea></div>
+    <div class="field" id="f_targetHsWrap"><label>현재 알아보고 싶은 고등학교</label><input id="f_targetHs" placeholder="예: OO고등학교, OO외국어고등학교"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">6</span>
+      <span class="section-title">희망 전형 및 목표</span>
+      <span class="section-hint">중복 선택 가능</span>
+    </div>
+    <div class="checklist" style="margin-bottom:20px">
+      <label class="check-item"><input type="checkbox" name="hopeType" value="학생부종합전형" checked>학생부종합전형</label>
+      <label class="check-item"><input type="checkbox" name="hopeType" value="학생부교과전형">학생부교과전형</label>
+      <label class="check-item"><input type="checkbox" name="hopeType" value="논술전형">논술전형</label>
+      <label class="check-item"><input type="checkbox" name="hopeType" value="정시(수능)">정시(수능)</label>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>면접 준비 현황</label>
+        <select id="f_interview">
+          <option value="경험 있음">경험 있음</option>
+          <option value="기본 대비 필요" selected>기본 대비 필요</option>
+          <option value="경험 없음">경험 없음</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">7</span>
+      <span class="section-title">상담 주요 질문 및 특이사항</span>
+    </div>
+    <div class="curiosity-grid" style="margin-bottom:18px">
+      <label class="check-item"><input type="checkbox" name="curiosity" value="희망 대학/학과 합격 가능성 진단">희망 대학/학과 합격 가능성 진단</label>
+      <label class="check-item"><input type="checkbox" name="curiosity" value="부족한 비교과/세특 보완 전략">부족한 비교과/세특 보완 전략</label>
+      <label class="check-item"><input type="checkbox" name="curiosity" value="남은 학기 내신 및 학습 전략">남은 학기 내신 및 학습 전략</label>
+    </div>
+    <div class="field"><label>상담 특이사항 / 자유 메모</label><textarea id="f_memo" rows="4" placeholder="상담에서 참고할 내용을 자유롭게 적어주세요"></textarea></div>
+    <div class="note-box">이 답변은 상담 시작 시 가장 먼저 다룹니다. 막연한 질문이어도 괜찮습니다 — 상담에서 구체화해 드립니다.</div>
+  </div>
+
+  <button type="submit" class="submit-btn" id="submitBtn">사전조사서 제출하기</button>
+  <button type="button" class="submit-btn" id="printBtn" onclick="window.print()" style="background:#fff;color:var(--ink);border:1.5px solid var(--ink);margin-top:10px">🖨 인쇄 / PDF로 저장</button>
+
+  <footer>
+    <span>작성해 주신 내용은 맞춤 분석 자료 준비 용도로만 사용됩니다.</span>
+    <span>SG상담플랫폼</span>
+  </footer>
+  </form>
+</div>
+
+<div class="sheet done-screen" id="doneScreen">
+  <div class="mark">✅</div>
+  <h2>제출이 완료되었습니다</h2>
+  <p>작성해 주셔서 감사합니다. 상담 시 확인 후 맞춤 분석을 준비하겠습니다.</p>
+</div>
+
+<script>
+// ── Firebase 초기화 (관리자 앱과 동일 프로젝트) ──
+// ★ Firebase SDK가 네트워크 문제 등으로 로드되지 않아도(광고차단기, 오프라인 등) 폼 자체는
+// 계속 채우고 인쇄할 수 있어야 하므로, 초기화 실패가 이후 스크립트 실행을 막지 않게 감싼다.
+let _db=null;
+try{
+  firebase.initializeApp({
+    apiKey: "AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
+    authDomain: "sg-counsel.firebaseapp.com",
+    projectId: "sg-counsel",
+    storageBucket: "sg-counsel.firebasestorage.app",
+    messagingSenderId: "134794459070",
+    appId: "1:134794459070:web:a636cac4df344bd26e2bef"
+  });
+  _db = firebase.firestore();
+  _db.settings({ experimentalAutoDetectLongPolling: true });
+}catch(e){
+  console.warn('Firebase 초기화 실패 — 온라인 제출은 불가하지만 폼 작성/인쇄는 계속 가능합니다:', e.message);
+}
+
+let LEVEL='MS';
+const GRID_SUBJECTS=[{key:'kor',label:'국어'},{key:'eng',label:'영어'},{key:'math',label:'수학'},{key:'soc',label:'사회'},{key:'sci',label:'과학'}];
+const SEM_COUNT=6;
+
+function $(id){ return document.getElementById(id); }
+
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
+}
+$('todayField').textContent='작성일  '+todayStr();
+
+function gradeSelectOptions(){
+  const g=$('f_grade');
+  // ★ 351: 학년 선택은 학교급 토글(중학생/고등학생)과 무관하게 중1~고3 전체를 항상 보여준다
+  const opts=['중1','중2','중3','고1','고2','고3'];
+  const cur=g.value;
+  if(!g.options.length){
+    g.innerHTML=opts.map(function(o){ return '<option value="'+o+'">'+o+'</option>'; }).join('');
+    g.value = LEVEL==='MS' ? '중1' : '고1';
+  } else if(cur){
+    g.value=cur; // 이미 선택돼 있던 값은 토글을 바꿔도 그대로 유지
+  }
+}
+
+// ★ 340: 과목별(국·영·수·사·과) × 6학기 성적 그리드. 중학생은 점수/A~E 자유 입력,
+// 고등학생(5등급제)은 등급(1~5) 숫자 입력 — 관리자 앱 기본상담과 동일한 방식.
+function renderSemGrid(){
+  const body=$('semGridBody');
+  const prev={};
+  GRID_SUBJECTS.forEach(function(subj){
+    prev[subj.key]=[];
+    for(let i=1;i<=SEM_COUNT;i++){ const el=$('sem_'+subj.key+'_'+i); prev[subj.key].push(el?el.value:''); }
+  });
+  body.innerHTML='';
+  GRID_SUBJECTS.forEach(function(subj){
+    let cells='';
+    for(let i=1;i<=SEM_COUNT;i++){
+      const cellId='sem_'+subj.key+'_'+i;
+      if(LEVEL==='MS'){
+        cells+='<td><input type="text" id="'+cellId+'" placeholder="A/90" oninput="onGradeGridInput()" style="width:100%;text-align:center;border:1px solid #ddd;border-radius:5px;padding:4px;font-size:12px"></td>';
+      } else {
+        cells+='<td><input type="number" id="'+cellId+'" min="1" max="5" step="1" placeholder="-" oninput="onGradeGridInput()" style="width:100%;text-align:center;border:1px solid #ddd;border-radius:5px;padding:4px;font-size:12px"></td>';
+      }
+    }
+    body.innerHTML+='<tr><td style="text-align:left;font-weight:600;font-size:12.5px">'+subj.label+'</td>'+cells+'</tr>';
+  });
+  GRID_SUBJECTS.forEach(function(subj){
+    prev[subj.key].forEach(function(v,i){ if(v){ const el=$('sem_'+subj.key+'_'+(i+1)); if(el) el.value=v; } });
+  });
+}
+// 중학생 셀(점수 또는 A~E) 1개 → 1~5등급 환산
+function msCellToGrade(raw){
+  const v=String(raw||'').trim();
+  if(!v) return null;
+  const letterMap={A:1,B:2,C:3,D:4,E:5};
+  const upper=v.toUpperCase();
+  if(letterMap.hasOwnProperty(upper)) return letterMap[upper];
+  const num=parseFloat(v);
+  if(isNaN(num)) return null;
+  if(num>=90) return 1;
+  if(num>=80) return 2;
+  if(num>=70) return 3;
+  if(num>=60) return 4;
+  return 5;
+}
+function onGradeGridInput(){
+  const vals=[];
+  GRID_SUBJECTS.forEach(function(subj){
+    for(let i=1;i<=SEM_COUNT;i++){
+      const el=$('sem_'+subj.key+'_'+i);
+      if(!el || !el.value) return;
+      let g=null;
+      if(LEVEL==='MS') g=msCellToGrade(el.value);
+      else { const n=parseFloat(el.value); g=isNaN(n)?null:n; }
+      if(g!==null) vals.push(g);
+    }
+  });
+  if(!vals.length) return; // 입력된 셀이 없으면 자동 필드를 건드리지 않고 직접입력을 그대로 둔다
+  const avg=(vals.reduce(function(a,b){ return a+b; },0)/vals.length);
+  const targetId = LEVEL==='MS' ? 'f_curOverallDirect' : 'f_curMainDirect';
+  const targetEl=$(targetId);
+  if(targetEl) targetEl.value=avg.toFixed(2);
+}
+
+function setLevel(level){
+  LEVEL=level;
+  $('levelBtnMS').classList.toggle('active', level==='MS');
+  $('levelBtnHS').classList.toggle('active', level==='HS');
+  gradeSelectOptions();
+  renderSemGrid();
+  const hintEl=$('semHint');
+  if(hintEl) hintEl.textContent = level==='MS'
+    ? '중학생 — 국어·영어·수학·사회·과학 학기별 성적을 점수 또는 A~E로 입력합니다. 입력하면 "현재 내신 전체 평균"이 자동 계산됩니다.'
+    : '고등학생(5등급제, 2028학년도 대입~) — 국어·영어·수학·사회·과학 학기별 등급(1~5)을 입력합니다. 입력하면 "현재 내신 주요과목 평균"이 자동 계산됩니다.';
+  const curOverallWrapEl=$('curOverallWrap'); if(curOverallWrapEl) curOverallWrapEl.style.display = (level==='MS') ? '' : 'none';
+  const curMainLabelEl=$('curMainLabel'); if(curMainLabelEl) curMainLabelEl.textContent='현재 내신 주요과목 평균 (5등급제 기준)'+(level==='HS'?' — 자동계산':'');
+  // ★ 341: "현재 알아보고 싶은 고등학교"는 아직 고등학교 진학 전인 중학생에게만 필요한 항목
+  const targetHsWrapEl=$('f_targetHsWrap'); if(targetHsWrapEl) targetHsWrapEl.style.display = (level==='MS') ? '' : 'none';
+}
+// 초기 렌더
+gradeSelectOptions();
+renderSemGrid();
+
+function checkedValues(name){
+  return Array.from(document.querySelectorAll('input[name="'+name+'"]:checked')).map(function(el){ return el.value; });
+}
+function gridValues(){
+  const out={};
+  GRID_SUBJECTS.forEach(function(subj){
+    out[subj.key]=[];
+    for(let i=1;i<=SEM_COUNT;i++){ const el=$('sem_'+subj.key+'_'+i); out[subj.key].push(el?el.value:''); }
+  });
+  return out;
+}
+
+function submitSurvey(ev){
+  ev.preventDefault();
+  const errBox=$('errBox');
+  errBox.style.display='none';
+  const name=$('f_name').value.trim();
+  if(!name){ errBox.textContent='학생 이름을 입력해주세요.'; errBox.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); return false; }
+
+  const params=new URLSearchParams(location.search);
+  const orgId=params.get('org')||null;
+
+  const data={
+    submittedAt: new Date().toISOString(),
+    status: 'new',
+    orgId: orgId,
+    schoolLevel: LEVEL,
+    name: name,
+    school: $('f_school').value.trim(),
+    grade: $('f_grade').value,
+    studentPhone: $('f_studentPhone').value.trim(),
+    parentPhone: $('f_parentPhone').value.trim(),
+    track: $('f_track').value,
+    dept1: $('f_dept1').value.trim(),
+    dept2: $('f_dept2').value.trim(),
+    univGroup: $('f_univGroup').value.trim(),
+    grid: gridValues(),
+    curOverallDirect: $('f_curOverallDirect').value,
+    curMainDirect: $('f_curMainDirect').value,
+    strongSubj: $('f_strongSubj').value.trim(),
+    weakSubj: $('f_weakSubj').value.trim(),
+    mock: {
+      kor: $('f_mock_kor').value, math: $('f_mock_math').value, eng: $('f_mock_eng').value,
+      soc: $('f_mock_soc').value, sci: $('f_mock_sci').value, hist: $('f_mock_hist').value
+    },
+    seduk: $('f_seduk').value,
+    targetHighSchool: $('f_targetHs') ? $('f_targetHs').value.trim() : '',
+    club: $('f_club').value.trim(),
+    interestKeyword: $('f_activities').value.trim(),
+    hopeTypes: checkedValues('hopeType'),
+    interviewStatus: $('f_interview').value,
+    curiosities: checkedValues('curiosity'),
+    memo: $('f_memo').value.trim()
+  };
+
+  const btn=$('submitBtn');
+  btn.disabled=true; btn.textContent='제출 중...';
+
+  if(!_db){
+    errBox.textContent='온라인 제출 기능을 불러오지 못했습니다(네트워크 상태를 확인해주세요). 이 화면을 인쇄하거나 캡처해서 전달해주셔도 됩니다.';
+    errBox.style.display='block';
+    btn.disabled=false; btn.textContent='사전조사서 제출하기';
+    window.scrollTo({top:0,behavior:'smooth'});
+    return false;
+  }
+
+  const id='ps_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  _db.collection('preSurveySubmissions').doc(id).set(Object.assign({id:id}, data))
+    .then(function(){
+      document.getElementById('formSheet').style.display='none';
+      document.getElementById('doneScreen').style.display='block';
+      window.scrollTo({top:0,behavior:'smooth'});
+    })
+    .catch(function(e){
+      errBox.textContent='제출 중 오류가 발생했습니다: '+e.message+' (네트워크 상태를 확인하고 다시 시도해주세요.)';
+      errBox.style.display='block';
+      btn.disabled=false; btn.textContent='사전조사서 제출하기';
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  return false;
+}
+</script>
+</body>
+</html>
