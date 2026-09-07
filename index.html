@@ -15746,6 +15746,23 @@ function renderRoadmapReport(s){
     +'<style>#rmLevelBtnMS.rm-active,#rmLevelBtnHS5.rm-active{border-color:#1a1a2e!important;background:#1a1a2e!important;color:#fff!important;font-weight:700}</style>'
     +'</div>';
 }
+// ★ 2026-09-07(352) 추가: 기관별 사전조사 웹폼 링크를 "이름"이 아니라 실제 내부 orgId
+// (org_1234567890 형태, 'org_'+Date.now()로 생성됨)로 만들어야 관리자 페이지와 정확히
+// 연동되는데, 기관관리자가 이 내부 ID를 직접 알 방법이 없어서 URL에 기관명을 그대로
+// 넣는 실수가 생기기 쉬웠다. 이 버튼이 정확한 orgId가 들어간 링크를 클립보드에 복사해준다.
+function copyOrgSurveyLink(orgId){
+  const path=location.pathname.replace(/[^/]*$/, ''); // 현재 관리자 파일이 있는 폴더 경로
+  const url=location.origin + path + encodeURIComponent('사전상담설문지_웹폼.html') + '?org=' + encodeURIComponent(orgId);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      alert('사전조사 웹폼 링크를 복사했습니다:\n\n'+url+'\n\n이 링크를 이 기관의 학생·학부모에게 공유해주세요.');
+    }).catch(function(){
+      prompt('아래 링크를 복사해서 사용해주세요:', url);
+    });
+  } else {
+    prompt('아래 링크를 복사해서 사용해주세요:', url);
+  }
+}
 function renderOrgMgmt(){
   const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
   return`<div>
@@ -15769,6 +15786,7 @@ function renderOrgMgmt(){
             <div style="font-size:11px;color:#888;margin-top:2px">ID: ${esc(org.loginId)}</div>
           </div>
           <div style="display:flex;gap:5px">
+            <button onclick="copyOrgSurveyLink('${org.id}')" style="background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🔗 사전조사 링크복사</button>
             <button onclick="openOrgFormById('${org.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">✏ 수정</button>
             <button onclick="deleteOrg('${org.id}')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑</button>
           </div>
