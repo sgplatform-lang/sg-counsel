@@ -15535,6 +15535,29 @@ function RM_toggleCf70Expand(id){
   ST._cf70Expanded[id]=!ST._cf70Expanded[id];
   render();
 }
+// ★ 358 추가: 6·9월 평가원 성적이 과목별 점수/등급 객관식 구조({kor:{score,grade},...})로
+// 바뀌면서, 예전 제출분(자유서술 문자열)과 새 제출분(객체) 둘 다 자연스럽게 표시하기 위한
+// 포맷 함수. 학원일정·현재교재도 배열로 바뀌어 같은 방식으로 처리한다.
+function RM_cf70FormatExamScore(v){
+  if(!v) return '—';
+  if(typeof v==='string') return v; // 예전 제출분(자유서술 문자열) 그대로 표시
+  var labels={kor:'국어',math:'수학',eng:'영어',tamgu1:'탐구1',tamgu2:'탐구2'};
+  var parts=[];
+  ['kor','math','eng','tamgu1','tamgu2'].forEach(function(k){
+    var s=v[k]||{};
+    if(!s.grade && !s.score) return;
+    var seg=labels[k]+' ';
+    if(s.score) seg+=s.score+(s.grade?'/':'');
+    if(s.grade) seg+=s.grade;
+    parts.push(seg);
+  });
+  return parts.length ? parts.join(', ') : '—';
+}
+function RM_cf70FormatList(v){
+  if(!v) return '—';
+  if(Array.isArray(v)) return v.length ? v.join('\n') : '—';
+  return v; // 예전 문자열 제출분은 그대로 표시
+}
 function RM_cf70ListHtml(){
   const isAdminRole=ST.currentUser?.role==='admin';
   const orgs=isAdminRole ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
@@ -15556,7 +15579,7 @@ function RM_cf70ListHtml(){
         </div>
         <div style="font-size:11px;color:#aaa">${esc((p.submittedAt||'').slice(0,16).replace('T',' '))}</div>
       </div>
-      ${expanded?('<div style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:6px;font-size:12px;color:#333"><b>목표등급</b> '+esc(p.targetGrades||'—')+' · <b>6월</b> '+esc(p.juneScore||'—')+' · <b>9월</b> '+esc(p.sepScore||'—')+'<br><b>시급 과목</b> '+esc((p.urgentSubjects||[]).join(', ')||'—')+' · <b>공부상태</b> '+esc(p.studyStatus||'—')+'</div>'):''}
+      ${expanded?('<div style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:6px;font-size:12px;color:#333"><b>목표등급</b> '+esc(p.targetGrades||'—')+' · <b>6월</b> '+esc(RM_cf70FormatExamScore(p.juneScore))+' · <b>9월</b> '+esc(RM_cf70FormatExamScore(p.sepScore))+'<br><b>시급 과목</b> '+esc((p.urgentSubjects||[]).join(', ')||'—')+' · <b>공부상태</b> '+esc(p.studyStatus||'—')+'</div>'):''}
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:${expanded?'12px':'8px'}">
         <button onclick="event.stopPropagation();ST._cf70View='report';ST._cf70ReportId='${p.id}';render()" style="background:#eefaf0;color:#10b981;border:1px solid #b7ecd2;border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">📄 개인 리포트 보기</button>
         <button onclick="event.stopPropagation();RM_markCF70Reviewed('${p.id}')" style="background:${isNew?'#fffbeb':'#f4f6fb'};color:${isNew?'#b45309':'#888'};border:1px solid ${isNew?'#fde68a':'#ddd'};border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">${isNew?'✓ 확인함으로 표시':'○ 다시 새 항목으로'}</button>
@@ -15643,8 +15666,8 @@ function RM_cf70ReportHtml(id){
       ${row('입시 준비 방향', p.prepDirection)}
       ${row('수능최저', p.minReq)}
       ${row('수능 목표등급', p.targetGrades)}
-      ${row('6월 평가원 성적', p.juneScore)}
-      ${row('9월 평가원 성적', p.sepScore)}
+      ${row('6월 평가원 성적', RM_cf70FormatExamScore(p.juneScore))}
+      ${row('9월 평가원 성적', RM_cf70FormatExamScore(p.sepScore))}
     </table>
     <div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px">2. 지금 실제 학습상태</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:18px">
@@ -15656,10 +15679,10 @@ function RM_cf70ReportHtml(id){
     </table>
     <div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px">3. FINAL 70 개인플랜 설계</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:18px">
-      ${row('학원·과외·수업 일정', p.schedule)}
+      ${row('학원·과외·수업 일정', RM_cf70FormatList(p.schedule))}
       ${row('M60 진행 시간', p.m60Time)}
       ${row('기출 풀어본 정도', p.pastExamCoverage)}
-      ${row('현재 풀고 있는 교재', p.currentMaterials)}
+      ${row('현재 풀고 있는 교재', RM_cf70FormatList(p.currentMaterials))}
       ${row('개인 처방 확인', p.finalPlanAck)}
     </table>
   </div>`;
