@@ -14975,6 +14975,17 @@ function RM_saveReport(){
   if(typeof upd==='function') upd(s);
   alert('리포트가 저장됐습니다. "상담리포트" 탭에서 다시 열어보실 수 있습니다.');
 }
+// ★ 2026-09-08(362) 추가: 상담리포트·사전조사 리포트·챌린저FINAL70 리포트 세 인쇄 화면이
+// 전부 프린트 결과가 흐리게 나온다는 피드백 — 원인은 브라우저의 인쇄 시 "잉크 절약" 기본
+// 동작(-webkit-print-color-adjust 기본값 economy)이 배경색·연한 회색 테두리·텍스트를
+// 실제보다 옅게 렌더링하기 때문이다. print-color-adjust:exact로 강제해서 화면에 보이는
+// 색 그대로 인쇄되게 하고, 표 테두리(기존 #ddd/#eee로 너무 연함)도 진하게 보정한다.
+const RM_PRINT_STYLE_TAG = "<style>"
+  +"*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}"
+  +"body{font-family:\"Malgun Gothic\",\"Apple SD Gothic Neo\",sans-serif;margin:0;padding:24px;color:#1a1a2e}"
+  +"table,td,th{border-color:#999!important}"
+  +"@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}table,td,th{border-color:#999!important}}"
+  +"</style>";
 function RM_printReport(){
   const sheet=document.getElementById('rmReportSheet');
   if(!sheet || !sheet.innerHTML.trim()){ alert('먼저 "리포트 생성"을 눌러주세요.'); return; }
@@ -14987,7 +14998,7 @@ function RM_printReport(){
   const printWin=window.open('','_blank','width=900,height=1000');
   if(!printWin){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
   printWin.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(printTitle)+'</title>'
-    +'<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;margin:0;padding:24px;color:#1a1a2e}</style>'
+    +RM_PRINT_STYLE_TAG
     +'</head><body>'+sheet.innerHTML+'</body></html>');
   printWin.document.close();
   // ★ 2026-09-07(344) 수정: 적용 학원 프로그램 전단(첨부 이미지)이 Firebase Storage에서
@@ -15567,7 +15578,7 @@ function RM_printSurveyReport(id){
   if(!printWin){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
   const printTitle=(p.name||'학생')+'_사전조사리포트_'+new Date().toISOString().slice(0,10).replace(/-/g,'');
   printWin.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(printTitle)+'</title>'
-    +'<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;margin:0;padding:24px;color:#1a1a2e}</style>'
+    +RM_PRINT_STYLE_TAG
     +'</head><body>'+reportEl.innerHTML
     +'<div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin:18px 0 8px">📝 전달사항</div>'
     +'<div style="border:1px solid #ddd;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;line-height:1.7">'+esc(noteText||'(작성된 전달사항 없음)')+'</div>'
@@ -15868,7 +15879,7 @@ function RM_printCF70Report(id){
   if(!printWin){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
   const printTitle=(p.name||'학생')+'_챌린저FINAL70_'+new Date().toISOString().slice(0,10).replace(/-/g,'');
   printWin.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(printTitle)+'</title>'
-    +'<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;margin:0;padding:24px;color:#1a1a2e}</style>'
+    +RM_PRINT_STYLE_TAG
     +'</head><body>'+reportEl.innerHTML
     +'<div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin:18px 0 8px">📝 전달사항</div>'
     +'<div style="border:1px solid #ddd;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;line-height:1.7">'+esc(noteText||'(작성된 전달사항 없음)')+'</div>'
