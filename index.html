@@ -1328,6 +1328,56 @@ function RM_deleteSurveySubmission(id){
   if(FB_USE()) window._fb.delete('preSurveySubmissions', id);
   render();
 }
+// ★ 2026-09-08(355) 추가: "챌린저 FINAL70" 사전진단 설문 — 사전조사 받은함과 완전히 같은
+// 패턴(Firestore 'challengerFinal70Submissions', 기관별 스코프)으로 별도 컬렉션을 쓴다.
+async function _ensureChallengerF70Loaded(forceRefresh){
+  if(!forceRefresh && ST.challengerF70Submissions && ST.challengerF70Submissions.length) return ST.challengerF70Submissions;
+  if(!FB_USE()) return ST.challengerF70Submissions||[];
+  const _role=ST.currentUser?.role;
+  const _orgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  let list;
+  if(_role!=='admin' && _orgId){
+    list = await Promise.race([
+        window._fb.collection('challengerFinal70Submissions').where('orgId','==',String(_orgId)).get(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: challengerFinal70Submissions(scoped) 로딩이 15초 안에 끝나지 않았습니다')), 15000))
+      ])
+      .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
+      .catch(e=>{ console.warn('FB load error(challengerFinal70Submissions scoped):', e.message); return null; });
+  } else {
+    list = await fbLoadAll('challengerFinal70Submissions');
+  }
+  if(list) ST.challengerF70Submissions=list;
+  return ST.challengerF70Submissions||[];
+}
+function RM_refreshChallengerF70(){
+  _ensureChallengerF70Loaded(true).then(function(){ render(); });
+}
+function RM_markCF70Reviewed(id){
+  const p=(ST.challengerF70Submissions||[]).find(function(x){ return String(x.id)===String(id); });
+  if(!p) return;
+  p.status = p.status==='reviewed' ? 'new' : 'reviewed';
+  if(FB_USE()) window._fb.set('challengerFinal70Submissions', p.id, p).catch(function(e){ alert('⚠️ 상태 저장에 실패했습니다(서버 연결 문제일 수 있습니다).\n\n'+(e&&e.message?e.message:'')); });
+  render();
+}
+function RM_deleteCF70Submission(id){
+  if(!confirm('이 챌린저 FINAL70 제출 내용을 삭제하시겠습니까?')) return;
+  ST.challengerF70Submissions=(ST.challengerF70Submissions||[]).filter(function(x){ return String(x.id)!==String(id); });
+  if(FB_USE()) window._fb.delete('challengerFinal70Submissions', id).catch(function(e){ alert('⚠️ 삭제가 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다). 새로고침하면 다시 나타날 수 있습니다.\n\n'+(e&&e.message?e.message:'')); });
+  render();
+}
+// 상담원이 개인 리포트 화면에서 작성한 컨설턴트 전달내용을 저장한다.
+function RM_saveCF70Note(id){
+  const p=(ST.challengerF70Submissions||[]).find(function(x){ return String(x.id)===String(id); });
+  const ta=document.getElementById('cf70NoteArea');
+  if(!p || !ta) return;
+  p.counselorNote=ta.value;
+  if(!FB_USE()){ alert('오프라인 상태라 서버에는 저장되지 않았습니다(화면에는 반영됨).'); return; }
+  window._fb.set('challengerFinal70Submissions', p.id, p).then(function(){
+    alert('컨설턴트 전달내용을 저장했습니다.');
+  }).catch(function(e){
+    alert('⚠️ 저장에 실패했습니다(서버 연결 문제일 수 있습니다). 다시 시도해주세요.\n\n'+(e&&e.message?e.message:''));
+  });
+}
 // ★ 2026-09-05 추가: schoolCatalog(고등학교 정보) — 특정 기관 소유가 아니라 examCatalog처럼
 // 전 기관이 공유하는 참고 데이터이므로 orgId 필터 없이 전체를 지연로딩한다.
 async function _ensureSchoolCatalogLoaded(){
@@ -15433,6 +15483,224 @@ function RM_surveyDetailHtml(p){
     +row('특이사항/메모', p.memo)
     +'</div>';
 }
+// ══════════════════════════════════════════════════════════════════
+// ★ 2026-09-08(355) 추가: "챌린저 FINAL70" — 챌린저 실전모의고사 신청 학생의 현재
+// 상황을 별도 웹폼(챌린저_FINAL70_설문.html)으로 받아 [목록/대시보드/개인리포트] 3가지
+// 화면으로 보여주는 기능. 사전조사 받은함과 같은 스코프 규칙(기관별)을 그대로 따른다.
+// ══════════════════════════════════════════════════════════════════
+function renderRoadmapCF70(){
+  if(!ST._cf70Loaded){
+    ST._cf70Loaded=true;
+    _ensureChallengerF70Loaded().then(function(){ render(); });
+    return '<div style="padding:48px;text-align:center;color:#888">챌린저 FINAL70 제출 내역을 불러오는 중...</div>';
+  }
+  const view=ST._cf70View||'list';
+  if(view==='report') return RM_cf70ReportHtml(ST._cf70ReportId);
+  if(view==='dashboard') return RM_cf70DashboardHtml();
+  return RM_cf70ListHtml();
+}
+function RM_cf70OrgFilterOptionsHtml(){
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const cur=ST._cf70OrgFilter||'';
+  let opts='<option value=""'+(cur===''?' selected':'')+'>전체 기관</option>';
+  opts+=orgs.map(function(o){ return '<option value="'+esc(o.id)+'"'+(String(o.id)===String(cur)?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('');
+  return opts;
+}
+function RM_onCf70OrgFilterChange(){
+  const el=document.getElementById('cf70OrgFilter');
+  ST._cf70OrgFilter = el ? el.value : '';
+  render();
+}
+function RM_cf70FilteredList(){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const filterVal=isAdminRole ? (ST._cf70OrgFilter||'') : '';
+  const all=(ST.challengerF70Submissions||[]).slice().sort(function(a,b){ return (b.submittedAt||'').localeCompare(a.submittedAt||''); });
+  return (isAdminRole && filterVal) ? all.filter(function(x){ return String(x.orgId||'')===String(filterVal); }) : all;
+}
+function RM_cf70ViewToggleHtml(active){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const orgs=isAdminRole ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
+  const orgNameById={}; orgs.forEach(function(o){ orgNameById[String(o.id)]=o.name; });
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="ST._cf70View='list';render()" style="background:${active==='list'?'#0f2540':'#fff'};color:${active==='list'?'#fff':'#333'};border:1px solid ${active==='list'?'#0f2540':'#ddd'};border-radius:20px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer">📋 목록 보기</button>
+      <button onclick="ST._cf70View='dashboard';render()" style="background:${active==='dashboard'?'#0f2540':'#fff'};color:${active==='dashboard'?'#fff':'#333'};border:1px solid ${active==='dashboard'?'#0f2540':'#ddd'};border-radius:20px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer">📊 대시보드 보기</button>
+    </div>
+    <button onclick="RM_refreshChallengerF70()" style="background:none;border:1px solid #ddd;color:#555;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer">🔄 새로고침</button>
+  </div>
+  ${isAdminRole ? `<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택:</span><select id="cf70OrgFilter" onchange="RM_onCf70OrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:160px">${RM_cf70OrgFilterOptionsHtml()}</select></div>` : ''}`;
+}
+function RM_toggleCf70Expand(id){
+  ST._cf70Expanded=ST._cf70Expanded||{};
+  ST._cf70Expanded[id]=!ST._cf70Expanded[id];
+  render();
+}
+function RM_cf70ListHtml(){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const orgs=isAdminRole ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
+  const orgNameById={}; orgs.forEach(function(o){ orgNameById[String(o.id)]=o.name; });
+  const list=RM_cf70FilteredList();
+  const unreadCount=list.filter(function(x){ return x.status!=='reviewed'; }).length;
+  const rows=list.map(function(p){
+    const isNew=p.status!=='reviewed';
+    const expanded=!!(ST._cf70Expanded||{})[p.id];
+    const orgLabel=isAdminRole ? ` <span style="color:#888;font-size:10.5px;font-weight:400">· ${esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))}</span>` : '';
+    const exam=p.examSubjects||{};
+    const summary=[exam.kor,exam.math,exam.tamgu1,exam.tamgu2].filter(Boolean).join(' · ');
+    return `<div style="background:#fff;border:1px solid ${isNew?'#fde68a':'#e8eaf6'};border-left:4px solid ${isNew?'#d97706':'#cbd5e1'};border-radius:10px;padding:14px 16px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="RM_toggleCf70Expand('${p.id}')">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${isNew?'<span style="background:#d97706;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">NEW</span>':''}
+          <span style="font-size:13.5px;font-weight:800;color:#1a1a2e">${esc(p.name||'이름 미입력')}</span>
+          <span style="font-size:11.5px;color:#888">${esc(summary)}${orgLabel}</span>
+        </div>
+        <div style="font-size:11px;color:#aaa">${esc((p.submittedAt||'').slice(0,16).replace('T',' '))}</div>
+      </div>
+      ${expanded?('<div style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:6px;font-size:12px;color:#333"><b>목표등급</b> '+esc(p.targetGrades||'—')+' · <b>6월</b> '+esc(p.juneScore||'—')+' · <b>9월</b> '+esc(p.sepScore||'—')+'<br><b>시급 과목</b> '+esc((p.urgentSubjects||[]).join(', ')||'—')+' · <b>공부상태</b> '+esc(p.studyStatus||'—')+'</div>'):''}
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:${expanded?'12px':'8px'}">
+        <button onclick="event.stopPropagation();ST._cf70View='report';ST._cf70ReportId='${p.id}';render()" style="background:#eefaf0;color:#10b981;border:1px solid #b7ecd2;border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">📄 개인 리포트 보기</button>
+        <button onclick="event.stopPropagation();RM_markCF70Reviewed('${p.id}')" style="background:${isNew?'#fffbeb':'#f4f6fb'};color:${isNew?'#b45309':'#888'};border:1px solid ${isNew?'#fde68a':'#ddd'};border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">${isNew?'✓ 확인함으로 표시':'○ 다시 새 항목으로'}</button>
+        <button onclick="event.stopPropagation();RM_deleteCF70Submission('${p.id}')" style="background:#fff;color:#dc2626;border:1px solid #fecaca;border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+    <div style="margin-bottom:6px">
+      <div style="font-size:15px;font-weight:900;color:#1a1a2e">🏆 챌린저 FINAL70</div>
+      <div style="font-size:11px;color:#777;margin-top:2px">총 ${list.length}건 (미확인 ${unreadCount}건) — 챌린저 실전모의고사 신청 학생의 사전진단 설문입니다. "📄 개인 리포트 보기"에서 컨설턴트 전달내용을 작성하고 PDF/인쇄할 수 있습니다.</div>
+    </div>
+    ${RM_cf70ViewToggleHtml('list')}
+    ${list.length ? rows : `<div style="text-align:center;padding:48px;color:#888">
+      <div style="font-size:40px;margin-bottom:12px">🏆</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px">${(ST.currentUser?.role==='admin' && ST._cf70OrgFilter) ? '이 기관에 제출된 설문이 없습니다' : '아직 제출된 설문이 없습니다'}</div>
+      <div style="font-size:12px;color:#aaa">챌린저_FINAL70_설문.html 링크를 공유해보세요</div>
+    </div>`}
+  </div>`;
+}
+// 체크박스·라디오 응답 등을 집계해 막대 형태로 보여주는 대시보드
+function RM_cf70TallyBarsHtml(list, field, isArray){
+  const tally={};
+  list.forEach(function(p){
+    const val=p[field];
+    const arr=isArray ? (val||[]) : (val?[val]:[]);
+    arr.forEach(function(v){ if(v){ tally[v]=(tally[v]||0)+1; } });
+  });
+  const entries=Object.entries(tally).sort(function(a,b){ return b[1]-a[1]; });
+  if(!entries.length) return '<div style="font-size:12px;color:#aaa">데이터 없음</div>';
+  const max=Math.max.apply(null, entries.map(function(e){ return e[1]; }));
+  return entries.map(function(e){
+    const pct=Math.round(e[1]/max*100);
+    return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:#333;margin-bottom:3px"><span>'+esc(e[0])+'</span><span style="font-weight:700">'+e[1]+'명</span></div><div style="background:#f0f1f5;border-radius:6px;height:8px;overflow:hidden"><div style="background:#0f2540;height:100%;width:'+pct+'%"></div></div></div>';
+  }).join('');
+}
+function RM_cf70DashboardHtml(){
+  const list=RM_cf70FilteredList();
+  const total=list.length;
+  const unread=list.filter(function(x){ return x.status!=='reviewed'; }).length;
+  function statCard(title,html){
+    return '<div style="background:#fff;border:1px solid #e8eaf6;border-radius:12px;padding:16px 18px"><div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:10px">'+title+'</div>'+html+'</div>';
+  }
+  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+    <div style="margin-bottom:6px">
+      <div style="font-size:15px;font-weight:900;color:#1a1a2e">🏆 챌린저 FINAL70</div>
+      <div style="font-size:11px;color:#777;margin-top:2px">전체 신청 학생 통계 대시보드입니다.</div>
+    </div>
+    ${RM_cf70ViewToggleHtml('dashboard')}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:#0f2540;color:#fff;border-radius:12px;padding:16px 18px"><div style="font-size:11px;color:#cbd5e1;margin-bottom:6px">총 제출</div><div style="font-size:26px;font-weight:900">${total}<span style="font-size:13px;font-weight:600">명</span></div></div>
+      <div style="background:#d97706;color:#fff;border-radius:12px;padding:16px 18px"><div style="font-size:11px;color:#fef3c7;margin-bottom:6px">미확인</div><div style="font-size:26px;font-weight:900">${unread}<span style="font-size:13px;font-weight:600">건</span></div></div>
+      <div style="background:#10b981;color:#fff;border-radius:12px;padding:16px 18px"><div style="font-size:11px;color:#d1fae5;margin-bottom:6px">확인 완료</div><div style="font-size:26px;font-weight:900">${total-unread}<span style="font-size:13px;font-weight:600">건</span></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      ${statCard('지금 가장 시급하게 올려야 하는 과목', RM_cf70TallyBarsHtml(list,'urgentSubjects',true))}
+      ${statCard('최근 수능 공부상태', RM_cf70TallyBarsHtml(list,'studyStatus',false))}
+      ${statCard('계획대로 공부하지 못하는 이유', RM_cf70TallyBarsHtml(list,'planBlockers',true))}
+      ${statCard('실제 시험에서 자주 발생하는 문제', RM_cf70TallyBarsHtml(list,'examIssues',true))}
+      ${statCard('현재 입시 준비 방향', RM_cf70TallyBarsHtml(list,'prepDirection',false))}
+      ${statCard('FINAL70 개인 처방 확인', RM_cf70TallyBarsHtml(list,'finalPlanAck',false))}
+    </div>
+  </div>`;
+}
+function RM_cf70ReportHtml(id){
+  const p=(ST.challengerF70Submissions||[]).find(function(x){ return String(x.id)===String(id); });
+  if(!p){
+    return `<div style="max-width:960px;margin:0 auto;padding:48px;text-align:center;color:#888">해당 제출 내역을 찾을 수 없습니다.<br><button onclick="ST._cf70View='list';render()" style="margin-top:14px;background:#0f2540;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer">← 목록으로</button></div>`;
+  }
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const orgs=isAdminRole ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
+  const orgName=(orgs.find(function(o){ return String(o.id)===String(p.orgId); })||{}).name;
+  const exam=p.examSubjects||{};
+  function row(label,val){ return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:150px;background:#fafaf8;font-size:12px">'+esc(label)+'</td><td style="border:1px solid #ddd;padding:8px;font-size:12.5px;white-space:pre-wrap">'+(val?esc(val):'—')+'</td></tr>'; }
+  const html=`<div id="cf70ReportPrintArea">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:11px;color:#888;letter-spacing:1px">CHALLENGER FINAL 70 · 개인 진단 리포트</div>
+      <div style="font-size:20px;font-weight:900;color:#1a1a2e;margin-top:4px">${esc(p.name||'이름 미입력')}${orgName?' <span style="font-size:13px;color:#888;font-weight:500">('+esc(orgName)+')</span>':''}</div>
+      <div style="font-size:11px;color:#aaa;margin-top:2px">제출일시 ${esc((p.submittedAt||'').slice(0,16).replace('T',' '))}</div>
+    </div>
+    <div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px">1. 목표와 현재 성적</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">
+      ${row('수능 선택과목','국어 '+(exam.kor||'-')+' / 수학 '+(exam.math||'-')+' / 탐구1 '+(exam.tamgu1||'-')+' / 탐구2 '+(exam.tamgu2||'-'))}
+      ${row('입시 준비 방향', p.prepDirection)}
+      ${row('수능최저', p.minReq)}
+      ${row('수능 목표등급', p.targetGrades)}
+      ${row('6월 평가원 성적', p.juneScore)}
+      ${row('9월 평가원 성적', p.sepScore)}
+    </table>
+    <div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px">2. 지금 실제 학습상태</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">
+      ${row('시급하게 올려야 하는 과목', (p.urgentSubjects||[]).join(', '))}
+      ${row('현재 실제로 하는 공부', (p.currentStudy||[]).join(', ')+(p.currentStudyNote?' ('+p.currentStudyNote+')':''))}
+      ${row('최근 공부상태', p.studyStatus)}
+      ${row('계획대로 못하는 이유', (p.planBlockers||[]).join(', '))}
+      ${row('시험에서 자주 발생하는 문제', (p.examIssues||[]).join(', '))}
+    </table>
+    <div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px">3. FINAL 70 개인플랜 설계</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">
+      ${row('학원·과외·수업 일정', p.schedule)}
+      ${row('M60 진행 시간', p.m60Time)}
+      ${row('기출 풀어본 정도', p.pastExamCoverage)}
+      ${row('현재 풀고 있는 교재', p.currentMaterials)}
+      ${row('개인 처방 확인', p.finalPlanAck)}
+    </table>
+  </div>`;
+  return `<div style="max-width:820px;margin:0 auto;padding-bottom:40px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <button onclick="ST._cf70View='list';render()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer">← 목록으로</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="RM_markCF70Reviewed('${p.id}')" style="background:#f4f6fb;color:#888;border:1px solid #ddd;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer">${p.status!=='reviewed'?'✓ 확인함으로 표시':'○ 다시 새 항목으로'}</button>
+        <button onclick="RM_printCF70Report('${p.id}')" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">🖨 인쇄 / PDF</button>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #e8eaf6;border-radius:14px;padding:28px 32px">
+      ${html}
+      <div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px">📝 컨설턴트 전달내용</div>
+      <textarea id="cf70NoteArea" placeholder="이 학생에게 전달할 내용을 직접 작성해주세요. (예: 이번 진단 결과와 FINAL 70 처방, 당부사항 등)" style="width:100%;min-height:140px;border:1px solid #ddd;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;font-family:inherit;resize:vertical">${esc(p.counselorNote||'')}</textarea>
+      <div style="text-align:right;margin-top:8px"><button onclick="RM_saveCF70Note('${p.id}')" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12.5px;font-weight:700;cursor:pointer">💾 전달내용 저장</button></div>
+    </div>
+  </div>`;
+}
+// ★ 인쇄창을 새로 열어 리포트+컨설턴트 전달내용을 함께 출력한다(사전상담 로드맵 리포트의
+// RM_printReport와 동일한 방식 — 이 리포트엔 이미지가 없어 로딩 대기는 불필요).
+function RM_printCF70Report(id){
+  const p=(ST.challengerF70Submissions||[]).find(function(x){ return String(x.id)===String(id); });
+  if(!p) return;
+  const noteEl=document.getElementById('cf70NoteArea');
+  const noteText=noteEl?noteEl.value:(p.counselorNote||'');
+  const reportEl=document.getElementById('cf70ReportPrintArea');
+  if(!reportEl) return;
+  const printWin=window.open('','_blank','width=900,height=1000');
+  if(!printWin){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+  const printTitle=(p.name||'학생')+'_챌린저FINAL70_'+new Date().toISOString().slice(0,10).replace(/-/g,'');
+  printWin.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(printTitle)+'</title>'
+    +'<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;margin:0;padding:24px;color:#1a1a2e}</style>'
+    +'</head><body>'+reportEl.innerHTML
+    +'<div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin:18px 0 8px">📝 컨설턴트 전달내용</div>'
+    +'<div style="border:1px solid #ddd;border-radius:8px;padding:14px;font-size:12.5px;white-space:pre-wrap;line-height:1.7">'+esc(noteText||'(작성된 전달내용 없음)')+'</div>'
+    +'</body></html>');
+  printWin.document.close();
+  setTimeout(function(){ printWin.focus(); printWin.print(); }, 300);
+}
+
 // ★ 2026-09-06 추가: "사전조사 받은함"의 제출 내용을 "기본상담" 입력폼에 그대로 옮겨
 // 담는 기능. 반영 대상은 항상 "현재 좌측에서 선택된 학생"이다(설문 자체는 로그인 없이
 // 이름만 적어 제출되는 데이터라 특정 학생 레코드와 자동으로 연결돼 있지 않기 때문 —
@@ -15545,6 +15813,7 @@ function renderRoadmap(s){
     : sub==='catalog' ? renderProgramCatalog()
     : sub==='school' ? renderRoadmapSchool(s)
     : sub==='inbox' ? renderRoadmapInbox()
+    : sub==='cf70' ? renderRoadmapCF70()
     : renderRoadmapReport(s); // 'basic'(기본상담) 및 그 외 값은 모두 원래 입시상담 입력화면
   return renderRoadmapSubNav(sub)+body;
 }
@@ -15558,12 +15827,14 @@ function renderRoadmap(s){
 // 웹폼에서 제출된 사전조사 내용을 확인) 총 5개 탭.
 function renderRoadmapSubNav(active){
   const newSurveyCount=(ST.preSurveySubmissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
+  const newCf70Count=(ST.challengerF70Submissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
   const tabs=[
     {key:'basic',   icon:'📝', label:'기본상담'},
     {key:'consult', icon:'📁', label:'상담리포트'},
     {key:'catalog', icon:'🗂', label:'프로그램 카탈로그'},
     {key:'school',  icon:'🏫', label:'고등학교 정보'},
     {key:'inbox',   icon:'📥', label:'사전조사 받은함'+(newSurveyCount?' ('+newSurveyCount+')':'')},
+    {key:'cf70',    icon:'🏆', label:'챌린저 FINAL70'+(newCf70Count?' ('+newCf70Count+')':'')},
   ];
   return `<div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
     <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">🧭 UNIVERSITY COUNSELING · 입시상담 통합관리</div>
@@ -15791,12 +16062,12 @@ function renderRoadmapReport(s){
 // (org_1234567890 형태, 'org_'+Date.now()로 생성됨)로 만들어야 관리자 페이지와 정확히
 // 연동되는데, 기관관리자가 이 내부 ID를 직접 알 방법이 없어서 URL에 기관명을 그대로
 // 넣는 실수가 생기기 쉬웠다. 이 버튼이 정확한 orgId가 들어간 링크를 클립보드에 복사해준다.
-function copyOrgSurveyLink(orgId){
+function copyOrgLinkGeneric(orgId, fileName, kindLabel){
   const path=location.pathname.replace(/[^/]*$/, ''); // 현재 관리자 파일이 있는 폴더 경로
-  const url=location.origin + path + encodeURIComponent('사전상담설문지_웹폼.html') + '?org=' + encodeURIComponent(orgId);
+  const url=location.origin + path + encodeURIComponent(fileName) + '?org=' + encodeURIComponent(orgId);
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(function(){
-      alert('사전조사 웹폼 링크를 복사했습니다:\n\n'+url+'\n\n이 링크를 이 기관의 학생·학부모에게 공유해주세요.');
+      alert(kindLabel+' 링크를 복사했습니다:\n\n'+url+'\n\n이 링크를 이 기관의 학생·학부모에게 공유해주세요.');
     }).catch(function(){
       prompt('아래 링크를 복사해서 사용해주세요:', url);
     });
@@ -15804,18 +16075,22 @@ function copyOrgSurveyLink(orgId){
     prompt('아래 링크를 복사해서 사용해주세요:', url);
   }
 }
+function copyOrgSurveyLink(orgId){ copyOrgLinkGeneric(orgId, '사전상담설문지_웹폼.html', '사전조사 웹폼'); }
+function copyOrgCf70Link(orgId){ copyOrgLinkGeneric(orgId, '챌린저_FINAL70_설문.html', '챌린저 FINAL70 설문'); }
 // ★ 2026-09-07(354) 추가: 카카오톡 등 메신저 링크 미리보기는 og:title 같은 정적 meta
 // 태그만 읽고 자바스크립트는 실행하지 않아서, "?org=" 쿼리로 기관을 구분하는 방식으로는
 // 미리보기에 기관명을 표시할 방법이 없다(정적 호스팅의 근본적 한계). 대신 기관별로 아주
 // 작은 "중계 페이지"(og:title에 기관명이 박혀있고 열리자마자 실제 설문지로 자동 이동)를
 // 만들어 그 페이지의 링크를 공유하면 카톡 미리보기에 기관명이 뜬다. 이 함수가 그 중계
 // 페이지의 HTML을 만들어 파일로 다운로드해준다 — 상담원이 이 파일을 GitHub에 올리고,
-// "🔗 사전조사 링크복사"로 만든 원래 링크 대신 이 파일의 링크를 공유하면 된다.
-function downloadOrgSurveyRedirectPage(orgId, orgName){
+// "🔗 링크복사"로 만든 원래 링크 대신 이 파일의 링크를 공유하면 된다.
+// ★ 2026-09-08(356) 변경: 사전조사 웹폼 전용이던 것을 파일명/제목을 매개변수로 받도록
+// 일반화해서 챌린저 FINAL70에도 같은 방식을 재사용한다.
+function downloadOrgRedirectPageGeneric(orgId, orgName, fileName, docTitle, downloadPrefix){
   const path=location.pathname.replace(/[^/]*$/, '');
-  const targetUrl=location.origin + path + encodeURIComponent('사전상담설문지_웹폼.html') + '?org=' + encodeURIComponent(orgId);
-  const title=orgName+' 상담 사전 설문지';
-  const desc='아래를 눌러 '+orgName+'의 상담 사전 설문지를 작성해주세요.';
+  const targetUrl=location.origin + path + encodeURIComponent(fileName) + '?org=' + encodeURIComponent(orgId);
+  const title=orgName+' '+docTitle;
+  const desc='아래를 눌러 '+orgName+'의 '+docTitle+'를 작성해주세요.';
   const html='<!DOCTYPE html>\n<html lang="ko">\n<head>\n<meta charset="UTF-8">\n'
     +'<title>'+esc(title)+'</title>\n'
     +'<meta property="og:title" content="'+esc(title)+'">\n'
@@ -15829,10 +16104,16 @@ function downloadOrgSurveyRedirectPage(orgId, orgName){
   const blob=new Blob([html], {type:'text/html;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='사전조사_'+safeName+'.html';
+  a.download=downloadPrefix+'_'+safeName+'.html';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
-  alert('"사전조사_'+safeName+'.html" 파일을 다운로드했습니다.\n\n1) 이 파일을 GitHub 저장소에 다른 파일들과 같은 방식(Add file → Upload files)으로 올려주세요.\n2) 그 다음 이 기관에는 방금 만든 "🔗 사전조사 링크복사" 대신, 지금 올린 이 파일의 주소를 공유해주세요.\n(카카오톡 등으로 공유하면 이제 미리보기 제목에 "'+orgName+'"이 표시됩니다)');
+  alert('"'+downloadPrefix+'_'+safeName+'.html" 파일을 다운로드했습니다.\n\n1) 이 파일을 GitHub 저장소에 다른 파일들과 같은 방식(Add file → Upload files)으로 올려주세요.\n2) 그 다음 이 기관에는 방금 만든 링크복사 대신, 지금 올린 이 파일의 주소를 공유해주세요.\n(카카오톡 등으로 공유하면 이제 미리보기 제목에 "'+orgName+'"이 표시됩니다)');
+}
+function downloadOrgSurveyRedirectPage(orgId, orgName){
+  downloadOrgRedirectPageGeneric(orgId, orgName, '사전상담설문지_웹폼.html', '상담 사전 설문지', '사전조사');
+}
+function downloadOrgCf70RedirectPage(orgId, orgName){
+  downloadOrgRedirectPageGeneric(orgId, orgName, '챌린저_FINAL70_설문.html', 'CHALLENGER FINAL 70 사전진단', '챌린저FINAL70');
 }
 function renderOrgMgmt(){
   const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
@@ -15849,18 +16130,32 @@ function renderOrgMgmt(){
       <div style="font-size:15px;font-weight:700;margin-bottom:8px">등록된 기관이 없습니다</div>
       <div style="font-size:12px;color:#aaa">+ 기관 추가 버튼으로 학원을 등록하세요</div>
     </div>`:`
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px">
       ${orgs.map(org=>`<div style="background:#fff;border-radius:14px;padding:18px;border:1.5px solid #e8eaf6;box-shadow:0 2px 8px rgba(0,0,0,.04)">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
           <div>
             <div style="font-size:16px;font-weight:800;color:#1a1a2e">${esc(org.name)}</div>
             <div style="font-size:11px;color:#888;margin-top:2px">ID: ${esc(org.loginId)}</div>
           </div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button onclick="copyOrgSurveyLink('${org.id}')" style="background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🔗 사전조사 링크복사</button>
-            <button onclick="downloadOrgSurveyRedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer" title="카카오톡 등에 공유했을 때 미리보기 제목에 기관명이 나오는 링크용 파일을 만듭니다">📇 카톡 미리보기 파일</button>
-            <button onclick="openOrgFormById('${org.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">✏ 수정</button>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <button onclick="openOrgFormById('${org.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">✏ 수정</button>
             <button onclick="deleteOrg('${org.id}')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;padding:12px;background:#fafbfc;border-radius:10px;border:1px solid #eef0f5">
+          <div>
+            <div style="font-size:10px;font-weight:800;color:#0f9d58;margin-bottom:6px">📋 사전조사</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <button onclick="copyOrgSurveyLink('${org.id}')" style="background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%">🔗 링크복사</button>
+              <button onclick="downloadOrgSurveyRedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%" title="카카오톡 등에 공유했을 때 미리보기 제목에 기관명이 나오는 링크용 파일을 만듭니다">📇 카톡파일</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:800;color:#0f766e;margin-bottom:6px">🏆 챌린저 FINAL70</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <button onclick="copyOrgCf70Link('${org.id}')" style="background:#eefaf0;color:#0f766e;border:1px solid #99f6e4;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%">🔗 링크복사</button>
+              <button onclick="downloadOrgCf70RedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%" title="카카오톡 등에 공유했을 때 미리보기 제목에 기관명이 나오는 링크용 파일을 만듭니다">📇 카톡파일</button>
+            </div>
           </div>
         </div>
         <div style="font-size:11px;color:#777;line-height:1.8">
