@@ -184,6 +184,81 @@
     color:var(--accent);
     margin-bottom:6px;
   }
+  .score-input-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+    margin-top:6px;
+  }
+  .score-input-table th, .score-input-table td{
+    border:1px solid var(--line);
+    padding:7px 8px;
+    text-align:center;
+  }
+  .score-input-table th{
+    background:#FAFAF8;
+    color:var(--muted);
+    font-weight:500;
+    font-size:11.5px;
+  }
+  .score-input-table td:first-child{
+    text-align:left;
+    font-weight:700;
+    color:var(--ink);
+    width:60px;
+  }
+  .score-input-table td.na{
+    color:var(--muted);
+  }
+  .score-input-table input, .score-input-table select{
+    width:100%;
+    border:none;
+    outline:none;
+    background:transparent;
+    text-align:center;
+    font-size:13px;
+  }
+  .dyn-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .dyn-row input{
+    flex:1;
+    border:none;
+    border-bottom:1px solid var(--line);
+    padding:4px 2px 6px;
+    background:transparent;
+    outline:none;
+    font-size:14px;
+    font-family:inherit;
+    color:var(--body-text);
+  }
+  .dyn-row input:focus{ border-bottom-color:var(--accent); }
+  .dyn-row .dyn-remove{
+    flex-shrink:0;
+    width:26px;
+    height:26px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--muted);
+    border-radius:6px;
+    cursor:pointer;
+    font-size:13px;
+    line-height:1;
+  }
+  .add-row-btn{
+    background:var(--accent-soft);
+    color:var(--accent);
+    border:1px dashed var(--accent);
+    border-radius:8px;
+    padding:6px 14px;
+    font-size:12.5px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:2px;
+  }
   .note-box{
     background:var(--accent-soft);
     border-left:3px solid var(--accent);
@@ -313,14 +388,32 @@
 
     <div class="q">
       <div class="q-head"><span class="q-num">6.</span><span class="q-title">6월 평가원 성적</span><span class="q-tag req">필수</span></div>
-      <div class="q-note">점수와 등급만 작성하세요. 예) 국어 78/3, 수학 84/2, 영어2, 생명42/2, 지구45/1</div>
-      <input id="q6_june" required>
+      <div class="q-note">과목별 점수(원점수)와 등급을 선택해주세요. 영어는 등급만 선택합니다.</div>
+      <table class="score-input-table">
+        <thead><tr><th></th><th>점수</th><th>등급</th></tr></thead>
+        <tbody>
+          <tr><td>국어</td><td><input type="number" min="0" max="100" id="q6_kor_score" placeholder="점수"></td><td><select id="q6_kor_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>수학</td><td><input type="number" min="0" max="100" id="q6_math_score" placeholder="점수"></td><td><select id="q6_math_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>영어</td><td class="na">—</td><td><select id="q6_eng_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>탐구1</td><td><input type="number" min="0" max="100" id="q6_tam1_score" placeholder="점수"></td><td><select id="q6_tam1_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>탐구2</td><td><input type="number" min="0" max="100" id="q6_tam2_score" placeholder="점수"></td><td><select id="q6_tam2_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="q">
       <div class="q-head"><span class="q-num">7.</span><span class="q-title">9월 평가원 성적</span><span class="q-tag req">필수</span></div>
-      <div class="q-note">점수와 등급만 작성하세요.</div>
-      <input id="q7_sep" required>
+      <div class="q-note">과목별 점수(원점수)와 등급을 선택해주세요. 영어는 등급만 선택합니다.</div>
+      <table class="score-input-table">
+        <thead><tr><th></th><th>점수</th><th>등급</th></tr></thead>
+        <tbody>
+          <tr><td>국어</td><td><input type="number" min="0" max="100" id="q7_kor_score" placeholder="점수"></td><td><select id="q7_kor_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>수학</td><td><input type="number" min="0" max="100" id="q7_math_score" placeholder="점수"></td><td><select id="q7_math_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>영어</td><td class="na">—</td><td><select id="q7_eng_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>탐구1</td><td><input type="number" min="0" max="100" id="q7_tam1_score" placeholder="점수"></td><td><select id="q7_tam1_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+          <tr><td>탐구2</td><td><input type="number" min="0" max="100" id="q7_tam2_score" placeholder="점수"></td><td><select id="q7_tam2_grade"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -406,8 +499,11 @@
 
     <div class="q">
       <div class="q-head"><span class="q-num">13.</span><span class="q-title">현재 학원·과외·수업 일정</span><span class="q-tag req">필수</span></div>
-      <div class="q-note">요일 / 과목 / 시간을 간단히 작성하세요. 예) 월·목 수학 18~22 / 화 국어 19~22</div>
-      <input id="q13_schedule" required>
+      <div class="q-note">요일 / 과목 / 시간을 간단히 작성하세요. 예) 월·목 수학 18~22 — 일정이 여러 개면 "+ 일정 추가"로 칸을 늘려주세요.</div>
+      <div id="q13List">
+        <div class="dyn-row"><input class="q13-item" placeholder="예: 월·목 수학 18~22"></div>
+      </div>
+      <button type="button" class="add-row-btn" onclick="addDynRow('q13List','q13-item','예: 화 국어 19~22')">+ 일정 추가</button>
     </div>
 
     <div class="q">
@@ -436,8 +532,11 @@
 
     <div class="q">
       <div class="q-head"><span class="q-num">16.</span><span class="q-title">현재 실제로 풀고 있는 실모·N제·EBS 교재</span><span class="q-tag">선택</span></div>
-      <div class="q-note">과목 + 교재명만 간단히 작성하세요. 예) 수학 드릴 / 국어 이감 / 생명 수능특강 — 없으면 "없음"</div>
-      <input id="q16_materials">
+      <div class="q-note">과목 + 교재명만 간단히 작성하세요. 예) 수학 드릴 — 여러 개면 "+ 교재 추가"로 칸을 늘려주세요. 없으면 비워두세요.</div>
+      <div id="q16List">
+        <div class="dyn-row"><input class="q16-item" placeholder="예: 수학 드릴"></div>
+      </div>
+      <button type="button" class="add-row-btn" onclick="addDynRow('q16List','q16-item','예: 국어 이감')">+ 교재 추가</button>
     </div>
 
     <div class="q">
@@ -513,6 +612,43 @@ limitChecks('q8',2);
 limitChecks('q11',2);
 limitChecks('q12',3);
 
+// ★ 358 추가: 13번(학원·과외 일정), 16번(현재 교재)처럼 1개 이상 입력해야 할 수 있는
+// 항목에 "+ 추가" 버튼으로 칸을 늘릴 수 있게 하는 범용 함수.
+function addDynRow(containerId, itemClass, placeholder){
+  const container=$(containerId);
+  const row=document.createElement('div');
+  row.className='dyn-row';
+  const inp=document.createElement('input');
+  inp.className=itemClass;
+  inp.placeholder=placeholder;
+  const rm=document.createElement('button');
+  rm.type='button';
+  rm.className='dyn-remove';
+  rm.textContent='✕';
+  rm.onclick=function(){ row.remove(); };
+  row.appendChild(inp);
+  row.appendChild(rm);
+  container.appendChild(row);
+}
+function collectDynValues(itemClass){
+  return Array.from(document.querySelectorAll('.'+itemClass)).map(function(el){ return el.value.trim(); }).filter(Boolean);
+}
+// ★ 358 추가: 6·9월 평가원 성적을 과목별 점수/등급 객관식 입력으로 받아 구조화한다.
+function collectExamScore(prefix){
+  function v(id){ return $(id) ? $(id).value : ''; }
+  return {
+    kor:{score:v(prefix+'_kor_score'), grade:v(prefix+'_kor_grade')},
+    math:{score:v(prefix+'_math_score'), grade:v(prefix+'_math_grade')},
+    eng:{grade:v(prefix+'_eng_grade')},
+    tamgu1:{score:v(prefix+'_tam1_score'), grade:v(prefix+'_tam1_grade')},
+    tamgu2:{score:v(prefix+'_tam2_score'), grade:v(prefix+'_tam2_grade')}
+  };
+}
+function examScoreFilled(prefix){
+  const s=collectExamScore(prefix);
+  return Object.keys(s).some(function(k){ return s[k].grade || s[k].score; });
+}
+
 function submitSurvey(ev){
   ev.preventDefault();
   const errBox=$('errBox');
@@ -525,10 +661,10 @@ function submitSurvey(ev){
   if(!radioValue('q3')) missing.push('3. 현재 입시 준비 방향');
   if(!radioValue('q4')) missing.push('4. 수능최저');
   if(!$('q5_target').value.trim()) missing.push('5. 수능 목표등급');
-  if(!$('q6_june').value.trim()) missing.push('6. 6월 평가원 성적');
-  if(!$('q7_sep').value.trim()) missing.push('7. 9월 평가원 성적');
+  if(!examScoreFilled('q6')) missing.push('6. 6월 평가원 성적');
+  if(!examScoreFilled('q7')) missing.push('7. 9월 평가원 성적');
   if(!radioValue('q10')) missing.push('10. 최근 수능 공부상태');
-  if(!$('q13_schedule').value.trim()) missing.push('13. 현재 학원·과외·수업 일정');
+  if(!collectDynValues('q13-item').length) missing.push('13. 현재 학원·과외·수업 일정');
   if(!radioValue('q14')) missing.push('14. M60 진행 시간');
   if(!radioValue('q15')) missing.push('15. 기출 풀어본 정도');
   if(!radioValue('q17')) missing.push('17. FINAL 70 개인 처방 확인');
@@ -557,18 +693,18 @@ function submitSurvey(ev){
     prepDirection: radioValue('q3'),
     minReq: radioValue('q4'),
     targetGrades: $('q5_target').value.trim(),
-    juneScore: $('q6_june').value.trim(),
-    sepScore: $('q7_sep').value.trim(),
+    juneScore: collectExamScore('q6'),
+    sepScore: collectExamScore('q7'),
     urgentSubjects: checkedValues('q8'),
     currentStudy: checkedValues('q9'),
     currentStudyNote: $('q9_note').value.trim(),
     studyStatus: radioValue('q10'),
     planBlockers: checkedValues('q11'),
     examIssues: checkedValues('q12'),
-    schedule: $('q13_schedule').value.trim(),
+    schedule: collectDynValues('q13-item'),
     m60Time: radioValue('q14'),
     pastExamCoverage: radioValue('q15'),
-    currentMaterials: $('q16_materials').value.trim(),
+    currentMaterials: collectDynValues('q16-item'),
     finalPlanAck: radioValue('q17')
   };
 
