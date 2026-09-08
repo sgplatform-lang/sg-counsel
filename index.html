@@ -3127,7 +3127,7 @@ function renderDetail(s){
     {id:'grade',     label:'성적',       icon:'📊', sub:false,  perm:'grade'},
     {id:'weekly',    label:'주간플랜',   icon:'📅', sub:true,   perm:'weekly'},
     {id:'test',      label:'테스트',     icon:'📝', sub:false,  perm:'test'},
-    {id:'consult',   label:'상담',       icon:'💬', sub:false,  perm:'consult'},
+    {id:'consult',   label:'학습상담',   icon:'📈', sub:false,  perm:'consult'},
     {id:'susi',      label:'수시',       icon:'🏫', sub:true,   perm:'susi'},
     {id:'jeongsi',   label:'정시',       icon:'🎯', sub:false,  perm:'jeongsi'},
     {id:'apex',       label:'APEX진단',   icon:'🏆', sub:false,  perm:'apex'},
@@ -3155,7 +3155,7 @@ function renderDetail(s){
     weekly:     `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습플랜 인쇄/PDF</button>`,
     achieve:    `<button onclick="printAchieve(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 점검표 인쇄/PDF</button>
                  <button onclick="exportAchieveXls(${s.id})" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀</button>`,
-    consult:    `<button onclick="printTab(${s.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 상담이력 인쇄/PDF</button>`,
+    consult:    `<button onclick="printTab(${s.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습상담 인쇄/PDF</button>`,
     jeongsi:    `<button onclick="saveJeongsiSnapshot('${s.id}')" style="background:#3b5bdb18;color:#3b5bdb;border:1.5px solid #3b5bdb40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">💾 분석결과 저장</button>
                  <button onclick="printJeongsi('${s.id}')" style="background:#ef444418;color:#ef4444;border:1.5px solid #ef444440;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 정시 인쇄/PDF</button>
                  <button onclick="exportJeongsiXls('${s.id}')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀</button>`,
@@ -3236,7 +3236,7 @@ function renderDetail(s){
     <!-- ③ 성적·상담·개요: 인쇄 버튼만 우측에 -->
     ${!isSusiGroup&&!isWeekGroup&&curPrintBtn?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:6px">${curPrintBtn}</div>`:''}
 
-    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='test'?renderStudentTest(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='roadmap'?renderRoadmap(s):renderConsult(s)}
+    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='test'?renderStudentTest(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
   </div>`;
 }
 
@@ -3250,7 +3250,7 @@ function renderOverview(s){
     <div class="stat"><div class="sv" style="color:${gc(a)}">${a.toFixed(2)}</div><div class="sl">내신평균</div></div>
     <div class="stat"><div class="sv" style="color:#f59e0b">${(s.targets||[]).length}</div><div class="sl">지원대학</div></div>
     <div class="stat"><div class="sv" style="color:#10b981">${Object.keys(s.weeklyPlan||{}).length}h</div><div class="sl">주간플랜</div></div>
-    <div class="stat"><div class="sv" style="color:#8b5cf6">${(s.consultations||[]).length}</div><div class="sl">상담횟수</div></div>
+    <div class="stat"><div class="sv" style="color:#8b5cf6">${(s.learningStyle||[]).length}</div><div class="sl">러닝기록</div></div>
   </div>
   ${_chHist.length?`<div class="box" style="margin-bottom:10px;cursor:pointer" onclick="ST.tab='challenger';render()">
     <div style="display:flex;justify-content:space-between;align-items:center">
@@ -10324,6 +10324,408 @@ function openSubjModal(subj){
   document.body.appendChild(ov);
 }
 // ══ 상담 탭 ══
+// ══════════════════════════════════════════════════════════════════
+// ★ 2026-09-08(363) 추가: 기존 "상담" 탭을 완전히 대체하는 "학습상담" 기능.
+// 학생 문서에 learningStyle 배열 필드로 저장(기존 consultations와 같은 패턴).
+// 항목: 날짜·과목·학생성향(자유서술) + 7개 수치평가(1~10, 계산속도/이해력/숙제성실/
+// 학생의지/눈속임/관심도/학원만족도). 개별 학생 탭에서 하나씩 입력하는 화면과,
+// 관리자 상단의 "📈 학습상담" 탭에서 날짜+과목 선택 후 여러 학생을 한 번에
+// 표로 입력하는 일괄 화면 두 가지를 모두 지원한다(둘 다 같은 필드에 저장됨).
+// ══════════════════════════════════════════════════════════════════
+const LS_FIELDS=[
+  {key:'calcSpeed',label:'계산속도'},
+  {key:'comprehension',label:'이해력'},
+  {key:'homework',label:'숙제성실'},
+  {key:'will',label:'학생의지'},
+  {key:'deception',label:'눈속임'},
+  {key:'interest',label:'관심도'},
+  {key:'satisfaction',label:'학원만족도'}
+];
+function LS_avg(nums){
+  const valid=nums.filter(function(n){ return n!==null && n!==undefined && n!=='' && !isNaN(n); }).map(Number);
+  if(!valid.length) return null;
+  return valid.reduce(function(a,b){ return a+b; },0)/valid.length;
+}
+// 과목별로 묶어서(선택한 기간 내) 7개 지표 평균과 입력 횟수를 계산한다.
+function LS_computeSubjectAverages(entries, fromDate, toDate){
+  const filtered=entries.filter(function(e){
+    if(fromDate && e.date < fromDate) return false;
+    if(toDate && e.date > toDate) return false;
+    return true;
+  });
+  const bySubject={};
+  filtered.forEach(function(e){
+    const subj=e.subject||'(과목 미지정)';
+    if(!bySubject[subj]) bySubject[subj]={count:0, fields:{}};
+    bySubject[subj].count++;
+    LS_FIELDS.forEach(function(f){
+      if(!bySubject[subj].fields[f.key]) bySubject[subj].fields[f.key]=[];
+      bySubject[subj].fields[f.key].push(e[f.key]);
+    });
+  });
+  return Object.keys(bySubject).sort().map(function(subj){
+    const row={subject:subj, count:bySubject[subj].count};
+    LS_FIELDS.forEach(function(f){ row[f.key]=LS_avg(bySubject[subj].fields[f.key]); });
+    return row;
+  });
+}
+// ★ 369 변경: "상담통계"가 기간 필터 대신 "회차"(학생이 기록을 저장한 순서) 기준으로
+// 바뀌면서, 월 필터용 헬퍼는 걷어내고 회차 계산용 헬퍼로 교체한다.
+function LS_fieldSum(e){
+  return LS_FIELDS.reduce(function(acc,f){ return acc + (typeof e[f.key]==='number'?e[f.key]:0); }, 0);
+}
+// 한 학생의 전체 기록을 날짜순(오래된 것부터)으로 정렬 — 인덱스+1이 곧 "N회차"가 된다.
+function LS_printStats(mode){
+  const s=ST.sel||ST.adminSel;
+  if(!s){ alert('선택된 학생이 없습니다.'); return; }
+  printTab(s.id, mode==='grade' ? 'ls_stat_grade' : 'ls_stat_student');
+}
+function LS_studentRoundsSorted(student){
+  return (student.learningStyle||[]).slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+}
+function LS_effectiveSubject(prefix){
+  const sel=document.getElementById(prefix+'Subject');
+  if(!sel) return '';
+  if(sel.value==='__custom__'){
+    const custom=document.getElementById(prefix+'SubjectCustom');
+    return custom ? custom.value.trim() : '';
+  }
+  return sel.value;
+}
+function LS_onSubjectSelectChange(prefix){
+  const sel=document.getElementById(prefix+'Subject');
+  const custom=document.getElementById(prefix+'SubjectCustom');
+  if(!sel||!custom) return;
+  custom.style.display = sel.value==='__custom__' ? '' : 'none';
+}
+// ★ 363/364: 개별 학생 페이지(prefix='ls')에서는 과목을 바꿔도 다시 그릴 필요가 없지만(그
+// 자리에서 바로 저장 버튼을 누르면 되므로), 관리자 일괄입력 화면(prefix='lsb')은 과목을
+// 골라야 비로소 전체 학생 표가 나타나는 구조라 과목이 확정되는 순간 다시 그려줘야 한다.
+function LS_onSubjectChanged(prefix){
+  LS_onSubjectSelectChange(prefix);
+  if(prefix==='lsb'){ ST._lsbSubject=LS_effectiveSubject(prefix); render(); }
+}
+function LS_subjectSelectHtml(id, current){
+  const preset=['국어','영어','수학'];
+  const isCustom = current && preset.indexOf(current)<0;
+  const prefix=id.replace(/Subject$/,'');
+  return `<select id="${id}" onchange="LS_onSubjectChanged('${prefix}')" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px;font-size:12.5px">
+    ${preset.map(function(p){ return '<option value="'+p+'"'+(current===p?' selected':'')+'>'+p+'</option>'; }).join('')}
+    <option value="__custom__"${isCustom?' selected':''}>기타(직접입력)</option>
+  </select>
+  <input id="${id}Custom" value="${isCustom?esc(current):''}" placeholder="과목명 입력" onchange="LS_onSubjectChanged('${prefix}')" style="width:100%;margin-top:6px;border:1px solid #ddd;border-radius:6px;padding:6px;font-size:12.5px;display:${isCustom?'':'none'}">`;
+}
+function LS_addEntry(s){
+  function v(id){ const el=document.getElementById(id); return el?el.value:''; }
+  const date=v('lsDate'), subject=LS_effectiveSubject('ls');
+  if(!date || !subject){ alert('날짜와 과목은 반드시 입력해주세요.'); return; }
+  const entry={ id:'ls_'+Date.now(), date:date, subject:subject, tendency:v('lsTendency').trim() };
+  LS_FIELDS.forEach(function(f){ const val=v('ls_'+f.key); entry[f.key]=val===''?null:Number(val); });
+  upd({...s, learningStyle:[...(s.learningStyle||[]), entry]});
+}
+function LS_deleteEntry(s, id){
+  if(!confirm('이 학습상담 기록을 삭제하시겠습니까?')) return;
+  upd({...s, learningStyle:(s.learningStyle||[]).filter(function(e){ return String(e.id)!==String(id); })});
+}
+// ★ 363 추가: 여러 학생을 한 번에 저장할 때 upd()를 학생 수만큼 반복 호출하면 그때마다
+// render()가 다시 실행되어 비효율적이므로, 변경된 학생들을 모아 한 번에 저장+렌더한다.
+function LS_batchSaveStudents(list){
+  if(!list.length) return;
+  if(!ST._savingIds) ST._savingIds=new Set();
+  list.forEach(function(s){
+    ST._savingIds.add(String(s.id));
+    ST.students=ST.students.map(function(x){ return String(x.id)===String(s.id)?s:x; });
+    if(String(ST.sel?.id)===String(s.id)) ST.sel=s;
+    if(String(ST.adminSel?.id)===String(s.id)) ST.adminSel=s;
+    if(FB_USE()) fbSave('students', s.id, s);
+  });
+  save(); render();
+  const ids=list.map(function(s){ return String(s.id); });
+  setTimeout(function(){ if(ST._savingIds) ids.forEach(function(id){ ST._savingIds.delete(id); }); },5000);
+}
+// 관리자 상단 "📈 학습상담" — 날짜+과목을 고른 뒤 여러 학생을 한 화면에서 일괄 입력.
+function LS_batchSaveAll(){
+  const date=(document.getElementById('lsbDate')||{}).value||'';
+  const subject=LS_effectiveSubject('lsb');
+  if(!date||!subject){ alert('날짜와 과목을 먼저 선택해주세요.'); return; }
+  const changed=[];
+  ST.students.forEach(function(s){
+    const sid=s.id;
+    function v(key){ const el=document.getElementById('lsb_'+key+'_'+sid); return el?el.value:''; }
+    const tendency=v('tendency').trim();
+    const vals={};
+    let anyFilled=!!tendency;
+    LS_FIELDS.forEach(function(f){
+      const raw=v(f.key);
+      vals[f.key]=raw===''?null:Number(raw);
+      if(raw!=='') anyFilled=true;
+    });
+    if(!anyFilled) return; // 이 학생 행은 아무것도 입력 안 했으면 건너뜀
+    const list=(s.learningStyle||[]).slice();
+    const existingIdx=list.findIndex(function(e){ return e.date===date && e.subject===subject; });
+    const entry=Object.assign({id: existingIdx>=0?list[existingIdx].id:('ls_'+Date.now()+'_'+sid), date:date, subject:subject, tendency:tendency}, vals);
+    if(existingIdx>=0) list[existingIdx]=entry; else list.push(entry);
+    changed.push(Object.assign({}, s, {learningStyle:list}));
+  });
+  if(!changed.length){ alert('입력된 내용이 없습니다.'); return; }
+  LS_batchSaveStudents(changed);
+  alert(changed.length+'명의 학습상담 기록이 저장되었습니다.');
+}
+function renderAdminLearningStyle(){
+  const date=ST._lsbDate || new Date().toISOString().slice(0,10);
+  const subject=(ST._lsbSubject!==undefined && ST._lsbSubject!==null) ? ST._lsbSubject : '수학';
+  const students=ST.students||[];
+  function existingFor(s){ return (s.learningStyle||[]).find(function(e){ return e.date===date && e.subject===subject; }); }
+  const rows = subject ? students.map(function(s){
+    const ex=existingFor(s)||{};
+    function numInput(f){ return '<td style="border:1px solid #eee;padding:4px"><input type="number" min="1" max="10" step="1" id="lsb_'+f.key+'_'+s.id+'" value="'+(ex[f.key]!==undefined&&ex[f.key]!==null?ex[f.key]:'')+'" style="width:52px;border:1px solid #ddd;border-radius:5px;padding:4px;font-size:12px;text-align:center"></td>'; }
+    return '<tr>'
+      +'<td style="border:1px solid #eee;padding:6px;font-weight:700;white-space:nowrap">'+esc(s.name)+'</td>'
+      +'<td style="border:1px solid #eee;padding:6px;white-space:nowrap;font-size:11.5px;color:#777">'+esc(s.school||'')+'</td>'
+      +'<td style="border:1px solid #eee;padding:4px"><input id="lsb_tendency_'+s.id+'" value="'+esc(ex.tendency||'')+'" style="width:100%;min-width:180px;border:1px solid #ddd;border-radius:5px;padding:4px 6px;font-size:12px"></td>'
+      +LS_FIELDS.map(numInput).join('')
+      +'</tr>';
+  }).join('') : '';
+  return `<div>
+    <div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
+      <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">📈 LEARNING STYLE · 학습상담 관리</div>
+      <div style="font-size:19px;font-weight:900;margin-bottom:4px">학습상담 일괄 입력</div>
+      <div style="font-size:12px;color:#cbd5e1">날짜와 과목을 고르면, 그 날짜·과목으로 이미 입력된 값이 있으면 자동으로 불러와서 수정할 수 있습니다. 학생별 "학습상담" 탭에 입력한 것과 완전히 같은 데이터입니다.</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap">
+      <div><label style="display:block;font-size:11px;color:#888;margin-bottom:4px">날짜</label><input type="date" id="lsbDate" value="${esc(date)}" onchange="ST._lsbDate=this.value;render()" style="border:1px solid #ddd;border-radius:6px;padding:7px 10px;font-size:13px"></div>
+      <div style="min-width:160px"><label style="display:block;font-size:11px;color:#888;margin-bottom:4px">과목</label>${LS_subjectSelectHtml('lsbSubject', subject||'수학')}</div>
+      ${subject?`<button onclick="LS_batchSaveAll()" class="btn-b" style="padding:8px 18px;font-size:12.5px;margin-top:22px">💾 전체 저장</button>`:''}
+    </div>
+    ${subject ? `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12.5px;width:100%">
+      <thead><tr style="background:#fafaf8">
+        <th style="border:1px solid #eee;padding:6px">이름</th>
+        <th style="border:1px solid #eee;padding:6px">학교</th>
+        <th style="border:1px solid #eee;padding:6px;min-width:180px">학생성향</th>
+        ${LS_FIELDS.map(function(f){ return '<th style="border:1px solid #eee;padding:6px">'+f.label+'</th>'; }).join('')}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>` : '<div style="font-size:12.5px;color:#aaa;padding:30px 2px;text-align:center">과목을 입력하면 학생 목록이 표시됩니다.</div>'}
+  </div>`;
+}
+// ★ 2026-09-08(365) 변경: 입시상담과 동일한 구조(진한 배너+캡슐 서브탭)로 재구성 —
+// 기본상담(입력)/상담리포트(큼직하게 보기+인쇄)/상담통계(과목별 누적평균) 3개 서브탭.
+function LS_bannerHtml(active){
+  const tabs=[
+    {key:'basic', icon:'📝', label:'기본상담'},
+    {key:'report', icon:'📁', label:'상담리포트'},
+    {key:'stats', icon:'📊', label:'상담통계'}
+  ];
+  return `<div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
+    <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">📈 LEARNING STYLE · 학습상담 관리</div>
+    <div style="font-size:19px;font-weight:900;margin-bottom:4px">학습상담 통합 관리</div>
+    <div style="font-size:12px;color:#cbd5e1;margin-bottom:16px">과목별 학습 태도·성향을 기록하고, 누적 추이를 상담에 활용하세요.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${tabs.map(function(t){
+        const isAct=active===t.key;
+        return `<button onclick="ST.lsSubTab='${t.key}';render()" style="background:${isAct?'#fff':'rgba(255,255,255,.12)'};color:${isAct?'#0f2540':'#fff'};border:1px solid ${isAct?'#fff':'rgba(255,255,255,.35)'};border-radius:20px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">${t.icon} ${t.label}</button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+function LS_studentInfoBoxHtml(s){
+  return `<div style="background:#fff;border:1px solid #e8eaf6;border-radius:12px;padding:18px 20px;margin-bottom:16px">
+    <div style="font-size:11px;color:#888;margin-bottom:10px">학생 정보 (자동 반영 — 기본정보 수정은 학생 '수정' 화면에서)</div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><span style="font-size:10.5px;color:#aaa">이름</span><br><b style="font-size:14px">${esc(s.name||'-')}</b></div>
+      <div><span style="font-size:10.5px;color:#aaa">학교</span><br><b style="font-size:14px">${esc(s.school||'-')}</b></div>
+      <div><span style="font-size:10.5px;color:#aaa">학년</span><br><b style="font-size:14px">${esc(s.grade||'-')}</b></div>
+    </div>
+  </div>`;
+}
+function renderLearningStyle(s){
+  const sub=ST.lsSubTab||'basic';
+  const body = sub==='report' ? LS_renderReport(s) : sub==='stats' ? LS_renderStats(s) : LS_renderBasic(s);
+  return LS_bannerHtml(sub) + `<div style="max-width:900px;margin:0 auto">${body}</div>`;
+}
+function LS_renderBasic(s){
+  const todayStr=new Date().toISOString().slice(0,10);
+  function fieldInputHtml(f){
+    return `<div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">${f.label}</label><input type="number" id="ls_${f.key}" min="1" max="10" step="1" placeholder="1~10" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:12px 8px;font-size:15px;text-align:center;font-weight:700"></div>`;
+  }
+  return `${LS_studentInfoBoxHtml(s)}
+    <div class="box">
+      <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:16px">1. 학습상담 기록 추가</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">날짜</label><input type="date" id="lsDate" value="${todayStr}" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:13.5px"></div>
+        <div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">과목</label>${LS_subjectSelectHtml('lsSubject','수학')}</div>
+      </div>
+      <div style="margin-bottom:16px"><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">학생성향 (자유 서술)</label><textarea id="lsTendency" rows="4" placeholder="예: 학생의 의지에 맡기는 편, 학생과 협의하면 어머니 동의" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:12px;font-size:14px;font-family:inherit;resize:vertical;line-height:1.6"></textarea></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+        ${LS_FIELDS.map(fieldInputHtml).join('')}
+      </div>
+      <button onclick="LS_addEntry(ST.sel||ST.adminSel)" class="btn-b" style="padding:10px 22px;font-size:13.5px">💾 기록 저장</button>
+    </div>`;
+}
+// ★ 365 추가: "상담리포트" — 입시상담 상담리포트처럼 항목을 큼직하게 보여주는 리포트 형태.
+function LS_renderReport(s){
+  const entries=(s.learningStyle||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return `${LS_studentInfoBoxHtml(s)}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button onclick="printTab('${s.id}','consult')" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer">🖨 인쇄 / PDF</button>
+    </div>
+    <div class="box">
+      <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:16px">🗂 전체 기록 (${entries.length}건)</div>
+      ${entries.length ? entries.map(function(e){
+        const sum=LS_fieldSum(e);
+        return `<div style="border:1px solid #e8eaf6;border-radius:12px;padding:18px 20px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-size:15px;font-weight:800;color:#1a1a2e">${esc(e.date||'')} · ${esc(e.subject||'')}</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="background:#eef2ff;color:#4338ca;border-radius:14px;padding:4px 12px;font-size:12.5px;font-weight:800">총합 ${sum}/70</span>
+              <button onclick="LS_deleteEntry(ST.sel||ST.adminSel,'${e.id}')" style="background:none;border:1px solid #fecaca;color:#dc2626;border-radius:12px;padding:4px 12px;font-size:11px;cursor:pointer">삭제</button>
+            </div>
+          </div>
+          ${e.tendency?'<div style="background:#f7f8fb;border-radius:10px;padding:14px 16px;font-size:15px;color:#333;line-height:1.7;margin-bottom:14px">'+esc(e.tendency)+'</div>':''}
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+            ${LS_FIELDS.map(function(f){
+              const v=e[f.key];
+              return '<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 8px;text-align:center">'
+                +'<div style="font-size:11px;color:#888;margin-bottom:4px">'+f.label+'</div>'
+                +'<div style="font-size:22px;font-weight:900;color:'+(v!==null&&v!==undefined?'#0f2540':'#ccc')+'">'+(v!==null&&v!==undefined?v:'—')+'</div>'
+                +'</div>';
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('') : '<div style="font-size:12px;color:#aaa;padding:10px 2px">아직 기록이 없습니다.</div>'}
+    </div>`;
+}
+// ★ 369 변경: "상담통계"를 [👤 학생 통계]/[🏫 학년별 통계] 두 화면으로 나눈다.
+function LS_renderStats(s){
+  const mode=ST._lsStatMode||'student';
+  return `${LS_studentInfoBoxHtml(s)}
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button onclick="ST._lsStatMode='student';render()" style="background:${mode==='student'?'#0f2540':'#fff'};color:${mode==='student'?'#fff':'#333'};border:1px solid ${mode==='student'?'#0f2540':'#ddd'};border-radius:20px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer">👤 학생 학습상담 통계</button>
+      <button onclick="ST._lsStatMode='grade';render()" style="background:${mode==='grade'?'#0f2540':'#fff'};color:${mode==='grade'?'#fff':'#333'};border:1px solid ${mode==='grade'?'#0f2540':'#ddd'};border-radius:20px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer">🏫 학년별 통계</button>
+    </div>
+    ${mode==='grade' ? LS_renderStatsGrade(s) : LS_renderStatsStudent(s)}`;
+}
+// [👤 학생 학습상담 통계] — 회차별 탭(전체=누적, N회차=그 기록 하나만).
+// 기본(전체)일 때: 1.학생성향은 최신순 누적 목록, 2.학습상황은 전체 평균.
+// 특정 회차 선택 시: 그 회차 하나의 학생성향·학습상황 그대로 표시.
+function LS_renderStatsStudent(s){
+  const rounds=LS_studentRoundsSorted(s); // 오래된 것부터, 인덱스+1 = N회차
+  const selRound=ST._lsStatRound || null; // null = 전체(누적)
+  const roundTabs=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    <button onclick="ST._lsStatRound=null;render()" style="background:${!selRound?'#eef2ff':'#fff'};color:${!selRound?'#4338ca':'#555'};border:1px solid ${!selRound?'#c7d2fe':'#ddd'};border-radius:16px;padding:5px 13px;font-size:11.5px;font-weight:700;cursor:pointer">전체(누적)</button>
+    ${rounds.map(function(e,i){
+      const n=i+1, isAct=selRound===n;
+      return '<button onclick="ST._lsStatRound='+n+';render()" style="background:'+(isAct?'#eef2ff':'#fff')+';color:'+(isAct?'#4338ca':'#555')+';border:1px solid '+(isAct?'#c7d2fe':'#ddd')+';border-radius:16px;padding:5px 13px;font-size:11.5px;font-weight:700;cursor:pointer">'+n+'회차 ('+esc(e.date||'')+' '+esc(e.subject||'')+')</button>';
+    }).join('')}
+  </div>`;
+  let tendencyHtml, statusHtml;
+  if(selRound && rounds[selRound-1]){
+    const e=rounds[selRound-1];
+    const sumE=LS_fieldSum(e);
+    tendencyHtml = e.tendency
+      ? '<div style="background:#f7f8fb;border-radius:10px;padding:14px 16px;font-size:15px;color:#333;line-height:1.7">'+esc(e.tendency)+'</div>'
+      : '<div style="font-size:12px;color:#aaa;padding:10px 2px">작성된 내용이 없습니다.</div>';
+    statusHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">'
+      +LS_FIELDS.map(function(f){
+        const v=e[f.key];
+        return '<div style="background:#fafbfc;border-radius:10px;padding:12px 8px;text-align:center">'
+          +'<div style="font-size:11px;color:#888;margin-bottom:4px">'+f.label+'</div>'
+          +'<div style="font-size:20px;font-weight:900;color:'+(v!==null&&v!==undefined?'#0f2540':'#ccc')+'">'+(v!==null&&v!==undefined?v:'—')+'</div>'
+          +'</div>';
+      }).join('')
+      +'<div style="background:#eef2ff;border-radius:10px;padding:12px 8px;text-align:center">'
+      +'<div style="font-size:11px;color:#4338ca;margin-bottom:4px;font-weight:700">총합</div>'
+      +'<div style="font-size:20px;font-weight:900;color:#4338ca">'+sumE+'/70</div>'
+      +'</div>'
+      +'</div>';
+  } else {
+    const newestFirst=rounds.slice().reverse();
+    tendencyHtml = newestFirst.length ? newestFirst.map(function(e){
+      return '<div style="border-bottom:1px solid #f1f5f9;padding:10px 2px"><div style="font-size:11px;color:#888;margin-bottom:4px">'+esc(e.date||'')+' · '+esc(e.subject||'')+'</div><div style="font-size:14px;color:#333;line-height:1.7">'+(e.tendency?esc(e.tendency):'<span style="color:#ccc">— 내용 없음 —</span>')+'</div></div>';
+    }).join('') : '<div style="font-size:12px;color:#aaa;padding:10px 2px">아직 기록이 없습니다.</div>';
+    const avgAll=LS_FIELDS.reduce(function(acc,f){ acc[f.key]=LS_avg(rounds.map(function(e){ return e[f.key]; })); return acc; },{});
+    const avgSumAll=LS_FIELDS.reduce(function(acc,f){ return acc+(avgAll[f.key]!==null?avgAll[f.key]:0); },0);
+    statusHtml = rounds.length ? '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">'
+      +LS_FIELDS.map(function(f){
+        const v=avgAll[f.key];
+        return '<div style="background:#fafbfc;border-radius:10px;padding:12px 8px;text-align:center">'
+          +'<div style="font-size:11px;color:#888;margin-bottom:4px">'+f.label+'</div>'
+          +'<div style="font-size:20px;font-weight:900;color:'+(v!==null?'#0f2540':'#ccc')+'">'+(v!==null?v.toFixed(1):'—')+'</div>'
+          +'</div>';
+      }).join('')
+      +'<div style="background:#eef2ff;border-radius:10px;padding:12px 8px;text-align:center">'
+      +'<div style="font-size:11px;color:#4338ca;margin-bottom:4px;font-weight:700">총합</div>'
+      +'<div style="font-size:20px;font-weight:900;color:#4338ca">'+avgSumAll.toFixed(1)+'/70</div>'
+      +'</div>'
+      +'</div>' : '<div style="font-size:12px;color:#aaa;padding:10px 2px">아직 기록이 없습니다.</div>';
+  }
+  return `<div class="box">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button onclick="LS_printStats('student')" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🖨 인쇄 / PDF</button>
+    </div>
+    ${roundTabs}
+    <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px">1. 학생성향</div>
+    <div style="margin-bottom:22px">${tendencyHtml}</div>
+    <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px">2. 학습상황${selRound?'':' (전체 평균)'}</div>
+    ${statusHtml}
+  </div>`;
+}
+// [🏫 학년별 통계] — 같은 학년 학생 전체를 회차별로 비교. 처음 열면 학년 전체에서 가장
+// 큰 회차 번호(=가장 최근까지 진행된 회차)를 기본 선택하고, 학생상황(7개 지표) 총합이
+// 높은 순으로 정렬. "입력 횟수"(그 학생의 전체 누적 기록 수) 칼럼도 포함.
+function LS_renderStatsGrade(s){
+  const grade=s.grade||'';
+  const gradeStudents=(ST.students||[]).filter(function(st){ return st.grade===grade; });
+  const roundsByStudent={};
+  let maxRound=0;
+  gradeStudents.forEach(function(st){
+    const r=LS_studentRoundsSorted(st);
+    roundsByStudent[st.id]=r;
+    if(r.length>maxRound) maxRound=r.length;
+  });
+  if(!maxRound){
+    return `<div class="box"><div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px">🏫 ${esc(grade)} 학년별 통계</div><div style="font-size:12px;color:#aaa;padding:10px 2px">같은 학년(${esc(grade)}) 학생 중 아직 기록이 없습니다.</div></div>`;
+  }
+  const selRound = ST._lsGradeRound || maxRound; // 처음 열면 무조건 최신(가장 큰) 회차
+  const rows=gradeStudents.map(function(st){
+    const r=roundsByStudent[st.id];
+    if(r.length<selRound) return null; // 이 회차까지 기록이 없는 학생은 제외
+    const e=r[selRound-1];
+    return {name:st.name, school:st.school, tendency:e.tendency, entry:e, sum:LS_fieldSum(e), count:r.length};
+  }).filter(Boolean).sort(function(a,b){ return b.sum-a.sum; });
+  const roundTabs=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    ${Array.from({length:maxRound}, function(_,i){ return i+1; }).map(function(n){
+      const isAct=selRound===n;
+      return '<button onclick="ST._lsGradeRound='+n+';render()" style="background:'+(isAct?'#eef2ff':'#fff')+';color:'+(isAct?'#4338ca':'#555')+';border:1px solid '+(isAct?'#c7d2fe':'#ddd')+';border-radius:16px;padding:5px 13px;font-size:11.5px;font-weight:700;cursor:pointer">'+n+'회차</button>';
+    }).join('')}
+  </div>`;
+  return `<div class="box">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button onclick="LS_printStats('grade')" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🖨 인쇄 / PDF</button>
+    </div>
+    <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px">🏫 ${esc(grade)} 학년별 통계 — ${selRound}회차</div>
+    <div style="font-size:11px;color:#888;margin-bottom:12px">같은 학년(${esc(grade)}) 학생 중 이 회차까지 기록이 있는 학생만 표시되며, 학생성향을 제외한 7개 항목 합계가 높은 순으로 정렬됩니다.</div>
+    ${roundTabs}
+    ${rows.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead><tr style="background:#fafaf8">
+        <th style="border:1px solid #eee;padding:8px">이름</th>
+        <th style="border:1px solid #eee;padding:8px">학교</th>
+        <th style="border:1px solid #eee;padding:8px;min-width:220px">학생성향</th>
+        ${LS_FIELDS.map(function(f){ return '<th style="border:1px solid #eee;padding:8px">'+f.label+'</th>'; }).join('')}
+        <th style="border:1px solid #eee;padding:8px;background:#eef2ff">총합</th>
+        <th style="border:1px solid #eee;padding:8px">입력 횟수</th>
+      </tr></thead>
+      <tbody>${rows.map(function(r){
+        return '<tr><td style="border:1px solid #eee;padding:8px;font-weight:700;white-space:nowrap">'+esc(r.name)+'</td>'
+          +'<td style="border:1px solid #eee;padding:8px;white-space:nowrap;color:#777">'+esc(r.school||'')+'</td>'
+          +'<td style="border:1px solid #eee;padding:8px;text-align:left">'+esc(r.tendency||'')+'</td>'
+          +LS_FIELDS.map(function(f){ const v=r.entry[f.key]; return '<td style="border:1px solid #eee;padding:8px;text-align:center;font-weight:700">'+(v!==null&&v!==undefined?v:'')+'</td>'; }).join('')
+          +'<td style="border:1px solid #eee;padding:8px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+r.sum+'/70</td>'
+          +'<td style="border:1px solid #eee;padding:8px;text-align:center">'+r.count+'</td></tr>';
+      }).join('')}</tbody>
+    </table></div>` : '<div style="font-size:12px;color:#aaa;padding:10px 2px">이 회차까지 기록이 있는 학생이 없습니다.</div>'}
+  </div>`;
+}
 function renderConsult(s){
   const consultList = s.consultations||[];
   const cNames = ST.teachers.map(t=>t.name);
@@ -10847,45 +11249,118 @@ function printTab(sid,tab){
       });
     }
   } else if(tab==='consult'){
-    const CCOLORS3={'입학상담':'#3b82f6','학습상담':'#10b981','성적상담':'#f59e0b','입시상담':'#8b5cf6','퇴원상담':'#ef4444','기타':'#64748b'};
-    const consultList=(s.consultations||[]);
-    const cardsHtml=consultList.map(c=>{
-      const cc=CCOLORS3[c.ctype]||'#334155';
-      return`<div style="margin-bottom:14px;border-left:4px solid ${cc};border-radius:0 8px 8px 0;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-        <div style="background:linear-gradient(135deg,${cc},${cc}cc);color:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700">${esc(c.ctype||'기타')}</span>
-            <strong style="font-size:13px">${esc(c.topic)}</strong>
-          </div>
-          <div style="font-size:9px;color:rgba(255,255,255,.8);white-space:nowrap">📅 ${c.date}</div>
-        </div>
-        <div style="background:${cc}18;padding:5px 14px;display:flex;gap:10px;align-items:center;font-size:9px;border-bottom:1px solid ${cc}22">
-          <span style="font-weight:700;color:${cc}">${esc(s.name)}</span>
-          <span style="color:#666">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''}</span>
-          <span style="color:#666">담당: ${esc(c.counselor)}</span>
-        </div>
-        <div style="padding:10px 14px">
-          <div style="font-size:11px;font-weight:700;color:#333;margin-bottom:4px">상담 내용</div>
-          <div style="font-size:11px;line-height:1.8;white-space:pre-wrap;background:#f4f6fb;border-radius:6px;padding:10px;margin-bottom:${c.aiAnalysis?'8px':'0'}">${esc(c.memo)}</div>
-          ${c.aiAnalysis?`<div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:4px">상담 상세 내용</div><div style="font-size:11px;line-height:1.8;white-space:pre-wrap;background:#f5f3ff;border-radius:6px;padding:10px">${esc(c.aiAnalysis)}</div>`:''}
+    // ★ 2026-09-08(364) 변경: "상담" 탭이 "학습상담"로 완전히 교체되면서, 인�쇄도
+    // 예전 상담이력(s.consultations) 대신 새 학습상담 기록(s.learningStyle)을 기준으로
+    // 만든다. 과목별 누적 평균(전체 기간) + 전체 기록을 리포트 형태로 인쇄한다.
+    const lsList=(s.learningStyle||[]).slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    const subjAvg=LS_computeSubjectAverages(lsList, '', '');
+    const avgTableHtml = subjAvg.length ? `<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">
+      <thead><tr style="background:#fafaf8">
+        <th style="border:1px solid #ddd;padding:6px">과목</th>
+        ${LS_FIELDS.map(function(f){ return '<th style="border:1px solid #ddd;padding:6px">'+f.label+'</th>'; }).join('')}
+        <th style="border:1px solid #ddd;padding:6px;background:#eef2ff">총합</th>
+        <th style="border:1px solid #ddd;padding:6px">기록수</th>
+      </tr></thead>
+      <tbody>${subjAvg.map(function(r){
+        const avgSum=LS_FIELDS.reduce(function(acc,f){ return acc+(r[f.key]!==null?r[f.key]:0); },0);
+        return '<tr><td style="border:1px solid #ddd;padding:6px;font-weight:700;text-align:left">'+esc(r.subject)+'</td>'
+          +LS_FIELDS.map(function(f){ return '<td style="border:1px solid #ddd;padding:6px;text-align:center">'+(r[f.key]!==null?r[f.key].toFixed(1):'—')+'</td>'; }).join('')
+          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+avgSum.toFixed(1)+'/70</td>'
+          +'<td style="border:1px solid #ddd;padding:6px;text-align:center">'+r.count+'</td></tr>';
+      }).join('')}</tbody>
+    </table>` : '<div style="font-size:12px;color:#888;margin-bottom:16px">기록이 없습니다.</div>';
+    // ★ 371 변경: 인쇄물도 화면(상담리포트)처럼 "1.학생성향 / 2.학습상황"으로 구분 표기
+    const cardsHtml2=lsList.slice().reverse().map(function(e){
+      const sum2=LS_fieldSum(e);
+      return `<div style="margin-bottom:12px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:8px"><span>${esc(e.date||'')} · ${esc(e.subject||'')}</span><span style="color:#4338ca">총합 ${sum2}/70</span></div>
+        <div style="font-size:10.5px;font-weight:700;color:#8B3A3A;margin-bottom:3px">1. 학생성향</div>
+        <div style="font-size:11px;color:#555;margin-bottom:8px">${e.tendency?esc(e.tendency):'—'}</div>
+        <div style="font-size:10.5px;font-weight:700;color:#8B3A3A;margin-bottom:3px">2. 학습상황</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:#777">
+          ${LS_FIELDS.map(function(f){ return '<span>'+f.label+' <b style="color:#1a1a2e">'+(e[f.key]!==null&&e[f.key]!==undefined?e[f.key]:'—')+'</b></span>'; }).join('')}
         </div>
       </div>`;
     }).join('');
-
-    // popPrint로 통일
-    const consultBody = `<div class="info-box" style="margin-bottom:18px">
+    const lsBody = `<div class="info-box" style="margin-bottom:18px">
       <div class="info-box-main">
-        <div class="info-box-name">${esc(s.name)} 상담이력</div>
+        <div class="info-box-name">${esc(s.name)} 학습상담 리포트</div>
         <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''} · 담당: ${esc(s.counselor)}</div>
-        <div style="font-size:10px;color:#888;margin-top:6px">총 ${consultList.length}건</div>
+        <div style="font-size:10px;color:#888;margin-top:6px">총 ${lsList.length}건</div>
       </div>
     </div>
-    <h3>💬 상담 이력 (${consultList.length}건)</h3>
-    ${cardsHtml}`;
-    popPrint(`${s.name} - 상담이력`, consultBody, {year: new Date().getFullYear(), month: new Date().getMonth()+1});
+    <h3>📊 과목별 누적 평균</h3>
+    ${avgTableHtml}
+    <h3>🗂 전체 기록 (${lsList.length}건)</h3>
+    ${cardsHtml2}`;
+    popPrint(`${s.name} - 학습상담`, lsBody, {year: new Date().getFullYear(), month: new Date().getMonth()+1, noCover: true});
+    return;
+  } else if(tab==='ls_stat_student'){
+    // ★ 371 추가: 상담통계 "👤 학생 학습상담 통계" 인쇄 — 화면에 현재 선택되어 있는
+    // 회차(전체 누적 또는 특정 회차) 상태를 그대로 반영해서 뽑는다.
+    const rounds=LS_studentRoundsSorted(s);
+    const selRound=ST._lsStatRound||null;
+    let tendencyBody, statusBody;
+    if(selRound && rounds[selRound-1]){
+      const e=rounds[selRound-1];
+      tendencyBody = '<div style="font-size:12px;color:#333;line-height:1.7">'+(e.tendency?esc(e.tendency):'—')+'</div>';
+      const sumE=LS_fieldSum(e);
+      statusBody = '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#fafaf8">'+LS_FIELDS.map(function(f){ return '<th style="border:1px solid #ddd;padding:6px">'+f.label+'</th>'; }).join('')+'<th style="border:1px solid #ddd;padding:6px;background:#eef2ff">총합</th></tr></thead><tbody><tr>'+LS_FIELDS.map(function(f){ return '<td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:700">'+(e[f.key]!==null&&e[f.key]!==undefined?e[f.key]:'—')+'</td>'; }).join('')+'<td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+sumE+'/70</td></tr></tbody></table>';
+    } else {
+      const newestFirst=rounds.slice().reverse();
+      tendencyBody = newestFirst.length ? newestFirst.map(function(e){ return '<div style="border-bottom:1px solid #eee;padding:6px 0"><div style="font-size:10.5px;color:#888">'+esc(e.date||'')+' · '+esc(e.subject||'')+'</div><div style="font-size:11.5px;color:#333">'+(e.tendency?esc(e.tendency):'—')+'</div></div>'; }).join('') : '<div style="font-size:12px;color:#888">기록이 없습니다.</div>';
+      const avgAll=LS_FIELDS.reduce(function(acc,f){ acc[f.key]=LS_avg(rounds.map(function(e){ return e[f.key]; })); return acc; },{});
+      const avgSumAll=LS_FIELDS.reduce(function(acc,f){ return acc+(avgAll[f.key]!==null?avgAll[f.key]:0); },0);
+      statusBody = rounds.length ? '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#fafaf8">'+LS_FIELDS.map(function(f){ return '<th style="border:1px solid #ddd;padding:6px">'+f.label+'</th>'; }).join('')+'<th style="border:1px solid #ddd;padding:6px;background:#eef2ff">총합</th></tr></thead><tbody><tr>'+LS_FIELDS.map(function(f){ return '<td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:700">'+(avgAll[f.key]!==null?avgAll[f.key].toFixed(1):'—')+'</td>'; }).join('')+'<td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+avgSumAll.toFixed(1)+'/70</td></tr></tbody></table>' : '<div style="font-size:12px;color:#888">기록이 없습니다.</div>';
+    }
+    const lsStatBody = `<div class="info-box" style="margin-bottom:18px">
+      <div class="info-box-main">
+        <div class="info-box-name">${esc(s.name)} 학습상담 통계${selRound?(' — '+selRound+'회차'):' (전체 누적)'}</div>
+        <div class="info-box-sub">${esc(s.school)} · ${esc(s.grade)}${s.className?' · '+esc(s.className):''}</div>
+      </div>
+    </div>
+    <h3>1. 학생성향</h3>
+    ${tendencyBody}
+    <h3>2. 학습상황${selRound?'':' (전체 평균)'}</h3>
+    ${statusBody}`;
+    popPrint(`${s.name} - 학습상담 통계`, lsStatBody, {year: new Date().getFullYear(), month: new Date().getMonth()+1, noCover: true});
+    return;
+  } else if(tab==='ls_stat_grade'){
+    // ★ 371 추가: 상담통계 "🏫 학년별 통계" 인쇄 — 현재 화면에 선택된 회차를 그대로 반영.
+    const grade=s.grade||'';
+    const gradeStudents=(ST.students||[]).filter(function(st){ return st.grade===grade; });
+    const roundsByStudent={}; let maxRound=0;
+    gradeStudents.forEach(function(st){ const r=LS_studentRoundsSorted(st); roundsByStudent[st.id]=r; if(r.length>maxRound) maxRound=r.length; });
+    const selRound = ST._lsGradeRound || maxRound;
+    const rows = gradeStudents.map(function(st){
+      const r=roundsByStudent[st.id];
+      if(r.length<selRound) return null;
+      const e=r[selRound-1];
+      return {name:st.name, school:st.school, tendency:e.tendency, entry:e, sum:LS_fieldSum(e), count:r.length};
+    }).filter(Boolean).sort(function(a,b){ return b.sum-a.sum; });
+    const tableHtml = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:10.5px">
+      <thead><tr style="background:#fafaf8">
+        <th style="border:1px solid #ddd;padding:5px">이름</th><th style="border:1px solid #ddd;padding:5px">학교</th><th style="border:1px solid #ddd;padding:5px">학생성향</th>
+        ${LS_FIELDS.map(function(f){ return '<th style="border:1px solid #ddd;padding:5px">'+f.label+'</th>'; }).join('')}
+        <th style="border:1px solid #ddd;padding:5px;background:#eef2ff">총합</th><th style="border:1px solid #ddd;padding:5px">입력횟수</th>
+      </tr></thead>
+      <tbody>${rows.map(function(r){
+        return '<tr><td style="border:1px solid #ddd;padding:5px;font-weight:700">'+esc(r.name)+'</td><td style="border:1px solid #ddd;padding:5px">'+esc(r.school||'')+'</td><td style="border:1px solid #ddd;padding:5px;text-align:left">'+esc(r.tendency||'')+'</td>'
+          +LS_FIELDS.map(function(f){ return '<td style="border:1px solid #ddd;padding:5px;text-align:center">'+(r.entry[f.key]!==null&&r.entry[f.key]!==undefined?r.entry[f.key]:'')+'</td>'; }).join('')
+          +'<td style="border:1px solid #ddd;padding:5px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+r.sum+'/70</td><td style="border:1px solid #ddd;padding:5px;text-align:center">'+r.count+'</td></tr>';
+      }).join('')}</tbody>
+    </table>` : '<div style="font-size:12px;color:#888">이 회차까지 기록이 있는 학생이 없습니다.</div>';
+    const gradeBody = `<div class="info-box" style="margin-bottom:18px">
+      <div class="info-box-main">
+        <div class="info-box-name">${esc(grade)} 학년별 학습상담 통계 — ${selRound}회차</div>
+        <div class="info-box-sub">학생성향을 제외한 7개 항목 합계가 높은 순으로 정렬</div>
+      </div>
+    </div>
+    ${tableHtml}`;
+    popPrint(`${grade} 학년별 학습상담 통계`, gradeBody, {year: new Date().getFullYear(), month: new Date().getMonth()+1, noCover: true});
     return;
   }
-  const _tabLabel = ({susi:'수시분석',weekly:'주간플랜',consult:'상담이력'}[tab]||tab);
+  const _tabLabel = ({susi:'수시분석',weekly:'주간플랜',consult:'학습상담'}[tab]||tab);
   const _tabOpts = tab==='weekly'
     ? (()=>{
         const _now2=new Date();
@@ -13679,7 +14154,7 @@ function renderAdmin(){
       ${(()=>{
         const isAdmin_=ST.currentUser?.role==='admin';
         const isOrgAdmin_=ST.currentUser?.role==='orgAdmin';
-        const tabs=[['report','📋 리포트'],['grade_stat','📊 성적 현황'],['test','📝 테스트'],['subj_config','⚙ 과목설정']];
+        const tabs=[['report','📋 리포트'],['grade_stat','📊 성적 현황'],['learning_style','📈 학습상담'],['test','📝 테스트'],['subj_config','⚙ 과목설정']];
         if(isAdmin_||isOrgAdmin_) tabs.push(['teacher','👨‍🏫 선생님']);
         if(isAdmin_||isOrgAdmin_) tabs.push(['student_mgmt','🎓 학생관리']);
         if(isAdmin_||isOrgAdmin_) tabs.push(['program_catalog','🗂 프로그램 카탈로그']);
@@ -13693,7 +14168,7 @@ function renderAdmin(){
       })()}
     </div>
   </div>
-  ${ST.adminTab==='report'?renderAdminReport():ST.adminTab==='grade_stat'?renderAdminGradeStat():ST.adminTab==='test'?renderTestMain():ST.adminTab==='subj_config'?renderSubjConfig():ST.adminTab==='student_mgmt'?renderStudentMgmt():ST.adminTab==='orgs'?renderOrgMgmt():ST.adminTab==='program_catalog'?renderProgramCatalog():ST.adminTab==='teacher'?renderAdminTeacher():renderAdminTeacher()}`;
+  ${ST.adminTab==='report'?renderAdminReport():ST.adminTab==='grade_stat'?renderAdminGradeStat():ST.adminTab==='learning_style'?renderAdminLearningStyle():ST.adminTab==='test'?renderTestMain():ST.adminTab==='subj_config'?renderSubjConfig():ST.adminTab==='student_mgmt'?renderStudentMgmt():ST.adminTab==='orgs'?renderOrgMgmt():ST.adminTab==='program_catalog'?renderProgramCatalog():ST.adminTab==='teacher'?renderAdminTeacher():renderAdminTeacher()}`;
 }
 
 // ── 관리자 리포트 탭 ──
@@ -16787,7 +17262,7 @@ function renderAdminTeacher(){
     </div>
     ${ST.teachers.length>0?`<div class="box" style="margin-top:16px">
       <div style="font-size:13px;font-weight:800;margin-bottom:12px">📊 전체 현황</div>
-      <div class="g4">${[['선생님',ST.teachers.length+'명','#f59e0b'],['학생',ST.students.length+'명','#3b82f6'],['지원대학',ST.students.reduce((s,st)=>s+(st.targets||[]).length,0)+'개','#10b981'],['상담',ST.students.reduce((s,st)=>s+(st.consultations||[]).length,0)+'회','#8b5cf6']].map(([l,v,c])=>`<div class="stat"><div class="sv" style="color:${c}">${v}</div><div class="sl">${l}</div></div>`).join('')}</div>
+      <div class="g4">${[['선생님',ST.teachers.length+'명','#f59e0b'],['학생',ST.students.length+'명','#3b82f6'],['지원대학',ST.students.reduce((s,st)=>s+(st.targets||[]).length,0)+'개','#10b981'],['러닝기록',ST.students.reduce((s,st)=>s+(st.learningStyle||[]).length,0)+'회','#8b5cf6']].map(([l,v,c])=>`<div class="stat"><div class="sv" style="color:${c}">${v}</div><div class="sl">${l}</div></div>`).join('')}</div>
     </div>`:''}
     <div style="height:40px"></div>
   </div>`;
