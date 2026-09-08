@@ -15145,29 +15145,67 @@ function schoolCatalogDelete(id){
 // ★ 345 변경: 개별 저장 성공 여부를 실제로 기다렸다가(Promise.allSettled) 실패한 항목이
 // 있으면 몇 개가 실패했는지 알려준다 — 예전에는 저장 요청만 던져놓고 결과를 확인하지
 // 않아 "N개 등록되었습니다" 알림이 떠도 실제로는 서버에 안 들어간 경우를 알 수 없었다.
+// ★ 359 변경: 이미 등록된 학교명과 같은 이름이 붙여넣어지면(중복) 무조건 새 항목으로
+// 또 추가되던 문제 — 붙여넣은 내용 중 기존 학교명과 같은 게 있으면 미리 물어봐서,
+// "확인"하면 기존 항목을 새 내용으로 덮어쓰고 "취소"하면 그 학교는 건너뛴다(새로 추가
+// 안 함). 반환값도 숫자 하나가 아니라 {added,updated,skipped,total} 객체로 바뀌었다.
+function _sgNormSchoolName(s){ return String(s||'').trim().replace(/\s+/g,''); }
 async function schoolCatalogBulkAddRows(rows){
-  var added=0;
-  var savePromises=[];
-  rows.forEach(function(c,i){
+  var parsed=[];
+  rows.forEach(function(c){
     var name=String(c[0]||'').trim();
     if(!name) return;
-    var id='sc_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'_'+i;
-    var p={id:id, name:name, region:String(c[1]||'').trim(), type:String(c[2]||'').trim(),
+    parsed.push({name:name, region:String(c[1]||'').trim(), type:String(c[2]||'').trim(),
       studentsPerGrade:String(c[3]||'').trim(), schoolStyle:String(c[4]||'').trim(), curriculum:String(c[5]||'').trim(),
       keyFitPoint:String(c[6]||'').trim(), curriculumFeature:String(c[7]||'').trim(), activities:String(c[8]||'').trim(),
-      admissionResults:String(c[9]||'').trim(), recommendedType:String(c[10]||'').trim(), note:String(c[11]||'').trim()};
-    ST.schoolCatalog=(ST.schoolCatalog||[]).concat([p]);
-    if(FB_USE()) savePromises.push(window._fb.set('schoolCatalog', id, p));
-    added++;
+      admissionResults:String(c[9]||'').trim(), recommendedType:String(c[10]||'').trim(), note:String(c[11]||'').trim()});
+  });
+  if(!parsed.length) return {added:0,updated:0,skipped:0,total:0};
+
+  var existing=ST.schoolCatalog||[];
+  var dupNames=[];
+  parsed.forEach(function(p){
+    if(existing.some(function(e){ return _sgNormSchoolName(e.name)===_sgNormSchoolName(p.name); })) dupNames.push(p.name);
+  });
+
+  var overwriteDup=false;
+  if(dupNames.length){
+    overwriteDup=confirm('다음 학교는 이미 등록되어 있습니다:\n\n'+dupNames.join(', ')+'\n\n확인을 누르면 기존 정보를 새로 붙여넣은 내용으로 덮어씁니다.\n취소를 누르면 이 학교들은 건너뛰고(기존 정보 유지), 나머지 새 학교만 추가합니다.');
+  }
+
+  var added=0, updated=0, skipped=0;
+  var savePromises=[];
+  parsed.forEach(function(p, i){
+    var match=existing.find(function(e){ return _sgNormSchoolName(e.name)===_sgNormSchoolName(p.name); });
+    if(match){
+      if(!overwriteDup){ skipped++; return; }
+      Object.assign(match, p); // id는 유지한 채 나머지 필드만 새 내용으로 덮어씀
+      if(FB_USE()) savePromises.push(window._fb.set('schoolCatalog', match.id, match));
+      updated++;
+    } else {
+      var id='sc_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'_'+i;
+      var np=Object.assign({id:id}, p);
+      ST.schoolCatalog=(ST.schoolCatalog||[]).concat([np]);
+      existing=ST.schoolCatalog; // 같은 붙여넣기 안에서도 방금 추가한 항목과 또 비교되도록 갱신
+      if(FB_USE()) savePromises.push(window._fb.set('schoolCatalog', id, np));
+      added++;
+    }
   });
   if(savePromises.length){
     const results=await Promise.allSettled(savePromises);
     const failCount=results.filter(function(r){ return r.status==='rejected'; }).length;
     if(failCount>0){
-      alert('⚠️ 등록한 '+added+'개 중 '+failCount+'개는 서버 저장에 실패했습니다(네트워크 문제일 수 있습니다). 잠시 후 새로고침해서 목록에 빠진 학교가 있으면 그 학교만 다시 등록해주세요.');
+      alert('⚠️ 저장 대상 '+(added+updated)+'개 중 '+failCount+'개는 서버 저장에 실패했습니다(네트워크 문제일 수 있습니다). 잠시 후 새로고침해서 목록에 빠지거나 안 바뀐 학교가 있으면 그 학교만 다시 등록해주세요.');
     }
   }
-  return added;
+  return {added:added, updated:updated, skipped:skipped, total:parsed.length};
+}
+function RM_schoolBulkResultMsg(r){
+  var parts=[];
+  if(r.added) parts.push(r.added+'개 학교가 새로 등록되었습니다.');
+  if(r.updated) parts.push(r.updated+'개 학교는 기존 정보를 덮어썼습니다.');
+  if(r.skipped) parts.push(r.skipped+'개 학교는 이미 등록되어 있어 건너뛰었습니다.');
+  return parts.length ? parts.join('\n') : '등록할 내용이 없습니다. 첫 칸(학교명)이 비어있지 않은지 확인해주세요.';
 }
 // ★ 2026-09-07(343) 추가: 엑셀에서 복사한 셀 안에 줄바꿈(Alt+Enter로 여러 줄 입력한
 // "특이사항" 등)이 들어있으면, 엑셀은 그 셀을 큰따옴표로 감싸서 클립보드에 담는다
@@ -15202,9 +15240,9 @@ async function schoolCatalogSubmitPaste(){
   if(!text || !text.trim()){ alert('붙여넣은 내용이 없습니다.'); return; }
   let rows=_sgParseDelimitedText(text, '\t');
   if(rows.length && String(rows[0][0]||'').trim()==='학교명') rows=rows.slice(1); // 헤더 행이 섞여 들어와도 자동으로 건너뜀
-  const n=await schoolCatalogBulkAddRows(rows);
-  if(n){ if(ta) ta.value=''; alert(n+'개 학교 정보가 등록되었습니다.'); render(); }
-  else alert('등록할 내용이 없습니다. 첫 칸(학교명)이 비어있지 않은지 확인해주세요.');
+  const r=await schoolCatalogBulkAddRows(rows);
+  alert(RM_schoolBulkResultMsg(r));
+  if(r.total){ if(ta) ta.value=''; render(); }
 }
 function schoolCatalogHandleFile(inputEl){
   const file=inputEl.files && inputEl.files[0];
@@ -15216,8 +15254,8 @@ function schoolCatalogHandleFile(inputEl){
       reader.onload=async function(e){
         let rows=_sgParseDelimitedText(String(e.target.result||''), ',');
         if(rows.length && String(rows[0][0]||'').trim()==='학교명') rows=rows.slice(1);
-        const n=await schoolCatalogBulkAddRows(rows);
-        alert(n+'개 학교 정보가 등록되었습니다.'); inputEl.value=''; render();
+        const r=await schoolCatalogBulkAddRows(rows);
+        alert(RM_schoolBulkResultMsg(r)); inputEl.value=''; render();
       };
       reader.readAsText(file,'UTF-8');
     } else {
@@ -15228,8 +15266,8 @@ function schoolCatalogHandleFile(inputEl){
           let all=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
           if(all.length && String(all[0][0]||'').trim()==='학교명') all=all.slice(1); // 헤더 행 제거
           const rows=all.map(function(r){ return r.map(function(c){ return String(c); }); });
-          const n=await schoolCatalogBulkAddRows(rows);
-          alert(n+'개 학교 정보가 등록되었습니다.'); inputEl.value=''; render();
+          const r=await schoolCatalogBulkAddRows(rows);
+          alert(RM_schoolBulkResultMsg(r)); inputEl.value=''; render();
         }catch(err){ alert('파일을 읽는 중 오류가 발생했습니다: '+err.message); }
       };
       reader.readAsArrayBuffer(file);
