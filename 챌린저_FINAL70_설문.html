@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHALLENGER FINAL 70 사전진단</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#F7F7F4;
+    --surface:#FFFFFF;
+    --ink:#1E2A44;
+    --body-text:#33394A;
+    --muted:#7A8093;
+    --line:#DADCE2;
+    --accent:#8B3A3A;
+    --accent-soft:#F3E7E7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--body-text);
+    font-family:'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    line-height:1.6;
+  }
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--body-text)}
+  .sheet{
+    max-width:760px;
+    margin:0 auto;
+    background:var(--surface);
+    padding:56px 64px 72px;
+  }
+  @media (max-width:600px){
+    .sheet{padding:32px 22px 48px;}
+  }
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:8px;
+  }
+  .masthead .org{
+    font-size:13px;
+    letter-spacing:0.02em;
+    color:var(--muted);
+  }
+  .masthead .date-field{
+    font-size:13px;
+    color:var(--muted);
+    text-align:right;
+  }
+  h1{
+    font-family:'Noto Serif KR', serif;
+    font-weight:700;
+    font-size:26px;
+    color:var(--ink);
+    margin:26px 0 6px;
+  }
+  .lede{
+    font-size:14px;
+    color:var(--muted);
+    margin-bottom:24px;
+    white-space:pre-line;
+  }
+  .lede b{color:var(--ink);}
+  .section{
+    margin-bottom:36px;
+  }
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:8px;
+    margin-bottom:18px;
+  }
+  .section-num{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--accent);
+    min-width:20px;
+  }
+  .section-title{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:18px;
+    color:var(--ink);
+  }
+  .q{
+    margin-bottom:26px;
+  }
+  .q-head{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin-bottom:4px;
+    flex-wrap:wrap;
+  }
+  .q-num{
+    font-weight:700;
+    color:var(--ink);
+    font-size:14.5px;
+  }
+  .q-title{
+    font-weight:700;
+    color:var(--ink);
+    font-size:14.5px;
+  }
+  .q-tag{
+    font-size:11px;
+    color:var(--muted);
+    background:#f0f1f5;
+    border-radius:10px;
+    padding:2px 9px;
+  }
+  .q-tag.req{ color:var(--accent); background:var(--accent-soft); }
+  .q-note{
+    font-size:12px;
+    color:var(--muted);
+    margin:2px 0 8px;
+  }
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px 20px;
+  }
+  @media (max-width:600px){
+    .grid2{grid-template-columns:1fr;}
+  }
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:5px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    border:none;
+    border-bottom:1px solid var(--line);
+    padding:4px 2px 6px;
+    background:transparent;
+    outline:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    border-bottom-color:var(--accent);
+  }
+  .field textarea{resize:vertical;min-height:30px;line-height:1.6}
+  .checklist{
+    display:flex;
+    flex-wrap:wrap;
+    gap:9px 20px;
+  }
+  .checklist.col{
+    flex-direction:column;
+    gap:9px;
+  }
+  .check-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13.5px;
+    cursor:pointer;
+  }
+  .check-item input[type=checkbox], .check-item input[type=radio]{
+    width:16px;height:16px;flex-shrink:0;accent-color:var(--ink);cursor:pointer;
+  }
+  .subgroup{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 14px;
+    margin-bottom:10px;
+  }
+  .subgroup .subgroup-label{
+    font-size:12px;
+    font-weight:700;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  .note-box{
+    background:var(--accent-soft);
+    border-left:3px solid var(--accent);
+    padding:10px 14px;
+    font-size:12px;
+    color:#5A2E2E;
+    margin-top:8px;
+  }
+  .submit-btn{
+    width:100%;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:18px;
+    font-size:16px;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+    margin-top:10px;
+  }
+  .submit-btn:active{ opacity:.85; }
+  .submit-btn:disabled{ background:#aab; cursor:default; }
+  footer{
+    margin-top:24px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    justify-content:space-between;
+  }
+  .done-screen{
+    display:none;
+    text-align:center;
+    padding:80px 20px;
+  }
+  .done-screen .mark{ font-size:52px; margin-bottom:18px; }
+  .done-screen h2{ font-family:'Noto Serif KR', serif; font-size:22px; color:var(--ink); margin-bottom:10px; }
+  .done-screen p{ color:var(--muted); font-size:14px; }
+  .err-box{
+    display:none;
+    background:#fdecea;
+    border-left:3px solid #c0392b;
+    padding:12px 16px;
+    font-size:13px;
+    color:#7a2c22;
+    margin-bottom:20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet" id="formSheet">
+
+  <div class="masthead">
+    <div class="org">SG상담플랫폼 · CHALLENGER</div>
+    <div class="date-field">작성일&nbsp;&nbsp;<span id="todayField"></span></div>
+  </div>
+
+  <h1>CHALLENGER FINAL 70</h1>
+  <p class="lede">앞으로 70일 동안 <b>실전 → SG 분석 → 필요한 학습 교정 → 재실전</b>을 반복합니다.
+6·9월 평가원 성적과 현재 학습상태를 바탕으로 개인별로 <b>과목별 실모 횟수 / M60 / 개념·기출·N제·EBS / TIME ATTACK</b>을 정합니다.
+앞으로 하고 싶은 공부가 아니라 <b>지금 실제 하고 있는 공부와 현재 상태</b>를 기준으로 체크해 주세요. (약 2~3분 소요됩니다)</p>
+
+  <div class="err-box" id="errBox"></div>
+
+  <form onsubmit="return submitSurvey(event)">
+
+  <!-- SECTION 1 -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">1</span><span class="section-title">목표와 현재 성적</span></div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">1.</span><span class="q-title">학생 이름</span><span class="q-tag req">필수</span></div>
+      <input id="q1_name" required>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">2.</span><span class="q-title">수능 선택과목</span><span class="q-tag req">필수</span></div>
+      <div class="subgroup">
+        <div class="subgroup-label">국어</div>
+        <div class="checklist"><label class="check-item"><input type="radio" name="q2_kor" value="화법과 작문">화법과 작문</label><label class="check-item"><input type="radio" name="q2_kor" value="언어와 매체">언어와 매체</label></div>
+      </div>
+      <div class="subgroup">
+        <div class="subgroup-label">수학</div>
+        <div class="checklist"><label class="check-item"><input type="radio" name="q2_math" value="확률과 통계">확률과 통계</label><label class="check-item"><input type="radio" name="q2_math" value="미적분">미적분</label><label class="check-item"><input type="radio" name="q2_math" value="기하">기하</label></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>탐구1</label><input id="q2_tamgu1" placeholder="예: 생활과 윤리"></div>
+        <div class="field"><label>탐구2</label><input id="q2_tamgu2" placeholder="예: 사회문화"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">3.</span><span class="q-title">현재 입시 준비 방향</span><span class="q-tag req">필수</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="radio" name="q3" value="수시 중심">수시 중심</label>
+        <label class="check-item"><input type="radio" name="q3" value="정시 중심">정시 중심</label>
+        <label class="check-item"><input type="radio" name="q3" value="수시 + 정시 병행">수시 + 정시 병행</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">4.</span><span class="q-title">가장 우선적으로 충족해야 하는 수능최저</span><span class="q-tag req">필수</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="radio" name="q4" value="2합4">2합4</label>
+        <label class="check-item"><input type="radio" name="q4" value="2합5">2합5</label>
+        <label class="check-item"><input type="radio" name="q4" value="2합6">2합6</label>
+        <label class="check-item"><input type="radio" name="q4" value="3합4">3합4</label>
+        <label class="check-item"><input type="radio" name="q4" value="3합5">3합5</label>
+        <label class="check-item"><input type="radio" name="q4" value="3합6">3합6</label>
+        <label class="check-item"><input type="radio" name="q4" value="3합7">3합7</label>
+        <label class="check-item"><input type="radio" name="q4" value="4합8">4합8</label>
+        <label class="check-item"><input type="radio" name="q4" value="3개 영역 각 1등급">3개 영역 각 1등급</label>
+        <label class="check-item"><input type="radio" name="q4" value="수능최저 없음">수능최저 없음</label>
+        <label class="check-item"><input type="radio" name="q4" value="정확히 모름">정확히 모름</label>
+        <label class="check-item"><input type="radio" name="q4" value="기타">기타</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">5.</span><span class="q-title">수능 목표등급</span><span class="q-tag req">필수</span></div>
+      <div class="q-note">예) 국2 / 수2 / 영1 / 생명2 / 지구2</div>
+      <input id="q5_target" required>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">6.</span><span class="q-title">6월 평가원 성적</span><span class="q-tag req">필수</span></div>
+      <div class="q-note">점수와 등급만 작성하세요. 예) 국어 78/3, 수학 84/2, 영어2, 생명42/2, 지구45/1</div>
+      <input id="q6_june" required>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">7.</span><span class="q-title">9월 평가원 성적</span><span class="q-tag req">필수</span></div>
+      <div class="q-note">점수와 등급만 작성하세요.</div>
+      <input id="q7_sep" required>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">2</span><span class="section-title">지금 실제 학습상태</span></div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">8.</span><span class="q-title">지금 가장 시급하게 올려야 하는 과목</span><span class="q-tag">체크박스 · 최대 2개</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="checkbox" name="q8" value="국어">국어</label>
+        <label class="check-item"><input type="checkbox" name="q8" value="수학">수학</label>
+        <label class="check-item"><input type="checkbox" name="q8" value="영어">영어</label>
+        <label class="check-item"><input type="checkbox" name="q8" value="탐구1">탐구1</label>
+        <label class="check-item"><input type="checkbox" name="q8" value="탐구2">탐구2</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">9.</span><span class="q-title">현재 실제로 하고 있는 공부</span><span class="q-tag">체크박스 · 복수선택</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="checkbox" name="q9" value="개념·강의">개념·강의</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="기출">기출</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="N제·문제집">N제·문제집</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="EBS 수능특강·수능완성">EBS 수능특강·수능완성</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="실전모의고사">실전모의고사</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="오답·복습">오답·복습</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="학원 과제 중심">학원 과제 중심</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="특별한 기준 없이 이것저것 하고 있음">특별한 기준 없이 이것저것 하고 있음</label>
+        <label class="check-item"><input type="checkbox" name="q9" value="현재 특별히 하고 있는 공부 없음">현재 특별히 하고 있는 공부 없음</label>
+      </div>
+      <div class="field" style="margin-top:10px"><label>필요한 경우 과목·교재명을 간단히 작성해주세요</label><input id="q9_note"></div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">10.</span><span class="q-title">최근 수능 공부상태와 가장 가까운 것은?</span><span class="q-tag req">필수</span></div>
+      <div class="checklist col">
+        <label class="check-item"><input type="radio" name="q10" value="계획한 공부를 대부분 하고 있다">계획한 공부를 대부분 하고 있다</label>
+        <label class="check-item"><input type="radio" name="q10" value="공부는 하지만 자주 밀린다">공부는 하지만 자주 밀린다</label>
+        <label class="check-item"><input type="radio" name="q10" value="해야 할 것은 알지만 실행이 잘 안 된다">해야 할 것은 알지만 실행이 잘 안 된다</label>
+        <label class="check-item"><input type="radio" name="q10" value="수시·면접·논술 준비로 공부 흐름이 많이 끊겼다">수시·면접·논술 준비로 공부 흐름이 많이 끊겼다</label>
+        <label class="check-item"><input type="radio" name="q10" value="하루 공부량이 들쭉날쭉하다">하루 공부량이 들쭉날쭉하다</label>
+        <label class="check-item"><input type="radio" name="q10" value="무엇부터 해야 할지 모르겠다">무엇부터 해야 할지 모르겠다</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">11.</span><span class="q-title">계획대로 공부하지 못하는 가장 큰 이유</span><span class="q-tag">체크박스 · 최대 2개</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="checkbox" name="q11" value="수시·면접·논술 준비">수시·면접·논술 준비</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="학원 일정·과제">학원 일정·과제</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="해야 할 공부가 너무 많음">해야 할 공부가 너무 많음</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="우선순위를 정하지 못함">우선순위를 정하지 못함</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="해야 할 것은 알지만 미룸">해야 할 것은 알지만 미룸</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="휴대폰·영상·SNS">휴대폰·영상·SNS</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="피로·집중력 저하">피로·집중력 저하</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="혼자 하면 강제성이 없음">혼자 하면 강제성이 없음</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="특별한 문제 없음">특별한 문제 없음</label>
+        <label class="check-item"><input type="checkbox" name="q11" value="기타">기타</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">12.</span><span class="q-title">실제 시험에서 가장 자주 발생하는 문제</span><span class="q-tag">체크박스 · 최대 3개</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="checkbox" name="q12" value="필요한 개념이 기억나지 않는다">필요한 개념이 기억나지 않는다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="개념은 알지만 문제에 적용하지 못한다">개념은 알지만 문제에 적용하지 못한다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="특정 단원·유형에서 반복해서 틀린다">특정 단원·유형에서 반복해서 틀린다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="지문·자료·문제 해석이 느리다">지문·자료·문제 해석이 느리다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="어려운 문제를 너무 오래 붙잡는다">어려운 문제를 너무 오래 붙잡는다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="문제를 넘길지 판단하기 어렵다">문제를 넘길지 판단하기 어렵다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="시간 부족으로 뒤 문제를 놓친다">시간 부족으로 뒤 문제를 놓친다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="쉬운 문제에서도 실수가 많다">쉬운 문제에서도 실수가 많다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="시험마다 점수 편차가 크다">시험마다 점수 편차가 크다</label>
+        <label class="check-item"><input type="checkbox" name="q12" value="특별한 문제를 잘 모르겠다">특별한 문제를 잘 모르겠다</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">3</span><span class="section-title">FINAL 70 개인플랜 설계</span></div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">13.</span><span class="q-title">현재 학원·과외·수업 일정</span><span class="q-tag req">필수</span></div>
+      <div class="q-note">요일 / 과목 / 시간을 간단히 작성하세요. 예) 월·목 수학 18~22 / 화 국어 19~22</div>
+      <input id="q13_schedule" required>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">14.</span><span class="q-title">M60을 진행하기 가장 좋은 시간</span><span class="q-tag req">필수</span></div>
+      <div class="checklist">
+        <label class="check-item"><input type="radio" name="q14" value="오전 등교 전">오전 등교 전</label>
+        <label class="check-item"><input type="radio" name="q14" value="학교 자습시간">학교 자습시간</label>
+        <label class="check-item"><input type="radio" name="q14" value="하교 후">하교 후</label>
+        <label class="check-item"><input type="radio" name="q14" value="저녁">저녁</label>
+        <label class="check-item"><input type="radio" name="q14" value="일정에 따라 달라짐">일정에 따라 달라짐</label>
+      </div>
+      <div class="note-box">※ M60은 개인별로 지정된 개념심화·고난도유형·EBS·오답·회독 등을 집중하는 60분입니다.</div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">15.</span><span class="q-title">최근 평가원·수능 기출을 풀어본 정도</span><span class="q-tag req">필수</span></div>
+      <div class="checklist col">
+        <label class="check-item"><input type="radio" name="q15" value="최근 3개년 대부분 풀었다">최근 3개년 대부분 풀었다</label>
+        <label class="check-item"><input type="radio" name="q15" value="절반 이상 풀었다">절반 이상 풀었다</label>
+        <label class="check-item"><input type="radio" name="q15" value="일부 풀었다">일부 풀었다</label>
+        <label class="check-item"><input type="radio" name="q15" value="거의 풀지 않았다">거의 풀지 않았다</label>
+        <label class="check-item"><input type="radio" name="q15" value="풀었지만 기억이 잘 나지 않는다">풀었지만 기억이 잘 나지 않는다</label>
+        <label class="check-item"><input type="radio" name="q15" value="정확히 모르겠다">정확히 모르겠다</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">16.</span><span class="q-title">현재 실제로 풀고 있는 실모·N제·EBS 교재</span><span class="q-tag">선택</span></div>
+      <div class="q-note">과목 + 교재명만 간단히 작성하세요. 예) 수학 드릴 / 국어 이감 / 생명 수능특강 — 없으면 "없음"</div>
+      <input id="q16_materials">
+    </div>
+
+    <div class="q">
+      <div class="q-head"><span class="q-num">17.</span><span class="q-title">FINAL 70 개인 처방 확인</span><span class="q-tag req">필수</span></div>
+      <div class="q-note">진단과 실전·SG 결과에 따라 M60 / 과목별 실모 횟수 / STANDARD·TIME ATTACK / 개념심화 / 기출 / N제 / EBS / 오답교정 등이 개인별로 지정됩니다. 지정된 학습은 정해진 기간 안에 완료하는 것을 원칙으로 합니다.</div>
+      <div class="checklist col">
+        <label class="check-item"><input type="radio" name="q17" value="확인했습니다. 지정된 계획대로 수행하겠습니다.">확인했습니다. 지정된 계획대로 수행하겠습니다.</label>
+        <label class="check-item"><input type="radio" name="q17" value="학원·학교 일정에 따른 시간조정이 필요합니다.">학원·학교 일정에 따른 시간조정이 필요합니다.</label>
+        <label class="check-item"><input type="radio" name="q17" value="수행에 어려움이 있을 것 같습니다.">수행에 어려움이 있을 것 같습니다.</label>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="submit-btn" id="submitBtn">FINAL 70 설문 제출하기</button>
+  </form>
+
+  <footer>
+    <span>작성해 주신 내용은 CHALLENGER FINAL 70 개인 학습설계 용도로만 사용됩니다.</span>
+    <span>SG상담플랫폼</span>
+  </footer>
+</div>
+
+<div class="done-screen" id="doneScreen">
+  <div class="mark">✅</div>
+  <h2>제출이 완료되었습니다</h2>
+  <p>작성해 주셔서 감사합니다. 진단 결과에 따라 개인별 FINAL 70 플랜을 안내해드리겠습니다.</p>
+</div>
+
+<script>
+let _db=null;
+try{
+  firebase.initializeApp({
+    apiKey: "AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
+    authDomain: "sg-counsel.firebaseapp.com",
+    projectId: "sg-counsel",
+    storageBucket: "sg-counsel.firebasestorage.app",
+    messagingSenderId: "134794459070",
+    appId: "1:134794459070:web:a636cac4df344bd26e2bef"
+  });
+  _db = firebase.firestore();
+  _db.settings({ experimentalAutoDetectLongPolling: true });
+}catch(e){
+  console.warn('Firebase 초기화 실패:', e.message);
+}
+
+function $(id){ return document.getElementById(id); }
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
+}
+$('todayField').textContent=todayStr();
+
+function radioValue(name){
+  const el=document.querySelector('input[name="'+name+'"]:checked');
+  return el?el.value:'';
+}
+function checkedValues(name){
+  return Array.from(document.querySelectorAll('input[name="'+name+'"]:checked')).map(function(el){ return el.value; });
+}
+// ★ 체크박스 최대 선택 개수 제한(8번=2개, 11번=2개, 12번=3개)
+function limitChecks(name, max){
+  document.querySelectorAll('input[name="'+name+'"]').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      const checked=document.querySelectorAll('input[name="'+name+'"]:checked');
+      if(checked.length>max){
+        cb.checked=false;
+        alert('최대 '+max+'개까지 선택할 수 있습니다.');
+      }
+    });
+  });
+}
+limitChecks('q8',2);
+limitChecks('q11',2);
+limitChecks('q12',3);
+
+function submitSurvey(ev){
+  ev.preventDefault();
+  const errBox=$('errBox');
+  errBox.style.display='none';
+
+  const missing=[];
+  if(!$('q1_name').value.trim()) missing.push('1. 학생 이름');
+  if(!radioValue('q2_kor')) missing.push('2. 수능 선택과목(국어)');
+  if(!radioValue('q2_math')) missing.push('2. 수능 선택과목(수학)');
+  if(!radioValue('q3')) missing.push('3. 현재 입시 준비 방향');
+  if(!radioValue('q4')) missing.push('4. 수능최저');
+  if(!$('q5_target').value.trim()) missing.push('5. 수능 목표등급');
+  if(!$('q6_june').value.trim()) missing.push('6. 6월 평가원 성적');
+  if(!$('q7_sep').value.trim()) missing.push('7. 9월 평가원 성적');
+  if(!radioValue('q10')) missing.push('10. 최근 수능 공부상태');
+  if(!$('q13_schedule').value.trim()) missing.push('13. 현재 학원·과외·수업 일정');
+  if(!radioValue('q14')) missing.push('14. M60 진행 시간');
+  if(!radioValue('q15')) missing.push('15. 기출 풀어본 정도');
+  if(!radioValue('q17')) missing.push('17. FINAL 70 개인 처방 확인');
+
+  if(missing.length){
+    errBox.innerHTML='다음 필수 항목을 확인해주세요:<br>'+missing.join(' / ');
+    errBox.style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+    return false;
+  }
+
+  const params=new URLSearchParams(location.search);
+  const orgId=params.get('org')||null;
+
+  const data={
+    submittedAt: new Date().toISOString(),
+    status: 'new',
+    orgId: orgId,
+    name: $('q1_name').value.trim(),
+    examSubjects: {
+      kor: radioValue('q2_kor'),
+      math: radioValue('q2_math'),
+      tamgu1: $('q2_tamgu1').value.trim(),
+      tamgu2: $('q2_tamgu2').value.trim()
+    },
+    prepDirection: radioValue('q3'),
+    minReq: radioValue('q4'),
+    targetGrades: $('q5_target').value.trim(),
+    juneScore: $('q6_june').value.trim(),
+    sepScore: $('q7_sep').value.trim(),
+    urgentSubjects: checkedValues('q8'),
+    currentStudy: checkedValues('q9'),
+    currentStudyNote: $('q9_note').value.trim(),
+    studyStatus: radioValue('q10'),
+    planBlockers: checkedValues('q11'),
+    examIssues: checkedValues('q12'),
+    schedule: $('q13_schedule').value.trim(),
+    m60Time: radioValue('q14'),
+    pastExamCoverage: radioValue('q15'),
+    currentMaterials: $('q16_materials').value.trim(),
+    finalPlanAck: radioValue('q17')
+  };
+
+  const btn=$('submitBtn');
+  btn.disabled=true; btn.textContent='제출 중...';
+
+  if(!_db){
+    errBox.textContent='온라인 제출 기능을 불러오지 못했습니다(네트워크 상태를 확인해주세요).';
+    errBox.style.display='block';
+    btn.disabled=false; btn.textContent='FINAL 70 설문 제출하기';
+    window.scrollTo({top:0,behavior:'smooth'});
+    return false;
+  }
+
+  const id='cf70_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  _db.collection('challengerFinal70Submissions').doc(id).set(Object.assign({id:id}, data))
+    .then(function(){
+      document.getElementById('formSheet').style.display='none';
+      document.getElementById('doneScreen').style.display='block';
+      window.scrollTo({top:0,behavior:'smooth'});
+    })
+    .catch(function(e){
+      errBox.textContent='제출 중 오류가 발생했습니다: '+e.message+' (네트워크 상태를 확인하고 다시 시도해주세요.)';
+      errBox.style.display='block';
+      btn.disabled=false; btn.textContent='FINAL 70 설문 제출하기';
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  return false;
+}
+</script>
+</body>
+</html>
