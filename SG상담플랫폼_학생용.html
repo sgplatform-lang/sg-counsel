@@ -2100,11 +2100,23 @@ function chgAnsDetailGridHtml(s){
 }
 // ★ 2026-08-30 추가: 지금 선택된 시험(응시일+시험명)과 실제로 저장된 최신 회차가 같을 때만
 // "이미 제출한 과목"으로 취급한다(다른 회차의 과목을 여기 회차의 제출 내역으로 착각하지 않도록).
+// ★ 2026-09-09(380-6) 수정: "현재(가장 최근) 회차"만 확인하다 보니, 나중에 더 예전 날짜의
+// 시험을 뒤늦게 입력하거나(cd.lastTestDate가 그대로라 문제 없음) 그 뒤에 또 다른(더 최신)
+// 시험을 새로 시작하면, 예전에 분명히 제출했던 회차가 "현재 회차" 자리에서 밀려나 history로만
+// 남게 되어 이 함수가 더 이상 못 찾는(=잠금이 풀려 다시 입력 가능해 보이는) 문제가 있었다.
+// 이제 "현재 회차"뿐 아니라 cd.history에 보관된 지난 회차까지 같이 찾아서 잠금 목록을 만든다.
 function chgAnsLockedSubjectsForCurrentRound(){
   const st=chgAnsInit(); const cd=chgInit();
   if(!st.date||!st.test) return [];
-  if(String(cd.lastTestDate||'').trim()!==String(st.date).trim() || String(cd.lastTestName||'').trim()!==String(st.test).trim()) return [];
-  return (cd.lastSubjects||[]).filter(s=>s&&s._locked);
+  const dateT=String(st.date).trim(), testT=String(st.test).trim();
+  let found=null;
+  if(String(cd.lastTestDate||'').trim()===dateT && String(cd.lastTestName||'').trim()===testT){
+    found=cd.lastSubjects||[];
+  } else {
+    const h=(cd.history||[]).find(function(x){ return String(x.date||'').trim()===dateT && String(x.test||'').trim()===testT; });
+    if(h) found=h.subjects||h.fullSubjects||[];
+  }
+  return (found||[]).filter(s=>s&&s._locked);
 }
 // ★ 2026-09-09(380) 추가: "응시 과목 선택"이 실제 시험 카탈로그에 등록된 과목·세부과목·
 // 문항수와 무관하게 항상 고정된 6개(국/수/영/한국사/탐구1,2)와 표준 수능 30문항 구성으로만
