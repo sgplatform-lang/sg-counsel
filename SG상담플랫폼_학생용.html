@@ -2116,7 +2116,8 @@ function chgAnsLockedSubjectsForCurrentRound(){
 // 선택창도 안 뜨고 전부 객관식으로만 나온다(수능 표준 30문항 구성일 때만 16~22·29~30번이
 // 단답형으로 처리됨).
 function _chgAnsExamMeta(entry){
-  const out={}; // { CODE: { detailQNos:{detail(''=공통): Set(문항번호)}, allDetails:[빈칸 아닌 detail만] } }
+  // { CODE: { detailQNos:{groupKey(''=공통): Set(문항번호)}, groupLabel:{groupKey:표시용 라벨}, allDetails:[groupKey들] } }
+  const out={};
   if(!entry) return out;
   const countSrc=entry.answerKey||{}, metaSrc=entry.itemMeta||{};
   const keysSeen=new Set(Object.keys(countSrc).concat(Object.keys(metaSrc)));
@@ -2125,30 +2126,46 @@ function _chgAnsExamMeta(entry){
     const idx=k.indexOf('|');
     if(idx<0) return;
     let code=k.slice(0,idx);
-    // ★ 380-3 수정: 카탈로그에 "언어와매체"/"언어와 매체", "확통"/"확률과통계"처럼 같은
-    // 세부과목이 띄어쓰기·표기만 다르게 등록되어 있으면, 정규화 없이 그대로 모으다 보니
-    // 학생 화면 세부과목 목록에 사실상 같은 항목이 중복으로 뜨고(문항 수도 쪼개져서 실제보다
-    // 적게 계산됨) 있었다. 채점 로직이 이미 쓰는 것과 동일한 정규화 함수로 detail을 통일한다.
-    const detail=_cbrNormalizeDetail(k.slice(idx+1));
     if(!code) return;
     // ★ 380-1 수정: 탐구는 카탈로그에 'INQ'뿐 아니라 'INQ1'/'INQ2'로도 저장될 수 있어(관리자
     // 채점 로직도 이 세 가지를 다 확인함), 여기서도 하나의 'INQ'로 합쳐야 탐구1·2 슬롯이
     // 정상적으로 "등록됨"으로 인식된다.
     if(code==='INQ1'||code==='INQ2') code='INQ';
-    if(!out[code]) out[code]={detailQNos:{}, allDetails:[]};
+    // ★ 380-3/380-4 수정: "언어와매체"/"언어와 매체", "확통"/"확률과통계"처럼 같은 세부과목이
+    // 표기만 다르게 등록되면 화면에 중복으로 뜨고 문항 수도 쪼개져 적게 계산되던 버그.
+    // 채점 로직과 같은 정규화 함수(_cbrNormalizeDetail)를 먼저 적용하고, 그걸로도 못 잡는
+    // 남은 표기 차이(공백·가운뎃점 등)까지 전부 지운 값을 그룹 키로 써서 한 번 더 병합한다.
+    const rawDetail=k.slice(idx+1);
+    const normDetail=_cbrNormalizeDetail(rawDetail);
+    const groupKey = _chgAnsStripForGroup(normDetail);
+    if(!out[code]) out[code]={detailQNos:{}, groupLabel:{}, allDetails:[]};
+    if(!out[code].detailQNos[groupKey]) out[code].detailQNos[groupKey]=new Set();
+    if(groupKey && !out[code].groupLabel[groupKey]) out[code].groupLabel[groupKey]=normDetail;
     const qnos=new Set(Object.keys(countSrc[k]||{}).concat(Object.keys(metaSrc[k]||{})));
-    if(!out[code].detailQNos[detail]) out[code].detailQNos[detail]=new Set();
-    qnos.forEach(function(n){ out[code].detailQNos[detail].add(n); });
-    if(detail && out[code].allDetails.indexOf(detail)<0) out[code].allDetails.push(detail);
+    qnos.forEach(function(n){ out[code].detailQNos[groupKey].add(n); });
+    if(groupKey && out[code].allDetails.indexOf(groupKey)<0) out[code].allDetails.push(groupKey);
   });
   return out;
+}
+// ★ 380-5 수정: 확률과통계/확률과 통계처럼 공백 차이는 이미 위에서 걸러지는데도 여전히
+// 중복으로 보인다는 재신고가 있어, 눈에 안 보이는 유니코드 공백류(줄바꿈 없는 공백,
+// 폭 없는 공백/조인러 등)·중간점 종류·하이픈·마침표·쉼표까지 전부 지우는 훨씬 더 넓은
+// 기준으로 강화한다. (실제 정답 조회에 쓰는 키는 그대로 _cbrNormalizeDetail 결과를 쓰므로,
+// 이 함수는 오직 "화면에 몇 개로 나눠 보여줄지"를 판단하는 용도로만 쓰인다.)
+function _chgAnsStripForGroup(normDetail){
+  if(!normDetail) return '';
+  return normDetail.replace(/[\s\u00A0\u200B\u200C\u200D\uFEFF·ㆍ•‧∙\-–—_,\.]+/g,'');
+}
+function _chgAnsDetailGroupKey(detail){
+  const n=_cbrNormalizeDetail(detail||'');
+  return n ? _chgAnsStripForGroup(n) : '';
 }
 function _chgAnsNeedsDetailPicker(code, examMeta){
   const m=examMeta[code]; return !!(m && m.allDetails.length>=2);
 }
 function _chgAnsAutoDetail(code, examMeta){
   const m=examMeta[code]; if(!m) return '';
-  return m.allDetails.length===1 ? m.allDetails[0] : '';
+  return m.allDetails.length===1 ? (m.groupLabel[m.allDetails[0]]||'') : '';
 }
 function _chgAnsResolvedCount(code, detail, examMeta, fallbackCount){
   // ★ 380-2 수정: 국어·수학처럼 "공통 문항(세부과목 없음)"과 "선택 문항(세부과목 있음)"이
@@ -2157,8 +2174,8 @@ function _chgAnsResolvedCount(code, detail, examMeta, fallbackCount){
   // 묶음"의 합집합 문항 번호 개수로 계산한다.
   const m=examMeta[code]; if(!m) return fallbackCount;
   const common=m.detailQNos['']||new Set();
-  const chosenDetail = (detail && m.detailQNos[detail]) ? detail : (m.allDetails[0]||'');
-  const specific=m.detailQNos[chosenDetail]||new Set();
+  const key = detail ? _chgAnsDetailGroupKey(detail) : (m.allDetails[0]||'');
+  const specific=m.detailQNos[key]||new Set();
   const union=new Set([...common,...specific]);
   return union.size>0 ? union.size : fallbackCount;
 }
@@ -2194,7 +2211,9 @@ function chgAnsSlotToggleHtml(x, examMeta){
   const needsDetail=_chgAnsNeedsDetailPicker(x.code, examMeta);
   const resolvedDetail = st.detail[x.slot] || _chgAnsAutoDetail(x.code, examMeta);
   const shownCount=_chgAnsResolvedCount(x.code, resolvedDetail, examMeta, def.count);
-  const registeredDetails=(examMeta[x.code]&&examMeta[x.code].allDetails.length) ? examMeta[x.code].allDetails : def.details;
+  const registeredDetails=(examMeta[x.code]&&examMeta[x.code].allDetails.length)
+    ? examMeta[x.code].allDetails.map(k=>examMeta[x.code].groupLabel[k])
+    : def.details;
   return `<div style="border:1px solid ${on?'#0f766e':'#e5e7eb'};background:${on?'#f0fdfa':'#fff'};border-radius:10px;padding:10px 12px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" ${on?'checked':''} onchange="chgAnsToggleSlot('${x.slot}')" style="width:18px;height:18px">
