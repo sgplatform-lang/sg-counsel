@@ -47,17 +47,23 @@ try{
     messagingSenderId: "134794459070",
     appId: "1:134794459070:web:a636cac4df344bd26e2bef"
   });
-  try{
-    if(SG_RECAPTCHA_SITE_KEY && SG_RECAPTCHA_SITE_KEY.indexOf('PASTE_YOUR')!==0){
-      firebase.appCheck().activate(
-        new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),
-        true
-      );
-      console.log('✅ App Check 활성화됨');
-    } else {
-      console.warn('⚠️ App Check 사이트 키가 아직 설정되지 않았습니다 — SG_RECAPTCHA_SITE_KEY를 교체해주세요.');
-    }
-  }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):', e.message); }
+  // ★ 2026-09-09(379) 수정: <body>가 아직 없는 시점에 reCAPTCHA가 배지를 삽입하려다
+  // 에러가 나던 문제 — body가 준비된 뒤로 활성화를 미룬다.
+  function _sgActivateAppCheck(){
+    try{
+      if(SG_RECAPTCHA_SITE_KEY && SG_RECAPTCHA_SITE_KEY.indexOf('PASTE_YOUR')!==0){
+        firebase.appCheck().activate(
+          new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),
+          true
+        );
+        console.log('✅ App Check 활성화됨');
+      } else {
+        console.warn('⚠️ App Check 사이트 키가 아직 설정되지 않았습니다 — SG_RECAPTCHA_SITE_KEY를 교체해주세요.');
+      }
+    }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):', e.message); }
+  }
+  if(document.body){ _sgActivateAppCheck(); }
+  else { document.addEventListener('DOMContentLoaded', _sgActivateAppCheck); }
   window._db = firebase.firestore(); // window에 노출하여 외부 접근 가능
   // ★ 2026-08-30 추가: 관리자 페이지에서 겪었던 것과 동일하게, 일부 홈/학교 네트워크
   // 환경(공유기 보안기능·백신 웹보호·불완전한 IPv6 등)에서 Firestore의 실시간 연결 방식
