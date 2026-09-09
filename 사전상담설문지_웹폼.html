@@ -9,6 +9,7 @@
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
 <style>
   :root{
     --bg:#F7F7F4;
@@ -472,6 +473,9 @@
 // ★ Firebase SDK가 네트워크 문제 등으로 로드되지 않아도(광고차단기, 오프라인 등) 폼 자체는
 // 계속 채우고 인쇄할 수 있어야 하므로, 초기화 실패가 이후 스크립트 실행을 막지 않게 감싼다.
 let _db=null;
+// ★ 2026-09-09(374) 추가: Firebase App Check — 아래 사이트 키를 Firebase 콘솔에서
+// 발급받은 값으로 교체해야 동작한다(교체 전엔 경고만 찍히고 폼은 평소처럼 작동).
+const SG_RECAPTCHA_SITE_KEY = '6LcoRrEtAAAAAG2W-Q8g-rhXW7j53hB6peh2DOFZ';
 try{
   firebase.initializeApp({
     apiKey: "AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
@@ -481,6 +485,17 @@ try{
     messagingSenderId: "134794459070",
     appId: "1:134794459070:web:a636cac4df344bd26e2bef"
   });
+  try{
+    if(SG_RECAPTCHA_SITE_KEY && SG_RECAPTCHA_SITE_KEY.indexOf('PASTE_YOUR')!==0){
+      firebase.appCheck().activate(
+        new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),
+        true
+      );
+      console.log('✅ App Check 활성화됨');
+    } else {
+      console.warn('⚠️ App Check 사이트 키가 아직 설정되지 않았습니다 — SG_RECAPTCHA_SITE_KEY를 교체해주세요.');
+    }
+  }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):', e.message); }
   _db = firebase.firestore();
   _db.settings({ experimentalAutoDetectLongPolling: true });
 }catch(e){
