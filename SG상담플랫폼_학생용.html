@@ -1811,6 +1811,55 @@ function chgOrderOptions(subjectCode){
   };
   return map[subjectCode] || ['번호 순서대로','쉬운 문제부터 선별해서'];
 }
+// ★ 2026-09-09(389) 추가: "챌린저 AAR"의 수학 항목이 처음부터 고3 수능 기준(확률과통계/
+// 미적분/기하 선택 + 수능 범위 단원)으로만 만들어져 있어, 중1~고2 학생에게는 전혀 안 맞는
+// 문항이 나오던 문제 — 2022 개정 교육과정 기준으로 학년별 단원 목록을 따로 준비해서,
+// 학생의 학년(CU.grade)에 맞춰 자동으로 다른 AAR 문항 세트가 나오게 한다. 시험 등록 시
+// 별도로 AAR을 고를 필요는 없다 — 학생 학년 기준으로 항상 자동 적용된다.
+const CHG_MATH_UNITS_BY_GRADE = {
+  '중1': ["소인수분해","최대공약수와 최소공배수","정수와 유리수","정수와 유리수의 계산","문자의 사용과 식","일차방정식","좌표평면과 그래프","정비례와 반비례","기본 도형","작도와 합동","다각형","원과 부채꼴","다면체와 회전체","입체도형의 겉넓이와 부피","대푯값","자료의 정리와 해석"],
+  '중2': ["유리수와 순환소수","단항식과 다항식의 계산","일차부등식","연립일차방정식","일차함수와 그 그래프","일차함수와 일차방정식의 관계","삼각형의 성질","사각형의 성질","도형의 닮음","닮음의 활용","피타고라스 정리","경우의 수","확률"],
+  '중3': ["제곱근과 실수","근호를 포함한 식의 계산","다항식의 곱셈","인수분해","이차방정식의 풀이","이차방정식의 활용","이차함수와 그 그래프","삼각비의 뜻과 값","삼각비의 활용","원과 직선","원주각","산포도(상관관계 포함)"],
+  '고1': ["다항식의 연산","항등식과 나머지정리","인수분해","복소수와 이차방정식","이차방정식과 이차함수","여러 가지 방정식과 부등식","합의 법칙과 곱의 법칙","순열과 조합","행렬과 그 연산","평면좌표","직선의 방정식","원의 방정식","도형의 이동","집합","명제","함수","유리함수와 무리함수"],
+  '고2': ["지수와 로그(대수)","지수함수와 로그함수(대수)","삼각함수(대수)","사인법칙과 코사인법칙(대수)","등차수열과 등비수열(대수)","수열의 합(대수)","수학적 귀납법(대수)","함수의 극한과 연속(미적분Ⅰ)","미분계수와 도함수(미적분Ⅰ)","도함수의 활용(미적분Ⅰ)","부정적분과 정적분(미적분Ⅰ)","정적분의 활용(미적분Ⅰ)","순열과 조합·이항정리(확률과통계)","확률(확률과통계)","통계적 추정(확률과통계)"]
+};
+// ★ 2026-09-09(390) 수정: 고2는 대수·미적분Ⅰ·확률과통계 중 "하나만 고르는" 선택과목이
+// 아니라 셋 다 배우는 게 맞다(수능 선택과목 결정은 보통 고3 때) — 고2용 "선택과목 고르기"
+// 문항을 없앤다. (현재는 학년별 선택과목 문항을 쓰는 학년이 없어 사실상 고3 전용이지만,
+// 나중에 실제 선택과목이 갈리는 학년이 생기면 여기에 다시 추가하면 된다.)
+const CHG_MATH_ELECTIVES_BY_GRADE = { };
+// 학생 학년 문자열("고2","중1" 등, 앞뒤 공백/부가텍스트가 섞여도 되도록 느슨하게 매칭)을
+// 위 단원표의 학년 키로 정규화 — 못 알아보거나 고3이면 null(=기존 고3 수능 기준 그대로 사용).
+function _chgAarMathGradeKey(){
+  const g=String((CU&&CU.grade)||'').trim();
+  const m=g.match(/(중|고)\s*([1-3])/);
+  if(!m) return null;
+  const key=m[1]+m[2];
+  return (key==='고3') ? null : (CHG_MATH_UNITS_BY_GRADE[key] ? key : null);
+}
+function _chgAarBuildMathFieldsForGrade(gk){
+  const units=CHG_MATH_UNITS_BY_GRADE[gk];
+  const hasElective=!!CHG_MATH_ELECTIVES_BY_GRADE[gk];
+  const fields=[];
+  if(hasElective) fields.push({key:'electiveSubject',label:'수학 선택과목',phase:'pre',type:'select',opts:CHG_MATH_ELECTIVES_BY_GRADE[gk]});
+  fields.push({key:'pretestWeakUnits',label:'시험 전 예상 취약 단원',phase:'pre',type:'multi',max:3,opts:units.concat(['아직 판단하기 어려움'])});
+  fields.push({key:'strategy',label:'오늘(이번 시험) 사용한 풀이 전략',phase:'post',type:'select',opts: hasElective
+    ? ["1번부터 순서대로","쉬운 문항 우선 해결","공통 완료 후 선택과목","선택과목 일부를 먼저 해결","어려운 문항 표시 후 1차·2차 풀이","별도 전략 없이 진행"]
+    : ["1번부터 순서대로","쉬운 문항 우선 해결","어려운 문항 표시 후 1차·2차 풀이","계산 검토 시간을 따로 확보","별도 전략 없이 진행"]});
+  fields.push({key:'timeLossArea',label:'가장 큰 시간 손실 구간',phase:'post',type:'select',opts: hasElective
+    ? ["쉬운 문항(2·3점)","중난도 문항","고난도 문항","선택과목 초반","선택과목 고난도","계산 검토","특정 구간 없음"]
+    : ["쉬운 문항(초반)","중난도 문항","고난도 문항","계산 검토","특정 구간 없음"]});
+  fields.push({key:'unfinishedCount',label:'미완료 문항 수',phase:'post',type:'select',opts:["0문항","1문항","2문항","3문항","4문항 이상","마킹 미완료"]});
+  fields.push({key:'primaryCause',label:'핵심 불안정 원인',phase:'post',type:'multi',max:2,opts:["개념이 기억나지 않음","조건 해석 실패","풀이 방향을 찾지 못함","계산이 길어짐","같은 계산을 반복함","고난도 문항 집착","쉬운 문항 실수","검산 부족","문제를 잘못 읽음","멘탈 흔들림","특별한 문제 없음"]});
+  fields.push({key:'riskyBehavior',label:'가장 위험했던 행동',phase:'post',type:'select',opts:["풀이 방향 없이 계산부터 시작했다","진전이 없는데 계속 붙잡았다","같은 풀이를 반복했다","어려운 문제 때문에 쉬운 문제를 놓쳤다","조건이나 범위를 누락했다","시간 부족으로 후반 문항을 읽지 못했다","답안 번호를 잘못 옮겼다","위험 행동 없음"]});
+  fields.push({key:'collapseTiming',label:'집중 붕괴 시점',phase:'post',type:'select',opts: hasElective
+    ? ["1~10번","11~15번","16~22번","선택과목 초반","선택과목 후반","종료 20분 전","종료 10분 전","붕괴 없음"]
+    : ["시작 후 10분 이내","전반부","중반부","후반부","종료 10분 전","붕괴 없음"]});
+  fields.push({key:'confirmedWeakArea',label:'시험 후 확인된 부족 단원',phase:'post',type:'multi',max:5,opts:units.concat(['특정 단원 없음'])});
+  fields.push({key:'weakAreaStatus',label:'부족 영역의 학습 상태',phase:'post',type:'select',opts:["아직 배우지 않은 단원","개념 학습 중","개념은 배웠지만 유형 연습 부족","기본 유형은 가능하나 고난도 적용 부족","충분히 학습했지만 시험에서 꺼내지 못함","시간 부족으로 시도하지 못함","계산 실수로 틀림"]});
+  fields.push({key:'scoreBasis',label:'학생 점수 자가해석',phase:'post',type:'select',opts:["전 범위 학습 완료 상태의 점수","일부 단원 미학습 상태의 점수","개념은 완료했으나 문제풀이 부족 상태의 점수","학습 진도보다 시험 운영 문제가 더 큰 점수","진도 부족과 시험 운영 문제가 함께 반영된 점수"]});
+  return fields;
+}
 function chgAarNormElective(detail){
   var s=String(detail||'').trim();
   if(!s) return null;
@@ -1819,6 +1868,12 @@ function chgAarNormElective(detail){
 }
 function chgAarFieldsFor(subjCode,detail){
   var base=CHG_AAR_FIELDS[subjCode]||CHG_AAR_FIELDS['INQ']||[];
+  // ★ 389: 수학은 학생 학년에 맞는 단원표가 있으면(중1~고2) 그걸로 통째로 교체하고,
+  // 학년을 못 알아보거나 고3이면 예전처럼 고3 수능 기준(확통/미적분/기하)을 그대로 쓴다.
+  if(subjCode==='MATH'){
+    const gk=_chgAarMathGradeKey();
+    if(gk) base=_chgAarBuildMathFieldsForGrade(gk);
+  }
   if(subjCode==='INQ'){
     var key=chgAarNormElective(detail);
     var extra=key&&CHG_INQ_ELECTIVE_FIELDS[key];
