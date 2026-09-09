@@ -259,7 +259,14 @@ input,select,textarea{font-size:16px!important}
   input,select,textarea{font-size:inherit!important}
 }
 
-</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script>
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script><script>
+// ★ 2026-09-09(374) 추가: Firebase App Check — 보안 규칙이 "누구나 읽기/쓰기 가능"으로
+// 열려있어(로그인 화면이 Firebase 정식 인증이 아니라 자체 아이디/비번 대조 방식이라 규칙에서
+// "로그인한 사람만" 구분이 안 됨) 데이터가 그대로 노출된 문제의 1차 방어선. 이 앱(우리
+// 도메인)에서 온 요청인지 reCAPTCHA v3로 검증해서, 설정값만 복사해 만든 외부 스크립트·봇의
+// 직접 접근을 막아준다. 아래 사이트 키를 Firebase 콘솔에서 발급받은 값으로 반드시
+// 교체해야 동작한다 — 교체 전까지는 계속 콘솔에 경고만 찍히고 앱 자체는 평소처럼 작동한다.
+const SG_RECAPTCHA_SITE_KEY = '6LcoRrEtAAAAAG2W-Q8g-rhXW7j53hB6peh2DOFZ';
 // ★ Firebase 설정 ★
 try{
   firebase.initializeApp({
@@ -270,6 +277,17 @@ try{
     messagingSenderId: "134794459070",
     appId: "1:134794459070:web:a636cac4df344bd26e2bef"
   });
+  try{
+    if(SG_RECAPTCHA_SITE_KEY && SG_RECAPTCHA_SITE_KEY.indexOf('PASTE_YOUR')!==0){
+      firebase.appCheck().activate(
+        new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),
+        true // 토큰 자동 갱신
+      );
+      console.log('✅ App Check 활성화됨');
+    } else {
+      console.warn('⚠️ App Check 사이트 키가 아직 설정되지 않았습니다 — SG_RECAPTCHA_SITE_KEY를 교체해주세요.');
+    }
+  }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):', e.message); }
   const _db = firebase.firestore();
   // ★ 2026-08-30 추가: Firestore의 기본 실시간 연결 방식(WebChannel)이, 특정 홈 네트워크의
   // 공유기 보안 기능·백신 웹보호 기능·불완전한 IPv6 설정 등과 자주 충돌해서 연결 자체가
