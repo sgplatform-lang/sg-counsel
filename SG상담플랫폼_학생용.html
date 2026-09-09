@@ -105,7 +105,12 @@ input,select,textarea{font-size:16px!important;font-family:inherit;border:1.5px 
    브라우저가 원천적으로 "하나만 선택 가능"을 보장해주는 라디오 버튼으로 바꿔서 이 문제
    자체가 생길 수 없게 만든다.
    name(그룹)이 같은 라디오는 브라우저가 하나만 선택되도록 강제해준다. */
-.mc-radio{ position:absolute; opacity:0; width:0; height:0; }
+/* ★ 2026-09-09(386) 수정: 위 383에서 라디오를 숨긴 방식(width:0;height:0)이 일부
+   모바일·데스크톱 브라우저에서 문제를 일으켰다 — 포커스를 받은 요소를 "화면에 보이게"
+   스크롤해주려는 브라우저 기본 동작 때문에, 크기가 0인 숨김 요소로 억지로 스크롤하면서
+   화면이 이상한 빈 위치로 튕기거나 눌리지 않는 것처럼 보였다. width:0 대신 웹 표준
+   "화면에는 안 보이지만 자리는 있는" 방식(1px+clip)으로 바꿔서 이 문제를 없앤다. */
+.mc-radio{ position:absolute; opacity:0; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
 .mc-radio + label{ flex:1; padding:7px 0; border:1px solid #ddd; border-radius:6px; font-size:12.5px; cursor:pointer; text-align:center; background:#fff; color:#333; user-select:none; }
 .mc-radio:checked + label{ background:#0f766e; color:#fff; border-color:#0f766e; font-weight:700; }
 input:focus,select:focus{border-color:#3b5bdb;box-shadow:0 0 0 3px rgba(59,91,219,.1)}
@@ -1836,7 +1841,10 @@ function chgAarSetField(sIdx,key,val){
   const cd=chgInit();
   const sub=cd.lastSubjects[sIdx];
   const a=chgAarInit(sub);
-  a[key]=val;
+  // ★ 2026-09-09(387) 수정: 이미 선택된 항목을 다시 누르면 선택 해제(처음 상태로 되돌림)
+  // 되도록 복원 — 예전에는 이렇게 동작했는데, 무조건 값을 덮어쓰기만 해서(같은 값을
+  // 다시 눌러도 그대로 유지) 선택 해제가 안 되고 있었다.
+  a[key] = (a[key]===val) ? '' : val;
   render();
   chgScheduleSave();
 }
