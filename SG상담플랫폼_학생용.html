@@ -2116,7 +2116,7 @@ function chgAnsLockedSubjectsForCurrentRound(){
 // 선택창도 안 뜨고 전부 객관식으로만 나온다(수능 표준 30문항 구성일 때만 16~22·29~30번이
 // 단답형으로 처리됨).
 function _chgAnsExamMeta(entry){
-  const out={}; // { CODE: { keys:{detail(''=공통):문항수}, allDetails:[빈칸 아닌 detail만] } }
+  const out={}; // { CODE: { detailQNos:{detail(''=공통): Set(문항번호)}, allDetails:[빈칸 아닌 detail만] } }
   if(!entry) return out;
   const countSrc=entry.answerKey||{}, metaSrc=entry.itemMeta||{};
   const keysSeen=new Set(Object.keys(countSrc).concat(Object.keys(metaSrc)));
@@ -2124,12 +2124,17 @@ function _chgAnsExamMeta(entry){
     if(/^\d+\|/.test(k)) return; // 예전에 잘못 파싱되어 끼어든 찌꺼기 데이터 제외
     const idx=k.indexOf('|');
     if(idx<0) return;
-    const code=k.slice(0,idx);
+    let code=k.slice(0,idx);
     const detail=k.slice(idx+1);
     if(!code) return;
-    if(!out[code]) out[code]={keys:{}, allDetails:[]};
-    const cnt=Object.keys(countSrc[k]||metaSrc[k]||{}).length;
-    if(cnt>0) out[code].keys[detail]=cnt;
+    // ★ 380-1 수정: 탐구는 카탈로그에 'INQ'뿐 아니라 'INQ1'/'INQ2'로도 저장될 수 있어(관리자
+    // 채점 로직도 이 세 가지를 다 확인함), 여기서도 하나의 'INQ'로 합쳐야 탐구1·2 슬롯이
+    // 정상적으로 "등록됨"으로 인식된다.
+    if(code==='INQ1'||code==='INQ2') code='INQ';
+    if(!out[code]) out[code]={detailQNos:{}, allDetails:[]};
+    const qnos=new Set(Object.keys(countSrc[k]||{}).concat(Object.keys(metaSrc[k]||{})));
+    if(!out[code].detailQNos[detail]) out[code].detailQNos[detail]=new Set();
+    qnos.forEach(function(n){ out[code].detailQNos[detail].add(n); });
     if(detail && out[code].allDetails.indexOf(detail)<0) out[code].allDetails.push(detail);
   });
   return out;
@@ -2142,9 +2147,16 @@ function _chgAnsAutoDetail(code, examMeta){
   return m.allDetails.length===1 ? m.allDetails[0] : '';
 }
 function _chgAnsResolvedCount(code, detail, examMeta, fallbackCount){
+  // ★ 380-2 수정: 국어·수학처럼 "공통 문항(세부과목 없음)"과 "선택 문항(세부과목 있음)"이
+  // 한 과목 안에 두 묶음으로 나뉘어 저장된 경우, 예전엔 그중 한 묶음 개수만 세서 실제보다
+  // 적게 나왔다(예: 45문항인데 34문항으로 표시). 채점 로직과 똑같이 "공통 묶음 ∪ 선택
+  // 묶음"의 합집합 문항 번호 개수로 계산한다.
   const m=examMeta[code]; if(!m) return fallbackCount;
-  const key=(detail && m.keys[detail]!=null) ? detail : (m.keys['']!=null ? '' : (m.allDetails[0]||''));
-  return m.keys[key]!=null ? m.keys[key] : fallbackCount;
+  const common=m.detailQNos['']||new Set();
+  const chosenDetail = (detail && m.detailQNos[detail]) ? detail : (m.allDetails[0]||'');
+  const specific=m.detailQNos[chosenDetail]||new Set();
+  const union=new Set([...common,...specific]);
+  return union.size>0 ? union.size : fallbackCount;
 }
 function _chgAnsResolvedType(code, no, resolvedCount){
   // 표준 수능 구성(수학 30문항)일 때만 16~22·29~30번을 단답형으로 처리한다.
