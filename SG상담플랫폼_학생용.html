@@ -1952,12 +1952,23 @@ function chgAnsSelectCatalog(catId){
   st.catId=catId;
   st.date=entry?(entry.defaultDate||''):'';
   st.test=entry?(entry.examName||''):'';
+  // ★ 380 추가: 시험을 바꾸면 이전 시험 기준으로 골라뒀던 과목·세부과목·답안은 더 이상
+  // 유효하지 않으므로(과목 구성이 다를 수 있음) 초기화한다.
+  st.enabled={}; st.detail={}; st.answers={};
   render();
 }
 function chgAnsToggleSlot(slot){
   const st=chgAnsInit();
   st.enabled[slot]=!st.enabled[slot];
   if(st.enabled[slot] && !st.answers[slot]) st.answers[slot]={};
+  if(st.enabled[slot] && !st.detail[slot]){
+    // ★ 380 추가: 세부과목 선택이 실제로 필요 없는 경우(등록된 세부과목이 0~1개) 자동 확정
+    const code=CHG_ANS_SLOTS.find(x=>x.slot===slot).code;
+    const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
+    if(!_chgAnsNeedsDetailPicker(code, examMeta)){
+      st.detail[slot]=_chgAnsAutoDetail(code, examMeta);
+    }
+  }
   render();
 }
 function chgAnsSetDetail(slot,val){ chgAnsInit().detail[slot]=val; render(); }
@@ -1968,9 +1979,12 @@ function chgAnsSetAnswer(slot,no,val){
   // 라디오 선택은 렌더를 다시 안 해도 되지만(성능), 진행률 표시를 위해 가볍게 갱신
   const el=document.getElementById('chgans-progress-'+slot);
   if(el){
-    const def=CHG_ANS_SUBJ_DEFS[CHG_ANS_SLOTS.find(x=>x.slot===slot).code];
+    const x=CHG_ANS_SLOTS.find(x=>x.slot===slot);
+    const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
+    const resolvedDetail = st.detail[slot] || _chgAnsAutoDetail(x.code, examMeta);
+    const count=_chgAnsResolvedCount(x.code, resolvedDetail, examMeta, CHG_ANS_SUBJ_DEFS[x.code].count);
     const filled=Object.keys(st.answers[slot]).filter(k=>String(st.answers[slot][k]||'').trim()).length;
-    el.textContent=filled+' / '+def.count+'문항 입력됨';
+    el.textContent=filled+' / '+count+'문항 입력됨';
   }
 }
 // ★ 정답 표기(①~⑤, 1~5, ①-⑤ 등)를 숫자 1~5로 정규화해 채점 시 안전하게 비교
@@ -2000,7 +2014,12 @@ function renderChallengerAnswerInput(){
     </div>`;
   }
   const catalogList=(_chgAnsCatalog||[]).slice().sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
-  const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot]);
+  const examEntry=_chgAnsCurrentExamEntry();
+  const examMeta=_chgAnsExamMeta(examEntry);
+  // ★ 380 추가: 시험을 선택했으면 그 시험에 실제로 등록된 과목만 보여주고, 아직 시험을
+  // 선택하지 않았으면 과목 선택 자체를 숨긴다(어떤 과목이 있는지 알 수 없으므로).
+  const availableSlots = st.catId ? CHG_ANS_SLOTS.filter(x=>!!examMeta[x.code]) : [];
+  const enabledSlots=availableSlots.filter(x=>st.enabled[x.slot]);
   return `<div>
     <div class="stitle">🖊️ 챌린저 답안 입력</div>
     <p style="font-size:11.5px;color:#888;margin:-6px 0 12px">문항별로 실제 고른 답을 입력하고 채점하면, 결과가 자동으로 챌린저·오답노트에 반영됩니다.</p>
@@ -2014,12 +2033,12 @@ function renderChallengerAnswerInput(){
       ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}
       ${st.date&&st.test?`<div style="margin-top:10px;padding:9px 12px;background:#f0fdfa;border-radius:8px;font-size:12.5px;color:#0f766e"><b>${esc(st.date)}</b> · ${esc(st.test)}</div>`:''}
       <p style="font-size:10.5px;color:#aaa;margin:8px 0 0">※ 응시일·시험명은 선생님이 등록한 정보 그대로 자동으로 채워지며, 직접 수정할 수 없습니다.</p>
-      <div style="font-size:12.5px;font-weight:700;margin:14px 0 6px">응시 과목 선택</div>
+      ${st.catId ? `<div style="font-size:12.5px;font-weight:700;margin:14px 0 6px">응시 과목 선택</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        ${CHG_ANS_SLOTS.map(x=>chgAnsSlotToggleHtml(x)).join('')}
-      </div>
+        ${availableSlots.length ? availableSlots.map(x=>chgAnsSlotToggleHtml(x, examMeta)).join('') : '<p style="font-size:12px;color:#e53935">⚠️ 이 시험에는 채점 가능한 과목이 등록되어 있지 않습니다. 선생님께 문의해주세요.</p>'}
+      </div>` : ''}
     </div></div>
-    ${enabledSlots.map(x=>chgAnsSlotGridHtml(x)).join('')}
+    ${enabledSlots.map(x=>chgAnsSlotGridHtml(x, examMeta)).join('')}
     ${enabledSlots.length?`<p style="font-size:11.5px;color:#e53935;text-align:center;font-weight:700;margin:14px 0 6px">⚠️ 답안 입력 후 저장하기를 누르면 답안 수정은 불가하오니 검토 후 입력바랍니다.</p>
     <button onclick="chgAnsGradeAndSave()" style="width:100%;padding:14px;background:#0f766e;color:#fff;border:none;border-radius:10px;font-size:14.5px;font-weight:700;margin:0 0 30px;cursor:pointer">✅ 채점하고 저장하기</button>`:''}
   </div>`;
@@ -2087,7 +2106,59 @@ function chgAnsLockedSubjectsForCurrentRound(){
   if(String(cd.lastTestDate||'').trim()!==String(st.date).trim() || String(cd.lastTestName||'').trim()!==String(st.test).trim()) return [];
   return (cd.lastSubjects||[]).filter(s=>s&&s._locked);
 }
-function chgAnsSlotToggleHtml(x){
+// ★ 2026-09-09(380) 추가: "응시 과목 선택"이 실제 시험 카탈로그에 등록된 과목·세부과목·
+// 문항수와 무관하게 항상 고정된 6개(국/수/영/한국사/탐구1,2)와 표준 수능 30문항 구성으로만
+// 나오던 문제 — 선생님이 실제로 등록한 시험 카탈로그(answerKey/itemMeta의 "과목|세부과목"
+// 키)를 그대로 읽어서, (1) 등록 안 된 과목은 아예 안 보이게, (2) 세부과목(예: 수학의
+// 확통/미적분/기하)이 실제로 2개 이상 등록돼 있을 때만 선택창을 보여주고 1개 이하면
+// 자동으로 확정, (3) 문항 수·문항 형식(객관식/단답형)도 등록된 실제 데이터 기준으로
+// 판단하도록 한다. 예를 들어 저학년용 20문항 수학을 세부과목 구분 없이 등록하면, 세부과목
+// 선택창도 안 뜨고 전부 객관식으로만 나온다(수능 표준 30문항 구성일 때만 16~22·29~30번이
+// 단답형으로 처리됨).
+function _chgAnsExamMeta(entry){
+  const out={}; // { CODE: { keys:{detail(''=공통):문항수}, allDetails:[빈칸 아닌 detail만] } }
+  if(!entry) return out;
+  const countSrc=entry.answerKey||{}, metaSrc=entry.itemMeta||{};
+  const keysSeen=new Set(Object.keys(countSrc).concat(Object.keys(metaSrc)));
+  keysSeen.forEach(function(k){
+    if(/^\d+\|/.test(k)) return; // 예전에 잘못 파싱되어 끼어든 찌꺼기 데이터 제외
+    const idx=k.indexOf('|');
+    if(idx<0) return;
+    const code=k.slice(0,idx);
+    const detail=k.slice(idx+1);
+    if(!code) return;
+    if(!out[code]) out[code]={keys:{}, allDetails:[]};
+    const cnt=Object.keys(countSrc[k]||metaSrc[k]||{}).length;
+    if(cnt>0) out[code].keys[detail]=cnt;
+    if(detail && out[code].allDetails.indexOf(detail)<0) out[code].allDetails.push(detail);
+  });
+  return out;
+}
+function _chgAnsNeedsDetailPicker(code, examMeta){
+  const m=examMeta[code]; return !!(m && m.allDetails.length>=2);
+}
+function _chgAnsAutoDetail(code, examMeta){
+  const m=examMeta[code]; if(!m) return '';
+  return m.allDetails.length===1 ? m.allDetails[0] : '';
+}
+function _chgAnsResolvedCount(code, detail, examMeta, fallbackCount){
+  const m=examMeta[code]; if(!m) return fallbackCount;
+  const key=(detail && m.keys[detail]!=null) ? detail : (m.keys['']!=null ? '' : (m.allDetails[0]||''));
+  return m.keys[key]!=null ? m.keys[key] : fallbackCount;
+}
+function _chgAnsResolvedType(code, no, resolvedCount){
+  // 표준 수능 구성(수학 30문항)일 때만 16~22·29~30번을 단답형으로 처리한다.
+  // 그 외 문항 수로 등록된 경우(예: 저학년용 20문항)는 전부 객관식으로 취급한다.
+  if(code==='MATH' && resolvedCount===30){
+    no=+no; return ((no>=1&&no<=15)||(no>=23&&no<=28)) ? 'mc5' : 'short';
+  }
+  return 'mc5';
+}
+function _chgAnsCurrentExamEntry(){
+  const st=chgAnsInit();
+  return (_chgAnsCatalog||[]).find(e=>e.id===st.catId) || null;
+}
+function chgAnsSlotToggleHtml(x, examMeta){
   const st=chgAnsInit();
   const def=CHG_ANS_SUBJ_DEFS[x.code];
   const on=!!st.enabled[x.slot];
@@ -2104,32 +2175,38 @@ function chgAnsSlotToggleHtml(x){
       </div>
     </div>`;
   }
+  const needsDetail=_chgAnsNeedsDetailPicker(x.code, examMeta);
+  const resolvedDetail = st.detail[x.slot] || _chgAnsAutoDetail(x.code, examMeta);
+  const shownCount=_chgAnsResolvedCount(x.code, resolvedDetail, examMeta, def.count);
+  const registeredDetails=(examMeta[x.code]&&examMeta[x.code].allDetails.length) ? examMeta[x.code].allDetails : def.details;
   return `<div style="border:1px solid ${on?'#0f766e':'#e5e7eb'};background:${on?'#f0fdfa':'#fff'};border-radius:10px;padding:10px 12px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" ${on?'checked':''} onchange="chgAnsToggleSlot('${x.slot}')" style="width:18px;height:18px">
       <span style="font-weight:700;font-size:13px">${label}</span>
-      <span style="font-size:11px;color:#999">(${def.count}문항)</span>
+      <span style="font-size:11px;color:#999">(${shownCount}문항)</span>
     </label>
-    ${on&&def.detailRequired?`<div style="margin-top:8px">
+    ${on&&needsDetail?`<div style="margin-top:8px">
       <select onchange="chgAnsSetDetail('${x.slot}',this.value)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:13px">
         <option value="">세부과목 선택</option>
-        ${def.details.map(d=>`<option value="${esc(d)}" ${st.detail[x.slot]===d?'selected':''}>${esc(d)}</option>`).join('')}
+        ${registeredDetails.map(d=>`<option value="${esc(d)}" ${st.detail[x.slot]===d?'selected':''}>${esc(d)}</option>`).join('')}
       </select>
       ${x.code==='INQ' && st.detail[x.slot] && chgAnsLockedSubjectsForCurrentRound().some(s=>s.subject==='INQ'&&_cbrNormalizeDetail(s.detail||'')===_cbrNormalizeDetail(st.detail[x.slot]))
         ? `<p style="font-size:11px;color:#e53935;margin-top:6px">⚠️ '${esc(st.detail[x.slot])}'은(는) 이 회차에 이미 제출된 과목입니다. 다른 과목을 선택해주세요.</p>` : ''}
     </div>`:''}
   </div>`;
 }
-function chgAnsSlotGridHtml(x){
+function chgAnsSlotGridHtml(x, examMeta){
   const st=chgAnsInit();
   const def=CHG_ANS_SUBJ_DEFS[x.code];
   const label = x.slot==='INQ1'?'탐구(제1선택)':x.slot==='INQ2'?'탐구(제2선택)':def.name;
-  const detailLabel = st.detail[x.slot]?` · ${esc(st.detail[x.slot])}`:'';
+  const resolvedDetail = st.detail[x.slot] || _chgAnsAutoDetail(x.code, examMeta);
+  const detailLabel = resolvedDetail?` · ${esc(resolvedDetail)}`:'';
+  const count=_chgAnsResolvedCount(x.code, resolvedDetail, examMeta, def.count);
   const ans=st.answers[x.slot]||{};
   const filled=Object.keys(ans).filter(k=>String(ans[k]||'').trim()).length;
   const cells=[];
-  for(let no=1;no<=def.count;no++){
-    const t=def.type(no);
+  for(let no=1;no<=count;no++){
+    const t=_chgAnsResolvedType(x.code, no, count);
     const v=ans[no]!=null?ans[no]:'';
     cells.push(`<div style="display:flex;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid #f1f5f9">
       <span style="width:26px;text-align:center;font-size:11.5px;font-weight:700;color:#555">${no}</span>
@@ -2144,7 +2221,7 @@ function chgAnsSlotGridHtml(x){
   return `<div class="card" style="margin-top:10px"><div class="card-body">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-weight:700;font-size:13px">${label}${detailLabel}</div>
-      <div id="chgans-progress-${x.slot}" style="font-size:11px;color:#888">${filled} / ${def.count}문항 입력됨</div>
+      <div id="chgans-progress-${x.slot}" style="font-size:11px;color:#888">${filled} / ${count}문항 입력됨</div>
     </div>
     <div>${cells.join('')}</div>
   </div></div>`;
@@ -2152,11 +2229,14 @@ function chgAnsSlotGridHtml(x){
 async function chgAnsGradeAndSave(){
   const st=chgAnsInit();
   if(!st.date||!st.test){ toast('시험을 먼저 선택해주세요'); return; }
-  const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot]);
+  const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
+  const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot] && !!examMeta[x.code]);
   if(!enabledSlots.length){ toast('과목을 최소 1개 선택해주세요'); return; }
   for(const x of enabledSlots){
     const def=CHG_ANS_SUBJ_DEFS[x.code];
-    if(def.detailRequired && !st.detail[x.slot]){ toast((x.slot.indexOf('INQ')===0?'탐구':def.name)+'의 세부과목을 선택해주세요'); return; }
+    // ★ 380 변경: 세부과목이 실제로 2개 이상 등록된 과목만 선택을 요구한다(1개 이하면
+    // 자동 확정되어 있어 별도로 고를 필요가 없음).
+    if(_chgAnsNeedsDetailPicker(x.code, examMeta) && !st.detail[x.slot]){ toast((x.slot.indexOf('INQ')===0?'탐구':def.name)+'의 세부과목을 선택해주세요'); return; }
   }
   // ★ 2026-08-30 추가: 탐구는 체크박스 자체를 잠그지 않으므로(세부과목을 골라야 알 수 있음),
   // 제출 시점에 한 번 더 "이미 제출된 세부과목"인지 확인해서 중복 제출을 막는다.
@@ -2176,8 +2256,9 @@ async function chgAnsGradeAndSave(){
   const newSubjects=[];
   for(const x of enabledSlots){
     const def=CHG_ANS_SUBJ_DEFS[x.code];
-    const detail=st.detail[x.slot]||'';
+    const detail=st.detail[x.slot]||_chgAnsAutoDetail(x.code, examMeta)||'';
     const normDetail=_cbrNormalizeDetail(detail);
+    const resolvedCount=_chgAnsResolvedCount(x.code, detail, examMeta, def.count);
     const ans=st.answers[x.slot]||{};
     // ★ 2026-08-31 추가: 탐구는 관리자 화면 곳곳(다학생 일괄채점 등)에서 과목코드를
     // "INQ1"/"INQ2"로 따로 입력받는 UI가 있어서, 시험 카탈로그도 "INQ"가 아니라
@@ -2200,15 +2281,15 @@ async function chgAnsGradeAndSave(){
     const items=[];
     const rawAnswers={}; // ★ 채점 결과와 별개로, 학생이 실제로 고른 답 전체(정답 문항 포함)를 그대로 보존
     let gotPoints=0, totalPoints=0, foundAnswerCount=0;
-    for(let no=1;no<=def.count;no++){
+    for(let no=1;no<=resolvedCount;no++){
       const ak=akMapDetail[no]||akMapCommon[no]||{};
       const meta=metaMapDetail[no]||metaMapCommon[no]||{};
-      const points=(+ak.points)||(+meta.points)||(100/def.count);
+      const points=(+ak.points)||(+meta.points)||(100/resolvedCount);
       totalPoints+=points;
       const correctRaw=ak.answer||meta.answer||'';
       const myRaw=ans[no];
       rawAnswers[no]=myRaw!=null?String(myRaw):'';
-      const t=def.type(no);
+      const t=_chgAnsResolvedType(x.code, no, resolvedCount);
       const isCorrect = t==='mc5'
         ? (correctRaw!=='' && _chgAnsNormMc(myRaw)===_chgAnsNormMc(correctRaw))
         : (correctRaw!=='' && String(myRaw==null?'':myRaw).trim()!=='' && String(myRaw).trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,''));
@@ -2235,7 +2316,7 @@ async function chgAnsGradeAndSave(){
       // 한 회차 안에서 항상 고유하므로, 이를 그대로 sid로 써서 절대 겹치지 않게 한다.
       sid: x.code+'_'+(detail?detail.replace(/\s+/g,''):'common'), subject:x.code, detail:detail,
       score: totalPoints? +(gotPoints).toFixed(1) : '',
-      totalItemCount: def.count, wrongCount: items.length,
+      totalItemCount: resolvedCount, wrongCount: items.length,
       items: items,
       studentAnswers: rawAnswers, // ★ 문항별 원본 답안(정답/오답 상관없이 전체) — 관리자·본인 확인용
       _studentSelfInput: true, // 학생이 직접 입력·채점한 과목임을 표시
