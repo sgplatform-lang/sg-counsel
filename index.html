@@ -15439,10 +15439,79 @@ function RM_generateReport(){
   }
   html+='</div>';
 
-  // 2. 학생부 관련활동 — ★ 339 변경: 명칭을 "학생부 갭 체크리스트"→"학생부 관련활동"으로
+  // ★ 2026-09-09(381) 추가, (382) MS 확장: "1.현재 포지션 분석"과 "2.학생부 관련활동" 사이에
+  // 학기별 내신 변화를 과목별 꺾은선으로 보여주는 그래프를 넣는다. 고등학교(5등급제)는 입력값이
+  // 이미 1~5 등급 숫자라 그대로 쓰고, 중학교는 A~E로 입력하는 경우 A→1·B→2·C→3·D→4·E→5로
+  // 환산해서 같은 방식으로 그린다(점수를 직접 입력한 칸은 등급으로 환산할 근거가 없어 제외).
+  {
+    const MS_LETTER_TO_GRADE={A:1,B:2,C:3,D:4,E:5};
+    const trendSemLabels=['1-1','1-2','2-1','2-2','3-1','3-2'];
+    const trendSubjDefs=[
+      {key:'kor',label:'국어',color:'#3b5bdb'},
+      {key:'eng',label:'영어',color:'#0f9d58'},
+      {key:'math',label:'수학',color:'#dc2626'},
+      {key:'soc',label:'사회',color:'#d97706'},
+      {key:'sci',label:'과학',color:'#7c3aed'}
+    ];
+    const trendSeries=trendSubjDefs.map(function(d){
+      const values=trendSemLabels.map(function(_,i){
+        const el=document.getElementById('rm_sem_'+d.key+'_'+(i+1));
+        const raw=el?el.value.trim():'';
+        if(raw==='') return null;
+        if(RM_schoolLevel==='HS5'){
+          const n=parseFloat(raw);
+          return isNaN(n) ? null : n;
+        }
+        // 중학교: A~E 문자면 1~5로 환산, 점수(숫자)는 환산 기준이 없어 그래프에서 제외
+        const letter=raw.trim().toUpperCase();
+        return MS_LETTER_TO_GRADE[letter]!==undefined ? MS_LETTER_TO_GRADE[letter] : null;
+      });
+      return Object.assign({}, d, {values:values});
+    }).filter(function(sr){ return sr.values.some(function(v){ return v!==null; }); });
+    if(trendSeries.length){
+      const allVals=trendSeries.reduce(function(a,sr){ return a.concat(sr.values.filter(function(v){ return v!==null; })); },[]);
+      let yMin=Math.min.apply(null,allVals), yMax=Math.max.apply(null,allVals);
+      if(yMin===yMax){ yMin=Math.max(1,yMin-0.5); yMax=Math.min(5,yMax+0.5); }
+      yMin=Math.max(1, Math.floor(yMin*2)/2 - 0.5); yMax=Math.min(5, Math.ceil(yMax*2)/2 + 0.3);
+      const W=660,H=190,padL=34,padR=14,padT=14,padB=26;
+      const xStep=(W-padL-padR)/(trendSemLabels.length-1);
+      const yToPix=function(v){ return padT + (v-yMin)/(yMax-yMin)*(H-padT-padB); }; // 등급 낮을수록(성적 좋을수록) 위쪽
+      const gridLines=[]; const gridStep=0.5;
+      for(let g=Math.ceil(yMin/gridStep)*gridStep; g<=yMax+1e-6; g+=gridStep){
+        const y=yToPix(g);
+        gridLines.push('<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="#f0f0f0"/><text x="'+(padL-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="#999">'+g.toFixed(1)+'</text>');
+      }
+      const xLabelsSvg=trendSemLabels.map(function(lb,i){ return '<text x="'+(padL+i*xStep).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10" fill="#888">'+lb+'</text>'; }).join('');
+      const linesSvg=trendSeries.map(function(sr){
+        const segs=[]; let cur=[];
+        sr.values.forEach(function(v,i){
+          if(v===null){ if(cur.length){ segs.push(cur); cur=[]; } return; }
+          cur.push([padL+i*xStep, yToPix(v)]);
+        });
+        if(cur.length) segs.push(cur);
+        const poly=segs.map(function(seg){ return '<polyline fill="none" stroke="'+sr.color+'" stroke-width="2.5" points="'+seg.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' ')+'"/>'; }).join('');
+        const dots=sr.values.map(function(v,i){ return v===null?'':'<circle cx="'+(padL+i*xStep).toFixed(1)+'" cy="'+yToPix(v).toFixed(1)+'" r="3.5" fill="'+sr.color+'"/>'; }).join('');
+        return poly+dots;
+      }).join('');
+      const legendSvg=trendSeries.map(function(sr,i){
+        const lx=padL+i*70;
+        return '<circle cx="'+lx+'" cy="'+(H+14)+'" r="4" fill="'+sr.color+'"/><text x="'+(lx+8)+'" y="'+(H+17)+'" font-size="10.5" fill="#333">'+esc(sr.label)+'</text>';
+      }).join('');
+      html+='<div style="margin-bottom:30px">'
+        +'<div style="font-size:12px;color:#888;margin-bottom:8px">📈 주요 과목별 내신 변화 추이 (학기별 등급'+(RM_schoolLevel==='MS'?' — 중학교는 A~E를 1~5등급으로 환산':'')+')</div>'
+        +'<div style="border:1px solid #eee;border-radius:10px;padding:12px 8px 4px"><svg viewBox="0 0 '+W+' '+(H+26)+'" style="width:100%;height:auto">'
+        +gridLines.join('')+xLabelsSvg+linesSvg+legendSvg
+        +'</svg></div></div>';
+    }
+  }
+
+
   // 바꾸고, 평가 뱃지 없이 기본상담에 입력한 값(동아리명/관심주제·키워드/교과세특 준비도)을
   // 그대로 표기한다.
-  html+='<div style="margin-bottom:30px"><div style="display:flex;gap:8px;align-items:baseline;border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:14px"><span style="color:#8B3A3A;font-weight:700;font-size:13px">2</span><span style="font-weight:700;font-size:15px;color:#1a1a2e">학생부 관련활동</span></div><div style="display:flex;flex-direction:column;gap:8px">';
+  html+='<div style="margin-bottom:30px">'
+    // ★ 339 변경: 명칭을 "학생부 갭 체크리스트"→"학생부 관련활동"으로 바꾸고, 평가 뱃지 없이
+    // 기본상담에 입력한 값(동아리명/관심주제·키워드/교과세특 준비도)을 그대로 표기한다.
+    +'<div style="display:flex;gap:8px;align-items:baseline;border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:14px"><span style="color:#8B3A3A;font-weight:700;font-size:13px">2</span><span style="font-weight:700;font-size:15px;color:#1a1a2e">학생부 관련활동</span></div><div style="display:flex;flex-direction:column;gap:8px">';
   function rmActRow(area,desc){ return '<div style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:start;padding:10px 12px;border:1px solid #ddd"><div style="font-weight:700;font-size:12.5px;color:#1a1a2e;white-space:nowrap">'+esc(area)+'</div><div style="font-size:12px;color:#333;white-space:pre-line">'+esc(desc)+'</div></div>'; }
   html+=rmActRow('동아리명', actClub)+rmActRow('관심주제 / 관심 키워드', interestKeyword||'입력 없음')+rmActRow('교과세특 준비도', sedukText);
   html+='</div></div>';
@@ -32191,7 +32260,13 @@ function openExamCatalog(){
 function _examcatRenderList(){
   const el=document.getElementById('examcat-list');
   if(!el) return;
-  const list=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const myOrgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  // ★ 2026-09-09(384) 추가: 시험마다 "어느 기관에 공개할지"(orgIds)를 지정할 수 있게 되면서,
+  // 기관관리자·선생님은 자기 기관에 공개된 시험만 봐야 한다(orgIds가 비어있으면 예전처럼
+  // 모든 기관에 공개된 것으로 취급 — 기존에 등록된 시험과 호환).
+  const allList=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const list = isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
   if(!list.length){
     // ★ 2026-08-29 추가: "진짜로 등록된 시험이 없는 것"과 "불러오다 실패한 것"을
     // 구분해서 보여준다 — 실패인데 "등록된 시험이 없다"고만 나오면, 이미 만들어둔
@@ -32205,12 +32280,18 @@ function _examcatRenderList(){
       : '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
     return;
   }
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  function orgBadge(e){
+    if(!e.orgIds || !e.orgIds.length) return '<span style="background:#f0fdf4;color:#16a34a;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🏫 전체 공개</span>';
+    const names=e.orgIds.map(function(id){ const o=orgs.find(function(x){ return x.id===id; }); return o?o.name:'?'; });
+    return '<span style="background:#fff7ed;color:#c2410c;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700" title="'+esc(names.join(', '))+'">🏫 '+(names.length===1?esc(names[0]):names.length+'개 기관')+'</span>';
+  }
   el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
     const qc=_examcatQuestionCount(e);
     const subj=_examcatSubjLabel(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13.5px;color:#0f172a">${esc(e.examName||'(이름 없음)')}</div>
+        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px">${esc(e.examName||'(이름 없음)')}${isAdminRole?orgBadge(e):''}</div>
         <div style="font-size:11.5px;color:#64748b;margin-top:2px">기본 응시일 ${esc(e.defaultDate||'미지정')} · ${esc(subj)} · 문항 ${qc}개</div>
       </div>
       <button onclick="_examcatEdit('${e.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">✏ 수정</button>
@@ -32290,6 +32371,7 @@ ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?
       <textarea id="examcat-answerkey" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	정답(선택)	해설(선택)	문제(선택, 줄바꿈은 ⏎ 로 표시)">${isEdit?esc(e.answerKeyRawText!=null?e.answerKeyRawText:_sgAnswerKeyMapToText(e.answerKey)):''}</textarea>
     </div>
     ${isEdit?_examcatPdfSectionHtml():'<p style="font-size:11.5px;color:#94a3b8;margin:0 0 12px">💡 PDF에서 문항 이미지를 잘라 붙이는 기능은, 이 시험을 먼저 등록하신 뒤 "✏ 수정"으로 다시 열면 나타납니다.</p>'}
+    ${_examcatOrgPickerHtml(e)}
     <div style="display:flex;gap:8px">
       <button onclick="_examcatSubmit()" style="background:#0369a1;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">${isEdit?'💾 수정 저장':'➕ 등록'}</button>
       ${isEdit?'<button onclick="EXAMCAT_editing=null;_examcatRenderForm()" style="background:#f1f5f9;color:#555;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">취소</button>':''}
@@ -32298,6 +32380,22 @@ ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?
   EXAMCAT_pdfStore = {q:null, e:null}; // ★ 2026-08-27 수정: 폼을 다시 그릴 때마다 두 PDF 상태 모두 초기화(이전 항목 화면과 캔버스가 섞이지 않도록)
   EXAMCAT_pdfActiveMode = null;
   if(isEdit) _examcatRenderSavedImageList();
+}
+// ★ 2026-09-09(384) 추가: 시험을 등록할 때 "어느 기관에서 볼 수 있게 할지" 지정하는 UI.
+// 최종관리자만 기관을 골라서 지정할 수 있고(안 고르면 전체 공개), 기관관리자·선생님이
+// 등록하는 시험은 자동으로 자기 기관에만 보이도록 저장 시점에 orgIds를 채운다(UI 노출 안 함).
+function _examcatOrgPickerHtml(e){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  if(!isAdminRole) return '';
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const checkedIds=(e&&e.orgIds)||[];
+  return `<div style="margin-bottom:14px;padding:12px;background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px">
+    <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:6px">🏫 공개 대상 기관</div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">아무것도 선택하지 않으면 <b>전체 기관에 공개</b>됩니다. 특정 기관에서만 보이게 하려면 해당 기관만 체크해주세요.</div>
+    <div id="examcat-org-checks" style="display:flex;flex-wrap:wrap;gap:8px 16px">
+      ${orgs.length ? orgs.map(function(o){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(o.id)+'" '+(checkedIds.indexOf(o.id)>=0?'checked':'')+'>'+esc(o.name)+'</label>'; }).join('') : '<span style="font-size:11.5px;color:#aaa">등록된 기관이 없습니다.</span>'}
+    </div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════════
@@ -32754,6 +32852,16 @@ async function _examcatSubmit(){
   }
   const entry = EXAMCAT_editing ? Object.assign({}, EXAMCAT_editing) : {id:_examcatId(), createdAt:Date.now()};
   entry.examName=name; entry.defaultDate=date; entry.itemMeta=itemMeta; entry.answerKey=answerKey;
+  // ★ 2026-09-09(384) 추가: 기관별 공개범위 저장 — 최종관리자는 화면에서 고른 기관 목록을
+  // 그대로 쓰고(하나도 안 골랐으면 전체공개 의미로 빈 배열), 기관관리자·선생님이 등록하는
+  // 시험은 항상 자기 기관에만 보이도록 자동으로 고정한다(별도 선택 UI 없음).
+  const isAdminRole=ST.currentUser?.role==='admin';
+  if(isAdminRole){
+    entry.orgIds = Array.from(document.querySelectorAll('#examcat-org-checks input:checked')).map(function(el){ return el.value; });
+  } else {
+    const myOrgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+    entry.orgIds = myOrgId ? [myOrgId] : (entry.orgIds||[]);
+  }
   // ★ 2026-08-29 추가: 예전엔 수정 화면을 다시 열 때마다 저장된 itemMeta/answerKey 객체를
   // 텍스트로 "재조립"해서 보여줬는데, 이 재조립 결과가 처음 붙여넣은 원문과 100% 똑같다는
   // 보장이 없어서(특히 여러 줄짜리 해설/단원 내용이 있을 때), 다시 열어보면 이상하게 섞이거나
