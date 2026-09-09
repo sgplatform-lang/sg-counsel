@@ -10415,13 +10415,71 @@ function LS_subjectSelectHtml(id, current){
   </select>
   <input id="${id}Custom" value="${isCustom?esc(current):''}" placeholder="과목명 입력" onchange="LS_onSubjectChanged('${prefix}')" style="width:100%;margin-top:6px;border:1px solid #ddd;border-radius:6px;padding:6px;font-size:12.5px;display:${isCustom?'':'none'}">`;
 }
+// ★ 2026-09-08(372) 추가: 여러 관리자가 동시에 접속해 있을 때, 어디선가 다른 학생을
+// 저장하면 실시간 동기화(onSnapshot)가 전체 화면을 다시 그리면서 "학습상담" 입력 화면에서
+// 아직 저장하지 않은 내용이 통째로 사라지던 문제 — 입시상담 기본상담에 적용했던 것과
+// 동일한 "임시 스냅샷 자동 복원" 패턴을 학습상담의 개별 입력·일괄 입력 두 화면 모두에
+// 적용한다.
+let LS_LIVE_DRAFT = null; // {studentId, snap} — 개별 학생 "기록 추가" 폼용
+function LS_collectBasicSnapshot(){
+  function v(id){ const el=document.getElementById(id); return el?el.value:''; }
+  const snap={ date:v('lsDate'), subject:LS_effectiveSubject('ls'), tendency:v('lsTendency') };
+  LS_FIELDS.forEach(function(f){ snap[f.key]=v('ls_'+f.key); });
+  return snap;
+}
+function LS_restoreBasicSnapshot(snap){
+  if(!snap) return;
+  function setv(id,val){ const el=document.getElementById(id); if(el && val!==undefined && val!==null) el.value=val; }
+  setv('lsDate', snap.date);
+  const preset=['국어','영어','수학'];
+  if(snap.subject){
+    if(preset.indexOf(snap.subject)>=0) setv('lsSubject', snap.subject);
+    else { setv('lsSubject','__custom__'); setv('lsSubjectCustom', snap.subject); }
+    LS_onSubjectSelectChange('ls');
+  }
+  setv('lsTendency', snap.tendency);
+  LS_FIELDS.forEach(function(f){ setv('ls_'+f.key, snap[f.key]); });
+}
+function LS_captureLiveDraft(){
+  const s=ST.sel||ST.adminSel; if(!s) return;
+  try{ LS_LIVE_DRAFT={ studentId:s.id, snap:LS_collectBasicSnapshot() }; }catch(e){ /* 폼이 아직 없으면 무시 */ }
+}
+// ---- 일괄 입력(관리자 상단 "📈 학습상담") 화면용 임시 스냅샷 ----
+let LS_BATCH_DRAFT = null; // {key:'날짜|과목', values:{studentId:{tendency,...}}}
+function LS_captureBatchDraft(){
+  const date=(document.getElementById('lsbDate')||{}).value||'';
+  const subject=LS_effectiveSubject('lsb');
+  if(!date||!subject) return;
+  const key=date+'|'+subject;
+  const values={};
+  (ST.students||[]).forEach(function(s){
+    const tEl=document.getElementById('lsb_tendency_'+s.id);
+    if(!tEl) return; // 화면에 없는 행은 건너뜀
+    const row={tendency:tEl.value};
+    LS_FIELDS.forEach(function(f){ const el=document.getElementById('lsb_'+f.key+'_'+s.id); row[f.key]=el?el.value:''; });
+    values[s.id]=row;
+  });
+  LS_BATCH_DRAFT={key:key, values:values};
+}
+// ★ 373 추가: learningStyle은 (상담리포트가 최근 20건으로 캡을 두는 것과 달리) 지금까지
+// 상한선 없이 계속 쌓이기만 했다 — 활발히 오래 다니는 학생일수록 계속 불어나 아주 먼
+// 미래에는 Firestore 문서 1개당 용량 제한(1MB)에 걸려 그 학생만 저장이 안 되는 사고로
+// 이어질 수 있다. 정상적인 사용(수백 건)에서는 절대 걸리지 않을 만큼 넉넉한 상한선
+// (최근 300건)을 안전장치로만 걸어둔다 — 오래된 것부터 정리되므로 "회차" 번호 매기기
+// 결과가 아주 오래 다닌 학생에 한해 조금씩 앞당겨질 수 있음을 감안한 타협.
+const LS_MAX_ENTRIES = 300;
+function LS_trimEntries(list){
+  const sorted=list.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  return sorted.length>LS_MAX_ENTRIES ? sorted.slice(sorted.length-LS_MAX_ENTRIES) : sorted;
+}
 function LS_addEntry(s){
   function v(id){ const el=document.getElementById(id); return el?el.value:''; }
   const date=v('lsDate'), subject=LS_effectiveSubject('ls');
   if(!date || !subject){ alert('날짜와 과목은 반드시 입력해주세요.'); return; }
   const entry={ id:'ls_'+Date.now(), date:date, subject:subject, tendency:v('lsTendency').trim() };
   LS_FIELDS.forEach(function(f){ const val=v('ls_'+f.key); entry[f.key]=val===''?null:Number(val); });
-  upd({...s, learningStyle:[...(s.learningStyle||[]), entry]});
+  LS_LIVE_DRAFT=null; // ★ 372: 저장 성공했으니 임시 스냅샷은 폐기
+  upd({...s, learningStyle: LS_trimEntries([...(s.learningStyle||[]), entry])});
 }
 function LS_deleteEntry(s, id){
   if(!confirm('이 학습상담 기록을 삭제하시겠습니까?')) return;
@@ -10465,9 +10523,10 @@ function LS_batchSaveAll(){
     const existingIdx=list.findIndex(function(e){ return e.date===date && e.subject===subject; });
     const entry=Object.assign({id: existingIdx>=0?list[existingIdx].id:('ls_'+Date.now()+'_'+sid), date:date, subject:subject, tendency:tendency}, vals);
     if(existingIdx>=0) list[existingIdx]=entry; else list.push(entry);
-    changed.push(Object.assign({}, s, {learningStyle:list}));
+    changed.push(Object.assign({}, s, {learningStyle: LS_trimEntries(list)}));
   });
   if(!changed.length){ alert('입력된 내용이 없습니다.'); return; }
+  LS_BATCH_DRAFT=null; // ★ 372: 저장 성공했으니 임시 스냅샷은 폐기
   LS_batchSaveStudents(changed);
   alert(changed.length+'명의 학습상담 기록이 저장되었습니다.');
 }
@@ -10486,7 +10545,29 @@ function renderAdminLearningStyle(){
       +LS_FIELDS.map(numInput).join('')
       +'</tr>';
   }).join('') : '';
-  return `<div>
+  // ★ 372 추가: 이 표가 DOM에 꽂힌 뒤, 지금 고른 날짜·과목에 해당하는 임시 스냅샷(다른
+  // 관리자의 저장으로 이 화면이 다시 그려진 경우)이 있으면 방금 서버에서 불러온 값 위에
+  // 덮어써서 복원하고, 이후 입력값이 바뀔 때마다 계속 스냅샷을 갱신해둔다.
+  setTimeout(function(){
+    const key=date+'|'+subject;
+    if(LS_BATCH_DRAFT && LS_BATCH_DRAFT.key===key){
+      Object.keys(LS_BATCH_DRAFT.values).forEach(function(sid){
+        const row=LS_BATCH_DRAFT.values[sid];
+        const tEl=document.getElementById('lsb_tendency_'+sid);
+        if(tEl) tEl.value=row.tendency||'';
+        LS_FIELDS.forEach(function(f){
+          const el=document.getElementById('lsb_'+f.key+'_'+sid);
+          if(el && row[f.key]!==undefined) el.value=row[f.key];
+        });
+      });
+    }
+    const root=document.getElementById('lsbFormRoot');
+    if(root){
+      root.addEventListener('input', LS_captureBatchDraft);
+      root.addEventListener('change', LS_captureBatchDraft);
+    }
+  },0);
+  return `<div id="lsbFormRoot">
     <div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
       <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">📈 LEARNING STYLE · 학습상담 관리</div>
       <div style="font-size:19px;font-weight:900;margin-bottom:4px">학습상담 일괄 입력</div>
@@ -10548,8 +10629,21 @@ function LS_renderBasic(s){
   function fieldInputHtml(f){
     return `<div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">${f.label}</label><input type="number" id="ls_${f.key}" min="1" max="10" step="1" placeholder="1~10" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:12px 8px;font-size:15px;text-align:center;font-weight:700"></div>`;
   }
+  // ★ 372 추가: 이 폼이 실제로 DOM에 꽂힌 뒤, 저장 전 임시 스냅샷(다른 관리자가 다른
+  // 학생을 저장해서 이 화면이 다시 그려진 경우)이 있으면 되돌려 채우고, 이후 입력값이
+  // 바뀔 때마다 계속 스냅샷을 갱신해둔다.
+  setTimeout(function(){
+    if(LS_LIVE_DRAFT && String(LS_LIVE_DRAFT.studentId)===String(s.id)){
+      LS_restoreBasicSnapshot(LS_LIVE_DRAFT.snap);
+    }
+    const root=document.getElementById('lsBasicFormRoot');
+    if(root){
+      root.addEventListener('input', LS_captureLiveDraft);
+      root.addEventListener('change', LS_captureLiveDraft);
+    }
+  },0);
   return `${LS_studentInfoBoxHtml(s)}
-    <div class="box">
+    <div class="box" id="lsBasicFormRoot">
       <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:16px">1. 학습상담 기록 추가</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
         <div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">날짜</label><input type="date" id="lsDate" value="${todayStr}" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:13.5px"></div>
