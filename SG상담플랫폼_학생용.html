@@ -98,6 +98,16 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;backg
 #app{height:100dvh;display:flex;flex-direction:column}
 /* 입력 - iOS 줌 방지 */
 input,select,textarea{font-size:16px!important;font-family:inherit;border:1.5px solid #dde1f0;border-radius:10px;padding:12px 14px;width:100%;background:#fff;color:#1a1a2e;outline:none;-webkit-appearance:none;transition:border-color .15s}
+/* ★ 2026-09-09(383) 추가: 챌린저 답안의 객관식(1~5) 선택지를 예전엔 <button>을 클릭할 때마다
+   같은 줄의 다른 버튼들 배경색을 JS로 일일이 되돌리는 방식으로 만들었는데, 화면이 다시
+   그려지는 타이밍이 겹치면 이전에 고른 답과 새로 고른 답이 둘 다 선택된 것처럼 보이는
+   경우가 있었다(실제 저장되는 답은 마지막 클릭 값 하나뿐이지만, 화면 표시가 꼬여 보임).
+   브라우저가 원천적으로 "하나만 선택 가능"을 보장해주는 라디오 버튼으로 바꿔서 이 문제
+   자체가 생길 수 없게 만든다.
+   name(그룹)이 같은 라디오는 브라우저가 하나만 선택되도록 강제해준다. */
+.mc-radio{ position:absolute; opacity:0; width:0; height:0; }
+.mc-radio + label{ flex:1; padding:7px 0; border:1px solid #ddd; border-radius:6px; font-size:12.5px; cursor:pointer; text-align:center; background:#fff; color:#333; user-select:none; }
+.mc-radio:checked + label{ background:#0f766e; color:#fff; border-color:#0f766e; font-weight:700; }
 input:focus,select:focus{border-color:#3b5bdb;box-shadow:0 0 0 3px rgba(59,91,219,.1)}
 input::placeholder{color:#bbb}
 /* 버튼 - 터치 최적화 */
@@ -1972,6 +1982,61 @@ function chgAnsToggleSlot(slot){
   render();
 }
 function chgAnsSetDetail(slot,val){ chgAnsInit().detail[slot]=val; render(); }
+// ★ 2026-09-09(385) 추가: 학원 자체 테스트에는 간혹 "정답 2개를 다 골라야 맞는" 체크박스형
+// 문항이 있다 — 카탈로그 정답칸에 "2+4"처럼 더하기(+)로 적어두면 이 문항만 체크박스로
+// 바뀌어, 학생이 정확히 그 조합(2번과 4번 둘 다, 그 외엔 아무것도 안 고름)을 골라야 정답
+// 처리된다. (반면 콤마 등으로 적은 "2,4"는 기존처럼 "둘 중 하나만 맞아도 인정"이다 — 표기
+// 방식으로 두 경우를 구분한다.)
+function _lookupBucketShared(mapObj, codes, keySuffix){
+  for(const c of codes){ const b=(mapObj&&mapObj[c+keySuffix]); if(b && Object.keys(b).length) return b; }
+  return {};
+}
+function _chgAnsCodeAliases(code){ return code==='INQ' ? ['INQ','INQ1','INQ2'] : [code]; }
+function _chgAnsGetAnswerMaps(examEntry, code, detail){
+  const codeAliases=_chgAnsCodeAliases(code);
+  const normDetail=_cbrNormalizeDetail(detail||'');
+  return {
+    akMapDetail:_lookupBucketShared(examEntry&&examEntry.answerKey, codeAliases, '|'+normDetail),
+    akMapCommon:_lookupBucketShared(examEntry&&examEntry.answerKey, codeAliases, '|'),
+    metaMapDetail:_lookupBucketShared(examEntry&&examEntry.itemMeta, codeAliases, '|'+normDetail),
+    metaMapCommon:_lookupBucketShared(examEntry&&examEntry.itemMeta, codeAliases, '|')
+  };
+}
+function _chgAnsGetCorrectAnswer(examEntry, code, detail, no){
+  if(!examEntry) return '';
+  const maps=_chgAnsGetAnswerMaps(examEntry, code, detail);
+  const ak=maps.akMapDetail[no]||maps.akMapCommon[no]||{};
+  const meta=maps.metaMapDetail[no]||maps.metaMapCommon[no]||{};
+  return ak.answer||meta.answer||'';
+}
+function _chgAnsIsMultiCheckboxFormat(correctRaw){
+  return !!(correctRaw && correctRaw.indexOf('+')>=0);
+}
+function _chgAnsIsMultiCorrect(myRaw, correctRaw){
+  const need=new Set(String(correctRaw||'').split('+').map(function(s){ return _chgAnsNormMc(s.trim()); }).filter(Boolean));
+  const got=new Set(String(myRaw||'').split(',').map(function(s){ return _chgAnsNormMc(s.trim()); }).filter(Boolean));
+  if(!need.size || need.size!==got.size) return false;
+  for(const v of need){ if(!got.has(v)) return false; }
+  return true;
+}
+function chgAnsToggleMultiAnswer(slot,no,n){
+  const st=chgAnsInit();
+  if(!st.answers[slot]) st.answers[slot]={};
+  const cur=new Set(String(st.answers[slot][no]||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean));
+  const nStr=String(n);
+  if(cur.has(nStr)) cur.delete(nStr); else cur.add(nStr);
+  const arr=Array.from(cur).sort(function(a,b){ return (+a)-(+b); });
+  st.answers[slot][no]=arr.join(',');
+  const el=document.getElementById('chgans-progress-'+slot);
+  if(el){
+    const x=CHG_ANS_SLOTS.find(function(x){ return x.slot===slot; });
+    const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
+    const resolvedDetail = st.detail[slot] || _chgAnsAutoDetail(x.code, examMeta);
+    const count=_chgAnsResolvedCount(x.code, resolvedDetail, examMeta, CHG_ANS_SUBJ_DEFS[x.code].count);
+    const filled=Object.keys(st.answers[slot]).filter(function(k){ return String(st.answers[slot][k]||'').trim(); }).length;
+    el.textContent=filled+' / '+count+'문항 입력됨';
+  }
+}
 function chgAnsSetAnswer(slot,no,val){
   const st=chgAnsInit();
   if(!st.answers[slot]) st.answers[slot]={};
@@ -1996,6 +2061,32 @@ function _chgAnsNormMc(v){
   var n=s.replace(/[^\d]/g,'');
   return n||s;
 }
+// ★ 2026-09-09(384) 추가: 평가원·모의고사에서 나중에 "복수 정답(예: 2번과 4번 모두 정답
+// 인정)"으로 처리되는 문항이 실제로 가끔 있다. 학생은 원래 시험처럼 하나만 골라서 응시하고,
+// 정답 등록 쪽에서 카탈로그에 "2,4"처럼 콤마(또는 "/", "또는")로 여러 정답을 적어두면 그중
+// 하나만 맞아도 정답으로 채점되도록 한다(객관식·단답형 둘 다 적용).
+function _chgAnsSplitMultiAnswer(raw){
+  return String(raw||'').split(/\s*(?:,|\/|·|또는|혹은)\s*/).map(function(s){ return s.trim(); }).filter(Boolean);
+}
+function _chgAnsIsMcCorrect(myRaw, correctRaw){
+  const options=_chgAnsSplitMultiAnswer(correctRaw);
+  if(!options.length) return false;
+  const myNorm=_chgAnsNormMc(myRaw);
+  return options.some(function(o){ return _chgAnsNormMc(o)===myNorm; });
+}
+function _chgAnsIsShortCorrect(myRaw, correctRaw){
+  const my=String(myRaw==null?'':myRaw).trim();
+  if(!my) return false;
+  const myKey=my.replace(/\s/g,'');
+  return _chgAnsSplitMultiAnswer(correctRaw).some(function(o){ return myKey===o.replace(/\s/g,''); });
+}
+function _chgAnsFormatAnswerDisplay(correctRaw){
+  if(_chgAnsIsMultiCheckboxFormat(correctRaw)){
+    return String(correctRaw).split('+').map(function(s){ return s.trim(); }).filter(Boolean).join('번+')+'번 모두 선택';
+  }
+  const options=_chgAnsSplitMultiAnswer(correctRaw);
+  return options.length>1 ? options.join(' 또는 ') : (options[0]||correctRaw);
+}
 function renderChallengerAnswerInput(){
   const st=chgAnsInit();
   if(_chgAnsCatalog===null){
@@ -2013,7 +2104,12 @@ function renderChallengerAnswerInput(){
       <div class="card"><div class="card-body" style="text-align:center;padding:30px;color:#999;font-size:13px">시험 목록을 불러오는 중입니다...</div></div>
     </div>`;
   }
-  const catalogList=(_chgAnsCatalog||[]).slice().sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
+  // ★ 2026-09-09(384) 추가: 시험마다 관리자가 지정한 "공개 대상 기관"(orgIds)이 있으면,
+  // 그 기관 소속 학생에게만 시험 선택 목록에 나오게 한다(orgIds가 없거나 비어있으면
+  // 예전처럼 모든 기관에 공개된 것으로 취급 — 기존 등록 시험과 호환).
+  const catalogList=(_chgAnsCatalog||[]).filter(function(e){
+    return !e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0);
+  }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
   const examEntry=_chgAnsCurrentExamEntry();
   const examMeta=_chgAnsExamMeta(examEntry);
   // ★ 380 추가: 시험을 선택했으면 그 시험에 실제로 등록된 과목만 보여주고, 아직 시험을
@@ -2093,7 +2189,7 @@ function chgAnsDetailGridHtml(s){
     cells.push(`<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-bottom:1px solid #f1f5f9;font-size:11.5px;background:${w?'#fff5f5':'#fff'}">
       <span style="width:22px;font-weight:700;color:#555">${no}</span>
       <span style="flex:1">내 답: <b>${esc(my||'미입력')}</b></span>
-      ${w?`<span style="color:#e53935">정답 ${esc(w.answer)}</span>`:`<span style="color:#16a34a">정답</span>`}
+      ${w?`<span style="color:#e53935">정답 ${esc(_chgAnsFormatAnswerDisplay(w.answer))}</span>`:`<span style="color:#16a34a">정답</span>`}
     </div>`);
   }
   return `<div style="max-height:260px;overflow:auto;margin-top:6px;border:1px solid #e2e8f0;border-radius:6px">${cells.join('')}</div>`;
@@ -2249,17 +2345,28 @@ function chgAnsSlotGridHtml(x, examMeta){
   const resolvedDetail = st.detail[x.slot] || _chgAnsAutoDetail(x.code, examMeta);
   const detailLabel = resolvedDetail?` · ${esc(resolvedDetail)}`:'';
   const count=_chgAnsResolvedCount(x.code, resolvedDetail, examMeta, def.count);
+  const examEntry=_chgAnsCurrentExamEntry();
   const ans=st.answers[x.slot]||{};
   const filled=Object.keys(ans).filter(k=>String(ans[k]||'').trim()).length;
   const cells=[];
   for(let no=1;no<=count;no++){
-    const t=_chgAnsResolvedType(x.code, no, count);
+    const correctForFormat=_chgAnsGetCorrectAnswer(examEntry, x.code, resolvedDetail, no);
+    const isMultiCheckbox=_chgAnsIsMultiCheckboxFormat(correctForFormat);
+    const t=isMultiCheckbox ? 'mc5multi' : _chgAnsResolvedType(x.code, no, count);
     const v=ans[no]!=null?ans[no]:'';
     cells.push(`<div style="display:flex;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid #f1f5f9">
       <span style="width:26px;text-align:center;font-size:11.5px;font-weight:700;color:#555">${no}</span>
-      ${t==='mc5'
+      ${t==='mc5multi'
         ? `<div style="display:flex;gap:4px;flex:1">${[1,2,3,4,5].map(function(n){
-            return `<button type="button" onclick="chgAnsSetAnswer('${x.slot}','${no}','${n}');this.parentElement.querySelectorAll('button').forEach(b=>{b.style.background='#fff';b.style.color='#333'});this.style.background='#0f766e';this.style.color='#fff'" style="flex:1;padding:7px 0;border:1px solid #ddd;border-radius:6px;font-size:12.5px;cursor:pointer;background:${String(v)===String(n)?'#0f766e':'#fff'};color:${String(v)===String(n)?'#fff':'#333'}">${n}</button>`;
+            const cid='mcm_'+x.slot+'_'+no+'_'+n;
+            const checkedSet=String(v).split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+            const checked=checkedSet.indexOf(String(n))>=0;
+            return `<input class="mc-radio" type="checkbox" id="${cid}" ${checked?'checked':''} onchange="chgAnsToggleMultiAnswer('${x.slot}','${no}','${n}')"><label for="${cid}">${n}</label>`;
+          }).join('')}</div><span style="font-size:9.5px;color:#0f766e;white-space:nowrap">복수선택</span>`
+        : t==='mc5'
+        ? `<div style="display:flex;gap:4px;flex:1">${[1,2,3,4,5].map(function(n){
+            const rid='mcq_'+x.slot+'_'+no+'_'+n;
+            return `<input class="mc-radio" type="radio" id="${rid}" name="mcgrp_${x.slot}_${no}" value="${n}" ${String(v)===String(n)?'checked':''} onchange="chgAnsSetAnswer('${x.slot}','${no}','${n}')"><label for="${rid}">${n}</label>`;
           }).join('')}</div>`
         : `<input type="text" value="${esc(v)}" placeholder="답 입력(단답형)" onchange="chgAnsSetAnswer('${x.slot}','${no}',this.value)" style="flex:1;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:12.5px">`
       }
@@ -2307,24 +2414,12 @@ async function chgAnsGradeAndSave(){
     const normDetail=_cbrNormalizeDetail(detail);
     const resolvedCount=_chgAnsResolvedCount(x.code, detail, examMeta, def.count);
     const ans=st.answers[x.slot]||{};
-    // ★ 2026-08-31 추가: 탐구는 관리자 화면 곳곳(다학생 일괄채점 등)에서 과목코드를
-    // "INQ1"/"INQ2"로 따로 입력받는 UI가 있어서, 시험 카탈로그도 "INQ"가 아니라
-    // "INQ1"/"INQ2"로 저장돼 있을 수 있다(선생님이 카탈로그를 만들 때 어느 표기를
-    // 썼는지 알 수 없으므로, 세 가지 표기를 전부 확인한다).
-    const codeAliases = x.code==='INQ' ? ['INQ','INQ1','INQ2'] : [x.code];
-    function _lookupBucket(mapObj, codes, keySuffix){
-      for(const c of codes){ const b=(mapObj&&mapObj[c+keySuffix]); if(b && Object.keys(b).length) return b; }
-      return {};
-    }
-    // ★ 2026-08-31 수정: 국어·수학처럼 "공통 문항(세부과목 없음)"과 "선택 문항(세부과목
-    // 있음)"이 한 과목 안에 섞여 있는 경우, 카탈로그에는 두 묶음(예: "MATH|"와 "MATH|미적분")
-    // 으로 나뉘어 저장돼 있다. 예전엔 세부과목 묶음이 있으면 그것만 쓰고 공통 묶음을 통째로
-    // 무시해서, 공통 문항의 정답을 못 찾아 전부 "정답"으로 잘못 처리됐다. 이제 문항 번호
-    // 하나하나마다 "세부과목 묶음에 있으면 그걸, 없으면 공통 묶음에서" 찾도록 병합한다.
-    const akMapDetail=_lookupBucket(examEntry.answerKey, codeAliases, '|'+normDetail);
-    const akMapCommon=_lookupBucket(examEntry.answerKey, codeAliases, '|');
-    const metaMapDetail=_lookupBucket(examEntry.itemMeta, codeAliases, '|'+normDetail);
-    const metaMapCommon=_lookupBucket(examEntry.itemMeta, codeAliases, '|');
+    // ★ 385 정리: 정답 조회 로직을 render 쪽과 공유하는 _chgAnsGetAnswerMaps로 통일한다
+    // (예전엔 이 함수 안에서만 따로 만든 지역 함수를 썼는데, 문항 형식(단일/복수선택)을
+    // 미리보기 화면에서도 판단해야 해서 공용 함수로 옮겼다 — 동작은 동일).
+    const maps=_chgAnsGetAnswerMaps(examEntry, x.code, detail);
+    const akMapDetail=maps.akMapDetail, akMapCommon=maps.akMapCommon;
+    const metaMapDetail=maps.metaMapDetail, metaMapCommon=maps.metaMapCommon;
     const items=[];
     const rawAnswers={}; // ★ 채점 결과와 별개로, 학생이 실제로 고른 답 전체(정답 문항 포함)를 그대로 보존
     let gotPoints=0, totalPoints=0, foundAnswerCount=0;
@@ -2337,9 +2432,11 @@ async function chgAnsGradeAndSave(){
       const myRaw=ans[no];
       rawAnswers[no]=myRaw!=null?String(myRaw):'';
       const t=_chgAnsResolvedType(x.code, no, resolvedCount);
-      const isCorrect = t==='mc5'
-        ? (correctRaw!=='' && _chgAnsNormMc(myRaw)===_chgAnsNormMc(correctRaw))
-        : (correctRaw!=='' && String(myRaw==null?'':myRaw).trim()!=='' && String(myRaw).trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,''));
+      const isCorrect = _chgAnsIsMultiCheckboxFormat(correctRaw)
+        ? (correctRaw!=='' && _chgAnsIsMultiCorrect(myRaw, correctRaw))
+        : t==='mc5'
+        ? (correctRaw!=='' && _chgAnsIsMcCorrect(myRaw, correctRaw))
+        : (correctRaw!=='' && _chgAnsIsShortCorrect(myRaw, correctRaw));
       if(!correctRaw){ continue; } // 카탈로그에 정답이 없는 문항은 채점 대상에서 제외
       foundAnswerCount++;
       if(isCorrect){ gotPoints+=points; }
