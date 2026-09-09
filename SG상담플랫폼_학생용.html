@@ -1860,6 +1860,46 @@ function _chgAarBuildMathFieldsForGrade(gk){
   fields.push({key:'scoreBasis',label:'학생 점수 자가해석',phase:'post',type:'select',opts:["전 범위 학습 완료 상태의 점수","일부 단원 미학습 상태의 점수","개념은 완료했으나 문제풀이 부족 상태의 점수","학습 진도보다 시험 운영 문제가 더 큰 점수","진도 부족과 시험 운영 문제가 함께 반영된 점수"]});
   return fields;
 }
+// ★ 2026-09-09(391) 추가: 국어도 수학과 같은 이유로 학년별 단원표를 반영한다. 다만 고2
+// 국어는(수학 고2와 달리) 실제로 "문학/독서/화법과 작문/언어와 매체" 중 하나를 선택하는
+// 게 맞아서(사용자 확인), 고2만 선택과목 문항을 유지한다.
+const CHG_KOR_UNITS_BY_GRADE = {
+  '중1': ["시의 표현과 형상화","소설의 구성 요소","수필과 경험","설명하는 글 읽기","요약하기 및 중심 내용 찾기","원활한 소통과 대화","언어의 본질과 기능","품사의 종류와 특성","매체의 언어와 의사소통"],
+  '중2': ["작품의 수용과 관점","문학 갈래의 이해","서술 방식과 표현 효과","주장하는 글 읽기(설득)","논증 방식","토의와 토론","발음과 음운 체계","어휘의 체계와 양상","매체 자료의 수용과 비판"],
+  '중3': ["문학과 사회·문화적 맥락","한국 현대 문학의 흐름","작품의 재구성 및 창작","주제 통합적 읽기","글쓰기 과정과 고쳐쓰기","설득하는 말하기","문장 성분과 문장의 짜임","국어의 음운 변동","훈민정음의 창제 원리"],
+  '고1': ["서정 문학(시)","서사 문학(소설)","극·교술 문학","문학의 수용과 생산","독서의 원리와 구조","사실적·추론적 읽기","비판적·감상적 읽기","주제 통합적 읽기","음운 변동과 표기","문법 요소의 활용","한글 맞춤법과 국어 생활","화법(대화·토의·토론·연설)","작문(정보전달·설득·고쳐쓰기)","매체(디지털 매체 언어와 자료)"],
+  '고2': ["한국 문학의 역사적 흐름(고전)","한국 문학의 역사적 흐름(근현대)","문학의 갈래와 유기적 관계","인문·예술 분야 독해","사회·문화 분야 독해","과학·기술 분야 독해","수능형 독서 기술","음운과 단어(언어와 매체)","문장과 담화(언어와 매체)","국어의 역사(언어와 매체)","화법(면접·발표·협상)","작문(비평문·보고서·자기소개서)"]
+};
+// ★ 2026-09-09(392) 수정: 고2 국어의 "문학/독서/화법과 작문/언어와 매체"는 시험에서 학생이
+// 고르는 선택과목이 아니라, 학교마다 교육과정에 편성하는 과목이 다를 뿐이라는 걸 확인받아
+// "선택과목 고르기" 문항을 없앤다(수학 고2와 같은 이유). 취약 단원 목록은 그대로 4개 과목
+// 단원을 합쳐서 보여준다(학교가 실제로 어떤 과목을 편성했는지와 무관하게 참고 가능하도록).
+const CHG_KOR_ELECTIVES_BY_GRADE = { };
+function _chgAarKorGradeKey(){
+  const g=String((CU&&CU.grade)||'').trim();
+  const m=g.match(/(중|고)\s*([1-3])/);
+  if(!m) return null;
+  const key=m[1]+m[2];
+  return (key==='고3') ? null : (CHG_KOR_UNITS_BY_GRADE[key] ? key : null);
+}
+function _chgAarBuildKorFieldsForGrade(gk){
+  const units=CHG_KOR_UNITS_BY_GRADE[gk];
+  const hasElective=!!CHG_KOR_ELECTIVES_BY_GRADE[gk];
+  const fields=[];
+  if(hasElective) fields.push({key:'electiveSubject',label:'국어 선택과목',phase:'pre',type:'select',opts:CHG_KOR_ELECTIVES_BY_GRADE[gk]});
+  fields.push({key:'pretestWeakArea',label:'시험 전 예상 취약 영역',phase:'pre',type:'multi',max:2,opts:units.concat(['아직 판단하기 어려움'])});
+  fields.push({key:'solvingOrder',label:'오늘 선택한 풀이 순서',phase:'post',type:'select',opts: hasElective
+    ? ["선택과목 → 문학 → 독서","선택과목 → 독서 → 문학","독서 → 문학 → 선택과목","문학 → 독서 → 선택과목","기타"]
+    : ["앞에서부터 순서대로","쉬운 지문·문항 우선","어려운 지문 표시 후 나중에 재풀이","기타"]});
+  fields.push({key:'timeCollapseArea',label:'가장 크게 시간이 무너진 영역',phase:'post',type:'select',opts:units.concat(['특정 영역 없음'])});
+  fields.push({key:'timeShortageLevel',label:'시간 부족 정도',phase:'post',type:'select',opts:["시간 여유가 있었다","마킹까지 간신히 완료했다","1~2문항을 충분히 검토하지 못했다","3~5문항을 급하게 풀었다","3문항 이상 풀지 못했다","마킹을 완료하지 못했다"]});
+  fields.push({key:'primaryCause',label:'핵심 불안정 원인',phase:'post',type:'multi',max:2,opts:["첫 지문에서 당황함","지문 체류시간 초과","선지 판단 지연","지문을 반복해서 읽음","선지 근거를 찾지 못함","두 선지 사이에서 과도하게 고민함","답을 여러 번 변경함","집중력 저하","후반 체력 저하","마킹 시간 미확보","특별한 문제 없음"]});
+  fields.push({key:'riskyBehavior',label:'가장 위험했던 행동',phase:'post',type:'select',opts:["어려운 지문을 끝까지 붙잡았다","내용이 들어오지 않아 반복해서 읽었다","근거 없이 답을 바꿨다","한 문항 때문에 전체 속도가 무너졌다","시간이 부족해 지문을 제대로 읽지 않았다","앞 문항의 실패를 계속 생각했다","위험 행동 없음"]});
+  fields.push({key:'confirmedWeakArea',label:'시험 후 확인된 부족 영역',phase:'post',type:'multi',max:3,opts:units.concat(['특정 영역 없음'])});
+  fields.push({key:'weakAreaStatus',label:'부족 영역의 학습 상태',phase:'post',type:'select',opts:["아직 배우지 않은 영역","학습 중이지만 개념 미완성","배웠지만 문제 적용 부족","충분히 배웠지만 실전에서 흔들림","시간 부족으로 판단 어려움","집중력 저하로 수행하지 못함"]});
+  fields.push({key:'scoreBasis',label:'학생 점수 자가해석',phase:'post',type:'select',opts:["전 범위 학습 완료 상태의 점수","일부 영역 학습 미완성 상태의 점수","개념은 완료했으나 문제풀이 부족 상태의 점수","학습 진도보다 시험 운영 문제가 더 큰 점수","진도와 시험 운영 문제가 함께 반영된 점수"]});
+  return fields;
+}
 function chgAarNormElective(detail){
   var s=String(detail||'').trim();
   if(!s) return null;
@@ -1873,6 +1913,11 @@ function chgAarFieldsFor(subjCode,detail){
   if(subjCode==='MATH'){
     const gk=_chgAarMathGradeKey();
     if(gk) base=_chgAarBuildMathFieldsForGrade(gk);
+  }
+  // ★ 391: 국어도 동일하게 학년별 단원표 적용(고2만 선택과목 문항 유지).
+  if(subjCode==='KOR'){
+    const gk=_chgAarKorGradeKey();
+    if(gk) base=_chgAarBuildKorFieldsForGrade(gk);
   }
   if(subjCode==='INQ'){
     var key=chgAarNormElective(detail);
