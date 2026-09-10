@@ -15512,65 +15512,6 @@ function RM_generateReport(){
     +rmPosCard('보완이 필요한 과목', esc(weakSubj))
     +'</div>';
   if(showConvertCol) html+='<div style="background:#f3e7e7;border-left:3px solid #8B3A3A;padding:12px 16px;font-size:11.5px;color:#5A2E2E;margin-top:8px">9등급제 환산은 교육부 발표 누적 백분율 기준을 바탕으로 동일 백분위 지점을 선형보간한 근사 추정치입니다. 공식 환산표가 아니며 참고용으로만 활용해 주세요.</div>';
-  // ★ 2026-09-04 추가: "현재 성적 기준 지원 가능 대학" — 목표 학과군 평균대를 손으로 입력하는
-  // 대신, 교과분석 탭이 이미 쓰는 gg_classifyChance(UNIV_DB)·종합분석 탭의 jh_classify
-  // (JH_UNIV_DB)를 그대로 호출해 자동으로 채운다(새 매칭 함수를 만들지 않음).
-  // rmMyGrade/rmMajorFilter/rmRegionFilters는 위에서 이미 계산해둔 값을 그대로 쓴다.
-  if(rmMyGrade){
-    var rmDeptFilter = (dept1 && dept1!=='희망 학과 미입력') ? dept1 : '';
-    var rmUnivMatches=RM_matchUniv(rmMyGrade, rmMajorFilter, rmRegionFilters, rmDeptFilter);
-    html+='<div style="margin-top:18px">';
-    html+='<div style="font-weight:800;font-size:13px;color:#1a1a2e;margin-bottom:8px">📍 현재 성적 기준 지원 가능 대학 (9등급 환산 '+rmMyGrade.toFixed(2)+'등급 기준'+(rmUnivMatches.deptFilterApplied?' · 희망 학과 "'+esc(dept1)+'" 기준':(rmMajorFilter?' · '+esc(rmMajorFilter):''))+(rmRegionFilters.length?' · '+esc(rmRegionFilters.join(', ')):'')+')</div>';
-    // ★ 2026-09-10(403) 추가: 중학생은 아직 실제 고교 내신이 없으므로, 지금 성취도(A~E)가
-    // 그대로 고교 5등급제 성적으로 이어진다고 가정한 조기 참고용 추정치임을 명확히 안내한다.
-    if(rmGradeIsMS){
-      html+='<div style="font-size:10.5px;color:#aaa;margin-bottom:6px">※ 중학교 현재 내신 전체 평균(A~E→1~5등급 환산)을 고교 5등급제 성적으로 그대로 이어진다고 가정한 조기 참고용 추정치입니다. 실제 고교 진학 후 성적과 다를 수 있습니다.</div>';
-    }
-    if(rmDeptFilter && !rmUnivMatches.deptFilterApplied){
-      html+='<div style="font-size:10.5px;color:#aaa;margin-bottom:6px">※ 입력한 희망 학과("'+esc(dept1)+'")와 일치하는 데이터가 없어 계열 기준으로 대신 표시합니다.</div>';
-    }
-    function rmSelMethod(r, isJonghap){
-      if(isJonghap) return (r.type||'')+(r.methodNote?(' · '+r.methodNote):'');
-      return (r.type||'')+(r.method?(' · '+r.method):'');
-    }
-    function rmUnivTable(rows, typeLabel, isJonghap){
-      if(!rows.length) return '';
-      var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb'};
-      var BG={도전:'#f5f3ff',상향:'#fef2f2',적정:'#fffbeb',안정:'#eff6ff'};
-      // ★ 2026-09-07(344) 변경: 학생부교과전형/학생부종합전형 두 표가 각자 내용 길이에 따라
-      // 컬럼 너비를 따로 자동 계산해서(서로 다른 <table>이라 독립적으로 auto-layout됨)
-      // PDF·인쇄에서 두 표의 칸 비율이 서로 달라 보이던 문제 — table-layout:fixed +
-      // 두 표에 동일한 colgroup(고정 비율)을 적용해 항상 같은 비율로 정렬되게 하고,
-      // "가능성" 배지가 좁은 칸 안에서 두 줄로 쪼개지던("상\n향") 것도 nowrap으로 방지한다.
-      var t='<div style="font-size:11.5px;color:#888;margin:10px 0 4px">'+typeLabel+'</div>';
-      t+='<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:11.5px">'
-        +'<colgroup><col style="width:17%"><col style="width:15%"><col style="width:33%"><col style="width:11%"><col style="width:14%"><col style="width:10%"></colgroup>'
-        +'<thead><tr style="background:#fafaf8">'
-        +'<th style="border:1px solid #ddd;padding:6px;text-align:left;color:#888;font-weight:500">대학</th>'
-        +'<th style="border:1px solid #ddd;padding:6px;text-align:left;color:#888;font-weight:500">학과</th>'
-        +'<th style="border:1px solid #ddd;padding:6px;text-align:left;color:#888;font-weight:500">선발방법</th>'
-        +'<th style="border:1px solid #ddd;padding:6px;color:#888;font-weight:500;white-space:nowrap">경쟁률</th>'
-        +'<th style="border:1px solid #ddd;padding:6px;color:#888;font-weight:500">등급컷(50%/70%)</th>'
-        +'<th style="border:1px solid #ddd;padding:6px;color:#888;font-weight:500;white-space:nowrap">가능성</th></tr></thead><tbody>';
-      rows.forEach(function(r){
-        t+='<tr><td style="border:1px solid #ddd;padding:6px;font-weight:700;word-break:keep-all">'+esc(r.univ)+'</td>'
-          +'<td style="border:1px solid #ddd;padding:6px;word-break:keep-all">'+esc(r.dept)+'</td>'
-          +'<td style="border:1px solid #ddd;padding:6px;font-size:10.5px;color:#555">'+esc(rmSelMethod(r,isJonghap)||'—')+'</td>'
-          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap">'+esc(r.comp26||r.comp||'-')+'</td>'
-          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap">'+(r.cut50>0?r.cut50.toFixed(2):'-')+' / '+(r.cut70>0?r.cut70.toFixed(2):'-')+'</td>'
-          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;background:'+(BG[r.chance]||'#eee')+';color:'+(CL[r.chance]||'#888')+'">'+esc(r.chance)+'</span></td></tr>';
-      });
-      t+='</tbody></table>';
-      return t;
-    }
-    var rmMatchHtml=rmUnivTable(rmUnivMatches.gyogwa,'학생부교과전형 (UNIV_DB 기준)',false)+rmUnivTable(rmUnivMatches.jonghap,'학생부종합전형 (JH_UNIV_DB 기준)',true);
-    html+= rmMatchHtml || '<div style="font-size:12px;color:#aaa">현재 등급·선택한 계열/대학군 조건으로 매칭되는 대학 데이터가 없습니다. 계열/대학군 조건을 넓혀보세요.</div>';
-    html+='<div style="font-size:10px;color:#aaa;margin-top:6px">※ 교과분석/종합분석 탭과 동일한 매칭 기준(gg_classifyChance / jh_classify)으로 자동 계산된 참고용 결과입니다. 정확한 지원 전략은 해당 탭에서 세부 조건으로 다시 확인해주세요.</div>';
-    html+='</div>';
-  } else {
-    html+='<div style="font-size:11.5px;color:#aaa;margin-top:12px">※ 전체 내신 또는 과목별 현재 성취도를 하나 이상 입력하면 "현재 성적 기준 지원 가능 대학"이 자동으로 표시됩니다.</div>';
-  }
-  html+='</div>';
 
   // ★ 2026-09-09(381) 추가, (382) MS 확장: "1.현재 포지션 분석"과 "2.학생부 관련활동" 사이에
   // 학기별 내신 변화를 과목별 꺾은선으로 보여주는 그래프를 넣는다. 고등학교(5등급제)는 입력값이
@@ -15638,7 +15579,10 @@ function RM_generateReport(){
         const lx=padL+i*70;
         return '<circle cx="'+lx+'" cy="'+(H+14)+'" r="4" fill="'+sr.color+'"/><text x="'+(lx+8)+'" y="'+(H+17)+'" font-size="10.5" fill="#333">'+esc(sr.label)+'</text>';
       }).join('');
-      html+='<div style="margin-bottom:30px">'
+      // ★ 2026-09-10(405) 수정: 바로 위 카드(자신있는과목/보완필요과목 등)와 이 그래프 제목이
+      // 위쪽 여백 없이 바로 붙어 나와서 시각적으로 답답해 보인다는 신고 — 이 블록의 위쪽에만
+      // 여백을 추가해 카드와 간격을 벌린다(아래쪽 30px 여백은 그대로 유지).
+      html+='<div style="margin:20px 0 30px">'
         +'<div style="font-size:12px;color:#888;margin-bottom:8px">📈 주요 과목별 내신 변화 추이 (학기별 등급'+(RM_schoolLevel==='MS'?' — 중학교는 A~E를 1~5등급으로 환산':'')+')</div>'
         +'<div style="border:1px solid #eee;border-radius:10px;padding:12px 8px 4px"><svg viewBox="0 0 '+W+' '+(H+26)+'" style="width:100%;height:auto">'
         +gridLines.join('')+xLabelsSvg+linesSvg+legendSvg
@@ -15646,7 +15590,65 @@ function RM_generateReport(){
     }
   }
 
-
+  // ★ 2026-09-04 추가: "현재 성적 기준 지원 가능 대학" — 목표 학과군 평균대를 손으로 입력하는
+  // 대신, 교과분석 탭이 이미 쓰는 gg_classifyChance(UNIV_DB)·종합분석 탭의 jh_classify
+  // (JH_UNIV_DB)를 그대로 호출해 자동으로 채운다(새 매칭 함수를 만들지 않음).
+  // rmMyGrade/rmMajorFilter/rmRegionFilters는 위에서 이미 계산해둔 값을 그대로 쓴다.
+  if(rmMyGrade){
+    var rmDeptFilter = (dept1 && dept1!=='희망 학과 미입력') ? dept1 : '';
+    var rmUnivMatches=RM_matchUniv(rmMyGrade, rmMajorFilter, rmRegionFilters, rmDeptFilter);
+    html+='<div style="margin-top:18px">';
+    html+='<div style="font-weight:800;font-size:13px;color:#1a1a2e;margin-bottom:8px">📍 현재 성적 기준 지원 가능 대학 (9등급 환산 '+rmMyGrade.toFixed(2)+'등급 기준'+(rmUnivMatches.deptFilterApplied?' · 희망 학과 "'+esc(dept1)+'" 기준':(rmMajorFilter?' · '+esc(rmMajorFilter):''))+(rmRegionFilters.length?' · '+esc(rmRegionFilters.join(', ')):'')+')</div>';
+    // ★ 2026-09-10(403) 추가: 중학생은 아직 실제 고교 내신이 없으므로, 지금 성취도(A~E)가
+    // 그대로 고교 5등급제 성적으로 이어진다고 가정한 조기 참고용 추정치임을 명확히 안내한다.
+    if(rmGradeIsMS){
+      html+='<div style="font-size:10.5px;color:#aaa;margin-bottom:6px">※ 중학교 현재 내신 전체 평균(A~E→1~5등급 환산)을 고교 5등급제 성적으로 그대로 이어진다고 가정한 조기 참고용 추정치입니다. 실제 고교 진학 후 성적과 다를 수 있습니다.</div>';
+    }
+    if(rmDeptFilter && !rmUnivMatches.deptFilterApplied){
+      html+='<div style="font-size:10.5px;color:#aaa;margin-bottom:6px">※ 입력한 희망 학과("'+esc(dept1)+'")와 일치하는 데이터가 없어 계열 기준으로 대신 표시합니다.</div>';
+    }
+    function rmSelMethod(r, isJonghap){
+      if(isJonghap) return (r.type||'')+(r.methodNote?(' · '+r.methodNote):'');
+      return (r.type||'')+(r.method?(' · '+r.method):'');
+    }
+    function rmUnivTable(rows, typeLabel, isJonghap){
+      if(!rows.length) return '';
+      var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb'};
+      var BG={도전:'#f5f3ff',상향:'#fef2f2',적정:'#fffbeb',안정:'#eff6ff'};
+      // ★ 2026-09-07(344) 변경: 학생부교과전형/학생부종합전형 두 표가 각자 내용 길이에 따라
+      // 컬럼 너비를 따로 자동 계산해서(서로 다른 <table>이라 독립적으로 auto-layout됨)
+      // PDF·인쇄에서 두 표의 칸 비율이 서로 달라 보이던 문제 — table-layout:fixed +
+      // 두 표에 동일한 colgroup(고정 비율)을 적용해 항상 같은 비율로 정렬되게 하고,
+      // "가능성" 배지가 좁은 칸 안에서 두 줄로 쪼개지던("상\n향") 것도 nowrap으로 방지한다.
+      var t='<div style="font-size:11.5px;color:#888;margin:10px 0 4px">'+typeLabel+'</div>';
+      t+='<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:11.5px">'
+        +'<colgroup><col style="width:17%"><col style="width:15%"><col style="width:33%"><col style="width:11%"><col style="width:14%"><col style="width:10%"></colgroup>'
+        +'<thead><tr style="background:#fafaf8">'
+        +'<th style="border:1px solid #ddd;padding:6px;text-align:left;color:#888;font-weight:500">대학</th>'
+        +'<th style="border:1px solid #ddd;padding:6px;text-align:left;color:#888;font-weight:500">학과</th>'
+        +'<th style="border:1px solid #ddd;padding:6px;text-align:left;color:#888;font-weight:500">선발방법</th>'
+        +'<th style="border:1px solid #ddd;padding:6px;color:#888;font-weight:500;white-space:nowrap">경쟁률</th>'
+        +'<th style="border:1px solid #ddd;padding:6px;color:#888;font-weight:500">등급컷(50%/70%)</th>'
+        +'<th style="border:1px solid #ddd;padding:6px;color:#888;font-weight:500;white-space:nowrap">가능성</th></tr></thead><tbody>';
+      rows.forEach(function(r){
+        t+='<tr><td style="border:1px solid #ddd;padding:6px;font-weight:700;word-break:keep-all">'+esc(r.univ)+'</td>'
+          +'<td style="border:1px solid #ddd;padding:6px;word-break:keep-all">'+esc(r.dept)+'</td>'
+          +'<td style="border:1px solid #ddd;padding:6px;font-size:10.5px;color:#555">'+esc(rmSelMethod(r,isJonghap)||'—')+'</td>'
+          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap">'+esc(r.comp26||r.comp||'-')+'</td>'
+          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap">'+(r.cut50>0?r.cut50.toFixed(2):'-')+' / '+(r.cut70>0?r.cut70.toFixed(2):'-')+'</td>'
+          +'<td style="border:1px solid #ddd;padding:6px;text-align:center;white-space:nowrap"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;background:'+(BG[r.chance]||'#eee')+';color:'+(CL[r.chance]||'#888')+'">'+esc(r.chance)+'</span></td></tr>';
+      });
+      t+='</tbody></table>';
+      return t;
+    }
+    var rmMatchHtml=rmUnivTable(rmUnivMatches.gyogwa,'학생부교과전형 (UNIV_DB 기준)',false)+rmUnivTable(rmUnivMatches.jonghap,'학생부종합전형 (JH_UNIV_DB 기준)',true);
+    html+= rmMatchHtml || '<div style="font-size:12px;color:#aaa">현재 등급·선택한 계열/대학군 조건으로 매칭되는 대학 데이터가 없습니다. 계열/대학군 조건을 넓혀보세요.</div>';
+    html+='<div style="font-size:10px;color:#aaa;margin-top:6px">※ 교과분석/종합분석 탭과 동일한 매칭 기준(gg_classifyChance / jh_classify)으로 자동 계산된 참고용 결과입니다. 정확한 지원 전략은 해당 탭에서 세부 조건으로 다시 확인해주세요.</div>';
+    html+='</div>';
+  } else {
+    html+='<div style="font-size:11.5px;color:#aaa;margin-top:12px">※ 전체 내신 또는 과목별 현재 성취도를 하나 이상 입력하면 "현재 성적 기준 지원 가능 대학"이 자동으로 표시됩니다.</div>';
+  }
+  html+='</div>';
   // 바꾸고, 평가 뱃지 없이 기본상담에 입력한 값(동아리명/관심주제·키워드/교과세특 준비도)을
   // 그대로 표기한다.
   html+='<div style="margin-bottom:30px">'
