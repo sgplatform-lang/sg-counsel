@@ -15422,11 +15422,21 @@ function RM_generateReport(){
 
   // ★ 340 변경: 9등급제 입력 모드 제거 — 고등학교(5등급제)만 대학 매칭 대상이며,
   // "현재 내신 주요과목 평균"을 우선 쓰고 없으면 "내신 목표 등급"으로 대신한다(둘 중 하나).
+  // ★ 2026-09-10(403) 수정: 위 조건이 RM_schoolLevel==='HS5'일 때만 성립해서, 중학생은
+  // 그리드에서 "현재 내신 전체 평균(5등급제 기준 — A~E를 1~5로 환산한 값)"이 자동계산돼
+  // 있어도 "📍 현재 성적 기준 지원 가능 대학" 섹션이 아예 뜨지 않았다는 신고 — 사용자 확인
+  // 결과 "중학생도 A~E→1~5 환산된 전체평균이 있으면 같은 기준으로 보여달라"는 요청이라,
+  // 중학교(MS)는 curOverall(전체평균, 그리드 자동계산)을, 고등학교(HS5)는 기존처럼
+  // curMain(주요과목평균)→targetOverall(목표등급) 순으로 소스를 잡아 동일하게 9등급 환산한다.
   var rmMyGrade=null;
+  var rmGradeSrc=null;
+  var rmGradeIsMS = (RM_schoolLevel!=='HS5');
   if(RM_schoolLevel==='HS5'){
-    var rmGradeSrc = (curMain!==null) ? curMain : (targetOverall!=='' ? targetOverall : null);
-    if(rmGradeSrc!==null) rmMyGrade=RM_convert5to9(parseFloat(rmGradeSrc));
+    rmGradeSrc = (curMain!==null) ? curMain : (targetOverall!=='' ? targetOverall : null);
+  } else {
+    rmGradeSrc = (curOverall!==null) ? curOverall : null;
   }
+  if(rmGradeSrc!==null) rmMyGrade=RM_convert5to9(parseFloat(rmGradeSrc));
   // ★ 희망계열/희망 대학군 필터 — 교과분석 등 공통으로 쓰는 _sg_majorMatch(계열)와
   // gg_getUnivRegion 기반 RM_getUnivRegion4(대학군)를 그대로 재사용해서 좁힌다.
   const rmMajorFilter=(document.getElementById('rmTrackFilter')||{}).value||'';
@@ -15511,6 +15521,11 @@ function RM_generateReport(){
     var rmUnivMatches=RM_matchUniv(rmMyGrade, rmMajorFilter, rmRegionFilters, rmDeptFilter);
     html+='<div style="margin-top:18px">';
     html+='<div style="font-weight:800;font-size:13px;color:#1a1a2e;margin-bottom:8px">📍 현재 성적 기준 지원 가능 대학 (9등급 환산 '+rmMyGrade.toFixed(2)+'등급 기준'+(rmUnivMatches.deptFilterApplied?' · 희망 학과 "'+esc(dept1)+'" 기준':(rmMajorFilter?' · '+esc(rmMajorFilter):''))+(rmRegionFilters.length?' · '+esc(rmRegionFilters.join(', ')):'')+')</div>';
+    // ★ 2026-09-10(403) 추가: 중학생은 아직 실제 고교 내신이 없으므로, 지금 성취도(A~E)가
+    // 그대로 고교 5등급제 성적으로 이어진다고 가정한 조기 참고용 추정치임을 명확히 안내한다.
+    if(rmGradeIsMS){
+      html+='<div style="font-size:10.5px;color:#aaa;margin-bottom:6px">※ 중학교 현재 내신 전체 평균(A~E→1~5등급 환산)을 고교 5등급제 성적으로 그대로 이어진다고 가정한 조기 참고용 추정치입니다. 실제 고교 진학 후 성적과 다를 수 있습니다.</div>';
+    }
     if(rmDeptFilter && !rmUnivMatches.deptFilterApplied){
       html+='<div style="font-size:10.5px;color:#aaa;margin-bottom:6px">※ 입력한 희망 학과("'+esc(dept1)+'")와 일치하는 데이터가 없어 계열 기준으로 대신 표시합니다.</div>';
     }
