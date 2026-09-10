@@ -576,10 +576,16 @@ function msCellToGrade(raw){
 }
 function onGradeGridInput(){
   const vals=[];
+  // ★ 2026-09-10(395) 수정: 학기 중 일부만 입력해도("아는 학기까지만 기입해도 됩니다")
+  // 평균이 자동 계산돼야 하는데, 아래 for문 안의 빈 칸 처리가 "return"이라 forEach 콜백
+  // 자체를 끝내버려서 — 앞쪽 학기 하나만 비어 있어도 그 과목의 뒤쪽 학기에 실제로 입력한
+  // 값까지 통째로 건너뛰어져 평균 필드가 끝내 비어있는 채로 남는 버그였다(관리자 파일의
+  // RM_onGradeGridInput과 동일한 버그 — 이 웹폼이 원본이고 관리자 쪽이 복사해 간 것으로 추정).
+  // "continue"로 바꿔서 빈 칸은 그 칸만 건너뛰고 같은 과목의 나머지 학기는 계속 스캔하도록 수정.
   GRID_SUBJECTS.forEach(function(subj){
     for(let i=1;i<=SEM_COUNT;i++){
       const el=$('sem_'+subj.key+'_'+i);
-      if(!el || !el.value) return;
+      if(!el || !el.value) continue;
       let g=null;
       if(LEVEL==='MS') g=msCellToGrade(el.value);
       else { const n=parseFloat(el.value); g=isNaN(n)?null:n; }
