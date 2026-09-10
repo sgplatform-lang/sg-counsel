@@ -16932,6 +16932,20 @@ function renderRoadmapReport(s){
       const survey=RM_PENDING_SURVEY_APPLY;
       RM_PENDING_SURVEY_APPLY=null;
       const _leftoverNotes=RM_applySurveyDataToForm(survey);
+      // ★ 2026-09-10(402) 추가: RM_applySurveyDataToForm은 setv()로 값만 채워 넣을 뿐
+      // input/change 이벤트를 일으키지 않으므로, 아래 rmBasicFormRoot의 이벤트 위임(input/change →
+      // RM_captureLiveDraft)이 전혀 발동하지 않는다 — 즉 사전조사를 반영해도 RM_LIVE_DRAFT는
+      // 여전히 비어있거나(또는 이전 학생 것으로) 낡은 상태로 남는다. 이 상태에서 Firestore
+      // onSnapshot으로 화면이 한 번이라도 다시 그려지면(실사용 환경에서는 몇 초 안에 흔히 발생),
+      // 위쪽 setTimeout의 RM_setSchoolLevel→RM_renderGradeGrid()가 그리드 입력칸을 통째로
+      // 새로 그려(빈칸으로) 버리는데, 복원할 RM_LIVE_DRAFT가 없으니 아무것도 되돌아오지
+      // 않는다 — 방금 반영된 성적 그리드·"현재 내신 주요과목 평균"이 그대로 사라지고, 그
+      // 값에 의존하는 "📍 현재 성적 기준 지원 가능 대학" 섹션도 함께 사라졌던 것이다.
+      // (상담원이 기본상담에서 직접 타이핑하면 매 입력마다 input 이벤트가 실제로 발생해
+      // RM_captureLiveDraft가 계속 갱신되므로 재렌더에도 안전했던 것과 대조됨.) 반영 직후
+      // 바로 한 번 RM_captureLiveDraft()를 호출해 방금 채운 값을 즉시 스냅샷으로 캡처,
+      // 이후 재렌더가 와도 RM_restoreFormSnapshot으로 그리드·평균·대학매칭까지 그대로 복원되게 한다.
+      RM_captureLiveDraft();
       // ★ 2026-09-10(393) 추가: 리포트에는 연결된 학생이 아니라 사전조사 제출자 본인의
       // 인적사항이 표시된다는 것을 상담원이 바로 알 수 있게 안내 문구에 덧붙인다.
       alert('사전조사 내용을 기본상담에 반영했습니다. 아래 내용을 확인·수정한 뒤 "리포트 생성"을 눌러주세요.'
