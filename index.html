@@ -15600,15 +15600,23 @@ function RM_generateReport(){
         gridLines.push('<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="#f0f0f0"/><text x="'+(padL-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="#999">'+g.toFixed(1)+'</text>');
       }
       const xLabelsSvg=trendSemLabels.map(function(lb,i){ return '<text x="'+(padL+i*xStep).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10" fill="#888">'+lb+'</text>'; }).join('');
-      const linesSvg=trendSeries.map(function(sr){
+      // ★ 2026-09-10(398) 수정: 여러 과목이 같은 학기에 같은 등급을 받으면(흔한 경우 —
+      // 예: 국어·사회가 나란히 B, 영어·수학·과학이 나란히 A) 좌표가 완전히 겹쳐서 선이
+      // 그려진 순서상 맨 나중에 그려진 과목 색만 보이고 앞서 그려진 과목 선은 그 아래
+      // 완전히 가려져 "일부 과목만 그래프에 나온다"는 것처럼 보이는 문제였다(신고: 국어·
+      // 영어·수학도 값이 있는데 사회·과학만 나온다 — 실제로는 값은 다 있고 겹쳐서 안 보였음).
+      // 데이터(등급) 자체는 그대로 두고, 같은 학기 칸 안에서 과목별로 아주 살짝 가로로만
+      // 흩어지게(지터) 그려서 겹치는 선도 나란히 구분되어 보이게 한다.
+      const linesSvg=trendSeries.map(function(sr,idx){
+        const jitter=(idx-(trendSeries.length-1)/2)*3;
         const segs=[]; let cur=[];
         sr.values.forEach(function(v,i){
           if(v===null){ if(cur.length){ segs.push(cur); cur=[]; } return; }
-          cur.push([padL+i*xStep, yToPix(v)]);
+          cur.push([padL+i*xStep+jitter, yToPix(v)]);
         });
         if(cur.length) segs.push(cur);
         const poly=segs.map(function(seg){ return '<polyline fill="none" stroke="'+sr.color+'" stroke-width="2.5" points="'+seg.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' ')+'"/>'; }).join('');
-        const dots=sr.values.map(function(v,i){ return v===null?'':'<circle cx="'+(padL+i*xStep).toFixed(1)+'" cy="'+yToPix(v).toFixed(1)+'" r="3.5" fill="'+sr.color+'"/>'; }).join('');
+        const dots=sr.values.map(function(v,i){ return v===null?'':'<circle cx="'+(padL+i*xStep+jitter).toFixed(1)+'" cy="'+yToPix(v).toFixed(1)+'" r="3.5" fill="'+sr.color+'"/>'; }).join('');
         return poly+dots;
       }).join('');
       const legendSvg=trendSeries.map(function(sr,i){
