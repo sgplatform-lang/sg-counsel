@@ -42696,9 +42696,20 @@ function generateReport() {
         .map(function(k){ return _aarEsc(k)+' '+reasonCounts[k]+'회'; }).join(', ');
       return {primTxt:primTxt, reasonTxt:reasonTxt};
     }
-    function _aarSelfSubs(stu){
+    // ★ 2026-09-10(400) 수정: 처음엔 학생이 직접 제출한(AAR self-input) 과목만 목록에
+    // 올렸는데, "이 시험을 응시한 모든 학생이 무조건 다 보이고, AAR을 안 채운 학생은
+    // 빈 칸이 아니라 '미입력'이라고 명시적으로 표시해달라"는 요청 → 이제 목록 자체는
+    // 이 회차에 "채점 기록이 있는"(점수/오답수/문항 중 하나라도 있는) 모든 과목을 다
+    // 보여주고(회차 통계표와 동일 기준), 그중 학생이 직접 제출한 과목만 AAR·오답원인을
+    // 실제 값으로, 나머지(상담원 입력 등 학생 본인이 제출하지 않은 과목)는 "미입력"으로
+    // 명확히 표시한다. 점수 자체는 누가 입력했든 그대로 보여준다(이건 AAR이 아니라 채점 결과).
+    function _aarAllSubs(stu){
       var cd2=stu.challengerData||{};
-      return (cd2.lastSubjects||[]).filter(function(s){ return s && s._studentSelfInput; });
+      return (cd2.lastSubjects||[]).filter(function(s){
+        if(!s||!s.subject) return false;
+        var score=+s.score||0, wrong=+s.wrongCount||(Array.isArray(s.items)?s.items.length:0);
+        return !!(score||wrong);
+      });
     }
 
     var overlay=document.getElementById('sg-aarstats-overlay');
@@ -42716,58 +42727,72 @@ function generateReport() {
     var headerHtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
       +'<b style="font-size:15px">📊 AAR·오답원인 통계'+(onlyCurrent?(' — '+_aarEsc(targets[0].name||'')):' — 전체 학생')+'</b>'
       +'<button onclick="document.getElementById(\'sg-aarstats-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 닫기</button></div>'
-      +'<div style="font-size:11.5px;color:#888;margin-bottom:14px">'+_aarEsc(info.date||'')+' · '+_aarEsc(info.name||'')+' — 학생이 직접 입력한 점수·AAR자가진단·오답원인만 표시됩니다(상담용 처방전·행동강령·누적현황은 포함되지 않습니다).</div>';
+      +'<div style="font-size:11.5px;color:#888;margin-bottom:14px">'+_aarEsc(info.date||'')+' · '+_aarEsc(info.name||'')+' — 이 회차에 채점 기록이 있는 과목은 모두 표시되며, AAR 자가진단·오답원인은 학생이 직접 제출한 과목만 실제 값을 보여주고 나머지는 "미입력"으로 표시합니다(상담용 처방전·행동강령·누적현황은 포함되지 않습니다).</div>';
 
     var contentHtml='';
     if(onlyCurrent){
       var stu=targets[0];
-      var subs=_aarSelfSubs(stu);
+      var subs=_aarAllSubs(stu);
       if(!subs.length){
-        contentHtml='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 학생이 직접 제출한 AAR 데이터가 아직 없습니다.</div>';
+        contentHtml='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 회차에 채점된 과목이 아직 없습니다.</div>';
       } else {
         contentHtml=subs.map(function(s){
           var label=_statGroupLabel(s.subject,s.detail);
-          var tally=_aarCauseTally(s.items);
-          var memoHtml=s.memo?_aarEsc(s.memo).replace(/\n/g,'<br>'):'<span style="color:#aaa">학생이 AAR 자가진단 입력을 완료하지 않았습니다.</span>';
+          var isSelf=!!s._studentSelfInput;
+          var tally=isSelf?_aarCauseTally(s.items):{primTxt:'',reasonTxt:''};
+          var memoHtml=!isSelf
+            ? '<span style="color:#aaa">미입력 (학생이 직접 제출한 과목이 아닙니다)</span>'
+            : (s.memo?_aarEsc(s.memo).replace(/\n/g,'<br>'):'<span style="color:#aaa">학생이 제출은 했지만 AAR 자가진단을 아직 완료하지 않았습니다.</span>');
+          var causeLine=!isSelf
+            ? '미입력 (학생이 직접 제출한 과목이 아닙니다)'
+            : (tally.primTxt?'1차: '+tally.primTxt:'1차원인 미입력')+(tally.reasonTxt?' · 2차: '+tally.reasonTxt:'');
           return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px">'
             +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
             +'<span style="font-weight:800;font-size:13.5px;color:#0f766e">'+_aarEsc(label)+'</span>'
-            +'<span style="font-size:12px;color:#555">점수 '+_aarEsc(String(s.score!=null?s.score:'-'))+' · 오답 '+(s.wrongCount!=null?s.wrongCount:'-')+'개</span>'
+            +'<span style="font-size:12px;color:#555">점수 '+_aarEsc(String(s.score!=null?s.score:'-'))+' · 오답 '+(s.wrongCount!=null?s.wrongCount:'-')+'개'+(isSelf?'':' · <span style="color:#c2410c">학생 미제출</span>')+'</span>'
             +'</div>'
             +'<div style="font-size:12.5px;color:#333;line-height:1.7;background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:8px">'+memoHtml+'</div>'
-            +'<div style="font-size:11.5px;color:#555"><b>오답원인(학생 선택)</b> — '
-            +(tally.primTxt?'1차: '+tally.primTxt:'1차원인 미입력')
-            +(tally.reasonTxt?' · 2차: '+tally.reasonTxt:'')
-            +'</div>'
+            +'<div style="font-size:11.5px;color:#555"><b>오답원인(학생 선택)</b> — '+causeLine+'</div>'
             +'</div>';
         }).join('');
       }
     } else {
       var groups={};
       targets.forEach(function(stu2){
-        _aarSelfSubs(stu2).forEach(function(s){
+        _aarAllSubs(stu2).forEach(function(s){
           var key=_statGroupKey(s.subject,s.detail);
           if(!groups[key]) groups[key]={label:_statGroupLabel(s.subject,s.detail), rows:[]};
-          groups[key].rows.push({name:stu2.name||'', score:(s.score!=null?s.score:'-'), memo:s.memo||'', tally:_aarCauseTally(s.items)});
+          var isSelf=!!s._studentSelfInput;
+          groups[key].rows.push({
+            name:stu2.name||'',
+            score:(s.score!=null?s.score:'-'),
+            isSelf:isSelf,
+            memo:isSelf?(s.memo||''):'',
+            tally:isSelf?_aarCauseTally(s.items):{primTxt:'',reasonTxt:''}
+          });
         });
       });
       var keys=Object.keys(groups);
       if(!keys.length){
-        contentHtml='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 회차에 학생이 직접 제출한 AAR 데이터가 아직 없습니다.</div>';
+        contentHtml='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 회차에 채점된 과목이 있는 학생이 아직 없습니다.</div>';
       } else {
         var order={KOR:0,MATH:1,ENG:2,HIST:3};
         keys.sort(function(a,b){ var oa=(a in order)?order[a]:(a.indexOf('INQ:')===0?4:9); var ob=(b in order)?order[b]:(b.indexOf('INQ:')===0?4:9); return oa-ob||a.localeCompare(b,'ko'); });
         contentHtml=keys.map(function(key){
           var g=groups[key];
           var trs=g.rows.map(function(r){
-            var memoShort=r.memo?(_aarEsc(r.memo.split('\n')[0])+(r.memo.indexOf('\n')>=0?' …':'')):'<span style="color:#aaa">미입력</span>';
-            var causeShort=r.tally.primTxt||'<span style="color:#aaa">미입력</span>';
+            var memoShort=!r.isSelf
+              ? '<span style="color:#c2410c">미입력(학생 미제출)</span>'
+              : (r.memo?(_aarEsc(r.memo.split('\n')[0])+(r.memo.indexOf('\n')>=0?' …':'')):'<span style="color:#aaa">AAR 미완료</span>');
+            var causeShort=!r.isSelf
+              ? '<span style="color:#c2410c">미입력</span>'
+              : (r.tally.primTxt||'<span style="color:#aaa">AAR 미완료</span>');
             return '<tr><td style="border:1px solid #e2e8f0;padding:6px 8px;font-weight:700">'+_aarEsc(r.name)+'</td><td style="border:1px solid #e2e8f0;padding:6px 8px;text-align:center">'+_aarEsc(String(r.score))+'</td><td style="border:1px solid #e2e8f0;padding:6px 8px">'+memoShort+'</td><td style="border:1px solid #e2e8f0;padding:6px 8px">'+causeShort+'</td></tr>';
           }).join('');
-          return '<div style="margin-bottom:18px"><div style="font-weight:800;font-size:13px;color:#0f766e;border-left:4px solid #0f766e;padding-left:8px;margin-bottom:6px">'+_aarEsc(g.label)+'</div>'
+          return '<div style="margin-bottom:18px"><div style="font-weight:800;font-size:13px;color:#0f766e;border-left:4px solid #0f766e;padding-left:8px;margin-bottom:6px">'+_aarEsc(g.label)+' <span style="font-weight:500;color:#94a3b8;font-size:11px">('+g.rows.length+'명)</span></div>'
             +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f0fdfa"><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">학생</th><th style="border:1px solid #e2e8f0;padding:6px 8px">점수</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">AAR 자가진단(첫 항목)</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">오답원인(1차)</th></tr></thead><tbody>'+trs+'</tbody></table></div></div>';
         }).join('');
-        contentHtml+='<div style="font-size:11px;color:#999;margin-top:4px">※ AAR 자가진단은 첫 항목만 미리보기로 표시됩니다. 학생별 전체 내용은 그 학생을 선택한 뒤 "📊 AAR통계(이 학생)"로 확인하세요.</div>';
+        contentHtml+='<div style="font-size:11px;color:#999;margin-top:4px">※ 여기 표시되는 학생은 "이 회차에 채점 기록이 있는" 학생 전원입니다(회차 통계표와 동일 기준). 시스템에 이 회차 채점 기록 자체가 전혀 없는 학생은 목록에 나타나지 않습니다. AAR 자가진단은 첫 항목만 미리보기로 표시되며, 학생별 전체 내용은 그 학생을 선택한 뒤 "📊 AAR통계(이 학생)"로 확인하세요.</div>';
       }
     }
 
