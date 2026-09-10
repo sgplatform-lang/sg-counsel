@@ -32503,12 +32503,18 @@ function _examcatRenderList(){
     const names=e.orgIds.map(function(id){ const o=orgs.find(function(x){ return x.id===id; }); return o?o.name:'?'; });
     return '<span style="background:#fff7ed;color:#c2410c;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700" title="'+esc(names.join(', '))+'">🏫 '+(names.length===1?esc(names[0]):names.length+'개 기관')+'</span>';
   }
+  // ★ 2026-09-10(406) 추가: "공개 대상 반"(classNames)이 설정된 시험은 목록에서도 바로
+  // 알아볼 수 있게 배지를 붙인다(비어있으면 반 제한이 없다는 뜻이라 배지 자체를 안 보여줌).
+  function classBadge(e){
+    if(!e.classNames || !e.classNames.length) return '';
+    return '<span style="background:#eef2ff;color:#4338ca;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700" title="'+esc(e.classNames.join(', '))+'">👥 '+(e.classNames.length===1?esc(e.classNames[0]):e.classNames.length+'개 반')+'</span>';
+  }
   el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
     const qc=_examcatQuestionCount(e);
     const subj=_examcatSubjLabel(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px">${esc(e.examName||'(이름 없음)')}${isAdminRole?orgBadge(e):''}</div>
+        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${esc(e.examName||'(이름 없음)')}${isAdminRole?orgBadge(e):''}${classBadge(e)}</div>
         <div style="font-size:11.5px;color:#64748b;margin-top:2px">기본 응시일 ${esc(e.defaultDate||'미지정')} · ${esc(subj)} · 문항 ${qc}개</div>
       </div>
       <button onclick="_examcatEdit('${e.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">✏ 수정</button>
@@ -32589,6 +32595,7 @@ ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?
     </div>
     ${isEdit?_examcatPdfSectionHtml():'<p style="font-size:11.5px;color:#94a3b8;margin:0 0 12px">💡 PDF에서 문항 이미지를 잘라 붙이는 기능은, 이 시험을 먼저 등록하신 뒤 "✏ 수정"으로 다시 열면 나타납니다.</p>'}
     ${_examcatOrgPickerHtml(e)}
+    ${_examcatClassPickerHtml(e)}
     <div style="display:flex;gap:8px">
       <button onclick="_examcatSubmit()" style="background:#0369a1;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">${isEdit?'💾 수정 저장':'➕ 등록'}</button>
       ${isEdit?'<button onclick="EXAMCAT_editing=null;_examcatRenderForm()" style="background:#f1f5f9;color:#555;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">취소</button>':''}
@@ -32610,9 +32617,78 @@ function _examcatOrgPickerHtml(e){
     <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:6px">🏫 공개 대상 기관</div>
     <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">아무것도 선택하지 않으면 <b>전체 기관에 공개</b>됩니다. 특정 기관에서만 보이게 하려면 해당 기관만 체크해주세요.</div>
     <div id="examcat-org-checks" style="display:flex;flex-wrap:wrap;gap:8px 16px">
-      ${orgs.length ? orgs.map(function(o){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(o.id)+'" '+(checkedIds.indexOf(o.id)>=0?'checked':'')+'>'+esc(o.name)+'</label>'; }).join('') : '<span style="font-size:11.5px;color:#aaa">등록된 기관이 없습니다.</span>'}
+      ${orgs.length ? orgs.map(function(o){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(o.id)+'" '+(checkedIds.indexOf(o.id)>=0?'checked':'')+' onchange="_examcatRefreshClassChecks()">'+esc(o.name)+'</label>'; }).join('') : '<span style="font-size:11.5px;color:#aaa">등록된 기관이 없습니다.</span>'}
     </div>
   </div>`;
+}
+// ★ 2026-09-10(406) 추가: 위 "공개 대상 기관"에 더해, 같은 기관 안에서도 특정 반(className)
+// 학생들끼리만 이 시험에 응시(답안 입력)하게 제한하고 싶다는 요청 — 학생 문서의 className을
+// 기준으로 한다(학생 등록 화면의 "반" 칸, 자유서술). 기존 "테스트" 기능(openTestForm)이
+// 이미 classNames 배열로 같은 방식의 반 제한을 쓰고 있어 그 패턴을 그대로 재사용한다.
+// 기관 선택과 달리 역할 구분 없이 모든 등록자(최종관리자/기관관리자/선생님)에게 노출한다
+// (기관 선택은 여러 기관 중에 고르는 것이라 최종관리자만 의미가 있지만, 반 제한은 자기
+// 기관 안에서도 누구나 쓸 수 있는 설정이라서).
+// ★ 2026-09-10(407) 수정: 최종관리자 화면에서 기관을 하나도 안 골랐을 때 모든 기관의 반이
+// 뒤섞여 나와서 "이 반이 어느 기관 소속인지 구분이 안 된다"는 신고 → 최종관리자는 위에서
+// 기관을 먼저 골라야 그 기관(들) 소속 반만 나오도록 바꾸고(안 고르면 안내문구만 표시,
+// 여러 기관을 고르면 각 반 옆에 기관명을 같이 표시), 기관관리자·선생님은 원래도 자기
+// 기관 하나뿐이라 바뀌는 부분이 없다.
+function _examcatClassPickerHtml(e){
+  const isAdminRole2=ST.currentUser?.role==='admin';
+  const initCheckedOrgIds = isAdminRole2 ? ((e&&e.orgIds)||[]) : [];
+  const checkedNames2=(e&&e.classNames)||[];
+  return `<div style="margin-bottom:14px;padding:12px;background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px">
+    <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:6px">🏫 공개 대상 반</div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">아무것도 선택하지 않으면 <b>(위 기관 설정 범위 안에서) 모든 반에 공개</b>됩니다. 특정 반 학생만 이 시험에 응시(답안 입력)하게 하려면 해당 반만 체크해주세요.</div>
+    <div id="examcat-class-checks" style="display:flex;flex-wrap:wrap;gap:8px 16px">
+      ${_examcatClassOptionsHtml(initCheckedOrgIds, checkedNames2)}
+    </div>
+  </div>`;
+}
+// ★ 2026-09-10(407) 추가: "공개 대상 반" 체크박스 내용만 만드는 부분을 따로 뺐다 — 최종관리자가
+// "공개 대상 기관" 체크박스를 바꿀 때마다(onchange) 이 부분만 다시 그려서, 전체 폼을 다시
+// 그리며 다른 입력값(문항 텍스트 등)이 날아가는 일 없이 방금 고른 기관 소속 반만 보여준다.
+function _examcatClassOptionsHtml(checkedOrgIds, checkedNames2){
+  const isAdminRole2=ST.currentUser?.role==='admin';
+  const myOrgId2=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  if(isAdminRole2){
+    if(!checkedOrgIds || !checkedOrgIds.length){
+      return '<span style="font-size:11.5px;color:#aaa">먼저 위에서 "공개 대상 기관"을 하나 이상 선택해주세요 — 기관마다 반이 따로 있어서, 기관을 고른 뒤에만 그 기관의 반 목록이 나타납니다.</span>';
+    }
+    const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+    const scoped=(ST.students||[]).filter(function(s){ return checkedOrgIds.indexOf(String(s.orgId||''))>=0; });
+    const singleOrg = checkedOrgIds.length===1;
+    // 같은 반 이름이라도 기관이 다르면 서로 다른 반이므로 "반이름+기관ID"로 묶어서 각각
+    // 별개의 체크박스로 보여준다(값 자체는 반 이름 문자열이라, 여러 기관이 같은 반 이름을
+    // 쓰면 저장 시 문자열이 겹칠 수 있다는 한계는 있음 — 기존 "테스트" 기능과 동일한 한계).
+    const byKey={};
+    scoped.forEach(function(s){
+      if(!s.className) return;
+      const key=s.className+'::'+String(s.orgId||'');
+      if(!byKey[key]) byKey[key]={cls:s.className, orgId:String(s.orgId||'')};
+    });
+    const entries=Object.values(byKey).sort(function(a,b){ return a.cls.localeCompare(b.cls,'ko')||a.orgId.localeCompare(b.orgId); });
+    if(!entries.length) return '<span style="font-size:11.5px;color:#aaa">선택한 기관에 "반"이 입력된 학생이 없습니다.</span>';
+    return entries.map(function(en){
+      const orgName=(orgs.find(function(o){ return o.id===en.orgId; })||{}).name||'?';
+      const label=singleOrg ? en.cls : (en.cls+' · '+orgName);
+      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(en.cls)+'" '+(checkedNames2.indexOf(en.cls)>=0?'checked':'')+'>'+esc(label)+'</label>';
+    }).join('');
+  }
+  const scoped2=(ST.students||[]).filter(function(s){ return !myOrgId2 || String(s.orgId||'')===String(myOrgId2); });
+  const classesList2=[...new Set(scoped2.map(function(s){ return s.className; }).filter(Boolean))].sort();
+  if(!classesList2.length) return '<span style="font-size:11.5px;color:#aaa">등록된 반이 없습니다(학생 등록 화면의 "반" 칸을 입력하면 여기 나타납니다).</span>';
+  return classesList2.map(function(c){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(c)+'" '+(checkedNames2.indexOf(c)>=0?'checked':'')+'>'+esc(c)+'</label>'; }).join('');
+}
+// ★ 2026-09-10(407) 추가: 최종관리자가 "공개 대상 기관" 체크박스를 바꿀 때 호출 — 지금
+// 체크된 기관 기준으로 "공개 대상 반" 목록만 다시 그린다(이미 체크해둔 반 이름은, 새
+// 목록에도 있으면 그대로 유지된다).
+function _examcatRefreshClassChecks(){
+  const wrap=document.getElementById('examcat-class-checks');
+  if(!wrap) return;
+  const checkedOrgIds=Array.from(document.querySelectorAll('#examcat-org-checks input:checked')).map(function(el){ return el.value; });
+  const checkedNames=Array.from(document.querySelectorAll('#examcat-class-checks input:checked')).map(function(el){ return el.value; });
+  wrap.innerHTML=_examcatClassOptionsHtml(checkedOrgIds, checkedNames);
 }
 
 // ══════════════════════════════════════════════════
@@ -33079,6 +33155,9 @@ async function _examcatSubmit(){
     const myOrgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
     entry.orgIds = myOrgId ? [myOrgId] : (entry.orgIds||[]);
   }
+  // ★ 2026-09-10(406) 추가: "공개 대상 반" 체크박스에서 고른 반 이름 목록 저장 — 하나도 안
+  // 고르면 빈 배열(= 기관 범위 안에서 반 제한 없음), 역할 구분 없이 모두 저장 대상.
+  entry.classNames = Array.from(document.querySelectorAll('#examcat-class-checks input:checked')).map(function(el){ return el.value; });
   // ★ 2026-08-29 추가: 예전엔 수정 화면을 다시 열 때마다 저장된 itemMeta/answerKey 객체를
   // 텍스트로 "재조립"해서 보여줬는데, 이 재조립 결과가 처음 붙여넣은 원문과 100% 똑같다는
   // 보장이 없어서(특히 여러 줄짜리 해설/단원 내용이 있을 때), 다시 열어보면 이상하게 섞이거나
