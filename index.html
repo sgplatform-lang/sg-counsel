@@ -43337,11 +43337,29 @@ function generateReport() {
     function _isSameSubject(x){
       return x.sid===s.sid && x.subject===s.subject && _cbrNormalizeDetail(x.detail||'')===_cbrNormalizeDetail(s.detail||'');
     }
+    // ★ 2026-09-10(408) 수정: "응시일은 같은데 시험명이 다른 시험(예: 같은 날짜의 중1/중2/중3
+    // 수학 내신대비TEST)에서 한 과목을 삭제했더니 다른 시험의 답안까지 같이 지워진다"는
+    // 신고 — 원인은 sid가 "그 학생의 챌린저 세션을 새로 열 때마다 1번부터 다시 매겨지는"
+    // 값이라(addSubject의 seq 카운터), 서로 다른 회차(날짜+시험명)인데도 우연히 같은
+    // sid+과목코드+세부과목 조합이 되는 경우가 있다는 것 — 특히 여러 학년용 같은 과목
+    // (수학) 시험을 같은 날 잇달아 입력하면 매번 "그 세션의 첫 과목"이 되어 sid가
+    // 겹치기 쉽다. 위 _isSameSubject는 sid+과목+세부과목만 비교하고 "어느 회차(응시일+
+    // 시험명)인지"는 전혀 보지 않아서, 지금 보고 있는 회차와 무관한 다른 회차(cd.lastSubjects
+    // 또는 history의 다른 항목)까지 같이 걸러져 지워지고 있었다. 지금 화면에 열려있는
+    // 회차(_sgAnsViewRoundDate/_sgAnsViewRoundName, 응시일+시험명 둘 다)와 정확히 일치하는
+    // 곳에서만 지우도록 범위를 좁힌다 — lastSubjects는 그 자체가 cd.lastTestDate/lastTestName
+    // 하나의 회차에 속하므로, 지금 보는 회차가 "현재 회차"일 때만 손댄다.
+    var roundDate=window._sgAnsViewRoundDate, roundName=window._sgAnsViewRoundName;
+    var isCurrentRound = String(cd.lastTestDate||'').trim()===String(roundDate||'').trim() && String(cd.lastTestName||'').trim()===String(roundName||'').trim();
     var beforeCount=(cd.lastSubjects||[]).length;
-    cd.lastSubjects=(cd.lastSubjects||[]).filter(function(x){ return !_isSameSubject(x); });
-    // ★ 과거 저장 회차(history)에도 같은 과목이 들어있으면 같이 지운다(안 지우면 "과거
-    // 회차 불러오기"로 여전히 남아있는 것처럼 보일 수 있음).
+    if(isCurrentRound){
+      cd.lastSubjects=(cd.lastSubjects||[]).filter(function(x){ return !_isSameSubject(x); });
+    }
+    // ★ 과거 저장 회차(history)도, 지금 보고 있는 회차(응시일+시험명)와 정확히 일치하는
+    // 항목에서만 같은 과목을 지운다(안 지우면 "과거 회차 불러오기"로 여전히 남아있는 것처럼
+    // 보일 수 있어 지우는 것 자체는 유지하되, 다른 회차는 절대 건드리지 않는다).
     (cd.history||[]).forEach(function(h){
+      if(String(h.date||'').trim()!==String(roundDate||'').trim() || String(h.test||'').trim()!==String(roundName||'').trim()) return;
       ['subjects','fullSubjects'].forEach(function(k){
         if(Array.isArray(h[k])) h[k]=h[k].filter(function(x){ return !_isSameSubject(x); });
       });
@@ -43443,9 +43461,17 @@ function generateReport() {
     function _isSameSubjectEdit(x){
       return x.sid===s.sid && x.subject===s.subject && _cbrNormalizeDetail(x.detail||'')===_cbrNormalizeDetail(s.detail||'');
     }
-    var real=(cd.lastSubjects||[]).find(_isSameSubjectEdit);
+    // ★ 2026-09-10(408) 수정: 삭제 기능(_sgDeleteStudentAnswer)에서 발견된 것과 같은 이유로,
+    // sid+과목코드+세부과목만으로 찾으면 "응시일은 같은데 시험명이 다른 시험"처럼 sid가
+    // 우연히 겹치는 다른 회차의 과목을 잘못 찾아 그 위에 이번 재채점 결과를 덮어쓸 수 있다
+    // (Object.assign이라 삭제보다 더 조용히 다른 시험 데이터가 바뀌어버리는 사고가 된다).
+    // 지금 보고 있는 회차(응시일+시험명)와 정확히 일치하는 곳에서만 찾아 교체한다.
+    var roundDate2=window._sgAnsViewRoundDate, roundName2=window._sgAnsViewRoundName;
+    var isCurrentRound2 = String(cd.lastTestDate||'').trim()===String(roundDate2||'').trim() && String(cd.lastTestName||'').trim()===String(roundName2||'').trim();
+    var real = isCurrentRound2 ? (cd.lastSubjects||[]).find(_isSameSubjectEdit) : null;
     if(real){ Object.assign(real, s); }
     (cd.history||[]).forEach(function(h){
+      if(String(h.date||'').trim()!==String(roundDate2||'').trim() || String(h.test||'').trim()!==String(roundName2||'').trim()) return;
       ['subjects','fullSubjects'].forEach(function(k){
         if(Array.isArray(h[k])){
           var hReal=h[k].find(_isSameSubjectEdit);
