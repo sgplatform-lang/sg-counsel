@@ -10450,6 +10450,13 @@ function LS_subjectSelectHtml(id, current){
 // 동일한 "임시 스냅샷 자동 복원" 패턴을 학습상담의 개별 입력·일괄 입력 두 화면 모두에
 // 적용한다.
 let LS_LIVE_DRAFT = null; // {studentId, snap} — 개별 학생 "기록 추가" 폼용
+// ★ 2026-09-10(394) 추가: "상담리포트"나 "기본상담" 기록 목록에서 "✏️ 수정"/"📂 불러오기"를
+// 누르면 그 기록의 값을 기본상담 입력폼에 채워 넣고 수정 모드로 전환한다 — 이 상태에서
+// "기록 저장"을 누르면 새 기록을 추가하는 대신 원래 기록을 그대로 덮어쓴다.
+// LS_EDITING={studentId, id} 형태로 어느 학생의 어느 기록을 고치는 중인지 함께 기억해서,
+// 다른 학생을 보는 사이에 실수로 엉뚱한 학생 기록에 반영되는 것을 막는다.
+let LS_EDITING = null; // {studentId, id} | null
+let LS_PENDING_EDIT_SNAP = null; // {studentId, snap} — 폼이 DOM에 꽂힌 뒤 1회 복원되고 비워짐
 function LS_collectBasicSnapshot(){
   function v(id){ const el=document.getElementById(id); return el?el.value:''; }
   const snap={ date:v('lsDate'), subject:LS_effectiveSubject('ls'), tendency:v('lsTendency') };
@@ -10505,14 +10512,51 @@ function LS_addEntry(s){
   function v(id){ const el=document.getElementById(id); return el?el.value:''; }
   const date=v('lsDate'), subject=LS_effectiveSubject('ls');
   if(!date || !subject){ alert('날짜와 과목은 반드시 입력해주세요.'); return; }
-  const entry={ id:'ls_'+Date.now(), date:date, subject:subject, tendency:v('lsTendency').trim() };
+  // ★ 2026-09-10(394) 변경: "기록 저장"을 눌러도 아무 안내가 없어 저장됐는지 몰라서
+  // 두 번 누르는 바람에 같은 내용이 2건씩 쌓이던 문제 신고 → 저장 후 반드시 alert로
+  // 확인 문구를 띄운다. 또한 LS_EDITING이 켜져 있으면(="✏️ 수정"/"📂 불러오기"로 들어온
+  // 경우) 새 기록을 추가하는 대신 원래 기록의 id를 그대로 유지해 덮어쓴다.
+  const isEdit = !!(LS_EDITING && String(LS_EDITING.studentId)===String(s.id));
+  const entry={ id:(isEdit?LS_EDITING.id:('ls_'+Date.now())), date:date, subject:subject, tendency:v('lsTendency').trim() };
   LS_FIELDS.forEach(function(f){ const val=v('ls_'+f.key); entry[f.key]=val===''?null:Number(val); });
   LS_LIVE_DRAFT=null; // ★ 372: 저장 성공했으니 임시 스냅샷은 폐기
-  upd({...s, learningStyle: LS_trimEntries([...(s.learningStyle||[]), entry])});
+  let list=(s.learningStyle||[]).slice();
+  if(isEdit){
+    const idx=list.findIndex(function(e){ return String(e.id)===String(LS_EDITING.id); });
+    if(idx>=0) list[idx]=entry; else list.push(entry); // 그 사이 삭제됐으면 새 기록으로 추가
+  } else {
+    list.push(entry);
+  }
+  LS_EDITING=null; LS_PENDING_EDIT_SNAP=null;
+  upd({...s, learningStyle: LS_trimEntries(list)});
+  alert(isEdit ? '학습상담 기록이 수정되었습니다.' : '학습상담 기록이 저장되었습니다.');
 }
 function LS_deleteEntry(s, id){
   if(!confirm('이 학습상담 기록을 삭제하시겠습니까?')) return;
+  // ★ 2026-09-10(394) 추가: 지금 수정 중이던 기록을 삭제하면 수정 모드도 함께 해제한다
+  // (그대로 두면 "기록 저장"을 눌렀을 때 이미 없는 기록을 덮어쓰려다 새 기록으로 추가되는
+  // 혼란이 생길 수 있음).
+  if(LS_EDITING && String(LS_EDITING.studentId)===String(s.id) && String(LS_EDITING.id)===String(id)){ LS_EDITING=null; LS_PENDING_EDIT_SNAP=null; }
   upd({...s, learningStyle:(s.learningStyle||[]).filter(function(e){ return String(e.id)!==String(id); })});
+}
+// ★ 2026-09-10(394) 추가: 기존 기록을 기본상담 입력폼으로 불러와 수정 모드로 전환한다.
+// "상담리포트"의 "✏️ 수정" 버튼과 "기본상담"의 "📂 불러오기" 버튼이 공통으로 사용한다.
+function LS_editEntry(s, id){
+  if(!s) return;
+  const e=(s.learningStyle||[]).find(function(x){ return String(x.id)===String(id); });
+  if(!e){ alert('기록을 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.'); return; }
+  const snap={ date:e.date||'', subject:e.subject||'', tendency:e.tendency||'' };
+  LS_FIELDS.forEach(function(f){ snap[f.key]=(e[f.key]!==null&&e[f.key]!==undefined)?e[f.key]:''; });
+  LS_EDITING={ studentId:s.id, id:id };
+  LS_PENDING_EDIT_SNAP={ studentId:s.id, snap:snap };
+  LS_LIVE_DRAFT=null; // 수정 모드로 들어가면 이전에 쓰다 만 새 기록 임시입력은 버린다(혼동 방지)
+  ST.lsSubTab='basic';
+  render();
+}
+// 수정 모드를 취소하고 새 기록 작성 화면(빈 폼)으로 되돌린다.
+function LS_cancelEdit(){
+  LS_EDITING=null; LS_PENDING_EDIT_SNAP=null; LS_LIVE_DRAFT=null;
+  render();
 }
 // ★ 363 추가: 여러 학생을 한 번에 저장할 때 upd()를 학생 수만큼 반복 호출하면 그때마다
 // render()가 다시 실행되어 비효율적이므로, 변경된 학생들을 모아 한 번에 저장+렌더한다.
@@ -10661,8 +10705,14 @@ function LS_renderBasic(s){
   // ★ 372 추가: 이 폼이 실제로 DOM에 꽂힌 뒤, 저장 전 임시 스냅샷(다른 관리자가 다른
   // 학생을 저장해서 이 화면이 다시 그려진 경우)이 있으면 되돌려 채우고, 이후 입력값이
   // 바뀔 때마다 계속 스냅샷을 갱신해둔다.
+  // ★ 2026-09-10(394) 변경: "✏️ 수정"/"📂 불러오기"로 들어온 경우(LS_PENDING_EDIT_SNAP)엔
+  // 그 기록의 값을 최우선으로 복원하고, 아니면 기존처럼 저장 전 임시 입력(LS_LIVE_DRAFT)을 복원한다.
+  const isEditingThisStudent = !!(LS_EDITING && String(LS_EDITING.studentId)===String(s.id));
   setTimeout(function(){
-    if(LS_LIVE_DRAFT && String(LS_LIVE_DRAFT.studentId)===String(s.id)){
+    if(LS_PENDING_EDIT_SNAP && String(LS_PENDING_EDIT_SNAP.studentId)===String(s.id)){
+      LS_restoreBasicSnapshot(LS_PENDING_EDIT_SNAP.snap);
+      LS_PENDING_EDIT_SNAP=null;
+    } else if(LS_LIVE_DRAFT && String(LS_LIVE_DRAFT.studentId)===String(s.id)){
       LS_restoreBasicSnapshot(LS_LIVE_DRAFT.snap);
     }
     const root=document.getElementById('lsBasicFormRoot');
@@ -10672,8 +10722,9 @@ function LS_renderBasic(s){
     }
   },0);
   return `${LS_studentInfoBoxHtml(s)}
+    ${isEditingThisStudent ? '<div style="background:#fff7e0;border:1px solid #ffe1a8;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:#8a5a00;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>✏️ 기존 기록을 불러와 수정하는 중입니다 — 저장하면 새 기록이 아니라 이 기록이 그대로 업데이트됩니다.</span><button onclick="LS_cancelEdit()" style="background:#fff;color:#8a5a00;border:1px solid #ffe1a8;border-radius:14px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">✖ 새 기록 작성으로 전환</button></div>' : ''}
     <div class="box" id="lsBasicFormRoot">
-      <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:16px">1. 학습상담 기록 추가</div>
+      <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:16px">1. ${isEditingThisStudent?'학습상담 기록 수정':'학습상담 기록 추가'}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
         <div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">날짜</label><input type="date" id="lsDate" value="${todayStr}" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:13.5px"></div>
         <div><label style="display:block;font-size:12px;color:#888;margin-bottom:5px">과목</label>${LS_subjectSelectHtml('lsSubject','수학')}</div>
@@ -10682,8 +10733,31 @@ function LS_renderBasic(s){
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
         ${LS_FIELDS.map(fieldInputHtml).join('')}
       </div>
-      <button onclick="LS_addEntry(ST.sel||ST.adminSel)" class="btn-b" style="padding:10px 22px;font-size:13.5px">💾 기록 저장</button>
+      <button onclick="LS_addEntry(ST.sel||ST.adminSel)" class="btn-b" style="padding:10px 22px;font-size:13.5px">${isEditingThisStudent?'💾 수정 저장':'💾 기록 저장'}</button>
+    </div>
+    <div class="box" style="margin-top:16px">
+      <div style="font-size:13px;font-weight:800;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:14px">2. 기존 기록 목록 (${(s.learningStyle||[]).length}건)</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:12px">"📂 불러오기"를 누르면 위 폼에 그 기록이 채워지고, 저장하면 새 기록이 아니라 그 기록이 수정됩니다.</div>
+      ${LS_recentEntriesListHtml(s)}
     </div>`;
+}
+// ★ 2026-09-10(394) 추가: "기본상담" 탭 하단의 간단한 기록 목록(날짜·과목·학생성향 미리보기
+// + 불러오기/삭제 버튼) — 큼직하게 전부 보여주는 "상담리포트"와 달리 빠르게 훑고 불러오기 위한 용도.
+function LS_recentEntriesListHtml(s){
+  const entries=(s.learningStyle||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(!entries.length) return '<div style="font-size:12px;color:#aaa;padding:6px 2px">아직 저장된 기록이 없습니다.</div>';
+  return entries.map(function(e){
+    const preview = e.tendency ? (e.tendency.length>42 ? e.tendency.slice(0,42)+'…' : e.tendency) : '';
+    const isThis = !!(LS_EDITING && String(LS_EDITING.studentId)===String(s.id) && String(LS_EDITING.id)===String(e.id));
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border:1px solid '+(isThis?'#c7d2fe':'#eee')+';background:'+(isThis?'#eef2ff':'#fff')+';border-radius:10px;margin-bottom:8px;flex-wrap:wrap">'
+      +'<div style="min-width:0"><span style="font-weight:700;font-size:12.5px">'+esc(e.date||'')+' · '+esc(e.subject||'')+'</span>'
+      +(preview?'<div style="font-size:11.5px;color:#888;margin-top:2px">'+esc(preview)+'</div>':'')
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0">'
+      +'<button onclick="LS_editEntry(ST.sel||ST.adminSel,\''+e.id+'\')" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">'+(isThis?'✏️ 수정 중':'📂 불러오기')+'</button>'
+      +'<button onclick="LS_deleteEntry(ST.sel||ST.adminSel,\''+e.id+'\')" style="background:none;border:1px solid #fecaca;color:#dc2626;border-radius:12px;padding:4px 12px;font-size:11px;cursor:pointer">삭제</button>'
+      +'</div></div>';
+  }).join('');
 }
 // ★ 365 추가: "상담리포트" — 입시상담 상담리포트처럼 항목을 큼직하게 보여주는 리포트 형태.
 function LS_renderReport(s){
@@ -10701,6 +10775,7 @@ function LS_renderReport(s){
             <span style="font-size:15px;font-weight:800;color:#1a1a2e">${esc(e.date||'')} · ${esc(e.subject||'')}</span>
             <div style="display:flex;align-items:center;gap:10px">
               <span style="background:#eef2ff;color:#4338ca;border-radius:14px;padding:4px 12px;font-size:12.5px;font-weight:800">총합 ${sum}/70</span>
+              <button onclick="LS_editEntry(ST.sel||ST.adminSel,'${e.id}')" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ 수정</button>
               <button onclick="LS_deleteEntry(ST.sel||ST.adminSel,'${e.id}')" style="background:none;border:1px solid #fecaca;color:#dc2626;border-radius:12px;padding:4px 12px;font-size:11px;cursor:pointer">삭제</button>
             </div>
           </div>
@@ -14925,10 +15000,16 @@ function RM_msCellToGrade(raw){
 }
 function RM_onGradeGridInput(){
   const vals=[];
+  // ★ 2026-09-10(395) 수정: 학기 중 일부만 입력해도("아는 학기까지만 기입해도 됩니다")
+  // 평균이 자동 계산돼야 하는데, 아래 for문 안의 빈 칸 처리가 "return"이라 forEach 콜백
+  // 자체를 끝내버려서 — 앞쪽 학기(예: 1학년 1학기) 하나만 비어 있어도 그 과목의 뒤쪽
+  // 학기(2학년 2학기 등에 실제로 입력한 값)까지 통째로 건너뛰어져 평균 필드가 끝내 비어있는
+  // 채로 남는 버그였다(신고: 일부 학기만 입력했는데 전체/주요과목 평균이 전혀 안 나옴).
+  // "continue"로 바꿔서 빈 칸은 그 칸만 건너뛰고 같은 과목의 나머지 학기는 계속 스캔하도록 수정.
   RM_GRID_SUBJECTS.forEach(function(subj){
     for(let i=1;i<=RM_SEM_COUNT;i++){
       const el=document.getElementById('rm_sem_'+subj.key+'_'+i);
-      if(!el || !el.value) return;
+      if(!el || !el.value) continue;
       let g=null;
       if(RM_schoolLevel==='MS') g=RM_msCellToGrade(el.value);
       else { const n=parseFloat(el.value); g=isNaN(n)?null:n; }
@@ -15157,6 +15238,9 @@ function RM_collectFormSnapshot(){
   const programChecks=Array.from(document.querySelectorAll('#rmProgramChecks input:checked')).map(function(el){ return el.dataset.name; });
   return {
     schoolLevel:RM_schoolLevel,
+    // ★ 2026-09-10(393) 추가: 리포트에 표시된 인적사항(연결된 학생 정보와 다를 수 있음)도
+    // 함께 스냅샷에 남겨서, 저장된 리포트를 "다시 보기"할 때 그대로 복원되게 한다.
+    displayName:v('rmDisplayName'), displaySchool:v('rmDisplaySchool'), displayGrade:v('rmDisplayGrade'),
     schoolRegion:v('rmSchoolRegion'), schoolChecks:Array.from(document.querySelectorAll('#rmSchoolChecks input:checked')).map(function(el){ return el.value; }),
     schoolManual:v('rmSchoolManual'),
     trackFilter:v('rmTrackFilter'), dept1:v('rmDept1'), dept2:v('rmDept2'), univGroup:v('rmUnivGroup'),
@@ -15182,6 +15266,11 @@ function RM_restoreFormSnapshot(snap){
   function setv(id,val){ const el=document.getElementById(id); if(el && val!==undefined && val!==null) el.value=val; }
   function setc(id,val){ const el=document.getElementById(id); if(el) el.checked=!!val; }
   RM_setSchoolLevel(snap.schoolLevel==='HS9' ? 'HS5' : (snap.schoolLevel||'MS')); // ★ 340: 옛 HS9 스냅샷은 HS5로 대체
+  // ★ 2026-09-10(393) 추가: 저장 당시 리포트에 표시됐던 인적사항을 복원(비어있으면 아래에서
+  // RM_STUDENT_REF 기준 기본값이 이미 채워져 있으므로 그대로 둔다).
+  if(snap.displayName) setv('rmDisplayName', snap.displayName);
+  if(snap.displaySchool) setv('rmDisplaySchool', snap.displaySchool);
+  if(snap.displayGrade) setv('rmDisplayGrade', snap.displayGrade);
   if(snap.schoolRegion) setv('rmSchoolRegion', snap.schoolRegion);
   // ★ 341: 체크박스 목록은 지역 필터와 무관하게 저장된 체크 상태를 우선 복원해야 하므로,
   // 지역 필터를 적용하지 않은 전체 목록으로 그린 뒤 체크 표시만 되살린다(이후 상담원이
@@ -15225,6 +15314,9 @@ function RM_restoreFromLegacyData(data){
   if(!data) return;
   function setv(id,val){ const el=document.getElementById(id); if(el && val!==undefined && val!==null && val!=='') el.value=val; }
   function setc(id,val){ const el=document.getElementById(id); if(el) el.checked=!!val; }
+  // ★ 2026-09-10(393) 추가: 예전 리포트(data 요약본)도 name/school/grade는 원래부터 있었으므로
+  // 함께 복원한다 — 없으면 위에서 RM_STUDENT_REF 기준 기본값이 이미 채워져 있으므로 그대로 둔다.
+  setv('rmDisplayName', data.name); setv('rmDisplaySchool', data.school); setv('rmDisplayGrade', data.grade);
   setv('rmTrackFilter', data.track);
   setv('rmDept1', data.dept1); setv('rmDept2', data.dept2); setv('rmUnivGroup', data.univGroup);
   setv('rmStrongSubj', data.strongSubj); setv('rmWeakSubj', data.weakSubj);
@@ -15260,9 +15352,14 @@ function RM_restoreFromLegacyData(data){
 function RM_generateReport(){
   const s=RM_STUDENT_REF; if(!s) return;
   RM_VIEWING_ARCHIVED_IDX=null; // ★ 2026-09-06: 새로 리포트를 생성하면 더 이상 "다시 보기" 상태가 아니다
-  const name=s.name||'학생';
-  const school=s.school||'';
-  const grade=s.grade||'';
+  // ★ 2026-09-10(393) 변경: 리포트에 표시할 이름·학교·학년은 더 이상 연결된 학생 레코드(s)에서
+  // 곧바로 읽지 않고, 위 "상담리포트에 표시될 학생 인적사항" 입력칸(rmDisplayName/School/Grade)을
+  // 먼저 읽는다 — 평소엔 그 칸이 s.name/school/grade로 자동 채워져 있어 결과가 같지만, 미등록
+  // 학생의 사전조사를 반영한 경우 그 칸이 사전조사 제출자 본인의 정보로 바뀌어 있으므로 리포트에도
+  // 제출자 본인의 인적사항이 표시된다(연결된 학생 s와 달라도 됨).
+  const name=((document.getElementById('rmDisplayName')||{}).value||'').trim() || s.name || '학생';
+  const school=((document.getElementById('rmDisplaySchool')||{}).value||'').trim() || s.school || '';
+  const grade=((document.getElementById('rmDisplayGrade')||{}).value||'').trim() || s.grade || '';
   const track=(document.getElementById('rmTrackFilter')||{}).value||'전체';
   const dept1=(document.getElementById('rmDept1')||{}).value||'희망 학과 미입력';
   const dept2=(document.getElementById('rmDept2')||{}).value||'';
@@ -15661,7 +15758,11 @@ function RM_printReport(){
   // 가져오므로, "입시 로드맵 리포트"라는 고정 제목 대신 "학생명_입시로드맵_YYYYMMDD"로 채운다
   // (APEX 진단서 인쇄에서 이미 쓰던 것과 같은 방식).
   const _pdfDate=new Date().toISOString().slice(0,10).replace(/-/g,'');
-  const printTitle=(s&&s.name?s.name:'학생')+'_입시로드맵_'+_pdfDate;
+  // ★ 2026-09-10(393) 변경: 인쇄/PDF 파일명도 리포트에 실제 표시된 이름(rmDisplayName —
+  // 사전조사 제출자 본인 정보일 수 있음)을 우선 쓰고, 없으면 연결된 학생(s.name)으로 대체한다.
+  const _dispNameEl=document.getElementById('rmDisplayName');
+  const printName=(_dispNameEl&&_dispNameEl.value.trim())?_dispNameEl.value.trim():((s&&s.name)?s.name:'학생');
+  const printTitle=printName+'_입시로드맵_'+_pdfDate;
   const printWin=window.open('','_blank','width=900,height=1000');
   if(!printWin){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
   printWin.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(printTitle)+'</title>'
@@ -15708,7 +15809,9 @@ function RM_exportAllBasicToCsv(){
     const latest=reports.length?reports[reports.length-1]:null;
     const d=(latest&&latest.data)||{};
     const row=[
-      s.name||'', d.school||s.school||'', d.grade||s.grade||'', d.track||'', d.dept1||'', d.dept2||'', d.univGroup||'',
+      // ★ 2026-09-10(393) 변경: 이름도 학교/학년과 같은 방식으로 저장된 리포트의 표시 인적사항
+      // (d.name — 사전조사 제출자 본인 정보일 수 있음)을 우선 쓰고, 없으면 연결된 학생(s.name).
+      d.name||s.name||'', d.school||s.school||'', d.grade||s.grade||'', d.track||'', d.dept1||'', d.dept2||'', d.univGroup||'',
       d.curOverall||'', d.curMain||'', d.strongSubj||'', d.weakSubj||'',
       d.mockKor||'', d.mockMath||'', d.mockEng||'', d.mockSoc||'', d.mockSci||'', d.mockHist||'',
       d.seduk||'', d.club||'', d.interestKeyword||'',
@@ -16592,6 +16695,11 @@ function RM_applySurveyDataToForm(p){
   // 무조건 HS5로 맞춘다(9등급제 선택지 자체가 없어짐).
   const targetLevel = p.schoolLevel==='MS' ? 'MS' : 'HS5';
   RM_setSchoolLevel(targetLevel);
+  // ★ 2026-09-10(393) 추가: 사전조사 제출자가 좌측에서 선택된 학생과 다른 사람(특히 아직
+  // 등록되지 않은 신규 학생)일 수 있으므로, 상담리포트에 표시될 인적사항은 연결된 학생(s)이
+  // 아니라 사전조사에 실제로 적힌 이름·학교·학년으로 덮어쓴다(리포트 저장 위치 자체는 그대로
+  // 좌측에서 선택된 학생 문서). 상담원이 확인 후 필요하면 위 칸에서 직접 고칠 수 있다.
+  setv('rmDisplayName', p.name); setv('rmDisplaySchool', p.school); setv('rmDisplayGrade', p.grade);
   setv('rmTrackFilter', p.track);
   setv('rmDept1', p.dept1); setv('rmDept2', p.dept2); setv('rmUnivGroup', p.univGroup);
   // ★ 340: 설문의 학기별 전체/주요과목 평균(semAll/semMain)은 옛 2행 요약 표 방식이라
@@ -16659,6 +16767,16 @@ function RM_resetForm(){
   const area=document.getElementById('rmReportArea'); if(area) area.style.display='none';
   const sheet=document.getElementById('rmReportSheet'); if(sheet) sheet.innerHTML='';
   render();
+}
+// ★ 2026-09-10(393) 추가: "상담리포트에 표시될 학생 인적사항" 칸을 연결된 학생(RM_STUDENT_REF)의
+// 등록 정보로 되돌리는 버튼용 핸들러 — 사전조사 반영으로 다른 사람 정보가 채워진 뒤 다시 원래
+// 학생 본인 기준으로 되돌리고 싶을 때 쓴다.
+function RM_resetDisplayIdentity(){
+  const s=RM_STUDENT_REF; if(!s) return;
+  const nEl=document.getElementById('rmDisplayName'); if(nEl) nEl.value=s.name||'';
+  const scEl=document.getElementById('rmDisplaySchool'); if(scEl) scEl.value=s.school||'';
+  const grEl=document.getElementById('rmDisplayGrade'); if(grEl) grEl.value=s.grade||'';
+  RM_captureLiveDraft();
 }
 function renderRoadmap(s){
   RM_STUDENT_REF=s;
@@ -16776,7 +16894,10 @@ function renderRoadmapReport(s){
       const survey=RM_PENDING_SURVEY_APPLY;
       RM_PENDING_SURVEY_APPLY=null;
       const _leftoverNotes=RM_applySurveyDataToForm(survey);
+      // ★ 2026-09-10(393) 추가: 리포트에는 연결된 학생이 아니라 사전조사 제출자 본인의
+      // 인적사항이 표시된다는 것을 상담원이 바로 알 수 있게 안내 문구에 덧붙인다.
       alert('사전조사 내용을 기본상담에 반영했습니다. 아래 내용을 확인·수정한 뒤 "리포트 생성"을 눌러주세요.'
+        +'\n\n📄 상담리포트에는 사전조사 제출자("'+(survey.name||'이름 미입력')+'") 본인의 인적사항이 표시됩니다(연결된 학생 "'+(RM_STUDENT_REF&&RM_STUDENT_REF.name||'')+'"과(와) 다르면 "상담리포트에 표시될 학생 인적사항" 칸에서 확인해주세요).'
         +(_leftoverNotes?'\n\n※ 자동으로 옮겨지지 않은 나머지 사전조사 내용:\n'+_leftoverNotes:''));
     }
     // ★ 2026-09-06(339) 추가: 입력값이 바뀔 때마다(input/change 이벤트 위임) 실시간으로
@@ -16818,11 +16939,31 @@ function renderRoadmapReport(s){
     +'<div style="font-size:12px;color:#888;margin-bottom:20px">학생 정보는 이미 등록된 데이터에서 자동으로 채워집니다. 없는 항목만 입력해주세요.</div>'
 
     +'<div style="background:#fff;border:1px solid #e8eaf6;border-radius:12px;padding:18px 20px;margin-bottom:16px">'
-    +'<div style="font-size:11px;color:#888;margin-bottom:10px">학생 정보 (자동 반영 — 기본정보 수정은 학생 &#39;수정&#39; 화면에서)</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">연결된 학생 (좌측에서 선택한 학생 — 리포트는 이 학생 문서에 저장됩니다. 기본정보 수정은 학생 &#39;수정&#39; 화면에서)</div>'
     +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
     +'<div><span style="font-size:10.5px;color:#aaa">이름</span><br><b style="font-size:14px">'+esc(s.name||'-')+'</b></div>'
     +'<div><span style="font-size:10.5px;color:#aaa">학교</span><br><b style="font-size:14px">'+esc(s.school||'-')+'</b></div>'
     +'<div><span style="font-size:10.5px;color:#aaa">학년</span><br><b style="font-size:14px">'+esc(s.grade||'-')+'</b></div>'
+    +'</div></div>'
+
+    // ★ 2026-09-10(393) 추가: "사전조사 받은함"에서 아직 등록되지 않은 학생(신규 학생)의
+    // 사전조사를 어쩔 수 없이 기존 학생에게 반영하면, 위 "연결된 학생" 정보(=실제 DB에
+    // 저장되는 학생) 그대로 상담리포트에도 이름·학교·학년이 표시되어 실제 작성자의
+    // 인적사항이 아닌 엉뚱한 학생 정보가 리포트에 찍히는 문제가 있었다. 리포트에 실제로
+    // 표시될 인적사항을 별도의 수정 가능한 칸으로 분리한다 — 평소(관리자가 직접 학생을
+    // 선택해 입력하는 경우)엔 위 연결된 학생 정보와 동일하게 자동 채워지고, "기본상담으로
+    // 반영"을 누르면 사전조사 제출자 본인의 이름·학교·학년으로 자동 대체된다(아래
+    // RM_applySurveyDataToForm 참고). RM_generateReport는 항상 이 칸의 값을 읽어 리포트에 쓴다.
+    +'<div style="background:#fff;border:1.5px solid #c7d2fe;border-radius:12px;padding:18px 20px;margin-bottom:16px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px">'
+    +'<div style="font-size:11px;color:#3b5bdb;font-weight:700">📄 상담리포트에 표시될 학생 인적사항 (수정 가능)</div>'
+    +'<button type="button" onclick="RM_resetDisplayIdentity()" style="background:none;border:1px solid #ddd;color:#666;border-radius:14px;padding:3px 10px;font-size:10.5px;cursor:pointer">↺ 연결된 학생 정보로 되돌리기</button>'
+    +'</div>'
+    +'<div style="font-size:10.5px;color:#aaa;margin-bottom:10px">평소엔 위 "연결된 학생" 정보와 같습니다. "사전조사 받은함"에서 아직 등록되지 않은 학생의 사전조사를 반영하면 제출자 본인의 인적사항으로 자동 대체되니, 확인 후 필요하면 직접 고쳐서 "리포트 생성"을 눌러주세요.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px">'
+    +'<div><label style="display:block;font-size:11.5px;color:#888;margin-bottom:5px">이름</label><input id="rmDisplayName" value="'+esc(s.name||'')+'" style="'+fieldStyle+'"></div>'
+    +'<div><label style="display:block;font-size:11.5px;color:#888;margin-bottom:5px">학교</label><input id="rmDisplaySchool" value="'+esc(s.school||'')+'" style="'+fieldStyle+'"></div>'
+    +'<div><label style="display:block;font-size:11.5px;color:#888;margin-bottom:5px">학년</label><input id="rmDisplayGrade" value="'+esc(s.grade||'')+'" style="'+fieldStyle+'"></div>'
     +'</div></div>'
 
     +'<div style="background:#fff;border:1px solid #e8eaf6;border-radius:12px;padding:18px 20px;margin-bottom:16px">'
