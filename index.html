@@ -42660,6 +42660,121 @@ function generateReport() {
     }
   };
 
+  // ★ 2026-09-10(399) 추가: "AAR·오답원인 통계" — 상담리포트/오답노트는 행동강령·처방전·
+  // 누적현황 등 상담원용 내용이 함께 들어있어, 학생이 직접 입력한 점수·AAR 자가진단·
+  // 오답원인 체크사항만 한눈에 보기가 어렵다는 신고에 따라 신설. _studentSelfInput===true인
+  // 과목(=학생이 직접 "챌린저 답안" 페이지에서 제출한 것)만 대상으로 하며, 학생이 스스로
+  // 작성한 AAR 요약(sub.memo, 학생용 파일의 chgGenerateAarMemo가 학생의 선택값 그대로
+  // 라벨을 붙여 만든 텍스트 — 상담원이 손대는 값이 아님)과 학생이 직접 선택한 오답원인
+  // (item.causePrimary 1차선택 + item.reasons 2차선택)만 집계해서 보여준다. onlyCurrent:true면
+  // 지금 선택된 학생 한 명(현재 화면에 표시된 회차)만, false면 같은 회차를 치른 전체 학생을
+  // 과목별로 묶어서 보여준다(기존 "회차 통계표"/"오답노트 출력" 버튼과 동일하게 _batchTargets로
+  // 대상을 찾는다).
+  window._sgOpenAarStatsView=function(opts){
+    opts=opts||{};
+    var onlyCurrent=!!opts.onlyCurrent;
+    var ifr=document.getElementById('challenger-iframe');
+    if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
+    var cw=ifr.contentWindow, cd=cw.document;
+    var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
+    var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'', onlyCurrent);
+    var targets=info.targets;
+    if(!targets.length){ alert(onlyCurrent?'이 학생의 챌린저 데이터를 찾지 못했습니다.':'같은 회차를 치른 학생을 찾지 못했습니다.'); return; }
+
+    var _aarCauseLabel={K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'};
+    function _aarEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+    function _aarCauseTally(items){
+      var primCounts={}, reasonCounts={};
+      (items||[]).forEach(function(it){
+        if(!it||!it.no) return;
+        if(it.causePrimary){ primCounts[it.causePrimary]=(primCounts[it.causePrimary]||0)+1; }
+        (it.reasons||[]).forEach(function(r){ if(!r) return; reasonCounts[r]=(reasonCounts[r]||0)+1; });
+      });
+      var primTxt=Object.keys(primCounts).sort(function(a,b){return primCounts[b]-primCounts[a];})
+        .map(function(k){ return _aarEsc(_aarCauseLabel[k]||k)+' '+primCounts[k]+'회'; }).join(', ');
+      var reasonTxt=Object.keys(reasonCounts).sort(function(a,b){return reasonCounts[b]-reasonCounts[a];})
+        .map(function(k){ return _aarEsc(k)+' '+reasonCounts[k]+'회'; }).join(', ');
+      return {primTxt:primTxt, reasonTxt:reasonTxt};
+    }
+    function _aarSelfSubs(stu){
+      var cd2=stu.challengerData||{};
+      return (cd2.lastSubjects||[]).filter(function(s){ return s && s._studentSelfInput; });
+    }
+
+    var overlay=document.getElementById('sg-aarstats-overlay');
+    if(!overlay){
+      overlay=document.createElement('div');
+      overlay.id='sg-aarstats-overlay';
+      overlay.style.cssText='display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;align-items:center;justify-content:center;padding:16px';
+      overlay.innerHTML='<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow:auto;padding:20px 22px" id="sg-aarstats-body"></div>';
+      overlay.onclick=function(e){ if(e.target===overlay) overlay.style.display='none'; };
+      document.body.appendChild(overlay);
+    }
+    var body=document.getElementById('sg-aarstats-body');
+    body.style.maxWidth=onlyCurrent?'760px':'1080px';
+
+    var headerHtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+      +'<b style="font-size:15px">📊 AAR·오답원인 통계'+(onlyCurrent?(' — '+_aarEsc(targets[0].name||'')):' — 전체 학생')+'</b>'
+      +'<button onclick="document.getElementById(\'sg-aarstats-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 닫기</button></div>'
+      +'<div style="font-size:11.5px;color:#888;margin-bottom:14px">'+_aarEsc(info.date||'')+' · '+_aarEsc(info.name||'')+' — 학생이 직접 입력한 점수·AAR자가진단·오답원인만 표시됩니다(상담용 처방전·행동강령·누적현황은 포함되지 않습니다).</div>';
+
+    var contentHtml='';
+    if(onlyCurrent){
+      var stu=targets[0];
+      var subs=_aarSelfSubs(stu);
+      if(!subs.length){
+        contentHtml='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 학생이 직접 제출한 AAR 데이터가 아직 없습니다.</div>';
+      } else {
+        contentHtml=subs.map(function(s){
+          var label=_statGroupLabel(s.subject,s.detail);
+          var tally=_aarCauseTally(s.items);
+          var memoHtml=s.memo?_aarEsc(s.memo).replace(/\n/g,'<br>'):'<span style="color:#aaa">학생이 AAR 자가진단 입력을 완료하지 않았습니다.</span>';
+          return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
+            +'<span style="font-weight:800;font-size:13.5px;color:#0f766e">'+_aarEsc(label)+'</span>'
+            +'<span style="font-size:12px;color:#555">점수 '+_aarEsc(String(s.score!=null?s.score:'-'))+' · 오답 '+(s.wrongCount!=null?s.wrongCount:'-')+'개</span>'
+            +'</div>'
+            +'<div style="font-size:12.5px;color:#333;line-height:1.7;background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:8px">'+memoHtml+'</div>'
+            +'<div style="font-size:11.5px;color:#555"><b>오답원인(학생 선택)</b> — '
+            +(tally.primTxt?'1차: '+tally.primTxt:'1차원인 미입력')
+            +(tally.reasonTxt?' · 2차: '+tally.reasonTxt:'')
+            +'</div>'
+            +'</div>';
+        }).join('');
+      }
+    } else {
+      var groups={};
+      targets.forEach(function(stu2){
+        _aarSelfSubs(stu2).forEach(function(s){
+          var key=_statGroupKey(s.subject,s.detail);
+          if(!groups[key]) groups[key]={label:_statGroupLabel(s.subject,s.detail), rows:[]};
+          groups[key].rows.push({name:stu2.name||'', score:(s.score!=null?s.score:'-'), memo:s.memo||'', tally:_aarCauseTally(s.items)});
+        });
+      });
+      var keys=Object.keys(groups);
+      if(!keys.length){
+        contentHtml='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px">이 회차에 학생이 직접 제출한 AAR 데이터가 아직 없습니다.</div>';
+      } else {
+        var order={KOR:0,MATH:1,ENG:2,HIST:3};
+        keys.sort(function(a,b){ var oa=(a in order)?order[a]:(a.indexOf('INQ:')===0?4:9); var ob=(b in order)?order[b]:(b.indexOf('INQ:')===0?4:9); return oa-ob||a.localeCompare(b,'ko'); });
+        contentHtml=keys.map(function(key){
+          var g=groups[key];
+          var trs=g.rows.map(function(r){
+            var memoShort=r.memo?(_aarEsc(r.memo.split('\n')[0])+(r.memo.indexOf('\n')>=0?' …':'')):'<span style="color:#aaa">미입력</span>';
+            var causeShort=r.tally.primTxt||'<span style="color:#aaa">미입력</span>';
+            return '<tr><td style="border:1px solid #e2e8f0;padding:6px 8px;font-weight:700">'+_aarEsc(r.name)+'</td><td style="border:1px solid #e2e8f0;padding:6px 8px;text-align:center">'+_aarEsc(String(r.score))+'</td><td style="border:1px solid #e2e8f0;padding:6px 8px">'+memoShort+'</td><td style="border:1px solid #e2e8f0;padding:6px 8px">'+causeShort+'</td></tr>';
+          }).join('');
+          return '<div style="margin-bottom:18px"><div style="font-weight:800;font-size:13px;color:#0f766e;border-left:4px solid #0f766e;padding-left:8px;margin-bottom:6px">'+_aarEsc(g.label)+'</div>'
+            +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f0fdfa"><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">학생</th><th style="border:1px solid #e2e8f0;padding:6px 8px">점수</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">AAR 자가진단(첫 항목)</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">오답원인(1차)</th></tr></thead><tbody>'+trs+'</tbody></table></div></div>';
+        }).join('');
+        contentHtml+='<div style="font-size:11px;color:#999;margin-top:4px">※ AAR 자가진단은 첫 항목만 미리보기로 표시됩니다. 학생별 전체 내용은 그 학생을 선택한 뒤 "📊 AAR통계(이 학생)"로 확인하세요.</div>';
+      }
+    }
+
+    body.innerHTML=headerHtml+contentHtml;
+    overlay.style.display='flex';
+  };
+
   function _wnEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   // ★ 해설 칸을 그냥 한 문단으로 뿌리지 않고, 몇 가지 가벼운 표시 규칙을 알아보고
   // 구조화해서 보여준다 (섹션 제목 / 불릿 / 선택지별 정답·오답 카드). 셀 안 줄바꿈은
@@ -43247,6 +43362,31 @@ function generateReport() {
       b3.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
       b3.onclick=function(){window._gg_printWrongNotes({onlyCurrent:true});};
       nav.appendChild(b3);
+    }
+    // ★ 2026-09-10(399) 추가: 상담리포트/오답노트는 행동강령·처방전 등 상담원용 내용이
+    // 섞여 있어, 학생이 직접 입력한 점수·AAR자가진단·오답원인만 한눈에 보기 어렵다는
+    // 요청으로 신설한 "AAR 통계" 버튼 2개(이 학생만 / 같은 회차 전체 학생).
+    if(!d.getElementById('sg-aar-stats-mine')){
+      var b4=d.createElement('button');
+      b4.id='sg-aar-stats-mine';
+      b4.className='tab';
+      b4.type='button';
+      b4.textContent='📊 AAR통계(이 학생)';
+      b4.title='지금 보고 있는 이 학생이 직접 입력한 점수·AAR자가진단·오답원인만 한눈에 봅니다(상담용 내용 제외)';
+      b4.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
+      b4.onclick=function(){window._sgOpenAarStatsView({onlyCurrent:true});};
+      nav.appendChild(b4);
+    }
+    if(!d.getElementById('sg-aar-stats-all')){
+      var b5=d.createElement('button');
+      b5.id='sg-aar-stats-all';
+      b5.className='tab';
+      b5.type='button';
+      b5.textContent='📊 AAR통계(전체학생)';
+      b5.title='같은 회차를 치른 전체 학생의 점수·AAR자가진단·오답원인을 과목별로 비교합니다(상담용 내용 제외)';
+      b5.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
+      b5.onclick=function(){window._sgOpenAarStatsView({onlyCurrent:false});};
+      nav.appendChild(b5);
     }
   }
 
