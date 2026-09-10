@@ -2298,7 +2298,15 @@ async function deleteStudent(sid){
   let _fbDeleteOk = true;
   if(FB_USE()){
     try{
-      await window._fb.delete('students', sid);
+      // ★ 2026-09-10(396) 변경: 삭제 직후 화면에서는 바로 사라져 "성공한 것처럼" 보이지만,
+      // 실제 Firestore delete() 요청은 별도 확인 없이 무기한 기다리는 구조였다 — 읽기(getAll)는
+      // 이미 378에서 25초+재시도 1회로 시간제한을 뒀지만 삭제(delete)는 그 보호가 없었다.
+      // 네트워크가 느린 환경(로그인 로딩에만 25~30초씩 걸리는 것이 콘솔로 확인된 사례 있음)에서
+      // 관리자가 화면에서 사라진 것만 보고 응답을 기다리지 않은 채 로그아웃하거나 창을 닫으면,
+      // 서버로는 삭제 요청이 끝내 전달되지 못해 다음 로그인 때 그 학생이 그대로 남아있는
+      // 원인이 될 수 있다 — 읽기와 동일한 _sgFetchWithRetry(25초 타임아웃+자동 재시도 1회)로
+      // 감싸서 오래 걸려도 결국 확실한 성공/실패로 끝맺게 한다.
+      await _sgFetchWithRetry(()=>window._fb.delete('students', sid), '학생 삭제');
     }catch(e){
       _fbDeleteOk = false;
       console.warn('Firebase 삭제 실패:', e);
@@ -2312,6 +2320,11 @@ async function deleteStudent(sid){
     // 실제 서버 상태(=아직 존재함)와 일치하도록 목록에 다시 표시한다.
     if(!ST.students.some(x=>String(x.id)===String(sid))) ST.students.push(s);
     alert('⚠️ 서버 연결 문제로 [' + s.name + '] 학생이 실제로는 삭제되지 못했습니다.\n\n인터넷 연결을 확인하신 뒤 다시 시도해주세요. 계속 실패하면 페이지를 새로고침한 뒤 다시 시도해주세요.');
+  } else if(FB_USE()){
+    // ★ 2026-09-10(396) 추가: 삭제가 서버에서도 실제로 확정된 뒤에만 안내한다 — 이 알림을
+    // 본 뒤에 로그아웃/새로고침해도 안전하다는 뜻(안내가 뜨기 전에 창을 닫으면 아직 서버
+    // 확인 전일 수 있다는 것도 알 수 있음).
+    alert('[' + s.name + '] 학생이 삭제되었습니다.');
   }
   // localStorage 최종 저장(성공 시엔 삭제된 상태, 실패 시엔 복원된 상태)
   try{ localStorage.setItem(SK, JSON.stringify(ST.students)); }catch(e){}
@@ -10889,7 +10902,7 @@ function LS_renderStatsGrade(s){
     const r=roundsByStudent[st.id];
     if(r.length<selRound) return null; // 이 회차까지 기록이 없는 학생은 제외
     const e=r[selRound-1];
-    return {name:st.name, school:st.school, tendency:e.tendency, entry:e, sum:LS_fieldSum(e), count:r.length};
+    return {name:st.name, school:st.school, grade:st.grade, tendency:e.tendency, entry:e, sum:LS_fieldSum(e), count:r.length};
   }).filter(Boolean).sort(function(a,b){ return b.sum-a.sum; });
   const roundTabs=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
     ${Array.from({length:maxRound}, function(_,i){ return i+1; }).map(function(n){
@@ -10906,8 +10919,9 @@ function LS_renderStatsGrade(s){
     ${roundTabs}
     ${rows.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
       <thead><tr style="background:#fafaf8">
-        <th style="border:1px solid #eee;padding:8px">이름</th>
-        <th style="border:1px solid #eee;padding:8px">학교</th>
+        <th style="border:1px solid #eee;padding:8px;white-space:nowrap">이름</th>
+        <th style="border:1px solid #eee;padding:8px;white-space:nowrap">학교</th>
+        <th style="border:1px solid #eee;padding:8px;white-space:nowrap">학년</th>
         <th style="border:1px solid #eee;padding:8px;min-width:220px">학생성향</th>
         ${LS_FIELDS.map(function(f){ return '<th style="border:1px solid #eee;padding:8px">'+f.label+'</th>'; }).join('')}
         <th style="border:1px solid #eee;padding:8px;background:#eef2ff">총합</th>
@@ -10916,6 +10930,7 @@ function LS_renderStatsGrade(s){
       <tbody>${rows.map(function(r){
         return '<tr><td style="border:1px solid #eee;padding:8px;font-weight:700;white-space:nowrap">'+esc(r.name)+'</td>'
           +'<td style="border:1px solid #eee;padding:8px;white-space:nowrap;color:#777">'+esc(r.school||'')+'</td>'
+          +'<td style="border:1px solid #eee;padding:8px;white-space:nowrap;color:#777">'+esc(r.grade||'')+'</td>'
           +'<td style="border:1px solid #eee;padding:8px;text-align:left">'+esc(r.tendency||'')+'</td>'
           +LS_FIELDS.map(function(f){ const v=r.entry[f.key]; return '<td style="border:1px solid #eee;padding:8px;text-align:center;font-weight:700">'+(v!==null&&v!==undefined?v:'')+'</td>'; }).join('')
           +'<td style="border:1px solid #eee;padding:8px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+r.sum+'/70</td>'
@@ -11534,16 +11549,16 @@ function printTab(sid,tab){
       const r=roundsByStudent[st.id];
       if(r.length<selRound) return null;
       const e=r[selRound-1];
-      return {name:st.name, school:st.school, tendency:e.tendency, entry:e, sum:LS_fieldSum(e), count:r.length};
+      return {name:st.name, school:st.school, grade:st.grade, tendency:e.tendency, entry:e, sum:LS_fieldSum(e), count:r.length};
     }).filter(Boolean).sort(function(a,b){ return b.sum-a.sum; });
     const tableHtml = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:10.5px">
       <thead><tr style="background:#fafaf8">
-        <th style="border:1px solid #ddd;padding:5px">이름</th><th style="border:1px solid #ddd;padding:5px">학교</th><th style="border:1px solid #ddd;padding:5px">학생성향</th>
+        <th style="border:1px solid #ddd;padding:5px;white-space:nowrap">이름</th><th style="border:1px solid #ddd;padding:5px;white-space:nowrap">학교</th><th style="border:1px solid #ddd;padding:5px;white-space:nowrap">학년</th><th style="border:1px solid #ddd;padding:5px">학생성향</th>
         ${LS_FIELDS.map(function(f){ return '<th style="border:1px solid #ddd;padding:5px">'+f.label+'</th>'; }).join('')}
         <th style="border:1px solid #ddd;padding:5px;background:#eef2ff">총합</th><th style="border:1px solid #ddd;padding:5px">입력횟수</th>
       </tr></thead>
       <tbody>${rows.map(function(r){
-        return '<tr><td style="border:1px solid #ddd;padding:5px;font-weight:700">'+esc(r.name)+'</td><td style="border:1px solid #ddd;padding:5px">'+esc(r.school||'')+'</td><td style="border:1px solid #ddd;padding:5px;text-align:left">'+esc(r.tendency||'')+'</td>'
+        return '<tr><td style="border:1px solid #ddd;padding:5px;font-weight:700;white-space:nowrap">'+esc(r.name)+'</td><td style="border:1px solid #ddd;padding:5px;white-space:nowrap">'+esc(r.school||'')+'</td><td style="border:1px solid #ddd;padding:5px;white-space:nowrap">'+esc(r.grade||'')+'</td><td style="border:1px solid #ddd;padding:5px;text-align:left">'+esc(r.tendency||'')+'</td>'
           +LS_FIELDS.map(function(f){ return '<td style="border:1px solid #ddd;padding:5px;text-align:center">'+(r.entry[f.key]!==null&&r.entry[f.key]!==undefined?r.entry[f.key]:'')+'</td>'; }).join('')
           +'<td style="border:1px solid #ddd;padding:5px;text-align:center;font-weight:800;color:#4338ca;background:#f7f8ff">'+r.sum+'/70</td><td style="border:1px solid #ddd;padding:5px;text-align:center">'+r.count+'</td></tr>';
       }).join('')}</tbody>
@@ -15302,6 +15317,12 @@ function RM_restoreFormSnapshot(snap){
   if(Array.isArray(snap.programChecks) && snap.programChecks.length){
     document.querySelectorAll('#rmProgramChecks input[type=checkbox]').forEach(function(el){ el.checked = snap.programChecks.indexOf(el.dataset.name)>=0; });
   }
+  // ★ 2026-09-10(397) 추가: 그리드 칸을 setv()로 복원해도 input 이벤트가 안 일어나 자동
+  // 평균계산(RM_onGradeGridInput)이 실행되지 않는 문제 — 위에서 이미 snap.curOverallDirect/
+  // curMainDirect로 평균 칸을 채웠지만, 그 값 자체가 예전(그리드 버그 당시) 저장분이라
+  // 비어있을 수 있으므로 그리드가 있었으면 여기서 한 번 더 재계산해 최종적으로 덮어써
+  // 항상 그리드 내용과 일치하는 평균이 표시되게 한다.
+  if(snap.grid) RM_onGradeGridInput();
 }
 // ★ 2026-09-06 추가: 2026-09-06 이전(이 기능이 추가되기 전) 버전에서 이미 저장된
 // 리포트는 formSnapshot이 없고, 그보다 훨씬 전부터 있던 가벼운 요약 데이터
@@ -16713,6 +16734,15 @@ function RM_applySurveyDataToForm(p){
     RM_GRID_SUBJECTS.forEach(function(subj){
       (p.grid[subj.key]||[]).forEach(function(val,i){ setv('rm_sem_'+subj.key+'_'+(i+1), val); });
     });
+    // ★ 2026-09-10(397) 추가: 위 setv()는 값만 채울 뿐 input 이벤트를 일으키지 않아서,
+    // 그리드 칸에 oninput으로 연결된 RM_onGradeGridInput()(평균 자동계산)이 실행되지 않는다.
+    // 그 결과 사전조사를 반영해도 "현재 내신 전체/주요과목 평균" 칸이 계속 비어있었다
+    // (신고: 그리드에 값은 보이는데 평균이 안 나옴 — 예전에 이 반영 기능이 만들어지기 전
+    // 제출분은 애초에 평균 자체가 계산 안 된 채 저장돼 있었던 것도 원인 중 하나였음).
+    // 그리드를 다 채운 직후 같은 함수를 직접 한 번 호출해 관리자가 직접 입력한 것과
+    // 동일하게 즉시 재계산되도록 한다 — p.curOverallDirect/curMainDirect(설문 저장 당시
+    // 값, 비어있을 수 있음)보다 방금 옮겨 넣은 그리드 기준 값이 우선하게 된다.
+    RM_onGradeGridInput();
   }
   setv('rmStrongSubj', p.strongSubj); setv('rmWeakSubj', p.weakSubj);
   if(p.mock){
