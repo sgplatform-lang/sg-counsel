@@ -32474,6 +32474,17 @@ function openExamCatalog(){
   _examcatRenderForm();
 }
 
+// ★ 2026-09-11(410) 추가: "챌린저 결과 일괄반영" 모달의 "등록된 시험 카탈로그에서
+// 불러오기" 드롭다운이 examCatalog 전체를 그대로 보여주고 있어(기관 구분 없이), 기관관리자
+// 화면에서도 다른 기관 소속 시험까지 다 보이던 문제 → 시험 카탈로그 관리 목록(_examcatRenderList)
+// 이 이미 쓰고 있던 "orgIds가 비어있으면 전체공개로 취급, 아니면 내 기관 포함 여부로 필터링"
+// 규칙을 공용 함수로 뽑아 이 드롭다운에도 동일하게 적용한다(최종관리자는 그대로 전체 다 보임).
+function _examcatScopedForCurrentOrg(){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const myOrgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  const allList=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  return isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
+}
 function _examcatRenderList(){
   const el=document.getElementById('examcat-list');
   if(!el) return;
@@ -33202,7 +33213,7 @@ function openChallengerBulkReflect(){
   _ensureExamCatalogLoaded().then(function(){
     const _selEl2=document.getElementById('cbr-examcat-select');
     if(_selEl2){
-      const list2=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      const list2=_examcatScopedForCurrentOrg();
       _selEl2.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
         + list2.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
     }
@@ -33380,7 +33391,7 @@ MATH	미적분	28	7		"></textarea>
   // (overlay div 자체는 최초 1회만 만들어지므로, 옵션 목록은 매번 갱신해야 함)
   const _selEl=document.getElementById('cbr-examcat-select');
   if(_selEl){
-    const list=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const list=_examcatScopedForCurrentOrg();
     _selEl.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
       + list.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
   }
