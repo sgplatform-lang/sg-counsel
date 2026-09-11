@@ -32617,7 +32617,7 @@ function _examcatOrgPickerHtml(e){
     <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:6px">🏫 공개 대상 기관</div>
     <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">아무것도 선택하지 않으면 <b>전체 기관에 공개</b>됩니다. 특정 기관에서만 보이게 하려면 해당 기관만 체크해주세요.</div>
     <div id="examcat-org-checks" style="display:flex;flex-wrap:wrap;gap:8px 16px">
-      ${orgs.length ? orgs.map(function(o){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(o.id)+'" '+(checkedIds.indexOf(o.id)>=0?'checked':'')+' onchange="_examcatRefreshClassChecks()">'+esc(o.name)+'</label>'; }).join('') : '<span style="font-size:11.5px;color:#aaa">등록된 기관이 없습니다.</span>'}
+      ${orgs.length ? orgs.map(function(o){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(o.id)+'" '+(checkedIds.indexOf(o.id)>=0?'checked':'')+' onchange="_examcatRefreshClassChecks()">'+esc(o.name)+'</label>'; }).join('') : '<span style="font-size:11.5px;color:#aaa">등록된 기관이 없습니다.</span>'}
     </div>
   </div>`;
 }
@@ -32669,16 +32669,21 @@ function _examcatClassOptionsHtml(checkedOrgIds, checkedNames2){
     });
     const entries=Object.values(byKey).sort(function(a,b){ return a.cls.localeCompare(b.cls,'ko')||a.orgId.localeCompare(b.orgId); });
     if(!entries.length) return '<span style="font-size:11.5px;color:#aaa">선택한 기관에 "반"이 입력된 학생이 없습니다.</span>';
+    // ★ 2026-09-11(409) 수정: 여러 기관을 골랐을 때 "반이름 · 기관명"을 한 줄로 붙이면
+    // 폭이 좁은 화면에서 글자가 줄바꿈돼(예: "스파르타영/수학원_새싹점"처럼) 알아보기 어렵다는
+    // 신고 → 반이름(굵게, 위)과 기관명(작은 회색 글씨, 아래) 두 줄로 세로 정렬하고 nowrap 처리.
     return entries.map(function(en){
       const orgName=(orgs.find(function(o){ return o.id===en.orgId; })||{}).name||'?';
-      const label=singleOrg ? en.cls : (en.cls+' · '+orgName);
-      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(en.cls)+'" '+(checkedNames2.indexOf(en.cls)>=0?'checked':'')+'>'+esc(label)+'</label>';
+      const inner=singleOrg
+        ? '<span style="white-space:nowrap">'+esc(en.cls)+'</span>'
+        : '<span style="display:flex;flex-direction:column;line-height:1.35;white-space:nowrap"><span>'+esc(en.cls)+'</span><span style="font-size:10px;color:#94a3b8">'+esc(orgName)+'</span></span>';
+      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(en.cls)+'" '+(checkedNames2.indexOf(en.cls)>=0?'checked':'')+'>'+inner+'</label>';
     }).join('');
   }
   const scoped2=(ST.students||[]).filter(function(s){ return !myOrgId2 || String(s.orgId||'')===String(myOrgId2); });
   const classesList2=[...new Set(scoped2.map(function(s){ return s.className; }).filter(Boolean))].sort();
   if(!classesList2.length) return '<span style="font-size:11.5px;color:#aaa">등록된 반이 없습니다(학생 등록 화면의 "반" 칸을 입력하면 여기 나타납니다).</span>';
-  return classesList2.map(function(c){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" value="'+esc(c)+'" '+(checkedNames2.indexOf(c)>=0?'checked':'')+'>'+esc(c)+'</label>'; }).join('');
+  return classesList2.map(function(c){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap"><input type="checkbox" value="'+esc(c)+'" '+(checkedNames2.indexOf(c)>=0?'checked':'')+'>'+esc(c)+'</label>'; }).join('');
 }
 // ★ 2026-09-10(407) 추가: 최종관리자가 "공개 대상 기관" 체크박스를 바꿀 때 호출 — 지금
 // 체크된 기관 기준으로 "공개 대상 반" 목록만 다시 그린다(이미 체크해둔 반 이름은, 새
