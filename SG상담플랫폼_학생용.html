@@ -80,6 +80,14 @@ try{
         window._db.collection(col).get(),
         new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: '+col+' 로딩이 15초 안에 끝나지 않았습니다')), 15000))
       ]).then(s=>s.docs.map(d=>({...d.data(),id:d.id}))),
+    // ★ 2026-09-12 추가: 로그인처럼 "많은 문서 중 조건에 맞는 1건만" 필요한 경우, 컬렉션
+    // 전체를 내려받지 말고 서버에서 미리 걸러서 필요한 문서만 받아오기 위한 헬퍼.
+    // (같은 공간에서 여러 학생이 동시에 로그인할 때 전체 학생 목록을 인원수만큼 반복해서
+    // 통째로 내려받던 것이 로딩 지연의 주요 원인이었음 — doLogin() 참고)
+    getWhere: (col,field,op,value)=>Promise.race([
+        window._db.collection(col).where(field,op,value).get(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: '+col+' 로딩이 15초 안에 끝나지 않았습니다')), 15000))
+      ]).then(s=>s.docs.map(d=>({...d.data(),id:d.id}))),
     set: (col,id,data)=>window._db.collection(col).doc(String(id)).set({...data,_t:Date.now()},{merge:true})
   };
   window._fbReady = true;
@@ -234,6 +242,13 @@ async function fbAll(col){
   try{
     return await window._fb.getAll(col);
   }catch(e){console.warn('fbAll error:',e.message);return[];}
+}
+// ★ 2026-09-12 추가: fbAll과 달리 실패(네트워크 오류/타임아웃)를 그냥 빈 배열로 감추지 않고
+// 그대로 던진다 — 호출하는 쪽(doLogin)에서 "네트워크 문제"와 "조건에 맞는 문서가 없음"을
+// 구분해서 서로 다른 안내 메시지를 보여줄 수 있어야 하기 때문.
+async function fbWhere(col,field,op,value){
+  if(!FB()) throw new Error('Firebase가 연결되지 않았습니다.');
+  return await window._fb.getWhere(col,field,op,value);
 }
 
 // ── 개인정보동의 ──
@@ -445,16 +460,19 @@ async function doLogin(){
   if(!FB()){if(err)err.textContent='Firebase가 연결되지 않았습니다.';return;}
   if(err)err.textContent='⏳ 로그인 중...';
   try{
-    const students=await fbAll('students');
-    // ★ 2026-08-31 추가: 예전엔 네트워크 지연으로 학생 목록을 아예 못 불러와도(빈 배열)
-    // "아이디/비밀번호가 틀렸다"는 잘못된 메시지가 떴다 — 실제로는 서버 응답 지연이었는데
-    // 마치 계정 정보가 틀린 것처럼 보여 혼란을 줬다. 목록 자체가 비어 있으면(=진짜로 학생이
-    // 0명일 리는 없으므로) 네트워크 문제로 보고 정확한 메시지 + 재시도 버튼을 보여준다.
-    if(!students.length){
-      if(err)err.innerHTML='⚠️ 서버 응답이 늦어 학생 목록을 불러오지 못했습니다.<br>인터넷 연결을 확인한 뒤 다시 시도해주세요.<br><button onclick="doLogin()" style="margin-top:8px;padding:7px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:12.5px;cursor:pointer">🔄 다시 시도</button>';
+    // ★ 2026-09-12 최적화: 예전엔 로그인할 때마다 전체 학생 목록(다른 기관·다른 학생 전체
+    // 포함)을 통째로 내려받은 뒤 그 중 아이디가 일치하는 1명을 골랐다. 같은 공간에서 여러
+    // 학생이 동시에 로그인하면 그만큼 네트워크 부하가 인원수배로 커져서 모두의 로딩이
+    // 느려지는 주요 원인이었다 — 서버에서 아이디가 일치하는 문서만 걸러서 받아오도록 변경.
+    let students;
+    try{
+      students = await fbWhere('students','studentLoginId','==',id);
+    }catch(netErr){
+      // 서버 응답 지연/네트워크 오류 — "아이디/비밀번호가 틀렸다"는 메시지와 구분해서 보여준다.
+      if(err)err.innerHTML='⚠️ 서버 응답이 늦어 로그인 정보를 불러오지 못했습니다.<br>인터넷 연결을 확인한 뒤 다시 시도해주세요.<br><button onclick="doLogin()" style="margin-top:8px;padding:7px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:12.5px;cursor:pointer">🔄 다시 시도</button>';
       return;
     }
-    const student=students.find(s=>String(s.studentLoginId||'').trim()===id&&String(s.studentPassword||'').trim()===pw);
+    const student=students.find(s=>String(s.studentPassword||'').trim()===pw);
     if(!student){if(err)err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';return;}
     const tests=await fbAll('tests');
     CU=student;
@@ -3171,9 +3189,17 @@ function startStudentRealtimeSync(studentId){
       if(!snap) return;
       const allTests = snap.docs.map(function(d){ return Object.assign({}, d.data(), {id:d.id}); });
       // 학생 기관/반 기준 필터링
+      // ★ 2026-09-12 수정: doLogin()의 최초 필터링에는 있던 "특정 학생 지정(studentIds)"
+      // 조건이 여기(실시간 동기화)에는 빠져 있었다 — 관리자가 tests 컬렉션의 아무 문서나
+      // 수정할 때마다 이 리스너가 다시 실행되며 DATA.tests를 이 필터 결과로 덮어썼기 때문에,
+      // 특정 학생에게만 배정한 시험이 같은 반 다른 학생에게도 보이게 되는 문제가 있었다.
       DATA.tests = allTests.filter(function(t){
         // 기관 필터
         if(t.orgId && CU.orgId && t.orgId !== CU.orgId) return false;
+        // 특정 학생 지정된 경우 - 해당 학생만 표시
+        if(t.studentIds && t.studentIds.length>0){
+          return t.studentIds.includes(String(CU.id));
+        }
         // 반 필터: classNames 없으면 전체 공개
         if(!t.classNames || t.classNames.length===0) return true;
         return t.classNames.includes(CU.className);
