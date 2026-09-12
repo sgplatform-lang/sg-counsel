@@ -27903,6 +27903,92 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 @media print{#omrAutomationPanel .no-print{display:none!important}}
 </style>
 
+<style id="v46-report-redesign">
+/* v46: 챌린저 상담 리포트(PART 1~3) 시각 구분 강화 + 빈 페이지(공백) 페이지네이션 수정 */
+
+/* -- PART 상단 헤더: 굵은 제목 + 하단 구분선 + 우측 학생명 + 회차 메타 정보 -- */
+/* ★ v46 버그수정: 처음에는 #weeklyReport 로 스코프를 줬었는데, "인쇄/PDF" 버튼을 누르면
+   별도 팝업 창에 reportEl.innerHTML(= #weeklyReport의 자식들)만 그대로 옮겨져서 #weeklyReport
+   라는 조상 요소 자체가 사라져 버려 스타일이 하나도 안 먹는 문제가 있었다.
+   그래서 ID 없이 클래스 선택자 자체의 우선순위(+ !important)만으로 구버전 .weekly-part 규칙을
+   항상 이기도록 한다 (화면 미리보기/인쇄 팝업 어느 쪽에서도 동일하게 적용됨). */
+.weekly-part{margin-top:0!important}
+.v46-part-head{margin:0 0 18px}
+.v46-part-head-row{
+  display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;
+  gap:10px 16px;padding-bottom:11px;border-bottom:3px solid #172033;
+}
+.v46-part-head-row h2{
+  margin:0!important;padding:0!important;border-left:0!important;
+  font-size:23px!important;font-weight:900!important;color:#172033!important;
+  letter-spacing:-.2px;
+}
+.v46-part-num{margin-right:2px}
+.v46-part-head-side{font-size:15px;font-weight:800;color:#172033;white-space:nowrap}
+.v46-part-head-meta{margin-top:8px;font-size:12.5px;color:#667085;display:flex;gap:7px;flex-wrap:wrap}
+.v46-part-head-meta .sep{color:#c9d3e0}
+@media print{
+  .weekly-part{page-break-before:always!important;break-before:page!important}
+  .v46-part-head{margin:0 0 12px}
+  .v46-part-head-row{padding-bottom:8px;border-bottom-width:2.5px}
+  .v46-part-head-row h2{font-size:18px!important}
+  .v46-part-head-side{font-size:13px}
+  .v46-part-head-meta{font-size:11px}
+}
+
+/* -- 빈 페이지(공백) 방지: 과목별 대형 카드는 내부에서 자유롭게 줄바꿈되도록 허용하고,
+   카드 내부의 짧은 소단위 박스만 쪼개지지 않게 유지 -- */
+@media print{
+  .report-card.aar-flow-card{page-break-inside:auto!important;break-inside:auto!important}
+  .report-card.aar-flow-card > h3,
+  .report-card.aar-flow-card > .bar{page-break-after:avoid;break-after:avoid}
+  .report-card.aar-flow-card .aar-analysis-box,
+  .report-card.aar-flow-card .aar-action-box,
+  .report-card.aar-flow-card .aar-objective-box,
+  .report-card.aar-flow-card .v41-ranking,
+  .report-card.aar-flow-card .aar-mini-stats,
+  .report-card.aar-flow-card .v41-rank-badge,
+  .report-card.aar-flow-card .v41-cause-status,
+  .report-card.aar-flow-card .v42-cause{
+    page-break-inside:avoid;break-inside:avoid;
+  }
+  .report-card.aar-flow-card table{page-break-inside:auto}
+  .report-card.aar-flow-card tr{page-break-inside:avoid;break-inside:avoid}
+}
+
+/* -- 핵심 수치 강조(큰 숫자) + 상태별 색상 -- */
+/* .aar-mini-stats 조상 클래스를 더해 위쪽 구버전 .aar-mini-stat b 규칙보다 우선 적용 */
+.aar-mini-stats .aar-mini-stat b{font-size:25px!important;color:var(--brand)!important}
+.aar-mini-stats .aar-mini-stat.stat-warn b{color:var(--red)!important}
+.aar-mini-stats .aar-mini-stat.stat-ok b{color:var(--amber)!important}
+.aar-mini-stats .aar-mini-stat.stat-good b{color:var(--green)!important}
+.aar-mini-stats .aar-mini-stat.stat-warn{border-color:#fecaca;background:#fff5f5}
+.aar-mini-stats .aar-mini-stat.stat-ok{border-color:#fed7aa;background:#fffaf0}
+.aar-mini-stats .aar-mini-stat.stat-good{border-color:#bbf7d0;background:#f0fdf4}
+
+/* -- TOP5 랭킹 박스: 순위 배지 -- */
+.v41-ranking .v41-rank-grid div{display:flex;align-items:center;gap:10px;justify-content:flex-start}
+.v41-ranking .v41-rank-grid div b{flex:1;font-weight:800}
+.v41-rank-num{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:11.5px;font-weight:900}
+
+/* -- 문항별 전체 오답률 막대 그래프(progress-bar) -- */
+.v46-pbar-wrap{display:flex;align-items:center;gap:8px;min-width:120px}
+.v46-pbar-track{flex:1;height:9px;border-radius:5px;background:#e7ecf3;overflow:hidden}
+.v46-pbar-fill{height:100%;border-radius:5px}
+.v46-pbar-fill.sev-good{background:var(--green)}
+.v46-pbar-fill.sev-mid{background:var(--amber)}
+.v46-pbar-fill.sev-high{background:var(--red)}
+.v46-pbar-num{font-weight:800;font-size:13px;white-space:nowrap;min-width:42px;text-align:right}
+.v46-pbar-num.sev-good{color:var(--green)}
+.v46-pbar-num.sev-mid{color:var(--amber)}
+.v46-pbar-num.sev-high{color:var(--red)}
+
+@media print{
+  .v46-part-num{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+  .v46-pbar-fill,.v46-pbar-track{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -29078,7 +29164,7 @@ function exclusionReason(s,i){
 function validItems(s){return s.items.filter(i=>i.no&&i.unit&&(i.reasons||[]).length>0).filter(i=>difficultyEligible(s,i))}
 function excludedItems(s){return s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).filter(i=>exclusionReason(s,i))}
 function issues(s){let map={};validItems(s).forEach(i=>i.reasons.forEach(r=>{if(!map[r])map[r]={tag:r,count:0,items:[],units:[],memos:[],diffs:[]};map[r].count++;map[r].items.push(i.no);map[r].units.push(i.unit);if(i.memo)map[r].memos.push(i.memo);map[r].diffs.push(i.diff)}));return Object.values(map).sort((a,b)=>b.count-a.count)}
-function wrongCount(s){return +(s.wrongCount||0)||s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).length}function name(s){return \`\${SUBJECTS[s.subject]}\${s.detail?'('+s.detail+')':''}\`}function _sgTrendLabel(s){if(s&&s.name)return _sgDisplayName(s.name);if(s&&s.subject&&SUBJECTS[s.subject])return name(s);return '';}function _sgTrendWrong(s){return (s&&s.wrong!=null)?s.wrong:((s&&s.wrongCount!=null)?s.wrongCount:'-');}function actionFor(s,tag){return ACTION_LIBRARY[s.subject]?.[tag]||\`\${SUBJECTS[s.subject]} \${tag} 원인은 다음 회차 전 유사 문항 3개로 재확인하고, 시험 중 같은 신호가 나오면 즉시 표시한다.\`}
+function wrongCount(s){return (s.wrongCount!=null&&s.wrongCount!=='')?+s.wrongCount:s.items.filter(i=>i.no||i.unit||(i.reasons||[]).length||i.memo).length}function name(s){return \`\${SUBJECTS[s.subject]}\${s.detail?'('+s.detail+')':''}\`}function _sgTrendLabel(s){if(s&&s.name)return _sgDisplayName(s.name);if(s&&s.subject&&SUBJECTS[s.subject])return name(s);return '';}function _sgTrendWrong(s){return (s&&s.wrong!=null)?s.wrong:((s&&s.wrongCount!=null)?s.wrongCount:'-');}function actionFor(s,tag){return ACTION_LIBRARY[s.subject]?.[tag]||\`\${SUBJECTS[s.subject]} \${tag} 원인은 다음 회차 전 유사 문항 3개로 재확인하고, 시험 중 같은 신호가 나오면 즉시 표시한다.\`}
 function scoreMission(s){let r=0;if(s.focus==='집중')r+=3;if(s.time==='심각'||s.mental!=='안정')r+=2;if(+s.targetScore&&+s.score&&(+s.targetScore-+s.score>=10))r+=2;if(issues(s).length)r+=2;return r}function focusedSubjects(){let raw=$('focusLimit').value;let limit=raw?+raw:state.subjects.length;return [...state.subjects].sort((a,b)=>scoreMission(b)-scoreMission(a)).slice(0,limit).map(s=>s.sid)}
 function selectedData(){let fs=focusedSubjects();let out=[];state.subjects.forEach(s=>{if(!fs.includes(s.sid))return;issues(s).slice(0,2).forEach(iss=>out.push({s,iss,action:actionFor(s,iss.tag)}))});return out}
 function countRank(v){let m={'0':0,'1~2':1,'3~5':2,'6개 이상':3};return m[v]??0}
@@ -29327,6 +29413,28 @@ function stripCovers(markup){
 // ══════════════════════════════════════════════════
 // 실전 수행손실·교정가능점수 (CHALLENGER 4대 실전지표, V1)
 // ══════════════════════════════════════════════════
+function _sgPartHeadHtml(label, title, colorVar){
+  const studentName = ($('studentName')?.value||'').trim();
+  const testDate = ($('testDate')?.value||'').trim();
+  const testName = ($('testName')?.value||'').trim();
+  const sideText = studentName ? \`\${studentName} 학생\` : '';
+  const metaBits = [];
+  if(testDate) metaBits.push(\`응시일 \${testDate}\`);
+  if(testName) metaBits.push(testName);
+  const metaHtml = metaBits.map(esc).join(' <span class="sep">|</span> ');
+  return \`<div class="v46-part-head">
+    <div class="v46-part-head-row">
+      <h2><span class="v46-part-num" style="color:\${colorVar}">\${esc(label)}</span> \${esc(title)}</h2>
+      \${sideText?\`<span class="v46-part-head-side">\${esc(sideText)}</span>\`:''}
+    </div>
+    \${metaHtml?\`<div class="v46-part-head-meta">\${metaHtml}</div>\`:''}
+  </div>\`;
+}
+function _sgPbarHtml(rate){
+  const r = Math.max(0, Math.min(100, rate));
+  const sev = r<=30?'sev-good':(r>=60?'sev-high':'sev-mid');
+  return \`<div class="v46-pbar-wrap"><div class="v46-pbar-track"><div class="v46-pbar-fill \${sev}" style="width:\${r}%"></div></div><span class="v46-pbar-num \${sev}">\${rate.toFixed(1)}%</span></div>\`;
+}
 function renderWeekly(){
   renderLong();
   renderShort();
@@ -29337,10 +29445,10 @@ function renderWeekly(){
   const perfLossBody = renderPerfLoss();
   $('weeklyReport').innerHTML =
     cover('챌린저 상담 리포트 (상담용+처방전+누적 통합)')+
-    \`<div class="weekly-part"><h2>PART 1. 상담용 분석 정밀 리포트</h2>\${longBody}</div>
-     <div class="weekly-part"><h2>PART 2. 학생 실천 처방전</h2>\${shortBody}</div>
-     <div class="weekly-part"><h2>PART 2.5. 실전 수행손실 분석 · 행동강령 연계</h2>\${perfLossBody}</div>
-     <div class="weekly-part"><h2>PART 3. 누적 변화 리포트</h2>\${trendBody}</div>\`;
+    \`<div class="weekly-part wp-1">\${_sgPartHeadHtml('PART 1.','상담용 분석 정밀 리포트','var(--brand)')}\${longBody}</div>
+     <div class="weekly-part wp-2">\${_sgPartHeadHtml('PART 2.','학생 실천 처방전','var(--amber)')}\${shortBody}</div>
+     <div class="weekly-part wp-3">\${_sgPartHeadHtml('PART 2.5.','실전 수행손실 분석 · 행동강령 연계','var(--red)')}\${perfLossBody}</div>
+     <div class="weekly-part wp-4">\${_sgPartHeadHtml('PART 3.','누적 변화 리포트','var(--purple)')}\${trendBody}</div>\`;
 }
 function populateHistoryDropdown(){let sel=$('historyLoadSelect');if(!sel)return;let st=$('studentName').value;let list=state.history.filter(h=>h.student===st).sort((a,b)=>(a.date||'').localeCompare(b.date||''));if(!list.length){sel.innerHTML='<option value="">저장된 과거 회차 없음</option>';return;}sel.innerHTML=list.map((h,i)=>\`<option value="\${i}">\${h.date||'날짜없음'} · \${h.test||'회차명없음'}\${h.fullSubjects&&h.fullSubjects.length?'':' (요약만 저장됨)'}</option>\`).join('');const curDate=$('testDate').value,curTest=$('testName').value;let matchIdx=list.findIndex(h=>_sgTrim(h.date)===_sgTrim(curDate)&&_sgTrim(h.test)===_sgTrim(curTest));if(matchIdx<0)matchIdx=list.length-1;sel.value=String(matchIdx)}
 function _sgInferSubjectCode(nm){
@@ -30414,7 +30522,7 @@ function aarObjectiveSummary(s){
   if(high.length)text+=\`전체 오답률 60% 이상 문항은 \${high.length}개로, 집단 고난도 영향도 함께 확인됩니다. \`;
   if(!low.length&&high.length)text+='기본·중간 난도보다 고난도 문항에서 변별된 양상이 상대적으로 큽니다. ';
   if(mid.length)text+=\`중간 변별 구간 문항은 \${mid.length}개입니다.\`;
-  return \`<div class="aar-objective-box"><h4>객관적 위치 비교</h4><div class="aar-mini-stats"><div class="aar-mini-stat"><b>\${d.length}</b><span>오답률 연계 문항</span></div><div class="aar-mini-stat"><b>\${low.length}</b><span>저오답률 오답</span></div><div class="aar-mini-stat"><b>\${mid.length}</b><span>중간 변별 오답</span></div><div class="aar-mini-stat"><b>\${high.length}</b><span>고오답률 오답</span></div></div><p>\${text}</p></div>\`
+  return \`<div class="aar-objective-box"><h4>📊 객관적 위치 비교</h4><div class="aar-mini-stats"><div class="aar-mini-stat"><b>\${d.length}</b><span>오답률 연계 문항</span></div><div class="aar-mini-stat"><b>\${low.length}</b><span>저오답률 오답</span></div><div class="aar-mini-stat"><b>\${mid.length}</b><span>중간 변별 오답</span></div><div class="aar-mini-stat \${high.length?'stat-warn':''}"><b>\${high.length}</b><span>고오답률 오답</span></div></div><p>\${text}</p></div>\`
 }
 function aarInfer(s,f){
   const subj=s.subject, cause=f['핵심 원인']||s.primaryFactor||'', risk=f['위험 행동']||'', time=f['시간 상태']||s.time||'', weak=f['확인된 부족 영역']||s.weakUnits||'', learn=f['학습 상태']||f['준비도']||s.preparationLevel||'', order=f['풀이 순서']||s.orderMemo||s.order||'';
@@ -30483,7 +30591,7 @@ function aarSummaryTable(){
   h+=state.subjects.map(s=>\`<tr><td>\${name(s)}</td><td>\${aarValid(s.score)?esc(s.score):'-'}</td>\${haveGrade?\`<td>\${aarValid(s.grade)?esc(s.grade):'-'}</td>\`:''}\${havePct?\`<td>\${aarValid(s.percentile)?esc(s.percentile):'-'}</td>\`:''}<td>\${esc(s.wrongCount||'0')}</td><td>\${esc(progressInterpretation(s))}</td></tr>\`).join('')+'</table>'; return h
 }
 function aarBatchAppendix(){
-  const blocks=state.subjects.map(s=>{const d=aarRateData(s);if(!d.length)return'';return \`<div class="report-card"><h3>\${name(s)} · 문항별 전체 오답률 비교</h3><table><tr><th>문항</th><th>단원/유형</th><th>난이도</th><th>전체 오답률</th><th>개인 해석</th></tr>\${d.map(x=>\`<tr><td>\${esc(x.no)}</td><td>\${esc(x.unit)}</td><td>\${esc(x.diff)}</td><td>\${x.rate.toFixed(1)}%</td><td>\${x.rate<=30?'우선 교정: 다수 학생이 맞힌 문항':x.rate>=60?'집단 고난도: 접근·시간·학습상태 확인':'중간 변별: 개념 적용과 정확도 확인'}</td></tr>\`).join('')}</table></div>\`}).join('');
+  const blocks=state.subjects.map(s=>{const d=aarRateData(s);if(!d.length)return'';return \`<div class="report-card aar-flow-card"><h3>📊 \${name(s)} · 문항별 전체 오답률 비교</h3><table><tr><th>문항</th><th>단원/유형</th><th>난이도</th><th style="min-width:130px">전체 오답률</th><th>개인 해석</th></tr>\${d.map(x=>\`<tr><td>\${esc(x.no)}</td><td>\${esc(x.unit)}</td><td>\${esc(x.diff)}</td><td>\${_sgPbarHtml(x.rate)}</td><td>\${x.rate<=30?'우선 교정: 다수 학생이 맞힌 문항':x.rate>=60?'집단 고난도: 접근·시간·학습상태 확인':'중간 변별: 개념 적용과 정확도 확인'}</td></tr>\`).join('')}</table></div>\`}).join('');
   return blocks?\`<div class="aar-appendix"><h2>부록. 문항별 전체 오답률과 개인 결과 비교</h2><p class="muted">오답률은 이번 회차 응시 집단 기준이며, 학생의 준비도·미학습 범위와 함께 해석합니다.</p>\${blocks}</div>\`:''
 }
 function renderLong(){
@@ -30561,21 +30669,24 @@ function perfLossCardHtml(s){
       \${issues(s).map(iss=>\`<div class="issue selected" style="margin-top:6px"><h4>\${esc(iss.tag)}</h4><table><tr><th>문항</th><td>\${esc(iss.items.join(', '))}</td><th>단원/유형</th><td>\${esc([...new Set(iss.units)].join(', '))}</td></tr><tr><th>행동강령</th><td colspan="3">\${esc(actionFor(s,iss.tag))}</td></tr></table></div>\`).join('')}
     </div>\`:'';
   if(!hasPts){
-    return \`<div class="report-card"><h4>\${esc(name(s))} · 실전 수행손실 분석</h4><p class="small muted">틀린 문항 입력란에서 배점과 1차 원인(K/T/M/J/C/U)을 채우면 실질 완주율·손실점수·교정가능점수가 자동 계산됩니다.</p>\${issuesHtml}</div>\`;
+    return \`<div class="report-card aar-flow-card"><h4>📉 \${esc(name(s))} · 실전 수행손실 분석</h4><p class="small muted">틀린 문항 입력란에서 배점과 1차 원인(K/T/M/J/C/U)을 채우면 실질 완주율·손실점수·교정가능점수가 자동 계산됩니다.</p>\${issuesHtml}</div>\`;
   }
   const r=computePerfLoss(s);
-  const compRow=r.completionRate!=null
-    ? \`<tr><th>실질 완주율</th><td colspan="3"><b>\${r.completionRate.toFixed(0)}%</b> <span class="small muted">(정상풀이 \${r.normalCnt} / \${r.totalCnt}문항)</span></td></tr>\`
-    : \`<tr><th>실질 완주율</th><td colspan="3"><span class="small muted">과목 입력란의 "전체 문항 수"를 채우면 계산됩니다</span></td></tr>\`;
-  return \`<div class="report-card">
-    <h4>\${esc(name(s))} · 실전 수행손실 분석</h4>
+  const compCell=r.completionRate!=null
+    ? \`<b>\${r.completionRate.toFixed(0)}%</b><span>실질 완주율 (\${r.normalCnt}/\${r.totalCnt}문항)</span>\`
+    : \`<b>-</b><span>실질 완주율 ("전체 문항 수" 입력 필요)</span>\`;
+  const recoverClass = r.recoverable>=10?'stat-warn':(r.recoverable>0?'stat-ok':'stat-good');
+  return \`<div class="report-card aar-flow-card">
+    <h4>📉 \${esc(name(s))} · 실전 수행손실 분석</h4>
     <div class="small muted" style="margin-bottom:6px">현재 점수 \${esc(s.score)||'-'}점</div>
+    <div class="aar-mini-stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div class="aar-mini-stat">\${compCell}</div>
+      <div class="aar-mini-stat stat-warn"><b>\${r.totalLoss}점</b><span>총 실전 수행손실</span></div>
+      <div class="aar-mini-stat \${recoverClass}"><b>약 +\${r.recoverable}점</b><span>단기 교정가능점수</span></div>
+    </div>
     <table><tbody>
-      \${compRow}
       <tr><th>시간 손실</th><td colspan="3"><b>\${r.timeLoss}점</b></td></tr>
       <tr><th>수행 손실</th><td colspan="3"><b>\${r.performanceLoss}점</b> <span class="small muted">(실수 \${r.mistakeLoss} · 판단·집착 \${r.judgeLoss} · 집중 \${r.concLoss})</span></td></tr>
-      <tr><th>총 실전 수행손실</th><td colspan="3"><b>\${r.totalLoss}점</b></td></tr>
-      <tr><th>단기 교정가능점수</th><td colspan="3"><b>약 +\${r.recoverable}점</b></td></tr>
     </tbody></table>
     <p style="margin-top:8px"><b>핵심 손실원인:</b> \${r.primaryLabel?esc(r.primaryLabel):'해당 없음'}</p>
     <p class="small">\${esc(_sgPerfLossInterpretSentence(r.primary))}</p>
@@ -31512,14 +31623,18 @@ function __SG_printSection(btn){
       titleParts=[studentName, testDate, testName, reportTitle];
     }
     const title = titleParts.filter(Boolean).join('_').replace(/[\\\\\\\\/:*?"<>|]/g, ''); // 파일명에 쓸 수 없는 문자 제거
-    const styleEl = document.querySelector('style');
+    // ★ v46 버그수정: document.querySelector('style')는 문서의 "첫 번째" <style> 태그만
+    // 가져오기 때문에, 그 뒤에 추가된 스타일 블록(v46 리포트 디자인 개선 포함)이
+    // 인쇄/PDF 창에는 전혀 반영되지 않는 문제가 있었다. 모든 <style> 태그를 합쳐서 전달한다.
+    const styleEls = Array.from(document.querySelectorAll('style'));
+    const styleHtml = styleEls.map(function(el){ return el.outerHTML; }).join('\\n');
     const printWin = window.open('', '_blank', 'width=900,height=1000');
     if(!printWin){
       alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.');
       return;
     }
     printWin.document.write(\`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>\${title}</title>
-      \${styleEl ? styleEl.outerHTML : ''}
+      \${styleHtml}
       <style>body{margin:0;padding:20px;background:#fff}.no-print{display:none!important}</style>
       </head><body>\${reportEl.innerHTML}</body></html>\`);    printWin.document.close();
     // 콘텐츠 렌더링 시간을 약간 두고 인쇄 다이얼로그 호출
@@ -31855,7 +31970,7 @@ function __SG_initFromHost(data){
     });
     items.sort(function(a,b){return b.count-a.count;}); items=items.slice(0,5);
     if(!items.length)return '';
-    return '<div class="v41-ranking"><h4>이번 회차 공통 체크 TOP '+items.length+'</h4><div class="v41-rank-grid">'+items.map(function(x,i){return '<div><b>'+(i+1)+'위 · '+esc(x.label)+'</b><span>'+esc(x.value)+' · '+x.count+'명</span></div>';}).join('')+'</div><p>동일 회차·동일 과목의 저장된 매니저 메모를 기준으로 집계했습니다.</p></div>';
+    return '<div class="v41-ranking"><h4>🏆 이번 회차 공통 체크 TOP '+items.length+'</h4><div class="v41-rank-grid">'+items.map(function(x,i){return '<div><span class="v41-rank-num">'+(i+1)+'</span><b>'+esc(x.label)+'</b><span>'+esc(x.value)+' · '+x.count+'명</span></div>';}).join('')+'</div><p>동일 회차·동일 과목의 저장된 매니저 메모를 기준으로 집계했습니다.</p></div>';
   }
   function v41StudentCauseStatus(s){
     var n=(s.items||[]).filter(function(it){return Array.isArray(it.reasons)&&it.reasons.length;}).length;
@@ -31876,13 +31991,13 @@ function __SG_initFromHost(data){
   window.aarSubjectReport=function(s){
     var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f), record=window.aarRecordHtml(f);
     var wrong=f['전체 오답']||((s.items||[]).map(function(x){return x.no;}).filter(Boolean).join(', '));
-    return '<div class="report-card"><h3>'+aarSubjectTitle(s)+' 실전 AAR</h3>'+
+    return '<div class="report-card aar-flow-card"><h3>'+aarSubjectTitle(s)+' 실전 AAR</h3>'+
       '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>오답</b><span>'+esc(s.wrongCount||'0')+'개</span>'+(v41Valid(wrong)?'<b>문항</b><span>'+esc(wrong)+'</span>':'')+'</div>'+
       v41ScoreRankHtml(s)+
       v41ItemUnitTableHtml(s)+
       v41RankingHtml(s)+record+window.aarObjectiveSummary(s)+v41StudentCauseStatus(s)+
-      '<div class="aar-analysis-box"><h4>무너진 원인과 점수 영향</h4><p>'+esc(inf.analysis)+'</p></div>'+
-      '<div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div></div>';
+      '<div class="aar-analysis-box"><h4>🔍 무너진 원인과 점수 영향</h4><p>'+esc(inf.analysis)+'</p></div>'+
+      '<div class="aar-action-box"><h4>✅ 다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div></div>';
   };
   window.aarAssignment=function(s){
     var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f);
@@ -31906,10 +32021,10 @@ function __SG_initFromHost(data){
       return '<tr><td>'+esc(x.no||'____')+'번</td><td>'+unitCell+'</td><td>'+rateCell+'</td><td>'+causeCell+'</td><td>□해결 □미해결</td><td>'+esc(inf.action)+'</td></tr>';
     }).join('');
     while((rows.match(/<tr>/g)||[]).length<2)rows+='<tr><td>____번</td><td>-</td><td>____%</td><td>□개념 □적용 □실수 □시간 □집중</td><td>□해결 □미해결</td><td>________________</td></tr>';
-    return '<div class="report-card v42-prescription"><h3>'+name(s)+'</h3>'+ 
-      '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>전체 오답</b><span>'+(v41Valid(wrong)?esc(wrong):'채점 결과 확인')+'</span></div>'+ 
-      (v41Valid(cause)?'<p class="v42-cause"><b>시험 직후 확인된 원인:</b> '+esc(cause)+'</p>':'')+ 
-      '<div class="aar-action-box"><h4>다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div>'+ 
+    return '<div class="report-card aar-flow-card v42-prescription"><h3>'+name(s)+'</h3>'+
+      '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>전체 오답</b><span>'+(v41Valid(wrong)?esc(wrong):'채점 결과 확인')+'</span></div>'+
+      (v41Valid(cause)?'<p class="v42-cause"><b>시험 직후 확인된 원인:</b> '+esc(cause)+'</p>':'')+
+      '<div class="aar-action-box"><h4>✅ 다음 시험 행동강령</h4><p>'+esc(inf.action)+'</p></div>'+
       '<p class="v42-suggest"><b>우선 분석 권장 문항:</b> '+esc(suggested||'오답 중 우선 문항 2개 선택')+'</p>'+ 
       '<table class="aar-assignment-table"><tr><th>문항</th><th>단원/유형</th><th>전체 오답률</th><th>실제 원인</th><th>다시 풀기</th><th>행동강령 연결</th></tr>'+rows+'</table></div>';
   };
@@ -42739,11 +42854,12 @@ function generateReport() {
       subs.forEach(function(s){
         if(!s||!s.subject) return;
         var score=+s.score||0;
-        var wrong=+s.wrongCount||(Array.isArray(s.items)?s.items.length:0);
+        var wrong=(s.wrongCount!=null&&s.wrongCount!=='')?+s.wrongCount:(Array.isArray(s.items)?s.items.filter(function(i){return i.no||i.unit||(i.reasons||[]).length||i.memo;}).length:0);
         if(!score && !wrong) return; // 응시 안 한 과목은 제외
         var key=_statGroupKey(s.subject,s.detail);
         if(!groups[key]) groups[key]={label:_statGroupLabel(s.subject,s.detail), rows:[]};
-        groups[key].rows.push({name:stu.name||'', score:score, wrong:wrong});
+        groups[key].rows.push({name:stu.name||'', score:score, wrong:wrong,
+          school:stu.school||'', grade:stu.grade||'', org:_gg_getOrgName(stu)||'', className:stu.className||''});
       });
     });
     var groupKeys=Object.keys(groups);
@@ -42762,15 +42878,15 @@ function generateReport() {
       var wrongRank=_denseRank(g.rows,'wrong',false);
       var displayRows=g.rows.slice().sort(function(a,b){ return scoreRank[a._i]-scoreRank[b._i]; });
       var trs=displayRows.map(function(r){
-        return '<tr><td>'+scoreRank[r._i]+'</td><td>'+_statEsc(r.name)+'</td><td>'+r.score+'</td><td>'+r.wrong+'</td><td>'+wrongRank[r._i]+'위</td></tr>';
+        return '<tr><td>'+scoreRank[r._i]+'</td><td>'+_statEsc(r.name)+'</td><td>'+_statEsc(r.school)+'</td><td>'+_statEsc(r.grade)+'</td><td>'+_statEsc(r.org)+'</td><td>'+_statEsc(r.className)+'</td><td>'+r.score+'</td><td>'+r.wrong+'</td><td>'+wrongRank[r._i]+'위</td></tr>';
       }).join('');
       return '<h3>'+_statEsc(g.label)+' 성적·오답 방어력</h3>'+
-        '<table class="stat-table"><thead><tr><th>성적순위</th><th>학생</th><th>점수</th><th>오답</th><th>오답방어</th></tr></thead><tbody>'+trs+'</tbody></table>';
+        '<table class="stat-table"><thead><tr><th>성적순위</th><th>학생</th><th>학교</th><th>학년</th><th>기관</th><th>반</th><th>점수</th><th>오답</th><th>오답방어</th></tr></thead><tbody>'+trs+'</tbody></table>';
     }).join('');
 
     var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계';
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_statEsc(title)+'</title>'+
-      '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px}table.stat-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:13px}table.stat-table th,table.stat-table td{border:1px solid #e2e8f0;padding:6px 10px;text-align:center}table.stat-table th{background:#f0fdfa;color:#0f766e}table.stat-table td:nth-child(2){text-align:left}@media print{body{padding:8mm}}</style>'+
+      '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px}table.stat-table{width:100%;table-layout:auto;border-collapse:collapse;margin-bottom:10px;font-size:11.5px}table.stat-table th,table.stat-table td{border:1px solid #e2e8f0;padding:5px 6px;text-align:center;white-space:nowrap}table.stat-table th{background:#f0fdfa;color:#0f766e}@media print{body{padding:8mm}table.stat-table{font-size:10.5px}table.stat-table th,table.stat-table td{padding:4px 5px}}</style>'+
       '</head><body>'+
       '<h1>CHALLENGER 통계 리포트</h1>'+
       '<h2>회차: '+_statEsc(info.date||'')+' · '+_statEsc(info.name||'')+' · '+targets.length+'명</h2>'+
@@ -42840,7 +42956,7 @@ function generateReport() {
       var cd2=stu.challengerData||{};
       return (cd2.lastSubjects||[]).filter(function(s){
         if(!s||!s.subject) return false;
-        var score=+s.score||0, wrong=+s.wrongCount||(Array.isArray(s.items)?s.items.length:0);
+        var score=+s.score||0, wrong=(s.wrongCount!=null&&s.wrongCount!=='')?+s.wrongCount:(Array.isArray(s.items)?s.items.filter(function(i){return i.no||i.unit||(i.reasons||[]).length||i.memo;}).length:0);
         return !!(score||wrong);
       });
     }
