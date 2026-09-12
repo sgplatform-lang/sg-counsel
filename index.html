@@ -27987,6 +27987,52 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   .v46-part-num{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
   .v46-pbar-fill,.v46-pbar-track{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 }
+
+/* -- AAR(시험 전/시험 후 자가진단) 항목별 표시: 학생·학부모가 보기 쉽도록 큰 글씨 + 구간 구분 -- */
+.aar-record-group{margin:14px 0}
+.aar-record-group-title{font-size:14.5px;font-weight:900;margin:0 0 9px;display:flex;align-items:center;gap:6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.aar-record-group-title.pre{color:var(--blue)}
+.aar-record-group-title.post{color:var(--brand)}
+.aar-record-grid-v2{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.aar-record-item-v2{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:#fafcff}
+.aar-record-item-v2 b{display:block;font-size:12.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.aar-record-item-v2 span{font-size:15.5px;font-weight:800;color:var(--ink);line-height:1.35}
+@media(max-width:800px){.aar-record-grid-v2{grid-template-columns:1fr}}
+@media print{
+  .aar-record-group{margin:10px 0;break-inside:auto}
+  .aar-record-group-title{font-size:13px}
+  .aar-record-grid-v2{grid-template-columns:1fr 1fr}
+  .aar-record-item-v2{padding:8px 10px;break-inside:avoid}
+  .aar-record-item-v2 b{font-size:11px;margin-bottom:3px}
+  .aar-record-item-v2 span{font-size:13px}
+}
+
+/* -- 대표 우수 유형 / 대표 취약 유형: 단원별 강약점 요약 박스 + 집단 오답률 비교표 -- */
+.v47-strength-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 10px}
+.v47-strength-box{border-radius:12px;padding:12px 14px;border:1px solid var(--line)}
+.v47-strength-box h4{margin:0 0 9px;font-size:13px;display:flex;align-items:center;gap:5px}
+.v47-strength-box.strong{background:#f0fdf9;border-color:#99e6d0}
+.v47-strength-box.strong h4{color:#0f766e}
+.v47-strength-box.weak{background:#fef2f2;border-color:#f3b6b6}
+.v47-strength-box.weak h4{color:#b91c1c}
+.v47-strength-row{background:#fff;border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.v47-strength-row:last-child{margin-bottom:0}
+.v47-strength-row b{display:block;font-size:12.5px;color:var(--ink);margin-bottom:2px}
+.v47-strength-row span{display:block;font-size:11px;color:var(--muted)}
+.v47-strength-table{width:100%;border-collapse:collapse;margin:4px 0 14px;font-size:12px}
+.v47-strength-table th,.v47-strength-table td{border:1px solid var(--line);padding:6px 8px;text-align:center}
+.v47-strength-table th{background:#f8fafc;color:var(--muted);font-weight:700}
+@media(max-width:700px){.v47-strength-wrap{grid-template-columns:1fr}}
+@media print{
+  .v47-strength-wrap{grid-template-columns:1fr 1fr;margin:10px 0 8px;gap:8px}
+  .v47-strength-box{padding:8px 10px;break-inside:avoid}
+  .v47-strength-box h4{font-size:11.5px;margin-bottom:6px}
+  .v47-strength-row{padding:6px 8px;margin-bottom:4px}
+  .v47-strength-row b{font-size:11px}
+  .v47-strength-row span{font-size:9.5px}
+  .v47-strength-table{font-size:10px;break-inside:avoid}
+  .v47-strength-table th,.v47-strength-table td{padding:4px 5px}
+}
 </style>
 
 </head>
@@ -30575,13 +30621,139 @@ function aarInfer(s,f){
   }
   return {analysis,action}
 }
-function aarRecordHtml(f){
-  const order=['전체 오답','미응답·찍은 문항','미학습 문항','시험 전 예상 취약 영역','확인된 부족 영역','풀이 순서','가장 큰 시간 손실','시간 상태','집중 붕괴 시점','집중 상태','위험 행동','핵심 원인','학습 상태','준비도','미학습 단원','점수 해석','학생 자기평가','학생 선택 행동'];
-  const rows=order.filter(k=>aarValid(f[k])).map(k=>\`<div class="aar-record-item"><b>\${esc(k)}:</b> \${esc(f[k])}</div>\`).join('');
-  return rows?\`<div class="aar-record-list">\${rows}</div>\`:''
+// ★ v47: 학생용 CHG_AAR_FIELDS(자가진단 문항)의 실제 라벨을 과목별로 그대로 반영해
+// "시험 전 AAR"/"시험 후 AAR"로 구분 표시한다. 학생이 입력한 라벨(및 학년별 변형,
+// 매니저 수동입력용 공통 라벨)까지 모두 후보로 매칭해, 라벨 표기가 조금 달라도
+// (공백·괄호·구두점 차이) 값이 조용히 누락되지 않도록 한다.
+function _sgAarNormKey(k){
+  return String(k||'').trim()
+    .replace(/^\s*(?:(?:\d{1,2})\s*[.)．、:-]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|[-*•▪◆※])\s*/,'')
+    .replace(/\s+/g,'').replace(/[·\/()（）]/g,'');
+}
+function _sgAarFieldVal(f,labels){
+  if(!f||!labels)return '';
+  var idx={};
+  Object.keys(f).forEach(function(k){ idx[_sgAarNormKey(k)]=f[k]; });
+  for(var i=0;i<labels.length;i++){
+    var v=idx[_sgAarNormKey(labels[i])];
+    if(aarValid(v))return v;
+  }
+  return '';
+}
+var AAR_FIELD_GROUPS={
+  KOR:[
+    {title:'선택과목 준비도',phase:'pre',labels:['선택과목 준비도']},
+    {title:'문학 준비도',phase:'pre',labels:['문학 준비도']},
+    {title:'독서 준비도',phase:'pre',labels:['독서 준비도']},
+    {title:'시험 전 예상 취약 영역',phase:'pre',labels:['시험 전 예상 취약 영역']},
+    {title:'오늘 선택한 풀이 순서',phase:'post',labels:['오늘 선택한 풀이 순서','풀이 순서']},
+    {title:'가장 크게 시간이 무너진 영역',phase:'post',labels:['가장 크게 시간이 무너진 영역','시간 붕괴 영역']},
+    {title:'시간 부족 정도',phase:'post',labels:['시간 부족 정도','시간 상태']},
+    {title:'핵심 불안정 원인',phase:'post',labels:['핵심 불안정 원인','핵심 원인']},
+    {title:'가장 위험했던 행동',phase:'post',labels:['가장 위험했던 행동','위험 행동']},
+    {title:'집중 붕괴 시점',phase:'post',labels:['집중 붕괴 시점']},
+    {title:'시험 후 확인된 부족 영역',phase:'post',labels:['시험 후 확인된 부족 영역','확인된 부족 영역']},
+    {title:'부족 영역의 학습 상태',phase:'post',labels:['부족 영역의 학습 상태','학습 상태']},
+    {title:'학생 점수 자가해석',phase:'post',labels:['학생 점수 자가해석','학생 자기평가']}
+  ],
+  MATH:[
+    {title:'수학 선택과목',phase:'pre',labels:['수학 선택과목']},
+    {title:'시험 전 예상 취약 단원',phase:'pre',labels:['시험 전 예상 취약 단원','시험 전 예상 취약 영역']},
+    {title:'오늘 사용한 풀이 전략',phase:'post',labels:['오늘 사용한 풀이 전략','오늘(이번 시험) 사용한 풀이 전략','풀이 순서']},
+    {title:'가장 큰 시간 손실 구간',phase:'post',labels:['가장 큰 시간 손실 구간','가장 큰 시간 손실','시간 붕괴 영역']},
+    {title:'미완료 문항 수',phase:'post',labels:['미완료 문항 수']},
+    {title:'핵심 불안정 원인',phase:'post',labels:['핵심 불안정 원인','핵심 원인']},
+    {title:'가장 위험했던 행동',phase:'post',labels:['가장 위험했던 행동','위험 행동']},
+    {title:'집중 붕괴 시점',phase:'post',labels:['집중 붕괴 시점']},
+    {title:'시험 후 확인된 부족 단원',phase:'post',labels:['시험 후 확인된 부족 단원','확인된 부족 영역']},
+    {title:'부족 영역의 학습 상태',phase:'post',labels:['부족 영역의 학습 상태','학습 상태']},
+    {title:'학생 점수 자가해석',phase:'post',labels:['학생 점수 자가해석','학생 자기평가']}
+  ],
+  ENG:[
+    {title:'영어 준비도',phase:'pre',labels:['영어 준비도']},
+    {title:'시험 전 예상 취약 유형',phase:'pre',labels:['시험 전 예상 취약 유형','시험 전 예상 취약 영역']},
+    {title:'듣기 수행 상태',phase:'post',labels:['듣기 수행 상태','듣기 수행']},
+    {title:'듣기 중 독해 병행 문항 수',phase:'post',labels:['듣기 중 독해 병행 문항 수','듣기 중 독해 병행']},
+    {title:'시간이 가장 많이 소요된 유형',phase:'post',labels:['시간이 가장 많이 소요된 유형','가장 오래 걸린 유형']},
+    {title:'시간 부족 정도',phase:'post',labels:['시간 부족 정도','시간 상태']},
+    {title:'핵심 불안정 원인',phase:'post',labels:['핵심 불안정 원인','핵심 원인']},
+    {title:'가장 위험했던 행동',phase:'post',labels:['가장 위험했던 행동','위험 행동']},
+    {title:'다음 영어 시험 행동강령',phase:'post',labels:['다음 영어 시험 행동강령','다음 행동강령','학생 선택 행동','매니저 최종 행동강령']}
+  ],
+  INQ:[
+    {title:'과목 역할',phase:'pre',labels:['과목 역할']},
+    {title:'시험 전 예상 취약 단원',phase:'pre',labels:['시험 전 예상 취약 단원','시험 전 예상 취약 영역']},
+    {title:'준비도',phase:'post',labels:['준비도']},
+    {title:'시간 상태',phase:'post',labels:['시간 상태','시간 부족 정도']},
+    {title:'핵심 불안정 원인',phase:'post',labels:['핵심 불안정 원인','핵심 원인']},
+    {title:'시험 후 확인된 부족 단원',phase:'post',labels:['시험 후 확인된 부족 단원','확인된 부족 영역']},
+    {title:'부족 영역의 학습 상태',phase:'post',labels:['부족 영역의 학습 상태','학습 상태']},
+    {title:'준비한 범위 수행 수준',phase:'post',labels:['준비한 범위 수행 수준','준비한 범위 수행']},
+    {title:'학생 점수 자가해석',phase:'post',labels:['학생 점수 자가해석','학생 자기평가']},
+    {title:'다음 행동강령',phase:'post',labels:['다음 행동강령','학생 선택 행동','매니저 최종 행동강령']}
+  ],
+  HIST:[
+    {title:'준비도(시험 전)',phase:'pre',labels:['준비도(시험 전)','준비도']},
+    {title:'시험 전 예상 취약 시대',phase:'pre',labels:['시험 전 예상 취약 시대','시험 전 예상 취약 영역']},
+    {title:'시간 상태',phase:'post',labels:['시간 상태','시간 부족 정도']},
+    {title:'핵심 불안정 원인',phase:'post',labels:['핵심 불안정 원인','핵심 원인']},
+    {title:'시험 후 확인된 부족 시대/영역',phase:'post',labels:['시험 후 확인된 부족 시대/영역','확인된 부족 영역']},
+    {title:'부족 영역의 학습 상태',phase:'post',labels:['부족 영역의 학습 상태','학습 상태']},
+    {title:'학생 점수 자가해석',phase:'post',labels:['학생 점수 자가해석','학생 자기평가']},
+    {title:'다음 행동강령',phase:'post',labels:['다음 행동강령','학생 선택 행동','매니저 최종 행동강령']}
+  ]
+};
+var AAR_EXTRA_LABELS=[
+  {title:'전체 오답',labels:['전체 오답']},
+  {title:'미응답·찍은 문항',labels:['미응답·찍은 문항']},
+  {title:'미학습 문항',labels:['미학습 문항']},
+  {title:'미학습 단원',labels:['미학습 단원']},
+  {title:'준비도',labels:['준비도']},
+  {title:'확인된 부족 영역',labels:['확인된 부족 영역']},
+  {title:'시간 부족 정도',labels:['시간 부족 정도']},
+  {title:'집중 붕괴 시점',labels:['집중 붕괴 시점']},
+  {title:'위험 행동',labels:['위험 행동']},
+  {title:'준비한 범위 수행',labels:['준비한 범위 수행']},
+  {title:'과목 역할',labels:['과목 역할']},
+  {title:'점수 해석',labels:['점수 해석']},
+  {title:'학생 자기평가',labels:['학생 자기평가']},
+  {title:'학생 선택 행동',labels:['학생 선택 행동']},
+  {title:'매니저 최종 행동강령',labels:['매니저 최종 행동강령']}
+];
+function _sgAarSubjectGroupKey(s){
+  var subj=s&&s.subject;
+  if(subj==='KOR'||subj==='MATH'||subj==='ENG'||subj==='INQ'||subj==='HIST')return subj;
+  return 'INQ';
+}
+function _sgAarRecordHtmlImpl(f,s){
+  if(!f)f={};
+  var groups=AAR_FIELD_GROUPS[_sgAarSubjectGroupKey(s)]||AAR_FIELD_GROUPS.INQ;
+  var used={}, preItems=[], postItems=[];
+  groups.forEach(function(g){
+    var v=_sgAarFieldVal(f,g.labels);
+    g.labels.forEach(function(lb){used[_sgAarNormKey(lb)]=true;});
+    if(!aarValid(v))return;
+    var item='<div class="aar-record-item-v2"><b>'+esc(g.title)+'</b><span>'+esc(v)+'</span></div>';
+    if(g.phase==='pre')preItems.push(item);else postItems.push(item);
+  });
+  var extraItems=[];
+  AAR_EXTRA_LABELS.forEach(function(g){
+    if(g.labels.some(function(lb){return used[_sgAarNormKey(lb)];}))return;
+    var v=_sgAarFieldVal(f,g.labels);
+    if(!aarValid(v))return;
+    extraItems.push('<div class="aar-record-item-v2"><b>'+esc(g.title)+'</b><span>'+esc(v)+'</span></div>');
+  });
+  var html='';
+  if(preItems.length)html+='<div class="aar-record-group"><div class="aar-record-group-title pre">📝 시험 전 AAR (사전 자가진단)</div><div class="aar-record-grid-v2">'+preItems.join('')+'</div></div>';
+  if(postItems.length)html+='<div class="aar-record-group"><div class="aar-record-group-title post">✅ 시험 후 AAR (직후 자가진단)</div><div class="aar-record-grid-v2">'+postItems.join('')+'</div></div>';
+  if(extraItems.length)html+='<div class="aar-record-group"><div class="aar-record-group-title post">➕ 추가 확인 정보</div><div class="aar-record-grid-v2">'+extraItems.join('')+'</div></div>';
+  return html;
+}
+function aarRecordHtml(f,s){
+  return _sgAarRecordHtmlImpl(f,s);
 }
 function aarSubjectReport(s){
-  const f=aarParseMemo(s.memo), inf=aarInfer(s,f), record=aarRecordHtml(f);
+  const f=aarParseMemo(s.memo), inf=aarInfer(s,f), record=aarRecordHtml(f,s);
   const wrong=f['전체 오답']||((s.items||[]).map(x=>x.no).filter(Boolean).join(', '));
   return \`<div class="report-card"><h3>\${aarSubjectTitle(s)} 시험 직후 기록</h3><div class="bar"><b>점수</b><span>\${aarValid(s.score)?esc(s.score)+'점':'-'}</span><b>오답 수</b><span>\${esc(s.wrongCount||'0')}개</span>\${aarValid(wrong)?\`<b>전체 오답</b><span>\${esc(wrong)}</span>\`:''}</div>\${record}\${aarObjectiveSummary(s)}<div class="aar-analysis-box"><h4>\${aarSubjectTitle(s)} 분석</h4><p>\${esc(inf.analysis)}</p></div><div class="aar-action-box"><h4>\${aarSubjectTitle(s)} 행동강령</h4><p>\${esc(inf.action)}</p></div></div>\`
 }
@@ -30989,10 +31161,8 @@ loadSampleAnswerKey();
     }); return out;
   };
 
-  window.aarRecordHtml=function(f){
-    const order=['전체 오답','미응답·찍은 문항','과목 역할','미학습 문항','시험 전 예상 취약 영역','확인된 부족 영역','풀이 순서','가장 큰 시간 손실','시간 상태','집중 붕괴 시점','집중 상태','위험 행동','핵심 원인','학습 상태','준비도','미학습 단원','준비한 범위 수행','점수 해석','학생 자기평가','학생 선택 행동'];
-    const rows=order.filter(k=>aarValid(f[k])).map(k=>\`<div class="aar-record-item"><b>\${esc(k)}:</b> \${esc(f[k])}</div>\`).join('');
-    return rows?\`<div class="aar-record-list">\${rows}</div>\`:'';
+  window.aarRecordHtml=function(f,s){
+    return _sgAarRecordHtmlImpl(f,s);
   };
 
   window.aarDynamicCriteria=function(s,f,action){
@@ -31034,7 +31204,7 @@ loadSampleAnswerKey();
   }
 
   window.aarSubjectReport=function(s){
-    const f=aarParseMemo(s.memo), inf=aarInfer(s,f), record=aarRecordHtml(f);
+    const f=aarParseMemo(s.memo), inf=aarInfer(s,f), record=aarRecordHtml(f,s);
     const wrong=f['전체 오답']||((s.items||[]).map(x=>x.no).filter(Boolean).join(', '));
     const quality=completeness(f,s);
     return \`<div class="report-card">
@@ -31874,21 +32044,8 @@ function __SG_initFromHost(data){
     var rows=keys.filter(function(k){return v41Valid(f[k]);}).map(function(k){return '<div class="aar-record-item"><b>'+esc(k)+':</b> '+esc(f[k])+'</div>';}).join('');
     return rows?'<div class="aar-record-list">'+rows+'</div>':'';
   }
-  window.aarRecordHtml=function(f){
-    var prep=v41Rows(f,['선택과목 준비도','문학 준비도','독서 준비도','영어 준비도','준비도']);
-    var pre=v41Rows(f,['시험 전 예상 취약 영역']);
-    var op=v41Rows(f,['풀이 순서','시간 붕괴 영역','시간 부족 정도','집중 붕괴 시점','집중 상태']);
-    var cause=v41Rows(f,['위험 행동','핵심 불안정 원인']);
-    var post=v41Rows(f,['확인된 부족 영역','학습 상태','학생 자기평가']);
-    var extra=v41Rows(f,['전체 오답','미응답·찍은 문항','미학습 문항','미학습 단원','준비한 범위 수행','과목 역할','학생 선택 행동']);
-    var html='';
-    if(prep)html+='<div class="v41-flow v41-flow-no-title">'+prep+'</div>';
-    if(pre)html+='<div class="v41-flow v41-flow-no-title">'+pre+'</div>';
-    if(op)html+='<div class="v41-flow v41-flow-no-title">'+op+'</div>';
-    if(cause)html+='<div class="v41-flow v41-flow-no-title">'+cause+'</div>';
-    if(post)html+='<div class="v41-flow v41-flow-no-title">'+post+'</div>';
-    if(extra)html+='<div class="v41-flow v41-extra"><h4>추가 확인 정보</h4>'+extra+'</div>';
-    return html;
+  window.aarRecordHtml=function(f,s){
+    return _sgAarRecordHtmlImpl(f,s);
   };
   function v41SubjectKey(s){return s&&s.subject==='KOR'?'KOR':s&&s.subject==='ENG'?'ENG':String(s&&s.subject||'');}
   function v41CurrentExam(){return {date:(document.getElementById('testDate')||{}).value||'',name:(document.getElementById('testName')||{}).value||''};}
@@ -31988,12 +32145,80 @@ function __SG_initFromHost(data){
     }).join('');
     return '<table class="aar-item-unit-table"><thead><tr><th>문항</th><th>단원/유형</th><th>난이도</th></tr></thead><tbody>'+rows+'</tbody></table>';
   }
+  // ★ v47: "대표 우수 유형 / 대표 취약 유형" 요약 박스 + 단원별 집단 오답률 비교표.
+  // 전국 동일 학년 평균 데이터가 없으므로, 이번 회차 동일 과목 응시 집단(peers) 기준으로
+  // 대체한다. items[]는 오답 문항만 기록되는 구조라 "우수 유형"은 peers 전체에 등장한
+  // 문항(=이번 시험에서 실제로 출제·채점된 문항) 중 내가 틀리지 않았고, 같은 단원에서도
+  // 다른 오답이 없는 단원만 후보로 삼아 "전 문항 정답" 근거가 있을 때만 표시한다.
+  function v41UnitStrengthHtml(s){
+    var myItems=(s.items||[]).filter(function(it){return it&&it.no;});
+    if(!myItems.length)return '';
+    var peers=v41PeerSubjects(s);
+    var isKor=s&&s.subject==='KOR';
+    var electivePeers=isKor?peers.filter(function(ps){return _cbrNormalizeDetail(ps&&ps.detail||'')===_cbrNormalizeDetail(s.detail||'');}):peers;
+    function rateFor(no){
+      var qn=parseInt(no,10);
+      var useCommon=isKor&&qn&&qn<=34;
+      var pool=useCommon?peers:electivePeers;
+      if(pool.length<2)pool=peers;
+      if(pool.length<2)return null;
+      var n=pool.length;
+      var wrong=pool.filter(function(ps){return (ps.items||[]).some(function(pi){return String(pi.no||'')===String(no);});}).length;
+      return wrong*100/n;
+    }
+    var weakMap={};
+    myItems.forEach(function(it){
+      var u=it.unit&&it.unit!=='단원정보 미입력'?it.unit:null; if(!u)return;
+      var r=rateFor(it.no);
+      if(!weakMap[u])weakMap[u]={unit:u,count:0,rateSum:0,rateN:0};
+      weakMap[u].count++;
+      if(r!=null){weakMap[u].rateSum+=r;weakMap[u].rateN++;}
+    });
+    var weakTop=Object.keys(weakMap).map(function(k){var w=weakMap[k];return {unit:w.unit,count:w.count,avgRate:w.rateN?w.rateSum/w.rateN:null};})
+      .sort(function(a,b){if(b.count!==a.count)return b.count-a.count;return (b.avgRate||0)-(a.avgRate||0);}).slice(0,3);
+
+    var strongUnits=[];
+    if(peers.length>=3){
+      var myWrongNos={}; myItems.forEach(function(it){myWrongNos[String(it.no)]=true;});
+      var myWrongUnits={}; myItems.forEach(function(it){if(it.unit&&it.unit!=='단원정보 미입력')myWrongUnits[it.unit]=true;});
+      var allNos={};
+      peers.forEach(function(ps){(ps.items||[]).forEach(function(pi){if(pi.no&&!(String(pi.no) in allNos))allNos[String(pi.no)]={unit:pi.unit&&pi.unit!=='단원정보 미입력'?pi.unit:null};});});
+      var strongMap={};
+      Object.keys(allNos).forEach(function(no){
+        if(myWrongNos[no])return;
+        var u=allNos[no].unit; if(!u||myWrongUnits[u])return;
+        var r=rateFor(no); if(r==null)return;
+        if(!strongMap[u])strongMap[u]={unit:u,rateSum:0,rateN:0};
+        strongMap[u].rateSum+=r; strongMap[u].rateN++;
+      });
+      strongUnits=Object.keys(strongMap).map(function(k){var w=strongMap[k];return {unit:w.unit,avgRate:w.rateN?w.rateSum/w.rateN:0};})
+        .filter(function(x){return x.avgRate>=20;}).sort(function(a,b){return b.avgRate-a.avgRate;}).slice(0,3);
+    }
+    if(!weakTop.length&&!strongUnits.length)return '';
+
+    var boxes='';
+    if(strongUnits.length){
+      boxes+='<div class="v47-strength-box strong"><h4>🌟 대표 우수 유형</h4>'+strongUnits.map(function(w){return '<div class="v47-strength-row"><b>'+esc(w.unit)+'</b><span>이번 회차 집단 오답률 '+w.avgRate.toFixed(1)+'% · 전 문항 정답</span></div>';}).join('')+'</div>';
+    }
+    if(weakTop.length){
+      boxes+='<div class="v47-strength-box weak"><h4>⚠ 대표 취약 유형</h4>'+weakTop.map(function(w){return '<div class="v47-strength-row"><b>'+esc(w.unit)+'</b><span>'+w.count+'문항 오답'+(w.avgRate!=null?' · 집단 오답률 '+w.avgRate.toFixed(1)+'%':'')+'</span></div>';}).join('')+'</div>';
+    }
+    var seen={}, compareUnits=[];
+    strongUnits.concat(weakTop).forEach(function(w){if(!seen[w.unit]){seen[w.unit]=true;compareUnits.push(w);}});
+    var myWrongUnits2={}; myItems.forEach(function(it){if(it.unit)myWrongUnits2[it.unit]=true;});
+    var tableRows=compareUnits.map(function(w){
+      return '<tr><td>'+esc(w.unit)+'</td><td>'+(myWrongUnits2[w.unit]?'오답':'정답')+'</td><td>'+_sgPbarHtml(w.avgRate||0)+'</td></tr>';
+    }).join('');
+    var table=tableRows?'<table class="v47-strength-table"><thead><tr><th>단원/유형</th><th>내 결과</th><th>이번 회차 집단 오답률</th></tr></thead><tbody>'+tableRows+'</tbody></table>':'';
+    return '<div class="v47-strength-wrap">'+boxes+'</div>'+table;
+  }
   window.aarSubjectReport=function(s){
-    var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f), record=window.aarRecordHtml(f);
+    var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f), record=window.aarRecordHtml(f,s);
     var wrong=f['전체 오답']||((s.items||[]).map(function(x){return x.no;}).filter(Boolean).join(', '));
     return '<div class="report-card aar-flow-card"><h3>'+aarSubjectTitle(s)+' 실전 AAR</h3>'+
       '<div class="bar"><b>점수</b><span>'+(v41Valid(s.score)?esc(s.score)+'점':'-')+'</span><b>오답</b><span>'+esc(s.wrongCount||'0')+'개</span>'+(v41Valid(wrong)?'<b>문항</b><span>'+esc(wrong)+'</span>':'')+'</div>'+
       v41ScoreRankHtml(s)+
+      v41UnitStrengthHtml(s)+
       v41ItemUnitTableHtml(s)+
       v41RankingHtml(s)+record+window.aarObjectiveSummary(s)+v41StudentCauseStatus(s)+
       '<div class="aar-analysis-box"><h4>🔍 무너진 원인과 점수 영향</h4><p>'+esc(inf.analysis)+'</p></div>'+
@@ -33952,6 +34177,10 @@ function cbrAnalyze(){
       <input type="checkbox" id="cbr-force-overwrite" style="width:16px;height:16px">
       카탈로그 정답/해설/문제로 강제 덮어쓰기 (이미 저장된 값도 카탈로그 값으로 교체 — 예전에 잘못/불완전하게 저장된 해설을 고친 뒤 재반영할 때 체크)
     </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#78350f;background:#fef3c7;border-radius:8px;padding:8px 12px;cursor:pointer">
+      <input type="checkbox" id="cbr-force-diff-recalc" style="width:16px;height:16px">
+      난이도도 이번 오답률 기준으로 재계산 (기존/카탈로그에 저장된 난이도값 대신 지금 반영하는 데이터의 실제 오답률로 덮어씀 — 처음 등록 시 잘못/기본값으로 저장된 난이도를 바로잡을 때 체크)
+    </label>
   </div>`;
 
   document.getElementById('cbr-result').innerHTML = html;
@@ -33963,16 +34192,11 @@ function cbrManualSelect(name, id){
 }
 
 
-/* v47 문항 세부단원 매핑: 기존 리포트 틀 유지, 결과 일괄반영 때 오답 문항에만 저장 */
-window.SG_ITEM_META = {"KOR":{"1":{"unit":"독서 · 정보적 텍스트 · 내용 일치","diff":"하"},"2":{"unit":"독서 · 정보적 텍스트 · 비판적 이해","diff":"중"},"3":{"unit":"독서 · 정보적 텍스트 · 보기 적용","diff":"중하"},"4":{"unit":"독서 · 공간 생산/공동 공간 · 지문 비교","diff":"하"},"5":{"unit":"독서 · 공간 생산/르페브르 · 개념 이해","diff":"상"},"6":{"unit":"독서 · 공동 공간 · 관점 비교","diff":"상"},"7":{"unit":"독서 · 공간 생산 관점 · 문맥 추론","diff":"상"},"8":{"unit":"독서 · 공간 생산 · 보기 적용","diff":"상"},"9":{"unit":"독서 · 어휘 · 문맥적 의미","diff":"상"},"10":{"unit":"독서 · 과학기술/배터리 · 내용 일치","diff":"중"},"11":{"unit":"독서 · 배터리 열폭주 · 추론","diff":"상"},"12":{"unit":"독서 · 배터리 열폭주 · 보기 적용","diff":"상"},"13":{"unit":"독서 · 어휘 · 다의어 문맥","diff":"하"},"14":{"unit":"독서 · 철학/하이데거·가다머·레비나스 · 사실 이해","diff":"중"},"15":{"unit":"독서 · 레비나스 윤리 · 개념 이해","diff":"하"},"16":{"unit":"독서 · 철학 · 관점 비교","diff":"중"},"17":{"unit":"독서 · 철학 · 보기 적용","diff":"중하"},"18":{"unit":"문학 · 현대소설/오정희 「동경」 · 서술상 특징","diff":"중"},"19":{"unit":"문학 · 현대소설 · 표현상 특징","diff":"하"},"20":{"unit":"문학 · 현대소설 · 인물 반응/장면 이해","diff":"하"},"21":{"unit":"문학 · 현대소설 · 상징/감상","diff":"하"},"22":{"unit":"문학 · 현대시·수필 · 공통점","diff":"하"},"23":{"unit":"문학 · 현대시/나희덕 · 시상 전개","diff":"하"},"24":{"unit":"문학 · 현대시/김선우 · 표현 방식","diff":"중상"},"25":{"unit":"문학 · 현대시·수필 · 시어 이해","diff":"하"},"26":{"unit":"문학 · 수필 · 보기 해석/자기 성찰","diff":"중상"},"27":{"unit":"문학 · 고전소설/인현왕후전 · 내용 이해","diff":"하"},"28":{"unit":"문학 · 고전소설 · 소재 기능","diff":"중하"},"29":{"unit":"문학 · 고전소설 · 인물 발화/서사 기능","diff":"중"},"30":{"unit":"문학 · 고전소설 · 작품 감상","diff":"중하"},"31":{"unit":"문학 · 고전시가/사친가·사설시조 · 표현상 특징","diff":"하"},"32":{"unit":"문학 · 고전시가 · 시구 이해/정서","diff":"상"},"33":{"unit":"문학 · 고전시가 · 시어 이해","diff":"하"},"34":{"unit":"문학 · 고전시가 · 작품 감상/부재 정서","diff":"상"},"35":{"unit":"화법 · 발표 · 말하기 방식/청중 고려","diff":"하"},"36":{"unit":"화법 · 발표 · 자료 활용/시각 자료","diff":"중하"},"37":{"unit":"화법 · 발표 · 청중 반응 이해","diff":"하"},"38":{"unit":"화법·작문 · 대담/비평문 · 내용 이해","diff":"하"},"39":{"unit":"화법·작문 · 대화 흐름/발화 기능","diff":"상"},"40":{"unit":"작문 · 비평문 · 내용 반영/자료 통합","diff":"중하"},"41":{"unit":"작문 · 비평문 · 글쓰기 방식","diff":"하"},"42":{"unit":"작문 · 고쳐쓰기 · 초고 수정/문단 마무리","diff":"중"},"43":{"unit":"작문 · 내용 생성 · 설명문 마무리","diff":"중상"},"44":{"unit":"작문 · 설명문 · 글쓰기 계획","diff":"하"},"45":{"unit":"작문 · 설명문 · 자료 활용/인터뷰·연구보고서","diff":"하"}},"ENG":{"1":{"unit":"듣기 · 목적 파악","diff":"하"},"2":{"unit":"듣기 · 의견 파악","diff":"하"},"3":{"unit":"듣기 · 요지 파악","diff":"하"},"4":{"unit":"듣기 · 그림 일치","diff":"하"},"5":{"unit":"듣기 · 할 일 파악","diff":"하"},"6":{"unit":"듣기 · 금액 계산","diff":"하"},"7":{"unit":"듣기 · 이유 파악","diff":"하"},"8":{"unit":"듣기 · 언급 여부","diff":"하"},"9":{"unit":"듣기 · 내용 일치","diff":"하"},"10":{"unit":"듣기 · 표 정보 파악","diff":"하"},"11":{"unit":"듣기 · 응답 고르기","diff":"하"},"12":{"unit":"듣기 · 응답 고르기","diff":"하"},"13":{"unit":"듣기 · 응답 고르기","diff":"하"},"14":{"unit":"듣기 · 응답 고르기","diff":"하"},"15":{"unit":"듣기 · 상황에 맞는 말","diff":"하"},"16":{"unit":"듣기 · 주제 파악","diff":"하"},"17":{"unit":"듣기 · 세부 정보 파악","diff":"하"},"18":{"unit":"읽기 · 목적 파악/실용문","diff":"하"},"19":{"unit":"읽기 · 심경 변화","diff":"하"},"20":{"unit":"읽기 · 주장 파악","diff":"하"},"21":{"unit":"읽기 · 밑줄 의미 추론","diff":"중하"},"22":{"unit":"읽기 · 요지 파악","diff":"하"},"23":{"unit":"읽기 · 주제 파악","diff":"중하"},"24":{"unit":"읽기 · 제목 고르기","diff":"중"},"25":{"unit":"읽기 · 도표 일치","diff":"하"},"26":{"unit":"읽기 · 내용 일치/인물","diff":"하"},"27":{"unit":"읽기 · 안내문 일치","diff":"하"},"28":{"unit":"읽기 · 안내문 일치","diff":"하"},"29":{"unit":"어법 · 어법 오류","diff":"중하"},"30":{"unit":"어휘 · 어휘 쓰임","diff":"중"},"31":{"unit":"읽기 · 빈칸 추론","diff":"하"},"32":{"unit":"읽기 · 빈칸 추론","diff":"중"},"33":{"unit":"읽기 · 빈칸 추론","diff":"중상"},"34":{"unit":"읽기 · 빈칸 추론","diff":"중상"},"35":{"unit":"읽기 · 무관한 문장 찾기","diff":"중하"},"36":{"unit":"읽기 · 글의 순서","diff":"중"},"37":{"unit":"읽기 · 글의 순서","diff":"하"},"38":{"unit":"읽기 · 문장 삽입","diff":"중"},"39":{"unit":"읽기 · 문장 삽입","diff":"중상"},"40":{"unit":"읽기 · 요약문 완성","diff":"중상"},"41":{"unit":"읽기 · 제목 고르기","diff":"하"},"42":{"unit":"어휘 · 어휘 쓰임","diff":"중상"},"43":{"unit":"읽기 · 글의 순서","diff":"하"},"44":{"unit":"읽기 · 지시어 추론","diff":"하"},"45":{"unit":"읽기 · 내용 불일치","diff":"하"}}};
-function _sgItemMeta(subjectCode, detail, no){
-  var code=String(subjectCode||'').toUpperCase();
-  var n=String(no||'').replace(/[^0-9]/g,'');
-  if(code==='KOR' && Number(n)>=35 && /언어와매체|언매/.test(String(detail||''))){
-    return {unit:(Number(n)<=39?'언어와매체 · 언어(문법)':'언어와매체 · 매체'), diff:''};
-  }
-  return (window.SG_ITEM_META[code]||{})[n]||null;
-}
+/* v47 문항 세부단원 매핑: 과거 특정 시험 데이터로 만들어졌던 하드코딩 참조표(SG_ITEM_META)는
+   2026-09-12에 제거함 — 문항 "번호"만으로 매칭되다 보니, 실제로 등록한 시험 내용과 무관하게
+   예전 다른 시험의 단원/난이도 값이 조용히 섞여 들어가는 문제가 있었음(카탈로그에 값이 없을 때만
+   발동하는 fallback이라 원인 파악이 어려웠음). 이제 카탈로그(문항별 단원/유형 붙여넣기)에 값이
+   없으면 unit은 '단원정보 미입력', diff는 실제 오답률 기반 자동계산으로 바로 떨어진다. */
 
 // ★ 2026-08-28 추가: 문항단원DB/정답·해설 붙여넣기 칸에서 "한 줄 = 한 문항"으로 단순히
 // 나누던 방식이, 엑셀에서 여러 줄(문단)짜리 해설 셀을 그대로 복사해 붙여넣으면 깨지는
@@ -34520,7 +34744,7 @@ function cbrConfirmApply(){
         const rt = (String(r.subjectCode||'').toUpperCase()==='KOR' && qNo<=34)
           ? (commonRateMap[no]||0)
           : (detailRateMap[no]||0);
-        const autoDiff = rt>=70?'최상':rt>=50?'상':rt>=30?'중상':rt>=15?'중':'하';
+        const autoDiff = rt>=90?'최상':rt>=70?'상':rt>=50?'중상':rt>=30?'중':'하';
         const _meta=_cbrLookupItemMeta(pastedItemMeta, r.subjectCode, r.detail, no)||{};
         const _ak=_cbrLookupAnswerKey(pastedAnswerKey, r.subjectCode, r.detail, no)||{};
         // ★ 2026-08-28 추가: 평소엔 학생이 이미 입력한 값을 항상 지키지만("빈 칸만 채움"),
@@ -34529,13 +34753,21 @@ function cbrConfirmApply(){
         // 뒤 재반영으로 바로잡을 때 쓴다. 카탈로그 쪽 값이 비어 있으면 이 옵션을 켜도
         // 기존 값을 그대로 둔다(값 삭제는 안 됨).
         const _forceOverwrite = !!(document.getElementById('cbr-force-overwrite')||{}).checked;
+        // ★ 2026-09-13 추가: "난이도도 이번 오답률 기준으로 재계산" 체크 시엔 기존/카탈로그 난이도값을
+        // 무시하고 이번에 실제로 관찰된 오답률(autoDiff)을 항상 우선한다 — 처음 등록 때 잘못/기본값으로
+        // 저장된 난이도가 이후 실제 오답률과 어긋나도 재반영 때마다 계속 고정돼있던 문제 대응
+        // ("문항이 처음 등록될 때의 난이도값을 계속 보호"하는 기존 로직은 체크 안 하면 그대로 유지됨).
+        const _forceDiffRecalc = !!(document.getElementById('cbr-force-diff-recalc')||{}).checked;
         const _catAnswer = _meta.answer || _ak.answer || '';
         const _catExplain = _meta.explain || _ak.explain || '';
         const _catQuestion = _ak.question || '';
         return {
           no: String(no),
-          unit: (prev?.unit && prev.unit!=='단원정보 미입력' ? prev.unit : null) || _meta.unit || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).unit) || '단원정보 미입력',
-          diff: prev?.diff || _meta.diff || ((_sgItemMeta(r.subjectCode, r.detail, no)||{}).diff) || autoDiff, // 기존 수동값 우선(단, '단원정보 미입력' 플레이스홀더는 값으로 치지 않음), 그다음 이번에 붙여넣은 값(세부과목 일치 우선, 없으면 공통), 그다음 범용 문항DB→오답률 기준
+          unit: (prev?.unit && prev.unit!=='단원정보 미입력' ? prev.unit : null) || _meta.unit || '단원정보 미입력',
+          diff: _forceDiffRecalc ? autoDiff : (prev?.diff || _meta.diff || autoDiff), // 기본: 기존 수동값 우선(단, '단원정보 미입력' 플레이스홀더는 값으로 치지 않음), 그다음 이번에 붙여넣은 값(세부과목 일치 우선, 없으면 공통), 그다음 실제 오답률 기준 자동계산. 체크박스 켜면 오답률 기준 자동계산값을 항상 우선
+          // ★ 2026-09-12 수정: 과거 특정 시험 데이터로 만들어졌던 범용 참조표(_sgItemMeta/SG_ITEM_META)를 unit/diff 대체값으로 쓰던 로직 제거.
+          // 문항 번호만으로 매칭되다 보니 실제로 등록한 시험과 무관한 예전 값(특히 난이도)이 카탈로그에 값이 없을 때 조용히 섞여 들어가는 문제가 있었음.
+          // 이제 카탈로그(붙여넣은 값)에 값이 없으면 unit은 '단원정보 미입력', diff는 실제 오답률 기반 자동계산(autoDiff)으로 바로 떨어짐.
           answer: (_forceOverwrite && _catAnswer) ? _catAnswer : ((prev?.answer) || _catAnswer || ''), // ★ 오답노트용 정답 (문항별 단원/유형 칸 또는 정답/해설 전용 칸 어느 쪽이든 입력 가능)
           explanation: (_forceOverwrite && _catExplain) ? _catExplain : ((prev?.explanation) || _catExplain || ''), // ★ 오답노트용 간단 해설
           question: (_forceOverwrite && _catQuestion) ? _catQuestion : ((prev?.question) || _catQuestion || ''), // ★ 오답노트용 문제(지문+선택지) 원문 — 정답/해설 칸의 6번째 열
