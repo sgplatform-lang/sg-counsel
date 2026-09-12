@@ -2526,6 +2526,46 @@ function chgAnsSlotGridHtml(x, examMeta){
     <div>${cells.join('')}</div>
   </div></div>`;
 }
+// ★ 2026-09-12 추가: 관리자 "결과 일괄반영"과 동일하게, 카탈로그에 난이도가 비어있는
+// 문항은 학생이 직접 채점·제출하는 이 경로에서도 "중"으로 무조건 고정하지 않고, 같은
+// 회차(응시일+시험명)에 이미 제출된 다른 학생들의 오답 여부를 기준으로 자동 계산한다.
+// students 컬렉션 전체를 내려받지 않고 응시일(challengerData.lastTestDate) 단일 조건으로만
+// 서버 필터링한 뒤, 시험명은 클라이언트에서 한 번 더 좁힌다(복합 인덱스 불필요).
+async function _chgFetchExamPeerSubjects(date, testName){
+  try{
+    if(!FB() || !date) return [];
+    const rows = await _fb.getWhere('students','challengerData.lastTestDate','==',date);
+    const out=[];
+    rows.forEach(function(stu){
+      const cd=stu.challengerData||{};
+      if(String(cd.lastTestName||'').trim()!==String(testName||'').trim()) return;
+      (cd.lastSubjects||[]).forEach(function(sub){ if(sub&&sub.subject) out.push(sub); });
+    });
+    return out;
+  }catch(e){
+    console.warn('동일 회차 응시생 오답률 조회 실패(난이도는 "중"으로 대체하고 진행):', e.message);
+    return [];
+  }
+}
+// 관리자 cbrConfirmApply의 autoDiff와 동일한 기준(90%↑최상/70%↑상/50%↑중상/30%↑중/미만 하)
+// 및 국어 공통(1~34번)·선택(세부과목별) 구분 기준을 그대로 재사용한다.
+function _chgAutoDiffForItem(code, detail, no, peers){
+  if(!peers||!peers.length) return '';
+  const isKor = code==='KOR';
+  const samePool = peers.filter(function(p){ return p.subject===code; });
+  const qn = parseInt(no,10);
+  const useCommon = isKor && qn && qn<=34;
+  let pool = samePool;
+  if(!useCommon && detail){
+    const elective = samePool.filter(function(p){ return _cbrNormalizeDetail(p.detail||'')===_cbrNormalizeDetail(detail); });
+    if(elective.length>=2) pool = elective;
+  }
+  if(pool.length<2) return '';
+  const n=pool.length;
+  const wrong=pool.filter(function(p){ return (p.items||[]).some(function(it){ return String(it.no||'')===String(no); }); }).length;
+  const rt=wrong*100/n;
+  return rt>=90?'최상':rt>=70?'상':rt>=50?'중상':rt>=30?'중':'하';
+}
 async function chgAnsGradeAndSave(){
   const st=chgAnsInit();
   if(!st.date||!st.test){ toast('시험을 먼저 선택해주세요'); return; }
@@ -2553,6 +2593,9 @@ async function chgAnsGradeAndSave(){
   toast('채점 중입니다...', 4000);
   const examEntry=(_chgAnsCatalog||[]).find(e=>e.id===st.catId);
   if(!examEntry){ toast('⚠️ 선택된 시험 정보를 찾지 못했습니다. 시험을 다시 선택해주세요.'); return; }
+  // ★ 2026-09-12 추가: 카탈로그에 난이도가 비어있는 문항의 자동 재계산을 위해, 제출 전에
+  // 동일 회차(같은 응시일+시험명)에 이미 제출된 다른 학생들의 과목별 오답 현황을 미리 받아둔다.
+  const _examPeerSubjects = await _chgFetchExamPeerSubjects(st.date, st.test);
   const newSubjects=[];
   for(const x of enabledSlots){
     const def=CHG_ANS_SUBJ_DEFS[x.code];
@@ -2587,7 +2630,11 @@ async function chgAnsGradeAndSave(){
       foundAnswerCount++;
       if(isCorrect){ gotPoints+=points; }
       else{
-        items.push({no:String(no), unit:meta.unit||'', diff:meta.diff||'중', reasons:[], memo:'', causePrimary:'', guessedTime:!(String(myRaw||'').trim()),
+        // ★ 2026-09-12: 카탈로그 난이도(meta.diff)가 있으면 그 값을 그대로 쓰고(기존 수동값
+        // 우선, 관리자 결과일괄반영과 동일 원칙), 비어있을 때만 동일 회차 응시생 기준 오답률로
+        // 자동 계산한다(peers 표본이 2명 미만이면 그때만 "중"으로 대체).
+        const _autoDiff = _chgAutoDiffForItem(x.code, detail, no, _examPeerSubjects);
+        items.push({no:String(no), unit:meta.unit||'', diff:meta.diff||_autoDiff||'중', reasons:[], memo:'', causePrimary:'', guessedTime:!(String(myRaw||'').trim()),
           points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'', explanation:ak.explain||meta.explain||'', question:ak.question||''});
       }
     }
