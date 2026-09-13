@@ -30565,7 +30565,7 @@ function aarParseMemo(memo){
 }
 function aarSubjectTitle(s){return name(s)}
 function aarRateData(s){
-  return (s.items||[]).map(it=>{const m=String(it.memo||'').match(/전체\\s*오답률\\s*([\\d.]+)%/);return m?{no:it.no,unit:it.unit||'-',rate:+m[1],answerMemo:it.memo,reasons:it.reasons||[],diff:it.diff||'-'}:null}).filter(Boolean)
+  return (s.items||[]).map(it=>{const m=String(it.memo||'').match(/전체\\s*오답률\\s*([\\d.]+)%/);if(!m)return null;const rt=+m[1];const df=rt>=90?'최상':rt>=70?'상':rt>=50?'중상':rt>=30?'중':'하';return {no:it.no,unit:it.unit||'-',rate:rt,answerMemo:it.memo,reasons:it.reasons||[],diff:df}}).filter(Boolean)
 }
 function aarObjectiveSummary(s){
   const d=aarRateData(s); if(!d.length)return '';
@@ -32074,13 +32074,24 @@ function __SG_initFromHost(data){
       return arr;
     }catch(e){return [];}
   }
+  // ★ 2026-09-13(3차) 수정: "부록" 표의 오답률(rate)은 항상 열람 시점에 라이브로 재계산되는데,
+  // 난이도(diff)는 그동안 문항에 저장된 값(it.diff — 결과일괄반영/학생자가제출 "그 시점"의
+  // 계산 결과, 또는 그 이전 수동입력값)을 그대로 보여주고 있었다. 그 학생이 이번 재반영
+  // 배치에 포함되지 않았거나, 반영 이후 표본이 더 바뀐 경우 저장된 난이도가 최신 오답률과
+  // 어긋나 보일 수 있다. "재계산" 체크박스 여부·반영 타이밍과 무관하게 이 표에서만큼은
+  // 항상 옆 칸의 오답률과 100% 일치하도록, 난이도를 저장값이 아니라 그 자리에서 표시되는
+  // rate로부터 즉시 계산한다(관리자 결과일괄반영의 autoDiff와 완전히 동일한 기준).
+  function _sgDiffFromRate(rt){
+    var n=+rt; if(!isFinite(n)) return '-';
+    return n>=90?'최상':n>=70?'상':n>=50?'중상':n>=30?'중':'하';
+  }
   window.aarRateData=function(s){
     var explicit=(s.items||[]).map(function(it){
       var rate=null, m=String(it.memo||'').match(/전체\\s*오답률\\s*([\\d.]+)%/);
       if(m)rate=+m[1];
       else if(isFinite(Number(it.wrongRate)))rate=Number(it.wrongRate);
       else if(isFinite(Number(it.error_rate)))rate=Number(it.error_rate);
-      return rate==null?null:{no:it.no,unit:it.unit||'단원정보 미입력',rate:rate,answerMemo:it.memo,reasons:it.reasons||[],diff:it.diff||'-'};
+      return rate==null?null:{no:it.no,unit:it.unit||'단원정보 미입력',rate:rate,answerMemo:it.memo,reasons:it.reasons||[],diff:_sgDiffFromRate(rate)};
     }).filter(Boolean);
     var peers=v41PeerSubjects(s);
     if(peers.length>=2){
@@ -32097,7 +32108,8 @@ function __SG_initFromHost(data){
         if(pool.length<2)pool=peers; // 같은 선택과목 표본이 부족하면 전체 국어 응시자로 대체
         var n=pool.length;
         var wrong=pool.filter(function(ps){return (ps.items||[]).some(function(pi){return String(pi.no||'')===no;});}).length;
-        return {no:it.no,unit:it.unit||'단원정보 미입력',rate:wrong*100/n,answerMemo:it.memo||'',reasons:it.reasons||[],diff:it.diff||'-'};
+        var rt=wrong*100/n;
+        return {no:it.no,unit:it.unit||'단원정보 미입력',rate:rt,answerMemo:it.memo||'',reasons:it.reasons||[],diff:_sgDiffFromRate(rt)};
       }).filter(Boolean);
     }
     return explicit;
