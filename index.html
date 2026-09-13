@@ -43345,32 +43345,34 @@ function generateReport() {
         return '<h3>'+_statEsc(g.label)+' TOP'+rank+'</h3>'+_statTableHtml(rows,scoreRank,wrongRank);
       }).join('');
 
-      // "모든 기관 포함"으로 여러 기관이 섞인 경우에만 전체 명단을 기관별로 나눈다
-      // (기존 전체 순위값은 그대로 유지 — 기관별로 다시 순위를 매기지 않음). 기관이
-      // 하나뿐이면(우리 기관만 조회 또는 단일기관) 기존처럼 표 하나로만 보여준다.
-      var orgNames=[];
-      displayRows.forEach(function(r){ if(r.org && orgNames.indexOf(r.org)<0) orgNames.push(r.org); });
-      var fullListHtml;
-      if(orgNames.length>1){
-        fullListHtml=orgNames.map(function(org){
-          var rows=displayRows.filter(function(r){return r.org===org;});
-          return '<h4 class="stat-org-sub">'+_statEsc(org)+' · '+rows.length+'명</h4>'+_statTableHtml(rows,scoreRank,wrongRank);
-        }).join('');
-        var noOrgRows=displayRows.filter(function(r){return !r.org;});
-        if(noOrgRows.length) fullListHtml+='<h4 class="stat-org-sub">기관 미확인 · '+noOrgRows.length+'명</h4>'+_statTableHtml(noOrgRows,scoreRank,wrongRank);
-      } else {
-        fullListHtml=_statTableHtml(displayRows,scoreRank,wrongRank);
-      }
+      // ★ 2026-09-13 수정: 기관별 명단 구분은 상단 회차 요약(응시생 수) 쪽으로 옮기고,
+      // "성적·오답 전체" 명단 자체는 기관 구분 없이 두 기관 인원을 합쳐 순위 하나로
+      // 보여달라는 요청 — 기관별로 표를 나누지 않고 항상 표 하나로 보여주되, 제목에
+      // 인원수만 괄호로 표기한다.
+      var fullListHtml=_statTableHtml(displayRows,scoreRank,wrongRank);
 
-      return topBlocks+'<h3>'+_statEsc(g.label)+' 성적·오답 전체</h3>'+fullListHtml;
+      return topBlocks+'<h3>'+_statEsc(g.label)+' 성적·오답 전체 ('+displayRows.length+'명)</h3>'+fullListHtml;
     }).join('');
+
+    // ★ 2026-09-13 추가: 회차 요약 줄의 응시생 수를 "N명" 하나로 뭉뚱그리지 않고, 여러
+    // 기관이 섞여 있을 때는 기관별 인원을 "기관명 · N명" 형태로 콤마로 나열한다(단일
+    // 기관이면 기존처럼 "N명" 하나만 표시 — 하위호환).
+    var _orgHeaderCounts={}, _orgHeaderOrder=[];
+    targets.forEach(function(stu){
+      var on=_gg_getOrgName(stu)||'';
+      if(!(on in _orgHeaderCounts)){ _orgHeaderCounts[on]=0; _orgHeaderOrder.push(on); }
+      _orgHeaderCounts[on]++;
+    });
+    var orgSummary = _orgHeaderOrder.length>1
+      ? _orgHeaderOrder.map(function(on){ return (on?_statEsc(on):'기관 미확인')+' · '+_orgHeaderCounts[on]+'명'; }).join(', ')
+      : (targets.length+'명');
 
     var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계'+(orgScope==='all'?'_전체기관':'');
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_statEsc(title)+'</title>'+
       '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px}h4.stat-org-sub{font-size:12.5px;margin:12px 0 4px;color:#0f766e;font-weight:800}table.stat-table{width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:10px;font-size:11.5px}table.stat-table th,table.stat-table td{border:1px solid #e2e8f0;padding:5px 6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}table.stat-table td:nth-child(3),table.stat-table td:nth-child(5){white-space:normal;word-break:keep-all;overflow:visible;text-overflow:clip}table.stat-table th{background:#f0fdfa;color:#0f766e}@media print{body{padding:8mm}table.stat-table{font-size:10.5px}table.stat-table th,table.stat-table td{padding:4px 5px}h4.stat-org-sub{font-size:11px}}</style>'+
       '</head><body>'+
       '<h1>CHALLENGER 통계 리포트'+_statEsc(scopeLabel)+'</h1>'+
-      '<h2>회차: '+_statEsc(info.date||'')+' · '+_statEsc(info.name||'')+' · '+targets.length+'명</h2>'+
+      '<h2>회차: '+_statEsc(info.date||'')+' · '+_statEsc(info.name||'')+' · '+orgSummary+'</h2>'+
       sections+
       '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
       '</body></html>';
