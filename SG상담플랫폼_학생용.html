@@ -1638,7 +1638,11 @@ async function chgSaveRound(){
 }
 function chgAddSubject(){
   const cd=chgInit();
-  cd.lastSubjects.push(chgNewSubject());
+  const ns=chgNewSubject();
+  // ★ 2026-09-13: 학생이 이 화면에서 직접 새 과목을 추가하는 것이므로 처음부터
+  // 학생 직접 입력으로 표시한다(위 chgSetItemField 참고).
+  ns._studentSelfInput = true;
+  cd.lastSubjects.push(ns);
   render();
   chgScheduleSave();
 }
@@ -1689,6 +1693,14 @@ function _cbrNormalizeDetail(v){
 function chgSetSubjField(sIdx,field,val){
   const cd=chgInit();
   cd.lastSubjects[sIdx][field]=(field==='detail')?_cbrNormalizeDetail(val):val;
+  // ★ 2026-09-13 추가: 이 파일의 모든 편집 함수는 학생 본인만 접근하는 화면에서만
+  // 호출된다(상담원은 별도의 관리자 파일 화면을 쓴다) — 그런데 결과일괄반영으로
+  // 이미 만들어진 과목(_studentSelfInput 없음)을 학생이 여기서 직접 수정해도 이
+  // 플래그가 계속 비어있어, AAR·오답원인 통계에서 학생이 분명 입력했는데
+  // "미입력(학생 미제출)"으로 잘못 표시되는 버그가 있었다. 학생이 이 화면에서
+  // 실제로 필드를 편집하는 순간을 그 과목이 "학생 본인 입력"임을 확정하는 시점으로
+  // 삼아 플래그를 세운다.
+  cd.lastSubjects[sIdx]._studentSelfInput = true;
   chgScheduleSave();
 }
 const CHG_TAGS={KOR:['문제를 잘못 읽음','끝까지 못읽어서','지문 독해 지연','선지 판단 미스','어휘 및 개념어 부족','고전 어려움','독서 특정제재 어려움','보기유형 이해부족','멘탈/집중력 저하'],MATH:['계산 실수','개념 이해 부족','공식이 떠오르지 않아서','문제 해석 오류','풀이 방법 몰라서','시간 부족','중반이후 마무리 부족','킬러 문항 포기','검산 안 함','멘탈 붕괴'],ENG:['어휘 몰라서','구문 해석 실패','빈칸 추론 실패','순서/삽입 실패','장문 시간 부족','주제/요지 오독','연결사 판단 실수','집중력 저하'],INQ:['개념 이해 부족','자료 해석 오류','시간 부족','암기 부족','계산 실수','문제 독해 실패','응용력 부족','집중력 저하'],HIST:['시대/시기 착각','사건 순서 오류','인물/사건 혼동','암기 부족','자료 해석 실패','시간 부족','문제 독해 실패','집중력 저하'],LANG:['어휘 몰라서','문법 이해 부족','듣기 못 들음','시간 부족','독해 실패','암기 부족','문화 이해 부족','집중력 저하']};
@@ -1709,6 +1721,8 @@ function chgSaveReasons(){
   if(!chgModalTarget) return;
   const cd=chgInit();
   cd.lastSubjects[chgModalTarget.sIdx].items[chgModalTarget.iIdx].reasons=[...chgModalTarget.temp];
+  // ★ 2026-09-13: 오답원인(2차) 선택도 학생 직접 입력 플래그 대상(위 chgSetItemField 참고).
+  cd.lastSubjects[chgModalTarget.sIdx]._studentSelfInput = true;
   chgModalTarget=null;
   render();
   chgScheduleSave();
@@ -1780,6 +1794,9 @@ function chgSetItemField(sIdx,iIdx,field,val){
   const it=cd.lastSubjects[sIdx].items[iIdx];
   if(field==='reasons'){ it.reasons = val.split(',').map(x=>x.trim()).filter(Boolean); }
   else { it[field]=val; }
+  // ★ 2026-09-13: chgSetSubjField와 동일한 이유(AAR·오답원인 통계 미표시 버그) —
+  // 문항별 오답원인(1차)·찍음체크 등을 학생이 직접 입력하는 순간에도 플래그를 세운다.
+  cd.lastSubjects[sIdx]._studentSelfInput = true;
   chgScheduleSave();
 }
 function chgSetMeta(field,val){
@@ -1959,6 +1976,8 @@ function chgAarSetField(sIdx,key,val){
   // 되도록 복원 — 예전에는 이렇게 동작했는데, 무조건 값을 덮어쓰기만 해서(같은 값을
   // 다시 눌러도 그대로 유지) 선택 해제가 안 되고 있었다.
   a[key] = (a[key]===val) ? '' : val;
+  // ★ 2026-09-13: AAR 자가진단 버튼 선택도 학생 직접 입력 플래그 대상(위 chgSetItemField 참고).
+  sub._studentSelfInput = true;
   render();
   chgScheduleSave();
 }
@@ -1974,6 +1993,7 @@ function chgAarToggleMulti(sIdx,key,val,max){
     cur.push(val);
   }
   a[key]=cur;
+  sub._studentSelfInput = true;
   render();
   chgScheduleSave();
 }
@@ -2023,6 +2043,9 @@ function chgGenerateAarMemo(sIdx){
     return (i+1)+'. '+f.label+': '+vt;
   });
   sub.memo=lines.join('\n');
+  // ★ 2026-09-13: AAR 요약 생성("입력완료")은 학생이 직접 AAR을 작성했다는 가장 확실한
+  // 신호이므로 여기서도 플래그를 세운다(위 chgSetItemField 참고).
+  sub._studentSelfInput = true;
   render();
   chgScheduleSave();
   toast('✅ 입력이 완료됐습니다!');
