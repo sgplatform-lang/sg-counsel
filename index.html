@@ -27527,10 +27527,10 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 .cover-sub{font-size:18px;color:#0f5b5b;margin-top:18px;letter-spacing:-.5px}
 .cover-eng{font-size:15px;color:#a8792a;margin-top:7px}
 .cover-meta{
-  position:relative;z-index:3;margin:28px auto 0;max-width:620px;background:rgba(255,255,255,.82);
-  border:1.5px solid #c89b3c;border-radius:16px;padding:10px 18px;box-shadow:0 10px 30px rgba(8,26,51,.06)
+  position:relative;z-index:3;margin:48px auto 0;max-width:660px;background:rgba(255,255,255,.82);
+  border:1.5px solid #c89b3c;border-radius:18px;padding:16px 26px;box-shadow:0 10px 30px rgba(8,26,51,.06)
 }
-.cover-meta-row{display:grid;grid-template-columns:155px 1fr;border-bottom:1px solid rgba(200,155,60,.34);padding:8px 0;font-size:15px}
+.cover-meta-row{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid rgba(200,155,60,.34);padding:13px 0;font-size:19px}
 .cover-meta-row:last-child{border-bottom:0}
 .cover-meta-label{font-weight:800;color:#16233a}.cover-meta-value{font-weight:700;color:#111827}
 .cover-footer{
@@ -27545,7 +27545,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 @media print{
   .premium-cover{min-height:96vh;border:0;padding:34px 48px 28px 145px}
   .cover-title h1{font-size:40px}
-  .cover-meta-row{font-size:12.5px;padding:6px 0}
+  .cover-meta-row{font-size:16px;padding:11px 0}
   .cover-footer{font-size:12px;padding:14px}
 }
 .report-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px;margin:8px 0;page-break-inside:avoid}.chart{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0;page-break-inside:avoid}svg{max-width:100%;height:auto}
@@ -29311,6 +29311,14 @@ function generate(){syncAll();state.subjects.forEach(ensureSituation);renderSubj
 function buildAnalysis(){let tags=allTags().map(x=>\`\${x.tag}(\${x.count})\`).join(' · ')||'문항/단원/오답원인을 입력하면 표시됩니다.';let fs=focusedSubjects();return \`<div class="bar"><b>전체 반복 확인 근거</b><span>\${tags}</span></div><div class="bar"><b>이번 회차 집중 과목</b><span>\${state.subjects.filter(s=>fs.includes(s.sid)).map(name).join(', ')}</span></div>\`+state.subjects.map(s=>\`<div class="report-card"><h3>\${name(s)} \${fs.includes(s.sid)?'<span class="pill green">집중</span>':'<span class="pill">비집중</span>'}</h3><p><b>범위:</b> \${s.processRange} · <b>난이도:</b> \${s.difficultySelect} · <b>목표:</b> \${s.accuracyTarget} · <b>오답개수:</b> \${wrongCount(s)}</p>\${progressReport(s)}\${situationReport(s)}\${excludedItems(s).length?\`<div class="bar"><b>이번 미션 제외</b><span>\${excludedItems(s).map(i=>\`\${i.no||'-'}번(\${i.diff||'-'}): \${exclusionReason(s,i)}\`).join(' · ')}</span></div>\`:''}\${issues(s).map(iss=>\`<div class="issue selected"><h4>\${iss.tag}</h4><table><tr><th>문항</th><td>\${iss.items.join(', ')}</td><th>단원/유형</th><td>\${[...new Set(iss.units)].join(', ')}</td></tr><tr><th>행동강령</th><td colspan="3">\${actionFor(s,iss.tag)}</td></tr></table></div>\`).join('')||'<p class="muted">미션으로 올릴 문항은 문항번호·단원/유형·오답원인을 모두 입력해야 합니다.</p>'}</div>\`).join('')}
 function allTags(){let m={};state.subjects.forEach(s=>issues(s).forEach(i=>m[i.tag]=(m[i.tag]||0)+i.count));return Object.entries(m).map(([tag,count])=>({tag,count})).sort((a,b)=>b.count-a.count)}
 function cover(title){let d=($('testDate').value||'').slice(0,7).replace('-','.');
+// ★ 2026-09-13 수정: 표지 학생정보 표를 "학생명/학교/학년/시험명/응시일" 5항목만 남기고
+// (담당 매니저·목표 대학/전공·작성일 제거) 오답노트 표지와 같은 항목 구성으로 통일 요청.
+// 학교/학년은 iframe 폼에 하나의 합쳐진 입력칸(studentSchool, 예: "합격고등학교 3학년")뿐이라
+// 마지막 공백 기준으로 나눠서 각각 별도 줄로 보여준다(학년은 항상 "3학년"류 한 단어라 안전).
+let _sgSchoolGrade=($('studentSchool').value||'').trim();
+let _sgSpaceIdx=_sgSchoolGrade.lastIndexOf(' ');
+let _sgSchoolOnly=_sgSpaceIdx>0?_sgSchoolGrade.slice(0,_sgSpaceIdx):_sgSchoolGrade;
+let _sgGradeOnly=_sgSpaceIdx>0?_sgSchoolGrade.slice(_sgSpaceIdx+1):'';
 return \`<div class="premium-cover">
   <div class="cover-side">PRECISION<br>ANALYSIS<br>ACHIEVES<br>EXCELLENCE</div>
   <div class="cover-side-list"><div>◎ 정밀 분석</div><div>✓ 실천 처방</div><div>↗ 누적 변화</div></div>
@@ -29328,11 +29336,10 @@ return \`<div class="premium-cover">
   </div>
   <div class="cover-meta">
     <div class="cover-meta-row"><div class="cover-meta-label">학생명</div><div class="cover-meta-value">\${esc($('studentName').value)}</div></div>
-    <div class="cover-meta-row"><div class="cover-meta-label">학교/학년</div><div class="cover-meta-value">\${esc($('studentSchool').value)}</div></div>
+    <div class="cover-meta-row"><div class="cover-meta-label">학교</div><div class="cover-meta-value">\${esc(_sgSchoolOnly)}</div></div>
+    <div class="cover-meta-row"><div class="cover-meta-label">학년</div><div class="cover-meta-value">\${esc(_sgGradeOnly)}</div></div>
     <div class="cover-meta-row"><div class="cover-meta-label">시험명</div><div class="cover-meta-value">\${esc($('testName').value)}</div></div>
-    <div class="cover-meta-row"><div class="cover-meta-label">담당 매니저</div><div class="cover-meta-value">\${esc($('managerName').value)}</div></div>
-    <div class="cover-meta-row"><div class="cover-meta-label">목표 대학/전공</div><div class="cover-meta-value">\${esc($('target').value)}</div></div>
-    <div class="cover-meta-row"><div class="cover-meta-label">작성일</div><div class="cover-meta-value">\${d||'2026.06'}</div></div>
+    <div class="cover-meta-row"><div class="cover-meta-label">응시일</div><div class="cover-meta-value">\${esc($('testDate').value||'')}</div></div>
   </div>
   <div class="cover-footer">실전 행동강령 기반 정밀 분석 시스템</div>
 </div>\`}
@@ -34106,6 +34113,78 @@ function cbrComputeItemRates(rows){
   return rates;
 }
 
+// ★ 2026-09-13 추가: 결과일괄반영에서 "난이도도 이번 오답률 기준으로 재계산"을 체크해도
+// 실제로는 이번에 붙여넣은 성적표(cbrAnalyze에서 계산해둔 CBR_parsed.rates)에 포함된
+// 학생들만으로 오답률을 계산하고 있었다 — 같은 회차를 여러 번에 나눠서 반영하거나(예: 반별로
+// 나눠서 순차 반영), 일부 학생은 학생용 페이지에서 직접 제출해 이미 저장돼있는 경우, 그
+// 학생들은 이번 오답률 계산에서 빠진다. 반면 상담리포트가 보여주는 "전체 오답률"(aarRateData)은
+// 항상 그 시점에 저장돼있는 같은 회차 전체 학생 기준이라, 두 값의 표본이 서로 달라지면서
+// "부록" 표의 난이도(저장 시점 표본)와 오답률(열람 시점 표본, 항상 최신)이 어긋나 보이는
+// 문제가 있었다. 이제 이번에 붙여넣은 학생 + 같은 회차(응시일+시험명)로 이미 저장돼있는
+// 다른 학생들(그 학생의 저장된 items — 오답 문항만 기록되는 구조라 wrongNos로 그대로 사용
+// 가능)까지 모두 합쳐서 오답률을 계산해, 상담리포트가 보여주는 값과 항상 같은 표본이 되도록
+// 통일한다. 이번 배치에 포함된 학생은 저장된 옛 값 대신 방금 붙여넣은 최신 값을 쓴다(중복 방지).
+const _cbrPopRateCache = {};
+function _cbrPopulationRates(examDate, examName){
+  const cacheKey = String(examDate||'')+'|'+String(examName||'');
+  if(_cbrPopRateCache[cacheKey]) return _cbrPopRateCache[cacheKey];
+  const groups = {};
+  function addRow(subjectCode, detail, wrongNos){
+    const isKor = String(subjectCode||'').toUpperCase()==='KOR';
+    const detailKey = subjectCode+'|'+(detail||'');
+    const commonKey = 'KOR|공통';
+    if(isKor){
+      if(!groups[commonKey]) groups[commonKey]={students:0,counts:{}};
+      groups[commonKey].students++;
+      if(!groups[detailKey]) groups[detailKey]={students:0,counts:{}};
+      groups[detailKey].students++;
+      (wrongNos||[]).forEach(no=>{
+        const n=parseInt(no,10); if(!n) return;
+        const key = n<=34?commonKey:detailKey;
+        groups[key].counts[String(n)]=(groups[key].counts[String(n)]||0)+1;
+      });
+    } else {
+      if(!groups[detailKey]) groups[detailKey]={students:0,counts:{}};
+      groups[detailKey].students++;
+      (wrongNos||[]).forEach(no=>{
+        if(!no) return;
+        groups[detailKey].counts[String(no)]=(groups[detailKey].counts[String(no)]||0)+1;
+      });
+    }
+  }
+  // 1) 이번에 붙여넣은 성적표(매칭 여부와 무관하게 전부 포함 — cbrComputeItemRates와 동일 기준)
+  const _cp = CBR_parsed||{};
+  const _includedIds = {};
+  Object.keys(_cp.byStudent||{}).forEach(nm=>{
+    (_cp.byStudent[nm]||[]).forEach(r=>{
+      if(String(r.examDate||'').trim()!==String(examDate||'').trim()) return;
+      if(String(r.examName||'').trim()!==String(examName||'').trim()) return;
+      addRow(r.subjectCode, r.detail, r.wrongNos);
+    });
+    const mid = ((_cp.matchInfo||{})[nm]||{}).selectedId;
+    if(mid) _includedIds[String(mid)]=true;
+  });
+  // 2) 같은 회차로 이미 저장돼있는 다른 학생들(이번 붙여넣기에 없는 학생만, 중복 집계 방지)
+  (ST.students||[]).forEach(stu=>{
+    if(_includedIds[String(stu.id)]) return;
+    const cd=stu.challengerData||{};
+    if(String(cd.lastTestDate||'').trim()!==String(examDate||'').trim()) return;
+    if(String(cd.lastTestName||'').trim()!==String(examName||'').trim()) return;
+    (cd.lastSubjects||[]).forEach(sub=>{
+      if(!sub||!sub.subject) return;
+      const wrongNos=(sub.items||[]).map(it=>it&&it.no).filter(Boolean);
+      addRow(sub.subject, sub.detail, wrongNos);
+    });
+  });
+  const rates={};
+  Object.keys(groups).forEach(key=>{
+    const g=groups[key]; rates[key]={};
+    Object.keys(g.counts).forEach(no=>{ rates[key][no]=+(g.counts[no]/g.students*100).toFixed(1); });
+  });
+  _cbrPopRateCache[cacheKey]=rates;
+  return rates;
+}
+
 function cbrFindStudentMatches(name){
   return ST.students.filter(s=>s.name===name);
 }
@@ -34592,7 +34671,7 @@ function cbrConfirmApply(){
     const sid=String(s.id);
     setTimeout(()=>{if(ST._savingIds) ST._savingIds.delete(sid);},5000);
   }
-  const { byStudent, rates, matchInfo } = CBR_parsed;
+  const { byStudent, matchInfo } = CBR_parsed; // ★ rates(이번 붙여넣기만의 오답률)는 더 이상 여기서 안 씀 — _cbrPopulationRates가 전체 표본 기준으로 대체
   const pastedItemMeta = _cbrParseItemMeta();
   const aarMemos = _cbrParseAarMemos();
   const pastedAnswerKey = _cbrParseAnswerKey();
@@ -34704,8 +34783,13 @@ function cbrConfirmApply(){
     rowsForStudent.forEach(r=>{
       const subjCode = subjMap[r.subjectCode] || r.subjectCode;
       const detailRateKey = r.subjectCode+'|'+(r.detail||'');
-      const commonRateMap = rates['KOR|공통'] || {};
-      const detailRateMap = rates[detailRateKey] || {};
+      // ★ 2026-09-13 수정: 이번에 붙여넣은 학생들만이 아니라 같은 회차(응시일+시험명)로 이미
+      // 저장돼있는 다른 학생들까지 합친 전체 표본으로 오답률을 계산한다(_cbrPopulationRates).
+      // 상담리포트의 "전체 오답률"(aarRateData)과 항상 같은 표본 기준이 되도록 하기 위함 —
+      // 자세한 배경은 _cbrPopulationRates 함수 위 주석 참고.
+      const _popRates = _cbrPopulationRates(r.examDate, r.examName);
+      const commonRateMap = _popRates['KOR|공통'] || {};
+      const detailRateMap = _popRates[detailRateKey] || {};
       let existing = singleInstanceCodes.indexOf(subjCode) > -1
         ? subjects.find(s=>s.subject===subjCode)
         // ★ 2026-08-30 추가: 저장돼 있던 예전 표기("생윤")와 이번에 새로 들어온 정규화된
@@ -43548,11 +43632,13 @@ function generateReport() {
         'text-align:center;padding:18px 30px;font-size:14px;letter-spacing:2px;z-index:3}'+
       // ★ 학생 정보 표(cover-meta) 대신 들어가는 과목명·문항수·점수 블록
       // ★ 학생 정보(학생명/학년/학교/시험명/응시일) 카드
-      '.wn-subj-cover-info{position:relative;z-index:3;margin:18px auto 0;max-width:420px;background:rgba(255,255,255,.82);'+
-        'border:1.5px solid #c89b3c;border-radius:14px;padding:6px 16px}'+
-      '.wn-subj-cover-info-row{border-bottom:1px solid rgba(200,155,60,.34);padding:5px 0;font-size:12px}'+
+      // ★ 2026-09-13 수정: 항목(학생명/학년/학교/시험명/응시일)은 그대로 유지하되, 내용이
+      // 잘 보이도록 표 자체와 글씨 크기를 키움(가로폭·안쪽 여백·줄간격·라벨폭 모두 확대)
+      '.wn-subj-cover-info{position:relative;z-index:3;margin:26px auto 0;max-width:480px;background:rgba(255,255,255,.82);'+
+        'border:1.5px solid #c89b3c;border-radius:14px;padding:12px 22px}'+
+      '.wn-subj-cover-info-row{border-bottom:1px solid rgba(200,155,60,.34);padding:9px 0;font-size:16px}'+
       '.wn-subj-cover-info-row:last-child{border-bottom:0}'+
-      '.wn-subj-cover-info-label{display:inline-block;width:60px;font-weight:800;color:#16233a;margin-right:14px}'+
+      '.wn-subj-cover-info-label{display:inline-block;width:78px;font-weight:800;color:#16233a;margin-right:14px}'+
       '.wn-subj-cover-info-value{font-weight:700;color:#111827}'+
       '.wn-subj-cover-meta{position:relative;z-index:3;margin-top:20px;text-align:center}'+
       '.wn-subj-cover-name{font-size:30px;font-weight:900;color:#061d38;letter-spacing:1px}'+
