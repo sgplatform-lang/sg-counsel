@@ -42975,7 +42975,7 @@ function generateReport() {
   function _examNameNorm(v){ return String(v==null?'':v).replace(/\s+/g,''); }
   function _examKeyNorm(v){ return String(v==null?'':v).trim().replace(/\s+/g,' '); } // (구버전 호환용, 더는 매칭에 안 씀)
 
-  function _batchTargets(liveDate,liveName,onlyCurrent){
+  function _batchTargets(liveDate,liveName,onlyCurrent,orgScope,extraStudents){
     var cur=ST.sel||ST.adminSel;
     if(!cur) return {cur:null,targets:[],date:'',name:''};
     var ccd=cur.challengerData||{};
@@ -43040,8 +43040,19 @@ function generateReport() {
     // 이 기관 필터를 적용하지 않고 전체 학생을 대상으로 한다 — 기관관리자·선생님 계정은
     // 애초에 ST.students 자체가 자기 기관 학생으로만 채워져 있으므로 필터를 유지해도 안전하다.
     var _isSuperAdmin = ST.currentUser && ST.currentUser.role==='admin';
-    var base=(ST.students||[]).filter(function(s){
-      if(_isSuperAdmin) return true;
+    // ★ 2026-09-13 추가: 기관관리자·선생님 계정이 "회차 통계표"에서 우리 기관뿐 아니라
+    // 같은 회차를 치른 다른 기관 학생까지 포함해 볼 수 있도록, 호출부(_gg_printExamStats)가
+    // orgScope==='all'과 함께 다른 기관 학생 목록(extraStudents, Firestore에서 별도로
+    // 조회해온 것)을 넘기면 ST.students(내 기관 데이터만 있음)에 합쳐서 대상에 포함한다.
+    // ST.students 자체는 건드리지 않으므로 다른 화면에는 영향이 없다.
+    var _pool=(ST.students||[]);
+    if(Array.isArray(extraStudents)&&extraStudents.length){
+      var _seenIds={}; _pool.forEach(function(s){_seenIds[String(s&&s.id)]=true;});
+      _pool=_pool.concat(extraStudents.filter(function(s){var k=String(s&&s.id);if(_seenIds[k])return false;_seenIds[k]=true;return true;}));
+    }
+    var _includeAllOrgs = _isSuperAdmin || orgScope==='all';
+    var base=_pool.filter(function(s){
+      if(_includeAllOrgs) return true;
       return !cur.orgId || String(s.orgId||'')===String(cur.orgId||'');
     });
     var _matchSrc={}; // 학생id -> 'current' | 'history'
@@ -43178,16 +43189,88 @@ function generateReport() {
     return out;
   }
 
+  // ★ 2026-09-13 추가: 기관관리자·선생님 계정은 로그인 시부터 Firestore 쿼리 자체가
+  // 자기 기관으로 스코프돼 있어(ST.students에 다른 기관 학생이 아예 없음), "회차
+  // 통계표"에서 "모든 기관"을 고르면 같은 응시일의 다른 기관 학생들을 이 함수로 Firestore에서
+  // 별도 조회해온다(ST.students는 건드리지 않음 — 이 통계표 1회 생성용으로만 사용).
+  // ★ 2026-09-13(2차) 수정: 처음엔 `.where('challengerData.lastTestDate','==',examDate)`로
+  // 서버 조건을 걸었는데, 이러면 그 학생이 "지금 보고 있는(지난) 회차" 이후 더 최근 시험을
+  // 봐서 현재 회차 포인터(lastTestDate/lastTestName)가 그 최신 시험으로 넘어가 있고 이번
+  // 시험은 history[]에만 보관돼있는 경우를 못 찾는다(우리 기관 학생은 _batchTargets가
+  // history까지 뒤지는데, 다른 기관 학생은 이 조건 하나로만 걸러 아예 서버에서부터 빠짐).
+  // 보안규칙이 전체공개(allow read,write: if true)라 전체 컬렉션을 한 번에 가져와서
+  // (최종관리자가 로그인 때마다 하는 것과 동일한 규모) 클라이언트에서 _batchTargets와
+  // 완전히 같은 방식(현재 회차 우선, 안 맞으면 history[]에서 응시일+시험명 일치하는
+  // 가장 최근 기록 탐색)으로 매칭해, "지난 회차 조회" 케이스도 우리 기관과 동일하게
+  // 빠짐없이 찾도록 한다.
+  async function _gg_fetchOtherOrgExamStudents(examDate, examName){
+    if(!FB_USE() || !examDate) return [];
+    try{
+      var snap = await _sgFetchWithRetry(function(){
+        return window._fb.collection('students').get();
+      }, 'students(전체기관 회차조회)');
+      var _dateN=_examDateNorm(examDate), _nameN=_examNameNorm(examName);
+      var out=[];
+      snap.docs.forEach(function(d){
+        var data=d.data(); var s=Object.assign({}, data, {id:data.id!=null?data.id:d.id});
+        var cd=s.challengerData||{};
+        if((!_dateN||_examDateNorm(cd.lastTestDate)===_dateN)&&(!_nameN||_examNameNorm(cd.lastTestName)===_nameN)){
+          out.push(s); return;
+        }
+        if(Array.isArray(cd.history)){
+          for(var i=cd.history.length-1;i>=0;i--){
+            var h=cd.history[i];
+            var hDate=_examDateNorm(h.date!=null?h.date:h.testDate);
+            var hName=_examNameNorm(h.test!=null?h.test:(h.testName!=null?h.testName:h.name));
+            if((!_dateN||hDate===_dateN)&&(!_nameN||hName===_nameN)){
+              var hSubs=h.subjects||h.lastSubjects||h.fullSubjects||[];
+              if(hSubs.length){
+                out.push(Object.assign({}, s, {challengerData:Object.assign({}, cd, {
+                  lastSubjects: hSubs,
+                  lastTestDate: h.date!=null?h.date:h.testDate,
+                  lastTestName: h.test!=null?h.test:(h.testName!=null?h.testName:h.name)
+                })}));
+              }
+              break;
+            }
+          }
+        }
+      });
+      return out;
+    }catch(e){
+      console.warn('[SG] 전체 기관 회차 조회 실패:', e.message);
+      return null;
+    }
+  }
+
   // ★ 회차(응시일+시험명) 기준 학생별 성적순위·오답방어 통계표. 성적순위/오답방어 모두
   // 동점자는 같은 순위를 공유하고, 다음으로 다른 값이 나오면 그 다음 순위(건너뛰지 않고
   // 바로 다음 숫자)를 받는 "밀집 순위(dense rank)" 방식을 쓴다(예: 74,74,72 → 3,3,4).
   // 팝업은 일괄 출력과 같은 이유로 window.open() 대신 Blob+링크 클릭 방식을 쓴다.
-  window._gg_printExamStats=function(){
+  // ★ 2026-09-13 추가: 기관관리자·선생님은 클릭 시 "우리 기관만" 또는 "모든 기관(다른
+  // 기관 포함)"을 선택할 수 있다(최종관리자는 원래부터 항상 전체 기관이 보이므로 물어보지
+  // 않는다). 통계표 제목·헤더에도 어느 범위로 생성됐는지 표기한다.
+  window._gg_printExamStats=async function(){
     var ifr=document.getElementById('challenger-iframe');
     if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
     var cw=ifr.contentWindow, cd=cw.document;
     var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
-    var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'');
+    var liveDate=liveDateEl?liveDateEl.value:'', liveName=liveNameEl?liveNameEl.value:'';
+
+    var _isSuperAdmin = ST.currentUser && ST.currentUser.role==='admin';
+    var orgScope='mine', extraStudents=[], scopeLabel='';
+    if(!_isSuperAdmin){
+      var wantAll=confirm('같은 회차(같은 응시일·시험명)를 치른 "다른 기관" 학생들까지 모두 포함해서 통계표를 만들까요?\n\n확인: 모든 기관 포함\n취소: 우리 기관 학생만');
+      if(wantAll){
+        var _fetched=await _gg_fetchOtherOrgExamStudents(liveDate||(ST.sel||ST.adminSel||{}).challengerData?.lastTestDate, liveName||(ST.sel||ST.adminSel||{}).challengerData?.lastTestName);
+        if(_fetched===null){
+          alert('다른 기관 학생 데이터를 불러오는 중 오류가 발생했습니다. 우리 기관 학생만으로 통계표를 만듭니다.');
+        } else {
+          orgScope='all'; extraStudents=_fetched; scopeLabel=' (전체 기관 포함)';
+        }
+      }
+    }
+    var info=_batchTargets(liveDate, liveName, false, orgScope, extraStudents);
     var targets=info.targets;
     if(!targets.length){alert('통계표를 만들 학생을 찾지 못했습니다.');return;}
 
@@ -43227,11 +43310,11 @@ function generateReport() {
         '<table class="stat-table"><thead><tr><th>성적순위</th><th>학생</th><th>학교</th><th>학년</th><th>기관</th><th>반</th><th>점수</th><th>오답</th><th>오답방어</th></tr></thead><tbody>'+trs+'</tbody></table>';
     }).join('');
 
-    var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계';
+    var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계'+(orgScope==='all'?'_전체기관':'');
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_statEsc(title)+'</title>'+
       '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px}table.stat-table{width:100%;table-layout:auto;border-collapse:collapse;margin-bottom:10px;font-size:11.5px}table.stat-table th,table.stat-table td{border:1px solid #e2e8f0;padding:5px 6px;text-align:center;white-space:nowrap}table.stat-table th{background:#f0fdfa;color:#0f766e}@media print{body{padding:8mm}table.stat-table{font-size:10.5px}table.stat-table th,table.stat-table td{padding:4px 5px}}</style>'+
       '</head><body>'+
-      '<h1>CHALLENGER 통계 리포트</h1>'+
+      '<h1>CHALLENGER 통계 리포트'+_statEsc(scopeLabel)+'</h1>'+
       '<h2>회차: '+_statEsc(info.date||'')+' · '+_statEsc(info.name||'')+' · '+targets.length+'명</h2>'+
       sections+
       '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
