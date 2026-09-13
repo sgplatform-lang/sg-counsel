@@ -34165,12 +34165,27 @@ function _cbrPopulationRates(examDate, examName){
     if(mid) _includedIds[String(mid)]=true;
   });
   // 2) 같은 회차로 이미 저장돼있는 다른 학생들(이번 붙여넣기에 없는 학생만, 중복 집계 방지)
+  // ★ 2026-09-13(2차) 수정: 처음엔 그 학생의 "현재 회차"(lastTestDate/lastTestName)만 봤는데,
+  // 그 학생이 그 뒤로 더 최근 시험을 봐서 이번 시험이 이미 history(보관함)로 넘어간 경우
+  // 통째로 계산에서 빠지고 있었다(오래된 시험일수록 이런 학생이 많아 표본이 크게 줄어듦).
+  // 상담리포트가 보여주는 "전체 오답률"(v41PeerSubjects)은 원래부터 history까지 뒤져서 찾고
+  // 있었으므로, 여기도 완전히 같은 방식(현재 회차에 없으면 history에서 응시일+시험명이
+  // 일치하는 가장 최근 기록을 찾음)으로 맞춰 표본을 통일한다.
   (ST.students||[]).forEach(stu=>{
     if(_includedIds[String(stu.id)]) return;
     const cd=stu.challengerData||{};
-    if(String(cd.lastTestDate||'').trim()!==String(examDate||'').trim()) return;
-    if(String(cd.lastTestName||'').trim()!==String(examName||'').trim()) return;
-    (cd.lastSubjects||[]).forEach(sub=>{
+    let subs=null;
+    if(String(cd.lastTestDate||'').trim()===String(examDate||'').trim() && String(cd.lastTestName||'').trim()===String(examName||'').trim()){
+      subs = cd.lastSubjects||[];
+    } else if(Array.isArray(cd.history)){
+      const h = cd.history.slice().reverse().find(x=>
+        String(x.testDate||x.date||'').trim()===String(examDate||'').trim() &&
+        String(x.testName||x.name||x.test||'').trim()===String(examName||'').trim()
+      );
+      if(h) subs = h.subjects||h.lastSubjects||[];
+    }
+    if(!subs) return;
+    subs.forEach(sub=>{
       if(!sub||!sub.subject) return;
       const wrongNos=(sub.items||[]).map(it=>it&&it.no).filter(Boolean);
       addRow(sub.subject, sub.detail, wrongNos);
