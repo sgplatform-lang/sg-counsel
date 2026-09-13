@@ -43262,11 +43262,18 @@ function generateReport() {
     if(!_isSuperAdmin){
       var wantAll=confirm('같은 회차(같은 응시일·시험명)를 치른 "다른 기관" 학생들까지 모두 포함해서 통계표를 만들까요?\n\n확인: 모든 기관 포함\n취소: 우리 기관 학생만');
       if(wantAll){
+        // ★ 2026-09-13 추가: "확인"을 누른 뒤 전체 학생 컬렉션을 조회해오는 동안(수 초 소요)
+        // 화면에 아무 변화가 없어 "안 눌린 줄" 알고 다른 걸 누르게 된다는 신고 → 조회 시작
+        // 즉시 토스트로 진행 중임을 알리고, 조회가 끝나는 순간(성공/실패 무관) 바로 닫는다.
+        if(typeof toast==='function') toast('⏳ 다른 기관 학생 데이터를 조회하는 중입니다... 잠시만 기다려주세요.', 30000);
         var _fetched=await _gg_fetchOtherOrgExamStudents(liveDate||(ST.sel||ST.adminSel||{}).challengerData?.lastTestDate, liveName||(ST.sel||ST.adminSel||{}).challengerData?.lastTestName);
+        var _loadingToastEl=document.getElementById('admin-toast');
+        if(_loadingToastEl) _loadingToastEl.style.display='none';
         if(_fetched===null){
           alert('다른 기관 학생 데이터를 불러오는 중 오류가 발생했습니다. 우리 기관 학생만으로 통계표를 만듭니다.');
         } else {
           orgScope='all'; extraStudents=_fetched; scopeLabel=' (전체 기관 포함)';
+          if(typeof toast==='function') toast('✅ 조회 완료 · 통계표를 생성합니다.', 1500);
         }
       }
     }
