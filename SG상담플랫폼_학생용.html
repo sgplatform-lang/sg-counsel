@@ -2311,9 +2311,16 @@ function renderChallengerAnswerInput(){
   // 그 반 소속 학생에게만 시험 선택 목록에 나오게 한다(비어있으면 기존처럼 반 제한 없음).
   // "테스트" 기능(3169~3172행)이 이미 같은 방식(classNames.includes(CU.className))을
   // 쓰고 있어 그대로 재사용한다.
+  // ★ 2026-09-14(412) 수정: "공개 대상 반"이 기관 구분 없이 하나의 배열(classNames)로만
+  // 적용되던 탓에, 다른 기관에서 체크한 반 이름 때문에 우리 기관 학생에게 "전체공개"인
+  // 시험이 안 보이거나, 우리 기관은 반을 하나도 안 골랐는데도 다른 기관이 고른 반 이름에
+  // 걸려 숨어버리는 문제가 있었다 — 이제 관리자 쪽에서 기관별로 반 제한을 따로 저장하므로
+  // (classNamesByOrg), 내 기관(CU.orgId)에 대해 저장된 값만 확인한다(구버전 시험처럼
+  // classNamesByOrg가 아예 없으면 예전 방식대로 classNames를 그대로 적용).
   const catalogList=(_chgAnsCatalog||[]).filter(function(e){
     if(!(!e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0))) return false;
-    if(e.classNames && e.classNames.length && !e.classNames.includes(CU.className)) return false;
+    const clsForMyOrg = e.classNamesByOrg ? (e.classNamesByOrg[CU.orgId]||[]) : (e.classNames||[]);
+    if(clsForMyOrg.length && !clsForMyOrg.includes(CU.className)) return false;
     return true;
   }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
   const examEntry=_chgAnsCurrentExamEntry();
