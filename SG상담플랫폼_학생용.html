@@ -1548,6 +1548,16 @@ window.openMockEdit=function(){
 // ══════════════════════════════════════════════════
 let _chgViewMode='aar'; // 'wrong'=챌린저 오답 입력, 'aar'=챌린저 AAR 입력 — 기본값을 AAR로 변경(2026-08-26)
 function chgSetViewMode(m){ _chgViewMode=m; render(); }
+// ★ 2026-09-14 추가: "챌린저"(🎯) 탭 한 화면에 (1)선생님이 등록한 시험의 AAR·오답원인을
+// 입력하는 것과 (2)선생님이 등록하지 않은 시험을 학생이 직접 만들어 기록하는 것이 아무
+// 구분 없이 섞여 있어, 어디에 입력해야 하는지 헷갈린다는 신고 → 화면 최상단에 "기관
+// 챌린저"/"셀프 챌린저" 선택 탭을 추가한다. 'org'=선생님이 등록한 시험(챌린저 답안 탭의
+// 자동채점 또는 관리자 결과일괄반영)의 AAR·오답원인만 보여줌(과목 추가 불가 — 새 과목은
+// 반드시 "챌린저 답안" 탭이나 선생님을 통해서만 생겨야 함), 'self'=학생이 직접 시험명·
+// 응시일·과목을 만드는 셀프 기록만 보여줌("+ 과목 추가" 가능). 어느 목록에 들어가는지는
+// 과목별로 이미 저장된 _selfRegistered 표식(chgAddSubject에서만 세팅)으로 자동 분류된다.
+let _chgRegMode='org';
+function chgSetRegMode(m){ _chgRegMode=m; render(); }
 function chgInit(){
   if(!CU.challengerData) CU.challengerData = {};
   const cd = CU.challengerData;
@@ -1642,6 +1652,12 @@ function chgAddSubject(){
   // ★ 2026-09-13: 학생이 이 화면에서 직접 새 과목을 추가하는 것이므로 처음부터
   // 학생 직접 입력으로 표시한다(위 chgSetItemField 참고).
   ns._studentSelfInput = true;
+  // ★ 2026-09-14 추가: 이 "챌린저"(🎯) 탭은 관리자가 카탈로그에 등록하지 않은 시험도
+  // 학생이 응시일·시험명을 자유롭게 입력해 셀프로 기록할 수 있는 화면이다("챌린저 답안"
+  // 탭은 반대로 카탈로그 등록이 필수). 상담원이 상담리포트를 볼 때 이게 카탈로그 기반
+  // 정식 시험인지, 학생이 개인적으로 기록해둔 셀프 시험인지 구분할 방법이 전혀 없다는
+  // 신고에 따라, 이 탭에서 만들어진 과목에는 _selfRegistered 표시를 남긴다.
+  ns._selfRegistered = true;
   cd.lastSubjects.push(ns);
   render();
   chgScheduleSave();
@@ -1824,6 +1840,19 @@ function chgSetMeta(field,val){
       return;
     }
     cd[field]=val;
+    // ★ 2026-09-14 추가: 과목을 하나도 추가하지 않은 채 응시일/시험명만 입력하고 화면을
+    // 나가도, 예전엔 이 값들이 곧바로 서버에 저장되어(500ms 자동저장) 관리자 쪽에 "빈
+    // 회차"(과목·AAR·오답원인이 전혀 없는 회차)가 그대로 들어와 있었다("과목입력을
+    // 안했는데도 회차는 들어와 있다"는 신고). 회차통계표·AAR통계 등 집계 화면은 과목이
+    // 있어야만 그 회차를 인식하므로 그런 빈 회차는 집계엔 안 잡히지만, 학생 상세를 직접
+    // 열어보면 의미 없는 빈 회차가 그대로 보이는 문제가 있었다. 과목이 1개 이상 생기기
+    // 전까지는 응시일/시험명 변경을 화면(로컬 상태)에만 반영하고 서버 저장은 보류한다 —
+    // 첫 과목이 추가되는 순간(chgAddSubject 등이 chgScheduleSave를 호출) 응시일/시험명과
+    // 과목이 함께 저장되므로 데이터 유실은 없다.
+    if(!Array.isArray(cd.lastSubjects) || !cd.lastSubjects.length){
+      render();
+      return;
+    }
   }
   else { cd.meta[field]=val; }
   chgScheduleSave();
@@ -2731,12 +2760,78 @@ async function chgAnsGradeAndSave(){
   render();
 }
 
+// ★ 2026-09-14 추가: 과목 카드 하나를 그리는 부분을 renderChallengerInput에서 분리했다
+// (기관/셀프 모드별로 필터링된 목록에 재사용하기 위함). 카드 내용 자체는 전혀 바뀌지
+// 않았고, 기존 렌더 로직을 그대로 옮긴 것뿐이다.
+function _chgSubjectCardHtml(sub, sIdx, mode){
+  return `<div class="card" style="margin-bottom:12px"><div class="card-body">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700">과목 ${sIdx+1}</div>
+      <button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveSubject(${sIdx})">삭제</button>
+    </div>
+    <div style="display:grid;grid-template-columns:${(sub.subject==='ENG'||sub.subject==='HIST')?'1fr':'1fr 1fr'};gap:8px 10px;margin-bottom:10px">
+      <div><label style="font-size:11px;color:#888">과목</label><select onchange="chgSetSubjField(${sIdx},'subject',this.value);render()">${CHG_SUBJ_OPT.map(([v,l])=>`<option value="${v}" ${sub.subject===v?'selected':''}>${l}</option>`).join('')}</select></div>
+      ${(sub.subject==='ENG'||sub.subject==='HIST')?'':`<div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>`}
+    </div>
+    ${mode==='wrong'?`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
+      <div><label style="font-size:11px;color:#888">실력 수준</label>${chgSelect(0,['상위권','중위권','하위권','불안정권'],sub.level,`chgSetSubjField(${sIdx},'level',this.value)`)}</div>
+      <div><label style="font-size:11px;color:#888">이번 회차 집중 여부</label>${chgSelect(0,['집중','유지','관찰','보류'],sub.focus,`chgSetSubjField(${sIdx},'focus',this.value)`)}</div>
+      <div><label style="font-size:11px;color:#888">정답률 목표</label>${chgSelect(0,['정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'],sub.accuracyTarget,`chgSetSubjField(${sIdx},'accuracyTarget',this.value)`)}</div>
+      <div><label style="font-size:11px;color:#888">오답개수</label><input type="number" value="${esc(sub.wrongCount)}" oninput="chgSetSubjField(${sIdx},'wrongCount',this.value)"></div>
+      <div><label style="font-size:11px;color:#888">전체 문항 수</label><input type="number" placeholder="예: 45" value="${esc(sub.totalItemCount)}" oninput="chgSetSubjField(${sIdx},'totalItemCount',this.value)"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
+      <div><label style="font-size:11px;color:#888">성적</label><input type="number" value="${esc(sub.score)}" oninput="chgSetSubjField(${sIdx},'score',this.value)"></div>
+      <div><label style="font-size:11px;color:#888">등급 <span style="color:#bbb">(선택입력)</span></label><input value="${esc(sub.grade)}" oninput="chgSetSubjField(${sIdx},'grade',this.value)"></div>
+      <div><label style="font-size:11px;color:#888">백분위 <span style="color:#bbb">(선택입력)</span></label><input type="number" value="${esc(sub.percentile)}" oninput="chgSetSubjField(${sIdx},'percentile',this.value)"></div>
+      <div><label style="font-size:11px;color:#888">목표 성적 <span style="color:#bbb">(선택입력)</span></label><input type="number" value="${esc(sub.targetScore)}" oninput="chgSetSubjField(${sIdx},'targetScore',this.value)"></div>
+      <div><label style="font-size:11px;color:#888">목표 등급 <span style="color:#bbb">(선택입력)</span></label><input value="${esc(sub.targetGrade)}" oninput="chgSetSubjField(${sIdx},'targetGrade',this.value)"></div>
+      <div><label style="font-size:11px;color:#888">목표 백분위 <span style="color:#bbb">(선택입력)</span></label><input type="number" value="${esc(sub.targetPercentile)}" oninput="chgSetSubjField(${sIdx},'targetPercentile',this.value)"></div>
+      <div><label style="font-size:11px;color:#2e7d32;font-weight:700">✅ 문제풀이순서 (필수)</label>${chgSelect(0,chgOrderOptions(sub.subject),sub.order,`chgSetSubjField(${sIdx},'order',this.value)`,'border-color:#8fd19e;background:#f4fbf5')}</div>
+      <div><label style="font-size:11px;color:#2e7d32;font-weight:700">✅ 시간부족 (필수)</label>${chgSelect(0,['없음','약간','뚜렷함','심각'],sub.time,`chgSetSubjField(${sIdx},'time',this.value)`,'border-color:#8fd19e;background:#f4fbf5')}</div>
+      <div><label style="font-size:11px;color:#2e7d32;font-weight:700">✅ 집중/멘탈 (필수)</label>${chgSelect(0,['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'],sub.mental,`chgSetSubjField(${sIdx},'mental',this.value)`,'border-color:#8fd19e;background:#f4fbf5')}</div>
+    </div>
+    <div>
+      <label style="font-size:15px;font-weight:800;color:#1a1a2e;display:block;margin-bottom:6px">🔴 틀린 문항별 오답 원인 체크</label>
+      ${(sub.items||[]).map((it,iIdx)=>`
+      <div style="border:1px solid #f0f0f8;border-radius:8px;padding:8px;margin-top:6px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 8px">
+          <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">오답 문항번호</label><input placeholder="문항 번호" value="${esc(it.no)}" oninput="chgSetItemField(${sIdx},${iIdx},'no',this.value)"></div>
+          <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">단원</label><input placeholder="단원/유형" value="${esc(it.unit)}" oninput="chgSetItemField(${sIdx},${iIdx},'unit',this.value)"></div>
+          <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">난이도</label>${chgSelect(0,['하','중','상','최상','킬러'],it.diff,`chgSetItemField(${sIdx},${iIdx},'diff',this.value)`)}</div>
+          <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">배점</label><input type="number" placeholder="배점" value="${esc(it.points)}" oninput="chgSetItemField(${sIdx},${iIdx},'points',this.value)"></div>
+          <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 1차선택</label>${chgSelect(0,[['','1차원인'],['K','K 지식부족'],['T','T 시간손실'],['M','M 실수'],['J','J 판단·집착'],['C','C 집중붕괴'],['U','U 판정보류']].map(o=>o[1]),(({K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'})[it.causePrimary]||'1차원인'),`chgSetItemField(${sIdx},${iIdx},'causePrimary',{'1차원인':'','K 지식부족':'K','T 시간손실':'T','M 실수':'M','J 판단·집착':'J','C 집중붕괴':'C','U 판정보류':'U'}[this.value])`,'border-color:#8fd19e;background:#f4fbf5')}</div>
+          <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 찍음/미응답 체크</label><div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#2e7d32;background:#f4fbf5;border:1.5px solid #8fd19e;border-radius:10px;padding:10px 12px"><input type="checkbox" style="width:18px;height:18px;flex:none;padding:0;margin:0;border-radius:4px;-webkit-appearance:checkbox;appearance:checkbox" ${it.guessedTime?'checked':''} onchange="chgSetItemField(${sIdx},${iIdx},'guessedTime',this.checked)">찍음/미응답</div></div>
+          <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 2차선택</label><button class="btn-sm" style="width:100%;background:#e8f5e9;color:#2e7d32;border:1.5px solid #8fd19e" onclick="chgOpenReasonModal(${sIdx},${iIdx})">오답원인 선택</button><div style="font-size:11px;margin-top:4px;color:${(it.reasons&&it.reasons.length)?'#333':'#aaa'}">${(it.reasons&&it.reasons.length)?esc(it.reasons.join(', ')):'선택 전'}</div></div>
+          <div><label style="font-size:10px;color:transparent;display:block;margin-bottom:2px">삭제</label><button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveItem(${sIdx},${iIdx})">이 문항 삭제</button></div>
+        </div>
+      </div>`).join('')}
+      <button class="btn-sm" style="margin-top:8px;width:100%" onclick="chgAddItem(${sIdx})">+ 문항 추가</button>
+    </div>
+    `:chgAarSectionHtml(sIdx,sub)}
+  </div></div>`;
+}
 function renderChallengerInput(){
   const s=CU;
   const cd=chgInit();
   const mode=_chgViewMode||'wrong';
+  const regMode=_chgRegMode||'org';
+  // ★ 2026-09-14: 과목별로 이미 저장된 _selfRegistered 표식으로 기관/셀프 목록을 나눈다.
+  // 표식이 없는 과목(카탈로그 자동채점·관리자 등록)은 전부 "기관 챌린저" 쪽에 표시된다.
+  const orgIdxs=[], selfIdxs=[];
+  cd.lastSubjects.forEach((sub,sIdx)=>{ (sub._selfRegistered?selfIdxs:orgIdxs).push(sIdx); });
+  const visibleIdxs = regMode==='self' ? selfIdxs : orgIdxs;
+  const hasRoundInfo = !!(cd.lastTestDate && cd.lastTestName);
+
   return `<div>
     <div class="stitle">🎯 챌린저 모의고사 입력</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn-sm" style="flex:1;min-height:46px;font-size:13px;font-weight:800;border:1.5px solid ${regMode==='org'?'#0f766e':'#e2e8f0'};background:${regMode==='org'?'#0f766e':'#fff'};color:${regMode==='org'?'#fff':'#333'}" onclick="chgSetRegMode('org')">🏫 기관 챌린저<div style="font-size:10px;font-weight:600;opacity:.9;margin-top:1px">선생님이 등록한 시험</div></button>
+      <button class="btn-sm" style="flex:1;min-height:46px;font-size:13px;font-weight:800;border:1.5px solid ${regMode==='self'?'#f59e0b':'#e2e8f0'};background:${regMode==='self'?'#f59e0b':'#fff'};color:${regMode==='self'?'#fff':'#333'}" onclick="chgSetRegMode('self')">🙋 셀프 챌린저<div style="font-size:10px;font-weight:600;opacity:.9;margin-top:1px">내가 직접 등록</div></button>
+    </div>
+
     <div class="card"><div class="card-body">
       <div style="font-size:13px;font-weight:700;margin-bottom:10px">기본 정보</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px">
@@ -2748,8 +2843,16 @@ function renderChallengerInput(){
       </div>
     </div></div>
 
+    ${regMode==='self'
+      ? `<div class="card" style="margin-top:12px;background:#fffbeb;border:1px solid #fde68a"><div class="card-body" style="padding:12px 14px">
+          <p style="font-size:12px;color:#92400e;line-height:1.6;margin:0">🙋 <b>셀프 챌린저</b>는 선생님이 등록하지 않은 시험(개인적으로 풀어본 모의고사·문제집 등)을 직접 기록하는 화면입니다.${hasRoundInfo?' 위 응시일·시험명을 확인했다면, 아래에서 과목을 추가해 AAR·오답원인을 입력해주세요.':' 먼저 위 "응시일"과 "시험명/회차"를 입력하면, 아래에서 과목을 추가할 수 있습니다.'}</p>
+        </div></div>`
+      : `<div class="card" style="margin-top:12px;background:#f0fdfa;border:1px solid #99f6e4"><div class="card-body" style="padding:12px 14px">
+          <p style="font-size:12px;color:#0f766e;line-height:1.6;margin:0">🏫 <b>기관 챌린저</b>는 선생님이 등록한 시험의 AAR·오답원인을 입력하는 화면입니다. 답안 채점은 "챌린저 답안" 탭에서 진행해주세요. 이미 성적표를 받은 시험인데 목록에 안 보인다면 선생님께 등록을 요청해주세요.</p>
+        </div></div>`}
+
     <div style="margin:16px 0 8px">
-      <div class="stitle" style="margin:0">📚 이번 회차 과목별 입력 <span style="font-size:11px;color:#dc2626;font-weight:700">(AAR,오답체크 필수)</span></div>
+      <div class="stitle" style="margin:0">📚 ${regMode==='self'?'셀프 기록':'이번 회차'} 과목별 입력 <span style="font-size:11px;color:#dc2626;font-weight:700">(AAR,오답체크 필수)</span></div>
     </div>
 
     <div style="display:flex;gap:8px;margin-bottom:14px">
@@ -2757,58 +2860,16 @@ function renderChallengerInput(){
       <button class="btn-sm" style="flex:1;min-height:42px;font-size:13px;font-weight:800;border:1.5px solid ${mode==='wrong'?'#3b5bdb':'#e2e8f0'};background:${mode==='wrong'?'#3b5bdb':'#fff'};color:${mode==='wrong'?'#fff':'#333'}" onclick="chgSetViewMode('wrong')">📝 챌린저 오답</button>
     </div>
 
-    ${cd.lastSubjects.length===0?`<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">입력된 과목이 없습니다</div><div class="empty-sub">아래 '+ 과목 추가'를 눌러 이번 회차 결과를 입력해보세요</div></div>`:''}
+    ${!visibleIdxs.length ? (regMode==='self'
+      ? (hasRoundInfo
+          ? `<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">셀프로 기록한 과목이 없습니다</div><div class="empty-sub">아래 '+ 과목 추가'를 눌러 셀프 기록을 시작해보세요</div></div>`
+          : `<div class="empty"><div class="empty-icon">🎯</div><div class="empty-title">응시일·시험명을 먼저 입력해주세요</div><div class="empty-sub">위 "기본 정보"에서 응시일과 시험명을 입력하면 과목을 추가할 수 있습니다</div></div>`)
+      : `<div class="empty"><div class="empty-icon">🏫</div><div class="empty-title">선생님이 등록한 시험 결과가 아직 없습니다</div><div class="empty-sub">"챌린저 답안" 탭에서 답안을 제출하거나, 선생님이 성적을 등록하면 여기에 나타납니다</div></div>`
+    ) : ''}
 
-    ${cd.lastSubjects.map((sub,sIdx)=>`
-    <div class="card" style="margin-bottom:12px"><div class="card-body">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700">과목 ${sIdx+1}</div>
-        <button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveSubject(${sIdx})">삭제</button>
-      </div>
-      <div style="display:grid;grid-template-columns:${(sub.subject==='ENG'||sub.subject==='HIST')?'1fr':'1fr 1fr'};gap:8px 10px;margin-bottom:10px">
-        <div><label style="font-size:11px;color:#888">과목</label><select onchange="chgSetSubjField(${sIdx},'subject',this.value);render()">${CHG_SUBJ_OPT.map(([v,l])=>`<option value="${v}" ${sub.subject===v?'selected':''}>${l}</option>`).join('')}</select></div>
-        ${(sub.subject==='ENG'||sub.subject==='HIST')?'':`<div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>`}
-      </div>
-      ${mode==='wrong'?`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
-        <div><label style="font-size:11px;color:#888">실력 수준</label>${chgSelect(0,['상위권','중위권','하위권','불안정권'],sub.level,`chgSetSubjField(${sIdx},'level',this.value)`)}</div>
-        <div><label style="font-size:11px;color:#888">이번 회차 집중 여부</label>${chgSelect(0,['집중','유지','관찰','보류'],sub.focus,`chgSetSubjField(${sIdx},'focus',this.value)`)}</div>
-        <div><label style="font-size:11px;color:#888">정답률 목표</label>${chgSelect(0,['정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'],sub.accuracyTarget,`chgSetSubjField(${sIdx},'accuracyTarget',this.value)`)}</div>
-        <div><label style="font-size:11px;color:#888">오답개수</label><input type="number" value="${esc(sub.wrongCount)}" oninput="chgSetSubjField(${sIdx},'wrongCount',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">전체 문항 수</label><input type="number" placeholder="예: 45" value="${esc(sub.totalItemCount)}" oninput="chgSetSubjField(${sIdx},'totalItemCount',this.value)"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
-        <div><label style="font-size:11px;color:#888">성적</label><input type="number" value="${esc(sub.score)}" oninput="chgSetSubjField(${sIdx},'score',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">등급 <span style="color:#bbb">(선택입력)</span></label><input value="${esc(sub.grade)}" oninput="chgSetSubjField(${sIdx},'grade',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">백분위 <span style="color:#bbb">(선택입력)</span></label><input type="number" value="${esc(sub.percentile)}" oninput="chgSetSubjField(${sIdx},'percentile',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">목표 성적 <span style="color:#bbb">(선택입력)</span></label><input type="number" value="${esc(sub.targetScore)}" oninput="chgSetSubjField(${sIdx},'targetScore',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">목표 등급 <span style="color:#bbb">(선택입력)</span></label><input value="${esc(sub.targetGrade)}" oninput="chgSetSubjField(${sIdx},'targetGrade',this.value)"></div>
-        <div><label style="font-size:11px;color:#888">목표 백분위 <span style="color:#bbb">(선택입력)</span></label><input type="number" value="${esc(sub.targetPercentile)}" oninput="chgSetSubjField(${sIdx},'targetPercentile',this.value)"></div>
-        <div><label style="font-size:11px;color:#2e7d32;font-weight:700">✅ 문제풀이순서 (필수)</label>${chgSelect(0,chgOrderOptions(sub.subject),sub.order,`chgSetSubjField(${sIdx},'order',this.value)`,'border-color:#8fd19e;background:#f4fbf5')}</div>
-        <div><label style="font-size:11px;color:#2e7d32;font-weight:700">✅ 시간부족 (필수)</label>${chgSelect(0,['없음','약간','뚜렷함','심각'],sub.time,`chgSetSubjField(${sIdx},'time',this.value)`,'border-color:#8fd19e;background:#f4fbf5')}</div>
-        <div><label style="font-size:11px;color:#2e7d32;font-weight:700">✅ 집중/멘탈 (필수)</label>${chgSelect(0,['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'],sub.mental,`chgSetSubjField(${sIdx},'mental',this.value)`,'border-color:#8fd19e;background:#f4fbf5')}</div>
-      </div>
-      <div>
-        <label style="font-size:15px;font-weight:800;color:#1a1a2e;display:block;margin-bottom:6px">🔴 틀린 문항별 오답 원인 체크</label>
-        ${(sub.items||[]).map((it,iIdx)=>`
-        <div style="border:1px solid #f0f0f8;border-radius:8px;padding:8px;margin-top:6px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 8px">
-            <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">오답 문항번호</label><input placeholder="문항 번호" value="${esc(it.no)}" oninput="chgSetItemField(${sIdx},${iIdx},'no',this.value)"></div>
-            <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">단원</label><input placeholder="단원/유형" value="${esc(it.unit)}" oninput="chgSetItemField(${sIdx},${iIdx},'unit',this.value)"></div>
-            <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">난이도</label>${chgSelect(0,['하','중','상','최상','킬러'],it.diff,`chgSetItemField(${sIdx},${iIdx},'diff',this.value)`)}</div>
-            <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">배점</label><input type="number" placeholder="배점" value="${esc(it.points)}" oninput="chgSetItemField(${sIdx},${iIdx},'points',this.value)"></div>
-            <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 1차선택</label>${chgSelect(0,[['','1차원인'],['K','K 지식부족'],['T','T 시간손실'],['M','M 실수'],['J','J 판단·집착'],['C','C 집중붕괴'],['U','U 판정보류']].map(o=>o[1]),(({K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'})[it.causePrimary]||'1차원인'),`chgSetItemField(${sIdx},${iIdx},'causePrimary',{'1차원인':'','K 지식부족':'K','T 시간손실':'T','M 실수':'M','J 판단·집착':'J','C 집중붕괴':'C','U 판정보류':'U'}[this.value])`,'border-color:#8fd19e;background:#f4fbf5')}</div>
-            <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 찍음/미응답 체크</label><div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#2e7d32;background:#f4fbf5;border:1.5px solid #8fd19e;border-radius:10px;padding:10px 12px"><input type="checkbox" style="width:18px;height:18px;flex:none;padding:0;margin:0;border-radius:4px;-webkit-appearance:checkbox;appearance:checkbox" ${it.guessedTime?'checked':''} onchange="chgSetItemField(${sIdx},${iIdx},'guessedTime',this.checked)">찍음/미응답</div></div>
-            <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 2차선택</label><button class="btn-sm" style="width:100%;background:#e8f5e9;color:#2e7d32;border:1.5px solid #8fd19e" onclick="chgOpenReasonModal(${sIdx},${iIdx})">오답원인 선택</button><div style="font-size:11px;margin-top:4px;color:${(it.reasons&&it.reasons.length)?'#333':'#aaa'}">${(it.reasons&&it.reasons.length)?esc(it.reasons.join(', ')):'선택 전'}</div></div>
-            <div><label style="font-size:10px;color:transparent;display:block;margin-bottom:2px">삭제</label><button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveItem(${sIdx},${iIdx})">이 문항 삭제</button></div>
-          </div>
-        </div>`).join('')}
-        <button class="btn-sm" style="margin-top:8px;width:100%" onclick="chgAddItem(${sIdx})">+ 문항 추가</button>
-      </div>
-      `:chgAarSectionHtml(sIdx,sub)}
-    </div></div>`).join('')}
+    ${visibleIdxs.map(sIdx=>_chgSubjectCardHtml(cd.lastSubjects[sIdx], sIdx, mode)).join('')}
 
-    <button class="btn-sm" style="width:100%;min-height:42px;margin-bottom:12px;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;font-size:13px" onclick="chgAddSubject()">+ 과목 추가</button>
+    ${regMode==='self' && hasRoundInfo ? `<button class="btn-sm" style="width:100%;min-height:42px;margin-bottom:12px;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;font-size:13px" onclick="chgAddSubject()">+ 과목 추가</button>` : ''}
 
     <button class="btn-sm" style="width:100%;min-height:52px;margin-bottom:12px;background:#3b5bdb;color:#fff;font-size:16px;font-weight:800;box-shadow:0 2px 8px rgba(59,91,219,.35)" onclick="chgSaveRound()">✅ ${mode==='wrong'?'오답입력 최종완료':'최종 입력 완료'}</button>
 
