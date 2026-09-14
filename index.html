@@ -259,7 +259,7 @@ input,select,textarea{font-size:16px!important}
   input,select,textarea{font-size:inherit!important}
 }
 
-</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script><script>
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script><script>
 // ★ 2026-09-09(374) 추가: Firebase App Check — 보안 규칙이 "누구나 읽기/쓰기 가능"으로
 // 열려있어(로그인 화면이 Firebase 정식 인증이 아니라 자체 아이디/비번 대조 방식이라 규칙에서
 // "로그인한 사람만" 구분이 안 됨) 데이터가 그대로 노출된 문제의 1차 방어선. 이 앱(우리
@@ -324,6 +324,10 @@ try{
     // ★ 2026-08-27 추가: Storage 업로드/삭제 — path 예: 'examCatalog/{examId}/q/21.png'
     uploadBlob: (path, blob)=>_storage.ref(path).put(blob).then(snap=>snap.ref.getDownloadURL()),
     deleteFile: (path)=>_storage.ref(path).delete().catch(e=>{ if(e && e.code!=='storage/object-not-found') throw e; }),
+    // ★ 2026-09-14(413) 추가: 문제지·정답지 PDF를 서버 함수(analyzeExamPdf)로 보내 Claude가
+    // 분석한 문항유형DB 텍스트를 받아온다. Anthropic API 키는 서버(Secret Manager)에만 있고
+    // 이 함수 호출로는 절대 전달되지 않음 — 서버 함수 배포는 별도 안내 참고.
+    analyzeExamPdf: (payload)=>firebase.functions().httpsCallable('analyzeExamPdf')(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -28119,7 +28123,8 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 
 /* -- TOP5 랭킹 박스: 순위 배지 -- */
 .v41-ranking .v41-rank-grid div{display:flex;align-items:center;gap:10px;justify-content:flex-start}
-.v41-ranking .v41-rank-grid div b{flex:1;font-weight:800}
+.v41-ranking .v41-rank-grid div b{flex:0 0 auto;white-space:nowrap;font-weight:800}
+.v41-ranking .v41-rank-grid div>span:last-child{flex:1;min-width:0}
 .v41-rank-num{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:11.5px;font-weight:900}
 
 /* -- 문항별 전체 오답률 막대 그래프(progress-bar) -- */
@@ -33112,17 +33117,203 @@ function _sgAnswerKeyMapToText(map){
   return lines.join('\n');
 }
 
+// ★ 2026-09-14(412) 추가: "기출/사설 모의고사"처럼 여러 과목을 한 번에 등록할 땐 기존 방식
+// (엑셀 형태의 문항 DB를 통째로 붙여넣기)이 편하지만, 학원 자체 주간테스트·총괄테스트처럼
+// 1과목만 보는 간단한 시험까지 매번 이 형식을 준비하는 건 번거롭다는 요청 → 문항별로
+// 단원명·정답·배점만 입력하면 되는 간단한 도우미 UI를 추가하고, "📥 아래 칸에 채우기"를
+// 누르면 기존 "문항별 단원/유형" 텍스트칸(examcat-itemmeta)에 똑같은 형식의 텍스트를 자동
+// 생성해 넣어준다 — 이후 저장·수정·자동채점·상담리포트 반영은 전부 기존 로직 그대로 동작한다
+// (과목코드는 학생용 "챌린저 답안 입력" 탭이 인식하는 국어/수학/영어/한국사/탐구 5개 중에서만
+// 고를 수 있다 — 이 5개 밖의 과목은 카탈로그에 등록해도 학생 쪽에서 표시될 자리 자체가 없다).
+let EXAMCAT_simpleRows = [];
+function _examcatSimpleReset(){
+  EXAMCAT_simpleRows = [{unit:'',answer:'',points:''},{unit:'',answer:'',points:''},{unit:'',answer:'',points:''}];
+}
+function _examcatSimpleSyncFromDom(){
+  const body=document.getElementById('examcat-simple-rows');
+  if(!body) return;
+  const rows=[];
+  body.querySelectorAll('[data-simple-row]').forEach(function(rowEl){
+    rows.push({
+      unit:(rowEl.querySelector('[data-f="unit"]')||{}).value||'',
+      answer:(rowEl.querySelector('[data-f="answer"]')||{}).value||'',
+      points:(rowEl.querySelector('[data-f="points"]')||{}).value||''
+    });
+  });
+  EXAMCAT_simpleRows = rows;
+}
+function _examcatSimpleRerenderRows(){
+  const body=document.getElementById('examcat-simple-rows');
+  if(!body) return;
+  body.innerHTML=_examcatSimpleRowsHtml();
+}
+function _examcatSimpleAddRow(){
+  _examcatSimpleSyncFromDom();
+  EXAMCAT_simpleRows.push({unit:'',answer:'',points:''});
+  _examcatSimpleRerenderRows();
+}
+function _examcatSimpleRemoveRow(idx){
+  _examcatSimpleSyncFromDom();
+  if(EXAMCAT_simpleRows.length<=1) return;
+  EXAMCAT_simpleRows.splice(idx,1);
+  _examcatSimpleRerenderRows();
+}
+function _examcatSimpleRowsHtml(){
+  return EXAMCAT_simpleRows.map(function(r,i){
+    return `<div data-simple-row style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
+      <span style="width:24px;text-align:center;font-size:11.5px;color:#94a3b8;font-weight:700">${i+1}</span>
+      <input data-f="unit" placeholder="단원명/유형(예: 이차함수의 활용)" value="${esc(r.unit||'')}" style="flex:2;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+      <input data-f="answer" placeholder="정답" value="${esc(r.answer||'')}" style="width:64px;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+      <input data-f="points" placeholder="배점" value="${esc(r.points||'')}" style="width:56px;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+      ${EXAMCAT_simpleRows.length>1?`<button type="button" onclick="_examcatSimpleRemoveRow(${i})" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:12px;flex-shrink:0">✕</button>`:'<span style="width:24px;flex-shrink:0"></span>'}
+    </div>`;
+  }).join('');
+}
+function _examcatSimplePanelHtml(){
+  const subjOptions=[['KOR','국어'],['MATH','수학'],['ENG','영어'],['HIST','한국사'],['INQ','탐구']];
+  return `<div style="margin-bottom:14px;border:1.5px dashed #0f766e;border-radius:10px;padding:12px;background:#f0fdfa">
+    <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">🧾 간편 입력 도우미 (주간·총괄테스트처럼 1과목만 볼 때)</div>
+    <p style="font-size:11px;color:#0f766e;margin:0 0 8px">문항별로 단원명·정답·배점만 입력하면 아래 "📚 문항별 단원/유형" 칸에 자동으로 채워집니다. 여러 과목을 한 번에 등록하는 기출·사설 모의고사는 기존처럼 아래 칸에 직접 붙여넣어 주세요. (학생용 "챌린저 답안 입력" 탭이 인식하는 국어·수학·영어·한국사·탐구 중에서만 과목을 고를 수 있습니다)</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <select id="examcat-simple-subj" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+        ${subjOptions.map(function(o){ return '<option value="'+o[0]+'">'+o[1]+'</option>'; }).join('')}
+      </select>
+      <input id="examcat-simple-detail" placeholder="세부과목(선택, 탐구는 예: 화학Ⅰ — 전체 문항에 공통 적용)" style="flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+    </div>
+    <div id="examcat-simple-rows">${_examcatSimpleRowsHtml()}</div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button type="button" onclick="_examcatSimpleAddRow()" style="background:#fff;border:1px solid #0f766e;color:#0f766e;border-radius:6px;padding:5px 12px;font-size:11.5px;cursor:pointer">+ 문항 추가</button>
+      <button type="button" onclick="_examcatSimpleApply()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">📥 아래 문항유형 칸에 채우기</button>
+    </div>
+  </div>`;
+}
+function _examcatSimpleApply(){
+  _examcatSimpleSyncFromDom();
+  const subj=(document.getElementById('examcat-simple-subj')||{}).value||'KOR';
+  const detail=((document.getElementById('examcat-simple-detail')||{}).value||'').trim();
+  const filled=EXAMCAT_simpleRows.filter(function(r){ return (r.unit||'').trim() || (r.answer||'').trim(); });
+  if(!filled.length){ alert('문항을 1개 이상 입력해주세요(단원명 또는 정답 중 하나는 있어야 합니다).'); return; }
+  const missingAnswer=filled.filter(function(r){ return !(r.answer||'').trim(); }).length;
+  if(missingAnswer && !confirm(missingAnswer+'개 문항에 정답이 비어있습니다. 정답이 없으면 학생이 제출해도 자동 채점이 안 됩니다. 이대로 진행할까요?')) return;
+  const lines=[];
+  let n=1;
+  filled.forEach(function(r){
+    lines.push([subj, detail, n, (r.unit||'').trim(), '', (r.answer||'').trim(), '', (r.points||'').trim()].join('\t'));
+    n++;
+  });
+  const ta=document.getElementById('examcat-itemmeta');
+  if(!ta) return;
+  if(ta.value.trim() && !confirm('이미 "문항별 단원/유형" 칸에 내용이 있습니다. 간편 입력 내용으로 덮어쓸까요?\n(기존 내용은 사라집니다)')) return;
+  ta.value = lines.join('\n');
+  toast('✅ 문항유형 칸에 '+lines.length+'개 문항을 채웠습니다. 내용 확인 후 아래 "등록/수정 저장" 버튼을 눌러주세요.');
+}
+// ★ 2026-09-14(413) 추가: 매쓰플랫·기출문제 모음 사이트 등에서 구한 문제지(+정답지) PDF를
+// 그대로 올리면 Claude가 분석해서 문항유형DB를 자동으로 만들어주는 기능 — 별도 도구
+// (SG챌린저_문항유형DB_자동생성기.html)와 동일한 프롬프트·로직을 서버 함수(analyzeExamPdf,
+// Cloud Functions)로 옮긴 것을 호출한다. Anthropic API 키는 서버에만 있고 브라우저로는
+// 절대 전달되지 않는다(이 앱은 Firestore 규칙이 완전공개라 키를 브라우저/DB에 직접 두면
+// 로그인 없이도 누구나 가져갈 수 있어, 반드시 서버 함수를 거치도록 설계함 — 서버 함수
+// 배포가 먼저 돼 있어야 동작하며, 배포 전에는 아래에서 "서버 함수가 아직 배포되지
+// 않았거나…" 오류로 안내됨).
+let EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'' };
+function _examcatAiReset(){
+  EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'' };
+}
+function _examcatAiReadFileAsBase64(file){
+  return new Promise(function(resolve,reject){
+    const reader=new FileReader();
+    reader.onload=function(){ resolve(reader.result.split(',')[1]); };
+    reader.onerror=function(){ reject(new Error('"'+file.name+'" 파일을 읽는 데 실패했습니다. 파일을 다시 선택한 뒤 시도해주세요.')); };
+    reader.onabort=function(){ reject(new Error('"'+file.name+'" 파일 읽기가 중간에 중단됐습니다. 다시 시도해주세요.')); };
+    reader.readAsDataURL(file);
+  });
+}
+function _examcatAiSetQFile(input){
+  EXAMCAT_aiState.qFile = input.files && input.files[0] ? input.files[0] : null;
+  const label=document.getElementById('examcat-ai-qfile-label');
+  if(label) label.textContent = EXAMCAT_aiState.qFile ? ('📄 '+EXAMCAT_aiState.qFile.name) : '📁 문제지 PDF 선택(필수)';
+}
+function _examcatAiSetAFile(input){
+  EXAMCAT_aiState.aFile = input.files && input.files[0] ? input.files[0] : null;
+  const label=document.getElementById('examcat-ai-afile-label');
+  if(label) label.textContent = EXAMCAT_aiState.aFile ? ('📄 '+EXAMCAT_aiState.aFile.name) : '📁 정답지 PDF 선택(선택, 문제지에 정답이 함께 있으면 생략 가능)';
+}
+function _examcatAiRerender(){
+  const wrap=document.getElementById('examcat-ai-panel');
+  if(wrap) wrap.outerHTML=_examcatAiPanelHtml();
+}
+function _examcatAiPanelHtml(){
+  const subjOptions=[['KOR','국어'],['MATH','수학'],['ENG','영어'],['HIST','한국사'],['INQ','탐구']];
+  const st=EXAMCAT_aiState;
+  return `<div id="examcat-ai-panel" style="margin-bottom:14px;border:1.5px dashed #7c3aed;border-radius:10px;padding:12px;background:#faf5ff">
+    <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">🧠 AI로 문제지·정답지 PDF 자동분석 (학원 공용 키 사용)</div>
+    <p style="font-size:11px;color:#7c3aed;margin:0 0 8px">매쓰플랫·기출문제 모음 사이트 등에서 구한 문제지(+정답지) PDF를 올리면, Claude가 문항별 단원·정답·배점·해설을 분석해서 아래 "문항별 단원/유형" 칸에 자동으로 채워줍니다. 시험 전체(45문항 안팎)는 분석에 1~2분 정도 걸릴 수 있습니다. 분석 결과는 저장 전에 꼭 확인·수정해주세요.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <select id="examcat-ai-subj" onchange="EXAMCAT_aiState.subj=this.value" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+        ${subjOptions.map(function(o){ return '<option value="'+o[0]+'" '+(st.subj===o[0]?'selected':'')+'>'+o[1]+'</option>'; }).join('')}
+      </select>
+      <input id="examcat-ai-elective" placeholder="세부과목(선택, 탐구는 예: 화학Ⅰ)" value="${esc(st.elective||'')}" oninput="EXAMCAT_aiState.elective=this.value" style="flex:1;min-width:200px;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <label style="display:inline-block;background:#fff;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155"><span id="examcat-ai-qfile-label">${st.qFile?('📄 '+esc(st.qFile.name)):'📁 문제지 PDF 선택(필수)'}</span><input type="file" accept="application/pdf" style="display:none" onchange="_examcatAiSetQFile(this)"></label>
+      <label style="display:inline-block;background:#fff;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155"><span id="examcat-ai-afile-label">${st.aFile?('📄 '+esc(st.aFile.name)):'📁 정답지 PDF 선택(선택, 문제지에 정답이 함께 있으면 생략 가능)'}</span><input type="file" accept="application/pdf" style="display:none" onchange="_examcatAiSetAFile(this)"></label>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button type="button" onclick="_examcatAiAnalyze()" ${st.busy?'disabled':''} style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;opacity:${st.busy?'0.6':'1'}">${st.busy?'⏳ 분석 중...':'🧠 AI로 분석해서 채우기'}</button>
+      <span id="examcat-ai-status" style="font-size:11.5px;color:#7c3aed">${esc(st.statusMsg||'')}</span>
+    </div>
+  </div>`;
+}
+async function _examcatAiAnalyze(){
+  const st=EXAMCAT_aiState;
+  if(st.busy) return;
+  if(!st.qFile){ alert('문제지 PDF를 먼저 선택해주세요.'); return; }
+  if(!FB_USE()){ alert('서버 연결이 안 되어 있어 AI 분석을 쓸 수 없습니다.'); return; }
+  const subjNameMap={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+  st.busy=true; st.statusMsg='📖 PDF 읽는 중...';
+  _examcatAiRerender();
+  try{
+    const questionPdfBase64 = await _examcatAiReadFileAsBase64(st.qFile);
+    const answerPdfBase64 = st.aFile ? await _examcatAiReadFileAsBase64(st.aFile) : null;
+    st.statusMsg='🧠 Claude가 분석 중입니다(문항 수에 따라 1~2분 정도 걸릴 수 있습니다)...';
+    _examcatAiRerender();
+    const result = await window._fb.analyzeExamPdf({
+      subjCode: st.subj, subjName: subjNameMap[st.subj]||st.subj, elective: st.elective||'',
+      questionPdfBase64: questionPdfBase64, answerPdfBase64: answerPdfBase64,
+    });
+    const ta=document.getElementById('examcat-itemmeta');
+    if(ta){
+      if(ta.value.trim() && !confirm('이미 "문항별 단원/유형" 칸에 내용이 있습니다. AI 분석 결과로 덮어쓸까요?\n(기존 내용은 사라집니다)')){
+        st.busy=false; st.statusMsg=''; _examcatAiRerender(); return;
+      }
+      ta.value = result.itemMetaText||'';
+    }
+    st.busy=false;
+    st.statusMsg = result.truncated ? '⚠️ 응답이 길어 일부만 반영됐을 수 있습니다 — 아래 내용을 꼭 확인해주세요.' : '✅ 분석 완료! 아래 "문항별 단원/유형" 칸 내용을 확인해주세요.';
+    _examcatAiRerender();
+    toast('✅ AI 분석 결과를 문항유형 칸에 채웠습니다. 내용 확인 후 저장해주세요.');
+  }catch(e){
+    st.busy=false;
+    st.statusMsg='';
+    _examcatAiRerender();
+    alert('AI 분석 중 오류가 발생했습니다.\n\n'+(e&&e.message?e.message:e)+'\n\n서버 함수가 아직 배포되지 않았거나, PDF 용량이 너무 크거나, 네트워크 문제일 수 있습니다.');
+  }
+}
 function _examcatRenderForm(){
   const el=document.getElementById('examcat-form');
   if(!el) return;
   const e=EXAMCAT_editing;
   const isEdit=!!e;
+  _examcatSimpleReset(); // ★ 폼을 다시 그릴 때마다(새 등록/수정 진입 전환 포함) 간편 입력 도우미도 빈 상태로 초기화
+  _examcatAiReset(); // ★ AI PDF 분석 도우미도 함께 초기화(파일 선택 상태가 다른 시험으로 넘어가지 않도록)
   el.innerHTML=`<div style="border:1.5px solid ${isEdit?'#0369a1':'#e2e8f0'};border-radius:12px;padding:16px;background:${isEdit?'#f0f9ff':'#fafbfc'}">
     <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:10px">${isEdit?'✏ 시험 수정: '+esc(e.examName||''):'➕ 새 시험 등록'}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <input id="examcat-name" placeholder="시험명/회차 (예: 1회 고2 챌린저 모의고사_영어)" value="${isEdit?esc(e.examName||''):''}" style="flex:1;min-width:260px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px">
       <input id="examcat-date" placeholder="기본 응시일 (예: 2026-08-26)" value="${isEdit?esc(e.defaultDate||''):''}" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;width:190px">
     </div>
+    ${_examcatAiPanelHtml()}
+    ${_examcatSimplePanelHtml()}
     <div style="margin-bottom:10px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">📚 문항별 단원/유형 (기존 문항 DB 엑셀 그대로 붙여넣기 가능)</div>
       <p style="font-size:11.5px;color:#dc2626;margin:0 0 4px">맨 끝 배점(선택) 칸을 꼭 채워주세요 — 비워두면 학생이 오답원인을 다 입력해도 상담리포트의 실질완주율·손실점수가 계산되지 않습니다.</p>
