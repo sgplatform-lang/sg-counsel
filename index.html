@@ -32959,6 +32959,14 @@ async function examcatDeleteEntry(id){
 let EXAMCAT_editing = null; // 현재 등록/수정 폼에서 편집 중인 항목(신규면 null)
 let EXAMCAT_fullscreen = false; // ★ 2026-08-27 추가: PDF 드래그 작업 시 좁아서 불편하다는 피드백으로,
 // 카탈로그 관리창을 화면 전체 크기로 넓혀볼 수 있는 토글 추가
+// ★ 2026-09-15(417) 추가: 등록된 시험이 많아지면 "새 시험 등록" 칸까지 스크롤이 길어진다는
+// 신고 → 목록 자체를 접었다 펼 수 있게 하고, 기본은 접힌 상태로 시작해서 카탈로그를 열자마자
+// 바로 등록 폼에 손이 닿게 한다(개별 시험을 수정/삭제/숨김하려면 펼치면 됨).
+let EXAMCAT_listOpen = false;
+function _examcatToggleListOpen(){
+  EXAMCAT_listOpen = !EXAMCAT_listOpen;
+  _examcatRenderList();
+}
 
 function _examcatToggleFullscreen(){
   EXAMCAT_fullscreen = !EXAMCAT_fullscreen;
@@ -33030,17 +33038,30 @@ function _examcatRenderList(){
   // 모든 기관에 공개된 것으로 취급 — 기존에 등록된 시험과 호환).
   const allList=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   const list = isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
+  // ★ 2026-09-15(417) 추가: 목록 접기/펼치기 헤더 — 실패 안내(_examCatLoadFailed)는 접혀
+  // 있어도 놓치면 안 되는 경고라 접힌 상태에서도 항상 보여준다.
+  const listHeader = `<div onclick="_examcatToggleListOpen()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:6px 4px;margin-bottom:${EXAMCAT_listOpen?'8':'0'}px;user-select:none">
+    <div style="font-size:13px;font-weight:800;color:#0f172a">📋 등록된 시험 목록 (총 ${list.length}개)</div>
+    <span style="font-size:12px;color:#3b5bdb;font-weight:700">${EXAMCAT_listOpen?'▾ 접기':'▸ 펼치기'}</span>
+  </div>`;
+  if(ST._examCatLoadFailed){
+    el.innerHTML = listHeader
+      + '<div style="text-align:center;padding:24px;color:#b45309;font-size:13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px">'
+      + '⚠️ 서버 응답이 늦어 시험 카탈로그를 불러오지 못했습니다.<br>이미 등록해두신 시험이 사라진 게 아닙니다 — 다시 시도해주세요.<br>'
+      + '<button class="btn-b" style="margin-top:10px;padding:7px 16px;font-size:12px" onclick="(async()=>{ST.examCatalog=[];await _ensureExamCatalogLoaded();_examcatRenderList();})()">🔄 다시 시도</button>'
+      + '</div>';
+    return;
+  }
+  if(!EXAMCAT_listOpen){
+    el.innerHTML = listHeader;
+    return;
+  }
   if(!list.length){
     // ★ 2026-08-29 추가: "진짜로 등록된 시험이 없는 것"과 "불러오다 실패한 것"을
     // 구분해서 보여준다 — 실패인데 "등록된 시험이 없다"고만 나오면, 이미 만들어둔
     // 카탈로그가 갑자기 사라진 것처럼 보여 당황스러울 수 있다(재로그인하면 다시 보이던
     // 증상이 바로 이거였다). 실패했을 땐 재로그인 없이 바로 다시 시도할 수 있게 한다.
-    el.innerHTML = ST._examCatLoadFailed
-      ? '<div style="text-align:center;padding:24px;color:#b45309;font-size:13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px">'
-        + '⚠️ 서버 응답이 늦어 시험 카탈로그를 불러오지 못했습니다.<br>이미 등록해두신 시험이 사라진 게 아닙니다 — 다시 시도해주세요.<br>'
-        + '<button class="btn-b" style="margin-top:10px;padding:7px 16px;font-size:12px" onclick="(async()=>{ST.examCatalog=[];await _ensureExamCatalogLoaded();_examcatRenderList();})()">🔄 다시 시도</button>'
-        + '</div>'
-      : '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
+    el.innerHTML = listHeader + '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
     return;
   }
   const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
@@ -33059,18 +33080,34 @@ function _examcatRenderList(){
     if(!uniqCls.length) return '';
     return '<span style="background:#eef2ff;color:#4338ca;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700" title="'+esc(uniqCls.join(', '))+'">👥 '+(uniqCls.length===1?esc(uniqCls[0]):uniqCls.length+'개 반')+'</span>';
   }
-  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
+  // ★ 2026-09-15(417) 추가: "이미 응시한 시험은 학생 쪽 시험 선택 목록에서 안 보이게 해달라"는
+  // 요청 → 카탈로그 항목 자체(문항DB·정답·이미 채점된 학생 결과 조회용 메타)는 그대로 두고,
+  // hiddenFromStudent 플래그만 켜서 학생용 파일의 "시험 선택" 드롭다운에서만 제외한다
+  // (학생용 파일의 catalogList 필터에서 이 플래그를 확인 — 아래 참고).
+  function hiddenBadge(e){
+    return e.hiddenFromStudent ? '<span style="background:#f1f5f9;color:#475569;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🙈 학생 비공개</span>' : '';
+  }
+  el.innerHTML=listHeader+`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
     const qc=_examcatQuestionCount(e);
     const subj=_examcatSubjLabel(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${esc(e.examName||'(이름 없음)')}${isAdminRole?orgBadge(e):''}${classBadge(e)}</div>
+        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${esc(e.examName||'(이름 없음)')}${isAdminRole?orgBadge(e):''}${classBadge(e)}${hiddenBadge(e)}</div>
         <div style="font-size:11.5px;color:#64748b;margin-top:2px">기본 응시일 ${esc(e.defaultDate||'미지정')} · ${esc(subj)} · 문항 ${qc}개</div>
       </div>
+      <button onclick="_examcatToggleHidden('${e.id}')" title="학생용 '시험 선택' 목록에서만 숨깁니다. 이미 채점된 결과·상담리포트·통계는 전혀 영향받지 않습니다." style="background:${e.hiddenFromStudent?'#eef2ff':'#f8fafc'};color:${e.hiddenFromStudent?'#3730a3':'#475569'};border:1px solid ${e.hiddenFromStudent?'#c7d2fe':'#cbd5e1'};border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">${e.hiddenFromStudent?'👁 학생 노출':'🙈 학생 숨김'}</button>
       <button onclick="_examcatEdit('${e.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">✏ 수정</button>
       <button onclick="_examcatDelete('${e.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">🗑 삭제</button>
     </div>`;
   }).join('')+`</div>`;
+}
+async function _examcatToggleHidden(id){
+  const e=(ST.examCatalog||[]).find(x=>x.id===id);
+  if(!e) return;
+  e.hiddenFromStudent = !e.hiddenFromStudent;
+  await examcatSaveEntry(e);
+  _examcatRenderList();
+  toast(e.hiddenFromStudent ? '🙈 학생용 "시험 선택" 목록에서 숨겼습니다. (이미 채점된 결과·상담리포트에는 영향 없습니다)' : '👁 다시 학생용 "시험 선택" 목록에 표시됩니다.');
 }
 
 function _examcatEdit(id){
