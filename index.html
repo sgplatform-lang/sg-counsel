@@ -169,7 +169,7 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
   .main-area{padding:0;flex:1}
 
   /* 헤더 */
-  .hdr{패딩:0 12px;높이:52px;간격:6px}
+  .hdr{padding:0 12px;height:52px;gap:6px}
   .logo-text{font-size:14px}
   .nav-menu{gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .nav-item{padding:0 8px;font-size:10px;white-space:nowrap;height:52px}
@@ -199,15 +199,15 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
   .mhd{padding:12px 14px}
 
   /* 버튼 */
-  버튼{글꼴 크기:11px;패딩:7px 10px}
+  button{font-size:11px;padding:7px 10px}
 
   /* 시간표 - 모바일에서 스크롤 */
-  .tt-cell{최소 너비:36px;높이:28px;글꼴 크기:9px}
+  .tt-cell{min-width:36px;height:28px;font-size:9px}
   .tt-time{font-size:8px;padding:2px 3px}
   .tt-header{font-size:10px;padding:5px 2px}
 
   /* 입력 내용 */
-  입력, 선택, 텍스트 영역, .inp{글꼴 크기: 16px!중요;패딩: 10px 12px}
+  input,select,textarea,.inp{font-size:16px!important;padding:10px 12px}
 
   /* 테이블 - 가로 스크롤 */
   .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px}
@@ -229,17 +229,17 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
   .hdr{padding:0 8px}
   .logo-text{font-size:13px}
   .nav-item{padding:0 8px;font-size:11px}
-  .g3,.g4{그리드 템플릿 열:1fr 1fr}
+  .g3,.g4{grid-template-columns:1fr 1fr}
   .tabs{padding:6px 8px}
 }
 
 /* 최적 최적화 */
 @media(hover:none){
-  버튼{최소 높이:40px;최소 너비:40px}
+  button{min-height:40px;min-width:40px}
   .tab{min-height:36px}
   .scard{min-height:56px}
-  입력, 선택{최소 높이:44px}
-  텍스트 영역{최소 높이:80px}
+  input,select{min-height:44px}
+  textarea{min-height:80px}
 }
 
 /* ── 모바일 반응형 ── */
@@ -256,7 +256,7 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
   .deskonly{display:none!important}
   .stat{padding:12px 8px!important}
   .sv{font-size:18px!important}
-  테이블{font-size:11px!important}
+  table{font-size:11px!important}
   th,td{padding:5px 6px!important}
 }
 @media(max-width:400px){
@@ -32395,12 +32395,14 @@ function __SG_initFromHost(data){
       if(same.length>=2) peers=same; else return '';
     }
     var myScore=+s.score||0;
-    var sortedDesc=peers.map(function(p){return +p.score||0;}).sort(function(a,b){return b-a;});
-    var rank=0, prev=null, rankMap=[];
-    sortedDesc.forEach(function(v){ if(prev===null||v!==prev){rank++; prev=v;} rankMap.push(rank); });
-    var idx=sortedDesc.indexOf(myScore);
-    if(idx<0) return '';
-    var myRank=rankMap[idx];
+    if(!v41Valid(s.score)) return '';
+    // ★ 2026-09-15(430) 수정: 예전엔 "밀집 순위(dense rank, 동점자 뒤 순위를 건너뛰지
+    // 않음 — 예: 100,100,90 → 1,1,2)"를 썼는데, 회차 통계표(_denseRank, 이름과 달리
+    // 실제로는 표준경쟁순위로 동작)와 기준이 달라 같은 학생인데도 리포트 등수와
+    // 통계표 등수가 서로 다르게 보이는 문제가 있었음 → 회차 통계표와 동일하게
+    // "나보다 점수가 높은 인원 수 + 1"(표준경쟁순위, 동점자는 같은 등수를 공유하고
+    // 그다음 등수는 동점자 인원 수만큼 건너뜀 — 예: 100,100,90 → 1,1,3)로 통일.
+    var myRank=peers.filter(function(p){return (+p.score||0)>myScore;}).length+1;
     var subjLabel=(SUBJECTS[s.subject]||s.subject)+(s.detail?'('+s.detail+')':'');
     return '<div class="v41-rank-badge">이번 회차 '+esc(subjLabel)+' 응시생 '+peers.length+'명 중 <b>'+myRank+'등</b></div>';
   }
