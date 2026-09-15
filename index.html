@@ -31117,7 +31117,7 @@ function perfLossCardHtml(s){
       <tr><th>시간 손실</th><td colspan="3"><b>\${r.timeLoss}점</b></td></tr>
       <tr><th>수행 손실</th><td colspan="3"><b>\${r.performanceLoss}점</b> <span class="small muted">(실수 \${r.mistakeLoss} · 판단·집착 \${r.judgeLoss} · 집중 \${r.concLoss})</span></td></tr>
     </tbody></table>
-    <p style="margin-top:8px"><b>핵심 손실원인:</b> \${r.primaryLabel?esc(r.primaryLabel):'해당 없음'}</p>
+    \${r.primary?\`<div class="v42-cause-box"><h4>💡 핵심 손실원인</h4><p>\${esc(r.primaryLabel)}</p></div>\`:\`<p style="margin-top:8px"><b>핵심 손실원인:</b> 해당 없음</p>\`}
     <p class="small">\${esc(_sgPerfLossInterpretSentence(r.primary))}</p>
     \${r.primary?\`<p><b>연계 행동강령 예시:</b> \${_sgPerfLossActionHint(r.primary).map(esc).join(' / ')}</p>\`:''}
     \${perfLossTrendTableHtml(s)}
