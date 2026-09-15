@@ -33022,10 +33022,16 @@ function openExamCatalog(){
 // 화면에서도 다른 기관 소속 시험까지 다 보이던 문제 → 시험 카탈로그 관리 목록(_examcatRenderList)
 // 이 이미 쓰고 있던 "orgIds가 비어있으면 전체공개로 취급, 아니면 내 기관 포함 여부로 필터링"
 // 규칙을 공용 함수로 뽑아 이 드롭다운에도 동일하게 적용한다(최종관리자는 그대로 전체 다 보임).
+// ★ 2026-09-15(418) 추가: 목록 정렬 기준. 원래 updatedAt(마지막 저장 시각) 기준이라
+// "학생 숨김/노출"을 누르거나 수정만 해도 그 시험이 목록 맨 위로 튀어 올라가는 문제가 있었다
+// → "새로 등록한 시험이 항상 맨 위, 이후 수정/숨김 토글을 해도 순서가 안 바뀌면 좋겠다"는
+// 요청으로 등록일(createdAt) 기준 정렬로 변경. createdAt이 없는 구버전 시험(이 필드가 생기기
+// 전에 등록된 것)은 updatedAt으로 대체해 정렬이 깨지지 않게 한다.
+function _examcatSortKey(e){ return e.createdAt || e.updatedAt || 0; }
 function _examcatScopedForCurrentOrg(){
   const isAdminRole=ST.currentUser?.role==='admin';
   const myOrgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
-  const allList=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const allList=(ST.examCatalog||[]).slice().sort((a,b)=>_examcatSortKey(b)-_examcatSortKey(a));
   return isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
 }
 function _examcatRenderList(){
@@ -33036,7 +33042,8 @@ function _examcatRenderList(){
   // ★ 2026-09-09(384) 추가: 시험마다 "어느 기관에 공개할지"(orgIds)를 지정할 수 있게 되면서,
   // 기관관리자·선생님은 자기 기관에 공개된 시험만 봐야 한다(orgIds가 비어있으면 예전처럼
   // 모든 기관에 공개된 것으로 취급 — 기존에 등록된 시험과 호환).
-  const allList=(ST.examCatalog||[]).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  // ★ 2026-09-15(418) 수정: updatedAt → createdAt 기준 정렬(바로 위 _examcatSortKey 참고).
+  const allList=(ST.examCatalog||[]).slice().sort((a,b)=>_examcatSortKey(b)-_examcatSortKey(a));
   const list = isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
   // ★ 2026-09-15(417) 추가: 목록 접기/펼치기 헤더 — 실패 안내(_examCatLoadFailed)는 접혀
   // 있어도 놓치면 안 되는 경고라 접힌 상태에서도 항상 보여준다.
