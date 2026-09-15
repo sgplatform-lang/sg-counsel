@@ -29,18 +29,30 @@
     <meta name="twitter:description" content="SG 상담 관리 시스템 - 관리자 전용 페이지입니다.">
     <meta name="twitter:image" content="og-admin.png"> <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SG상담플랫폼 - 수시입시 상담 관리 시스템</title><meta name="description" content="SG상담플랫폼 관리자 페이지 - 학생 내신·모의고사 성적 관리, 수시 AI 분석, 주간 플랜, 테스트 출제"><meta property="og:type" content="website"><meta property="og:url" content="https://sgplatform-lang.github.io/sg-counsel/"><meta property="og:title" content="📚 SG상담플랫폼 - 관리자"><meta property="og:description" content="수시입시 전문 상담 관리 시스템 · 선생님 전용 관리자 페이지입니다. 학생 성적 관리, AI 수시 분석, 주간 학습 플랜을 한 곳에서 관리하세요."><meta property="og:image" content="https://sgplatform-lang.github.io/sg-counsel/og-admin.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:locale" content="ko_KR"><meta property="og:site_name" content="SG상담플랫폼"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="📚 SG상담플랫폼 - 관리자"><meta name="twitter:description" content="수시입시 전문 상담 관리 시스템 · 선생님 전용 관리자 페이지"><meta name="twitter:image" content="https://sgplatform-lang.github.io/sg-counsel/og-admin.png"><script>
 window.ANTHROPIC_API_KEY = '';
-</script><style>
+</script>
+<!-- ★ 2026-09-15(429) 디자인 개편 1단계(시범): 랜딩페이지 기준 브랜드 폰트(Pretendard) 실제 로드.
+     기존 font-family 목록엔 'Pretendard'가 이미 3순위로 있었지만 실제 폰트 파일을 불러오는 곳이
+     없어서 브라우저가 그 이름을 무시하고 Noto Sans KR(2023번째 줄에서 별도 로드)로 렌더링되고
+     있었음 — 그래서 랜딩페이지와 느낌이 달라 보였던 것. 이 링크 하나만 추가하면 아래 폰트
+     우선순위 변경과 합쳐져 전체 화면이 Pretendard로 렌더링됨(기능 로직과 무관, 순수 시각 변경). -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+/* ★ 2026-09-15(429) 디자인 토큰(브랜드 기준값) — 랜딩페이지(index_3.html) CSS에서 그대로 가져옴.
+   기존 하드코딩 색상(#3b5bdb 등)은 건드리지 않고, 이번 시범 적용 범위(헤더·사이드바 학생카드·탭·
+   기본 버튼·입력창 포커스)에서만 이 변수를 사용하도록 아래에서 부분 교체함. */
+:root{--sg-blue:#2F6FED;--sg-blue-dark:#1d52c9;--sg-grad-a:#4F7DFF;--sg-grad-b:#8A4DFF;--sg-radius:14px}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#f4f6fb;color:#1a1a2e;font-family:'Apple SD Gothic Neo','Noto Sans KR','Pretendard',sans-serif;min-height:100vh;overscroll-behavior-y:none;}
+body{background:#f4f6fb;color:#1a1a2e;font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;min-height:100vh;overscroll-behavior-y:none;}
 html{overscroll-behavior-y:none;}
 
 /* 입력요소 - 모두 밝은 배경, 어두운 글자 */
 input,select,textarea{background:#fff;border:1.5px solid #dde1f0;color:#1a1a2e !important;border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;font-family:inherit;transition:border-color .15s}
-input:focus,select:focus,textarea:focus{border-color:#3b5bdb}
+input:focus,select:focus,textarea:focus{border-color:var(--sg-blue)}
 input::placeholder,textarea::placeholder{color:#aaa !important}
 select option{background:#fff;color:#1a1a2e}
 .inp{background:#fff;border:1.5px solid #dde1f0;color:#1a1a2e !important;border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;font-family:inherit;transition:border-color .15s}
-.inp:focus{border-color:#3b5bdb}
+.inp:focus{border-color:var(--sg-blue)}
 .inp::placeholder{color:#aaa !important}
 select.inp option{background:#fff;color:#1a1a2e}
 
@@ -59,11 +71,11 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
 /* 헤더 */
 .hdr{background:#fff;border-bottom:1.5px solid #e8eaf6;padding:0 22px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;gap:8px;height:56px}
 .logo-area{display:flex;align-items:center;gap:10px}
-.logo-mark{width:32px;height:32px;background:#3b5bdb;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
-.logo-text{font-size:17px;font-weight:800;color:#3b5bdb;letter-spacing:-0.5px}
+.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--sg-grad-a),var(--sg-grad-b));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo-text{font-size:17px;font-weight:800;color:var(--sg-blue);letter-spacing:-0.5px}
 .nav-menu{display:flex;gap:0;height:56px;align-items:center}
 .nav-item{padding:0 10px;font-size:11px;font-weight:600;color:#555;cursor:pointer;height:56px;display:flex;align-items:center;border-bottom:2.5px solid transparent;transition:all .15s}
-.nav-item.act,.nav-item:hover{color:#3b5bdb;border-bottom-color:#3b5bdb}
+.nav-item.act,.nav-item:hover{color:var(--sg-blue);border-bottom-color:var(--sg-blue)}
 
 /* 레이아웃 */
 .layout{display:flex;height:calc(100vh - 56px)}
@@ -71,17 +83,17 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
 .main-area{flex:1;overflow-y:auto;background:#f4f6fb}
 
 /* 학생 카드 */
-.scard{border-radius:10px;padding:11px;margin-bottom:6px;cursor:pointer;border:1.5px solid #eef0f8;background:#fff;transition:all .15s}
-.scard:hover{border-color:#c5cae9;background:#f8f9ff}
-.scard.act{border-color:#3b5bdb;background:#eef1ff}
+.scard{border-radius:var(--sg-radius);padding:11px;margin-bottom:6px;cursor:pointer;border:1.5px solid #eef0f8;background:#fff;transition:all .15s}
+.scard:hover{border-color:#c5cae9;background:#f8f9ff;box-shadow:0 6px 16px rgba(47,111,237,0.08)}
+.scard.act{border-color:var(--sg-blue);background:#eef1ff}
 
 /* 탭 */
 .tabs{display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
 .tab{background:transparent;color:#888;border:1.5px solid #e0e3ef;border-radius:20px;padding:5px 13px;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0;cursor:pointer;transition:all .15s}
-.tab.act{background:#3b5bdb;color:#fff;border-color:#3b5bdb}
+.tab.act{background:var(--sg-blue);color:#fff;border-color:var(--sg-blue)}
 
 /* 카드 박스 - 항상 흰색 배경 */
-.box{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;border:1.5px solid #e8eaf6}
+.box{background:#fff;border-radius:var(--sg-radius);padding:16px;margin-bottom:12px;border:1.5px solid #e8eaf6}
 
 /* 그리드 */
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -112,8 +124,8 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
 .tbl td.lbl{background:#f4f6fb;color:#555;font-weight:600;white-space:nowrap}
 
 /* 버튼 */
-.btn-b{background:#3b5bdb;color:#fff}
-.btn-b:hover{background:#2f4cc0}
+.btn-b{background:var(--sg-blue);color:#fff}
+.btn-b:hover{background:var(--sg-blue-dark)}
 .btn-o{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff}
 .btn-g{background:transparent;color:#666;border:1.5px solid #dde1f0 !important}
 .btn-g:hover{background:#f4f6fb}
@@ -147,7 +159,7 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
 .api-banner{background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 /* 로딩 스피너 */
-.spin-el{width:14px;height:14px;border:2px solid #c5cae9;border-top-color:#3b5bdb;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+.spin-el{width:14px;height:14px;border:2px solid #c5cae9;border-top-color:var(--sg-blue);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
 
 /* 반응형 - 모바일 전면 개선 */
 @media(max-width:767px){
@@ -32308,10 +32320,21 @@ function __SG_initFromHost(data){
   function v41CurrentExam(){return {date:(document.getElementById('testDate')||{}).value||'',name:(document.getElementById('testName')||{}).value||''};}
   function v41PeerSubjects(s){
     try{
-      var p=window.parent, st=p&&p.ST, ex=v41CurrentExam(), key=v41SubjectKey(s);
-      if(!st||!Array.isArray(st.students))return [];
+      var ex=v41CurrentExam(), key=v41SubjectKey(s);
+      // ★ 2026-09-15(430) 수정: 등수·응시생 수 계산의 "모집단"을, 가능하면 항상 이번 시험
+      // 전체 응시자 기준으로 통일한다. window.__SG_EXTRA_PEERS는 부모창(SG)이 비동기로
+      // Firestore 전체 조회해 채워주는 "이번 시험 전체 응시자" 목록(관리자 role일 때는
+      // 이미 ST.students 자체가 전체라 조회를 안 하므로 비어있음) — 있으면 이것을 쓰고,
+      // 아직 도착 전(최초 렌더 순간)이면 예전처럼 부모창의 ST.students(역할별로 좁혀져
+      // 있을 수 있음)로 우선 표시한 뒤, 전체 목록이 도착하면 sg_update_exam_peers로 갱신된다.
+      var pool = (Array.isArray(window.__SG_EXTRA_PEERS) && window.__SG_EXTRA_PEERS.length) ? window.__SG_EXTRA_PEERS : null;
+      if(!pool){
+        var p=window.parent, st=p&&p.ST;
+        if(!st||!Array.isArray(st.students))return [];
+        pool = st.students;
+      }
       var arr=[];
-      st.students.forEach(function(stu){
+      pool.forEach(function(stu){
         var cd=stu.challengerData||{}, subs=[];
         if((!ex.date||cd.lastTestDate===ex.date)&&(!ex.name||cd.lastTestName===ex.name))subs=cd.lastSubjects||[];
         if(!subs.length&&Array.isArray(cd.history)){
@@ -32547,6 +32570,19 @@ window.addEventListener('message', function(ev){
   if(ev.data.type === 'sg_init_student'){
     __SG_initFromHost(ev.data);
   }
+  // ★ 2026-09-15(430) 추가: "OO명 중 O등" 등수 표기가 역할별로 좁혀진 학생 목록(기관관리자=
+  // 자기 기관만, 선생님=담당 학생만) 기준으로 계산되어, 최종관리자만 전체 응시자 기준이고
+  // 기관관리자·선생님은 인원이 더 적은 기관/반 기준으로 서로 다르게 보이던 문제 수정.
+  // 부모창이 전체 응시자 목록을 비동기로 조회해 도착하는 대로 이 메시지로 보내주면,
+  // 지금 보고 있는 학생과 일치할 때만 반영하고 리포트를 조용히 다시 그린다(토스트 없이).
+  if(ev.data.type === 'sg_update_exam_peers'){
+    if(String(ev.data.studentId||'')===String(__SG_STUDENT_ID||'')){
+      window.__SG_EXTRA_PEERS = Array.isArray(ev.data.examPeers) ? ev.data.examPeers : null;
+      try{ if(typeof renderLong==='function') renderLong(); }catch(e){}
+      try{ if(typeof renderShort==='function') renderShort(); }catch(e){}
+      try{ if(typeof renderWeekly==='function') renderWeekly(); }catch(e){}
+    }
+  }
 });
 
 // iframe 준비 완료를 부모에 알림 (부모가 이 시점 이후 데이터를 보내도록)
@@ -32558,6 +32594,42 @@ if(window.__SG_EMBED__){
 </body></html>`;
 
 let __challengerIframeBound = false;
+
+// ★ 2026-09-15(430) 추가: 챌린저 상담리포트의 "OO명 중 O등" 표시를 역할(최종관리자/기관관리자/
+// 선생님)과 무관하게 항상 "이번 시험 전체 응시자" 기준으로 통일하기 위한 초기화 payload 빌더 +
+// 전송 함수. 최종관리자는 ST.students 자체가 이미 전체라 별도 조회가 필요 없지만, 기관관리자는
+// 자기 기관만, 선생님은 담당 학생만으로 ST.students가 좁혀져 있어 그대로 두면 등수 모집단이
+// 달라진다 — 그래서 admin이 아닌 역할일 때만 전체 학생 컬렉션을 한 번 더 조회해(캐시 재사용)
+// iframe에 별도로 넘겨준다. 개인 리포트(renderChallenger)와 일괄 인쇄(_gg_printAllChallengerReports)
+// 양쪽 모두 이 iframe 안의 v41PeerSubjects()를 공유하므로, 여기 한 곳만 고치면 둘 다 해결된다.
+function _gg_challengerInitPayload(stu){
+  return {
+    type: 'sg_init_student',
+    studentId: String(stu.id),
+    studentName: stu.name || '',
+    studentSchool: (stu.school||'')+' '+(stu.grade||''),
+    target: (stu.challengerData?.meta?.target)||stu.target||stu.targetUniv||'',
+    managerName: stu.counselor || (ST.currentUser?.name||''),
+    lastTestDate: (stu.challengerData?.lastTestDate)||'',
+    lastTestName: (stu.challengerData?.lastTestName)||'',
+    history: (stu.challengerData?.history)||[],
+    lastSubjects: (stu.challengerData?.lastSubjects)||[],
+    meta: (stu.challengerData?.meta)||{}
+  };
+}
+function _gg_sendChallengerInit(ifr, stu){
+  if(!ifr || !ifr.contentWindow || !stu) return;
+  const payload = _gg_challengerInitPayload(stu);
+  ifr.contentWindow.postMessage(payload, '*');
+  const examDate = payload.lastTestDate, examName = payload.lastTestName;
+  if((examDate || examName) && typeof window._gg_ensureFullExamPeers === 'function'){
+    window._gg_ensureFullExamPeers(examDate, examName).then(function(peers){
+      if(peers && peers.length && ifr.contentWindow){
+        ifr.contentWindow.postMessage({type:'sg_update_exam_peers', studentId: payload.studentId, examPeers: peers}, '*');
+      }
+    });
+  }
+}
 
 function renderChallenger(s){
   // ★ iframe을 매번 재생성하지 않도록, body에 고정된 영구 컨테이너를 사용한다.
@@ -32592,19 +32664,7 @@ function renderChallenger(s){
           // 중복 전송하지 않도록 한다 (중복 전송 시 챌린저 쪽 state.history가
           // 겹쳐 저장되면서 누적 리포트에 같은 회차가 두 줄로 보이는 문제 방지)
           window.__challengerLoadedFor = String(cur.id);
-          ifr.contentWindow.postMessage({
-            type: 'sg_init_student',
-            studentId: String(cur.id),
-            studentName: cur.name || '',
-            studentSchool: (cur.school||'')+' '+(cur.grade||''),
-            target: (cur.challengerData?.meta?.target)||cur.target||cur.targetUniv||'',
-            managerName: cur.counselor || (ST.currentUser?.name||''),
-            lastTestDate: (cur.challengerData?.lastTestDate)||'',
-            lastTestName: (cur.challengerData?.lastTestName)||'',
-            history: (cur.challengerData?.history)||[],
-            lastSubjects: (cur.challengerData?.lastSubjects)||[],
-            meta: (cur.challengerData?.meta)||{}
-          }, '*');
+          _gg_sendChallengerInit(ifr, cur);
         }
       }
       if(ev.data.type === 'challenger_save'){
@@ -32749,19 +32809,7 @@ function renderChallenger(s){
     const ifr = document.getElementById('challenger-iframe');
     const trySend = ()=>{
       if(ifr && ifr.contentWindow){
-        ifr.contentWindow.postMessage({
-          type: 'sg_init_student',
-          studentId: curId,
-          studentName: curStu.name || '',
-          studentSchool: (curStu.school||'')+' '+(curStu.grade||''),
-          target: (curStu.challengerData?.meta?.target)||curStu.target||curStu.targetUniv||'',
-          managerName: curStu.counselor || (ST.currentUser?.name||''),
-          lastTestDate: (curStu.challengerData?.lastTestDate)||'',
-          lastTestName: (curStu.challengerData?.lastTestName)||'',
-          history: (curStu.challengerData?.history)||[],
-          lastSubjects: (curStu.challengerData?.lastSubjects)||[],
-          meta: (curStu.challengerData?.meta)||{}
-        }, '*');
+        _gg_sendChallengerInit(ifr, curStu);
       }
     };
     // iframe이 이미 로드되어 있을 수도 있으므로 약간의 지연 후 전송 시도
@@ -35699,19 +35747,7 @@ function cbrConfirmApply(){
   if(_ifr && _ifr.contentWindow && _match){
     const cur = _match.stu;
     window.__challengerLoadedFor = String(cur.id);
-    _ifr.contentWindow.postMessage({
-      type: 'sg_init_student',
-      studentId: String(cur.id),
-      studentName: cur.name || '',
-      studentSchool: (cur.school||'')+' '+(cur.grade||''),
-      target: (cur.challengerData?.meta?.target)||cur.target||cur.targetUniv||'',
-      managerName: cur.counselor || (ST.currentUser?.name||''),
-      lastTestDate: (cur.challengerData?.lastTestDate)||'',
-      lastTestName: (cur.challengerData?.lastTestName)||'',
-      history: (cur.challengerData?.history)||[],
-      lastSubjects: (cur.challengerData?.lastSubjects)||[],
-      meta: (cur.challengerData?.meta)||{}
-    }, '*');
+    _gg_sendChallengerInit(_ifr, cur);
   }
   // ★ 2026-07-25 추가: toast()는 놓치기 쉬워서, 명확한 완료 알림창을 별도로 띄운다.
   var _warnMsg = archiveWarnings.length
@@ -43831,7 +43867,7 @@ function generateReport() {
     return {cur:cur,targets:targets,date:date,name:name};
   }
 
-  window._gg_printAllChallengerReports=function(){
+  window._gg_printAllChallengerReports=async function(){
     // ★ window.open() 계열 방식(관리자 창에서 열기 / iframe 창에서 열기)을 세 차례
     // 시도했는데도 계속 막혀서, 팝업 차단 메커니즘 자체를 건드리지 않는 방식으로
     // 완전히 바꾼다: 리포트 전체를 하나의 HTML 문자열로 먼저 만든 뒤 Blob으로 감싸고,
@@ -43854,6 +43890,22 @@ function generateReport() {
     var label=(info.date||'날짜 미입력')+(info.name?' · '+info.name:'');
     if(!confirm(label+'\n\n총 '+targets.length+'명의 상담용 리포트와 처방전을 한 번에 생성합니다.\nDB에는 저장하거나 변경하지 않습니다.\n\n계속할까요?')) return;
 
+    // ★ 2026-09-15(430) 추가: 일괄 인쇄에 포함된 각 학생의 "OO명 중 O등" 표시도 개인 리포트와
+    // 동일하게 이번 시험 전체 응시자 기준으로 통일한다. 최종관리자는 이미 ST.students가
+    // 전체라 조회가 필요 없고(_gg_ensureFullExamPeers가 null 반환), 기관관리자·선생님만
+    // 한 번 조회해서 이번 일괄 인쇄 전체에 재사용한다(학생별로 매번 조회하지 않음).
+    var _isNonAdmin = ST.currentUser && ST.currentUser.role!=='admin';
+    if(_isNonAdmin && typeof toast==='function') toast('⏳ 전체 응시자 등수 데이터를 조회하는 중입니다...', 20000);
+    var _examPeers=null;
+    if(typeof window._gg_ensureFullExamPeers==='function'){
+      try{ _examPeers = await window._gg_ensureFullExamPeers(info.date, info.name); }catch(e){ _examPeers=null; }
+    }
+    if(_isNonAdmin){
+      var _loadingToastEl2=document.getElementById('admin-toast');
+      if(_loadingToastEl2) _loadingToastEl2.style.display='none';
+    }
+    cw.__SG_EXTRA_PEERS = (_examPeers && _examPeers.length) ? _examPeers : null;
+
     var original=_batchPayload(cur);
     var pieces=[];
     try{
@@ -43864,16 +43916,18 @@ function generateReport() {
         var longEl=cd.getElementById('longReport');
         var shortEl=cd.getElementById('shortReport');
         pieces.push('<article class="batch-student">'+
-          '<section class="batch-report batch-long">'+(longEl?longEl.innerHTML:'<p>상담용 리포트 없음</p>')+'</section>'+ 
-          '<section class="batch-report batch-short">'+(shortEl?shortEl.innerHTML:'<p>처방전 없음</p>')+'</section>'+ 
+          '<section class="batch-report batch-long">'+(longEl?longEl.innerHTML:'<p>상담용 리포트 없음</p>')+'</section>'+
+          '<section class="batch-report batch-short">'+(shortEl?shortEl.innerHTML:'<p>처방전 없음</p>')+'</section>'+
           '</article>');
       });
     }catch(e){
       console.error('[SG] 전체 리포트 생성 오류',e);
       alert('전체 리포트 생성 중 오류가 발생했습니다.\n'+(e&&e.message?e.message:e));
+      cw.__SG_EXTRA_PEERS = null;
       try{cw.__SG_initFromHost(original);}catch(_e){}
       return;
     }
+    cw.__SG_EXTRA_PEERS = null;
     try{cw.__SG_initFromHost(original);}catch(e){}
 
     var styles=Array.from(cd.querySelectorAll('style')).map(function(x){return x.outerHTML;}).join('\\n');
@@ -43982,6 +44036,21 @@ function generateReport() {
       return null;
     }
   }
+
+  // ★ 2026-09-15(430) 추가: 챌린저 상담리포트(개인/일괄인쇄 공통)의 "OO명 중 O등" 등수 표시가
+  // 최종관리자는 항상 전체 응시자 기준인데, 기관관리자·선생님은 역할별로 좁혀진 ST.students
+  // (자기 기관만 / 담당 학생만) 기준으로 계산되어 서로 다르게 보이던 문제를 해결하기 위한
+  // 전체 응시자 조회 캐시. 시험(응시일+시험명) 하나당 한 번만 조회하고 재사용한다.
+  window.__gg_examPeerCache = window.__gg_examPeerCache || {};
+  window._gg_ensureFullExamPeers = function(examDate, examName){
+    if(!examDate && !examName) return Promise.resolve(null);
+    if(ST.currentUser && ST.currentUser.role==='admin') return Promise.resolve(null); // 최종관리자는 이미 ST.students가 전체라 조회 불필요
+    var key = String(examDate||'')+'|'+String(examName||'');
+    if(!window.__gg_examPeerCache[key]){
+      window.__gg_examPeerCache[key] = _gg_fetchOtherOrgExamStudents(examDate, examName).catch(function(){return null;});
+    }
+    return window.__gg_examPeerCache[key];
+  };
 
   // ★ 회차(응시일+시험명) 기준 학생별 성적순위·오답방어 통계표. 성적순위/오답방어 모두
   // 동점자는 같은 순위를 공유하고, 그다음 순위는 동점자 인원 수만큼 건너뛴 "표준경쟁순위"
