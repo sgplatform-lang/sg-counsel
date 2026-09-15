@@ -327,7 +327,12 @@ try{
     // ★ 2026-09-14(413) 추가: 문제지·정답지 PDF를 서버 함수(analyzeExamPdf)로 보내 Claude가
     // 분석한 문항유형DB 텍스트를 받아온다. Anthropic API 키는 서버(Secret Manager)에만 있고
     // 이 함수 호출로는 절대 전달되지 않음 — 서버 함수 배포는 별도 안내 참고.
-    analyzeExamPdf: (payload)=>firebase.functions().httpsCallable('analyzeExamPdf')(payload).then(r=>r.data),
+    // ★ 2026-09-15(419) 수정: 실제 PDF로 처음 테스트했을 때 "deadline-exceeded" 오류 발생 —
+    // 서버 함수는 최대 5분(timeoutSeconds:300)까지 기다리도록 설정돼 있는데, 브라우저 쪽
+    // httpsCallable 호출엔 그 제한이 안 걸려있어 SDK 기본 타임아웃(약 70초)에 먼저 걸려버린
+    // 것이 원인 — 문항수 많은 PDF는 분석에 70초 이상 걸릴 수 있어 실사용에서 충분히 재현됨.
+    // 클라이언트 타임아웃을 서버와 동일하게 5분으로 맞춰서 해결.
+    analyzeExamPdf: (payload)=>firebase.functions().httpsCallable('analyzeExamPdf', {timeout: 300000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
