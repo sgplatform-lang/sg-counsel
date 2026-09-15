@@ -30951,7 +30951,7 @@ function aarSummaryTable(){
   h+=state.subjects.map(s=>\`<tr><td>\${name(s)}</td><td>\${aarValid(s.score)?esc(s.score):'-'}</td>\${haveGrade?\`<td>\${aarValid(s.grade)?esc(s.grade):'-'}</td>\`:''}\${havePct?\`<td>\${aarValid(s.percentile)?esc(s.percentile):'-'}</td>\`:''}<td>\${esc(s.wrongCount||'0')}</td><td>\${esc(progressInterpretation(s))}</td></tr>\`).join('')+'</table>'; return h
 }
 function aarBatchAppendix(){
-  const blocks=state.subjects.map(s=>{const d=aarRateData(s);if(!d.length)return'';return _sgSubjectBannerHtml(s)+\`<div class="report-card aar-flow-card"><h3>📊 \${name(s)} · 문항별 전체 오답률 비교</h3><table><tr><th>문항</th><th>단원/유형</th><th>난이도</th><th style="min-width:130px">전체 오답률</th><th>개인 해석</th></tr>\${d.map(x=>\`<tr><td>\${esc(x.no)}</td><td>\${esc(x.unit)}</td><td>\${esc(x.diff)}</td><td>\${_sgPbarHtml(x.rate)}</td><td>\${x.rate<=30?'우선 교정: 다수 학생이 맞힌 문항':x.rate>=60?'집단 고난도: 접근·시간·학습상태 확인':'중간 변별: 개념 적용과 정확도 확인'}</td></tr>\`).join('')}</table></div>\`}).join('');
+  const blocks=state.subjects.map(s=>{const d=aarRateData(s);if(!d.length)return'';return _sgSubjectBannerHtml(s)+\`<div class="report-card aar-flow-card"><h3>📊 \${name(s)} · 문항별 전체 오답률 비교</h3><table><tr><th>문항</th><th>단원/유형</th><th>실제난이도</th><th style="min-width:130px">전체 오답률</th><th>개인 해석</th></tr>\${d.map(x=>\`<tr><td>\${esc(x.no)}</td><td>\${esc(x.unit)}</td><td>\${esc(x.diff)}</td><td>\${_sgPbarHtml(x.rate)}</td><td>\${x.rate<=30?'우선 교정: 다수 학생이 맞힌 문항':x.rate>=60?'집단 고난도: 접근·시간·학습상태 확인':'중간 변별: 개념 적용과 정확도 확인'}</td></tr>\`).join('')}</table></div>\`}).join('');
   return blocks?\`<div class="aar-appendix"><h2>부록. 문항별 전체 오답률과 개인 결과 비교</h2><p class="muted">오답률은 이번 회차 응시 집단 기준이며, 학생의 준비도·미학습 범위와 함께 해석합니다.</p>\${blocks}</div>\`:''
 }
 function renderLong(){
@@ -32343,7 +32343,9 @@ function __SG_initFromHost(data){
     var rows=items.map(function(it){
       return '<tr><td>'+esc(it.no)+'번</td><td>'+esc(it.unit||'단원정보 미입력')+'</td><td>'+esc(it.diff||'-')+'</td></tr>';
     }).join('');
-    return '<table class="aar-item-unit-table"><thead><tr><th>문항</th><th>단원/유형</th><th>난이도</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    // ★ 2026-09-15(421) 수정: 여기 난이도는 실제 채점 결과(오답률)가 아니라 시험 등록 시
+    // 입력해둔 예상값(또는 그 값이 없을 때만 오답률로 보정한 값)이라 "예상난이도"로 명칭 변경.
+    return '<table class="aar-item-unit-table"><thead><tr><th>문항</th><th>단원/유형</th><th>예상난이도</th></tr></thead><tbody>'+rows+'</tbody></table>';
   }
   // ★ v47: "대표 우수 유형 / 대표 취약 유형" 요약 박스 + 단원별 집단 오답률 비교표.
   // 전국 동일 학년 평균 데이터가 없으므로, 이번 회차 동일 과목 응시 집단(peers) 기준으로
@@ -33304,7 +33306,7 @@ function _examcatAiPanelHtml(){
   const st=EXAMCAT_aiState;
   return `<div id="examcat-ai-panel" style="margin-bottom:14px;border:1.5px dashed #7c3aed;border-radius:10px;padding:12px;background:#faf5ff">
     <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">🧠 AI로 문제지·정답지 PDF 자동분석 (학원 공용 키 사용)</div>
-    <p style="font-size:11px;color:#7c3aed;margin:0 0 8px">매쓰플랫·기출문제 모음 사이트 등에서 구한 문제지(+정답지) PDF를 올리면, Claude가 문항별 단원·정답·배점·해설을 분석해서 아래 "문항별 단원/유형" 칸에 자동으로 채워줍니다. 시험 전체(45문항 안팎)는 분석에 1~2분 정도 걸릴 수 있습니다. 분석 결과는 저장 전에 꼭 확인·수정해주세요.</p>
+    <p style="font-size:11px;color:#7c3aed;margin:0 0 8px">테스트 문제지(+정답지) PDF를 올리면, SG가 문항별 단원·정답·배점·해설을 분석해서 아래 "문항별 단원/유형" 칸에 자동으로 채워줍니다. 시험 전체(45문항 안팎)는 분석에 1~2분 정도 걸릴 수 있습니다. 분석 결과는 저장 전에 꼭 확인·수정해주세요.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <select id="examcat-ai-subj" onchange="EXAMCAT_aiState.subj=this.value" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px">
         ${subjOptions.map(function(o){ return '<option value="'+o[0]+'" '+(st.subj===o[0]?'selected':'')+'>'+o[1]+'</option>'; }).join('')}
@@ -33332,7 +33334,7 @@ async function _examcatAiAnalyze(){
   try{
     const questionPdfBase64 = await _examcatAiReadFileAsBase64(st.qFile);
     const answerPdfBase64 = st.aFile ? await _examcatAiReadFileAsBase64(st.aFile) : null;
-    st.statusMsg='🧠 Claude가 분석 중입니다(문항 수에 따라 1~2분 정도 걸릴 수 있습니다)...';
+    st.statusMsg='🧠 SG가 분석 중입니다(문항 수에 따라 1~2분 정도 걸릴 수 있습니다)...';
     _examcatAiRerender();
     const result = await window._fb.analyzeExamPdf({
       subjCode: st.subj, subjName: subjNameMap[st.subj]||st.subj, elective: st.elective||'',
@@ -33375,14 +33377,15 @@ function _examcatAiParseRows(text){
     rows.push({
       subjCode:c[0]||'', subjName:c[1]||'', elective:c[2]||'', no:c[3]||'',
       big:c[4]||'', detail:c[5]||'', type:c[6]||'', points:c[7]||'',
-      answer:c[8]||'', explain:(c[9]||'').replace(/⏎/g,'\n')
+      answer:c[8]||'', explain:(c[9]||'').replace(/⏎/g,'\n'),
+      diff:c[10]||'' // ★ 2026-09-15(421) 추가: 예상난이도(AI는 채우지 않고, 관리자가 표에서 직접 입력)
     });
   });
   return rows;
 }
 function _examcatAiRowsToText(rows){
   return (rows||[]).map(function(r){
-    return [r.subjCode,r.subjName,r.elective,r.no,r.big,r.detail,r.type,r.points,r.answer,String(r.explain||'').replace(/\r?\n/g,'⏎')].join('\t');
+    return [r.subjCode,r.subjName,r.elective,r.no,r.big,r.detail,r.type,r.points,r.answer,String(r.explain||'').replace(/\r?\n/g,'⏎'),r.diff||''].join('\t');
   }).join('\n');
 }
 function _examcatAiPreviewSyncFromDom(){
@@ -33398,8 +33401,13 @@ function _examcatAiPreviewSyncFromDom(){
     r.points=(rowEl.querySelector('[data-f="points"]')||{}).value||'';
     r.answer=(rowEl.querySelector('[data-f="answer"]')||{}).value||'';
     r.explain=(rowEl.querySelector('[data-f="explain"]')||{}).value||'';
+    r.diff=(rowEl.querySelector('[data-f="diff"]')||{}).value||'';
   });
 }
+// ★ 2026-09-15(421) 추가: 예상난이도 선택지 — 자동계산(실제 오답률 기반, _sgDiffFromRate)과
+// 동일한 라벨을 써서, 나중에 실제난이도(부록 표)와 예상난이도(AAR 표)를 나란히 봤을 때
+// 같은 기준으로 비교할 수 있게 한다.
+const _EXAMCAT_DIFF_OPTIONS=['','최상','상','중상','중','하'];
 function _examcatAiPreviewRowsHtml(){
   return (EXAMCAT_aiPreviewRows||[]).map(function(r,i){
     return `<tr data-ai-row>
@@ -33410,6 +33418,7 @@ function _examcatAiPreviewRowsHtml(){
       <td style="padding:3px"><input data-f="points" value="${esc(r.points)}" style="width:38px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
       <td style="padding:3px"><input data-f="answer" value="${esc(r.answer)}" style="width:56px;border:1.5px solid #f59e0b;border-radius:4px;padding:4px;font-size:11.5px;font-weight:700;background:#fffbeb"></td>
       <td style="padding:3px"><textarea data-f="explain" style="width:240px;min-height:34px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11px;font-family:inherit">${esc(r.explain)}</textarea></td>
+      <td style="padding:3px"><select data-f="diff" style="width:60px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px">${_EXAMCAT_DIFF_OPTIONS.map(function(o){ return '<option value="'+o+'" '+(r.diff===o?'selected':'')+'>'+(o||'-')+'</option>'; }).join('')}</select></td>
       <td style="padding:3px;text-align:center"><button type="button" onclick="_examcatAiPreviewRemoveRow(${i})" title="이 문항 삭제" style="border:none;background:#fee2e2;color:#dc2626;border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button></td>
     </tr>`;
   }).join('');
@@ -33430,10 +33439,10 @@ function _examcatAiPreviewPanelHtml(){
         <label style="background:#fff;border:1px solid #f59e0b;color:#b45309;border-radius:6px;padding:5px 10px;font-size:11.5px;cursor:pointer">📤 수정한 엑셀 업로드<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="_examcatAiPreviewUploadXlsx(this)"></label>
       </div>
     </div>
-    <p style="font-size:11px;color:#92400e;margin:0 0 8px">화면 표에서 칸을 직접 고쳐도 되고, "엑셀로 다운로드" → 엑셀에서 편하게 수정 → "수정한 엑셀 업로드"로 다시 불러와도 됩니다(다운로드 받은 파일의 칸 구성을 그대로 유지해주세요: 문항/대영역/세부단원/유형/배점/정답/해설).</p>
+    <p style="font-size:11px;color:#92400e;margin:0 0 8px">화면 표에서 칸을 직접 고쳐도 되고, "엑셀로 다운로드" → 엑셀에서 편하게 수정 → "수정한 엑셀 업로드"로 다시 불러와도 됩니다(다운로드 받은 파일의 칸 구성을 그대로 유지해주세요: 문항/대영역/세부단원/유형/배점/정답/해설/예상난이도). 예상난이도는 AI가 채우지 않으니 필요하면 직접 선택해주세요(비워둬도 됩니다).</p>
     <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11.5px;width:100%">
       <thead><tr style="background:#fef3c7;text-align:left">
-        <th style="padding:3px">문항</th><th style="padding:3px">대영역</th><th style="padding:3px">세부단원</th><th style="padding:3px">유형</th><th style="padding:3px">배점</th><th style="padding:3px">정답</th><th style="padding:3px">해설</th><th></th>
+        <th style="padding:3px">문항</th><th style="padding:3px">대영역</th><th style="padding:3px">세부단원</th><th style="padding:3px">유형</th><th style="padding:3px">배점</th><th style="padding:3px">정답</th><th style="padding:3px">해설</th><th style="padding:3px">예상난이도</th><th></th>
       </tr></thead>
       <tbody id="examcat-ai-preview-rows">${_examcatAiPreviewRowsHtml()}</tbody>
     </table></div>
@@ -33464,16 +33473,24 @@ function _examcatAiPreviewDownloadXlsx(){
   _examcatAiPreviewSyncFromDom();
   if(!EXAMCAT_aiPreviewRows || !EXAMCAT_aiPreviewRows.length) return;
   function doExport(){
-    const header=['문항','대영역','세부단원','유형','배점','정답','해설'];
+    const header=['문항','대영역','세부단원','유형','배점','정답','해설','예상난이도'];
     const aoa=[header].concat(EXAMCAT_aiPreviewRows.map(function(r){
-      return [r.no,r.big,r.detail,r.type,r.points,r.answer,r.explain];
+      return [r.no,r.big,r.detail,r.type,r.points,r.answer,r.explain,r.diff||''];
     }));
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'문항유형DB');
     const subjNameMap={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구'};
     const st=EXAMCAT_aiState;
-    XLSX.writeFile(wb,'AI분석_'+(subjNameMap[st.subj]||st.subj)+'_'+(new Date().toISOString().slice(0,10))+'.xlsx');
+    // ★ 2026-09-15(421) 수정: 파일명이 "AI분석_수학_2026-09-15"처럼 어떤 시험인지 알 수 없게
+    // 나와서 여러 시험을 분석하다 보면 구분이 안 된다는 요청 — "시험명_과목명_문항분석_날짜"로 변경.
+    // 시험명은 등록 화면의 시험명 입력칸(#examcat-name) 값을 그대로 쓰고, 파일명에 못 쓰는
+    // 문자(\/:*?"<>|)는 공백으로 바꾼다. 아직 시험명을 안 적은 새 시험이면 "새시험"으로 대체.
+    const nameEl=document.getElementById('examcat-name');
+    const examName=((nameEl&&nameEl.value.trim())||'새시험').replace(/[\\/:*?"<>|]/g,' ').replace(/\s+/g,' ').trim();
+    const subjName=subjNameMap[st.subj]||st.subj;
+    const dateStr=new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb,examName+'_'+subjName+'_문항분석_'+dateStr+'.xlsx');
   }
   if(typeof XLSX!=='undefined'){ doExport(); }
   else { const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=doExport; document.head.appendChild(sc); }
@@ -33490,9 +33507,10 @@ function _examcatAiPreviewUploadXlsx(input){
     const out=rows.filter(function(r){ return r && r[0]!=null && String(r[0]).trim()!==''; }).map(function(r){
       return { subjCode:subjCode, subjName:subjName, elective:elective,
         no:String(r[0]==null?'':r[0]), big:String(r[1]==null?'':r[1]), detail:String(r[2]==null?'':r[2]), type:String(r[3]==null?'':r[3]),
-        points:String(r[4]==null?'':r[4]), answer:String(r[5]==null?'':r[5]), explain:String(r[6]==null?'':r[6]) };
+        points:String(r[4]==null?'':r[4]), answer:String(r[5]==null?'':r[5]), explain:String(r[6]==null?'':r[6]),
+        diff:String(r[7]==null?'':r[7]) }; // ★ 2026-09-15(421) 추가: 8번째 칸(예상난이도), 없어도 빈 값으로 처리
     });
-    if(!out.length){ alert('엑셀에서 문항을 하나도 찾지 못했습니다. 다운로드했던 양식 그대로(문항/대영역/세부단원/유형/배점/정답/해설 7칸) 수정해서 다시 올려주세요.'); input.value=''; return; }
+    if(!out.length){ alert('엑셀에서 문항을 하나도 찾지 못했습니다. 다운로드했던 양식 그대로(문항/대영역/세부단원/유형/배점/정답/해설/예상난이도 8칸) 수정해서 다시 올려주세요.'); input.value=''; return; }
     EXAMCAT_aiPreviewRows=out;
     _examcatAiRerender();
     toast('✅ 엑셀에서 '+out.length+'개 문항을 불러왔습니다. 내용 확인 후 반영해주세요.');
@@ -35003,13 +35021,14 @@ function _sgParseItemMetaText(text){
     let subj, detail, no, unit, diff='', answer='', explain='', points='';
     if(MASTER_DB_SUBJ_NAMES.includes(c[1])){
       // ★ 기존에 쓰던 마스터 문항 DB 형식도 그대로 인식한다:
-      // 과목코드 / 과목명 / 선택과목 / 문항 / 대영역 / 세부단원 / 유형 / (배점) / (정답) / (해설)
+      // 과목코드 / 과목명 / 선택과목 / 문항 / 대영역 / 세부단원 / 유형 / (배점) / (정답) / (해설) / (예상난이도)
       subj=c[0].toUpperCase();
       detail=(c[2]==='공통'||!c[2])?'':c[2];
       no=c[3];
       unit=[c[4],c[5],c[6]].filter(Boolean).join(' · ');
       points=c[7]||''; // ★ 실전손실·교정가능점수 계산용 문항 배점
       answer=c[8]||''; explain=c[9]||'';
+      diff=c[10]||''; // ★ 2026-09-15(421) 추가: AI분석 미리보기 표에서 관리자가 입력한 예상난이도(11번째 칸)
     } else {
       // 기본 형식: 과목코드 / 세부과목(공통이면 비움) / 문항번호 / 단원유형 / 난이도(선택) / 정답(선택) / 해설(선택) / 배점(선택)
       subj=c[0].toUpperCase();
@@ -43685,11 +43704,24 @@ function generateReport() {
       var _seenIds={}; _pool.forEach(function(s){_seenIds[String(s&&s.id)]=true;});
       _pool=_pool.concat(extraStudents.filter(function(s){var k=String(s&&s.id);if(_seenIds[k])return false;_seenIds[k]=true;return true;}));
     }
-    var _includeAllOrgs = _isSuperAdmin || orgScope==='all';
+    // ★ 2026-09-15(422) 수정: orgScope에 'org'/'class'를 새로 받는다 — "최종관리자는
+    // 항상 전체 기관"이던 기존 규칙과 달리, 이 두 값은 최종관리자에게도 명시적으로
+    // "우리 기관만"/"우리 반만"으로 좁히기 위한 것이라 _isSuperAdmin이어도 전체포함을
+    // 강제하지 않는다(orgScope가 아예 안 넘어온 기존 호출부는 그대로 하위호환 유지).
+    var _includeAllOrgs = orgScope==='all' || (orgScope!=='org' && orgScope!=='class' && _isSuperAdmin);
     var base=_pool.filter(function(s){
       if(_includeAllOrgs) return true;
       return !cur.orgId || String(s.orgId||'')===String(cur.orgId||'');
     });
+    // ★ 2026-09-15(422) 추가: "우리 반만" — 지금 보고 있는 학생(cur)과 같은 반(className,
+    // 자유서술 필드)인 학생만 남긴다. 기관 필터(위)는 이미 적용된 뒤라 다른 기관에 같은
+    // 반 이름이 있어도 섞이지 않는다. cur에 반 정보가 없으면(빈 문자열) 필터를 걸지
+    // 않는다 — 호출부(_gg_printExamStats)에서 반 정보가 없을 때 애초에 "우리 반" 선택지를
+    // 막아두므로, 여기까지 빈 값으로 들어오는 건 사실상 없지만 안전장치로 남겨둔다.
+    if(orgScope==='class' && String(cur.className||'').trim()){
+      var _curClassName=String(cur.className||'').trim();
+      base=base.filter(function(s){ return String(s.className||'').trim()===_curClassName; });
+    }
     var _matchSrc={}; // 학생id -> 'current' | 'history'
     var targets=[];
     base.forEach(function(s){
@@ -43814,12 +43846,17 @@ function generateReport() {
     return base||subjCode;
   }
   function _statEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  // ★ 2026-09-15(423) 수정: 예전엔 "밀집 순위(dense rank, 74,74,72 → 3,3,4처럼 동점자
+  // 뒤 순위를 건너뛰지 않음)"를 썼는데, "1등이 2명이면 그다음은 3등, 1등이 10명이면
+  // 그다음은 11등"(표준경쟁순위, standard competition ranking)으로 바뀌달라는 요청 →
+  // 순위 = "정렬했을 때 그 값보다 앞에 있는 인원 수 + 1"로 변경(74,74,72 → 1,1,3).
+  // 함수명은 기존 호출부와의 혼동을 줄이기 위해 그대로 두되 동작만 바꿨다.
   function _denseRank(rows,key,desc){
     var sorted=rows.slice().sort(function(a,b){ return desc?(b[key]-a[key]):(a[key]-b[key]); });
-    var rank=0, prev=null, out={};
-    sorted.forEach(function(r){
-      if(prev===null||r[key]!==prev){ rank++; prev=r[key]; }
-      out[r._i]=rank;
+    var out={};
+    sorted.forEach(function(r,i){
+      if(i===0 || r[key]!==sorted[i-1][key]){ out[r._i]=i+1; }
+      else { out[r._i]=out[sorted[i-1]._i]; }
     });
     return out;
   }
@@ -43879,39 +43916,104 @@ function generateReport() {
   }
 
   // ★ 회차(응시일+시험명) 기준 학생별 성적순위·오답방어 통계표. 성적순위/오답방어 모두
-  // 동점자는 같은 순위를 공유하고, 다음으로 다른 값이 나오면 그 다음 순위(건너뛰지 않고
-  // 바로 다음 숫자)를 받는 "밀집 순위(dense rank)" 방식을 쓴다(예: 74,74,72 → 3,3,4).
+  // 동점자는 같은 순위를 공유하고, 그다음 순위는 동점자 인원 수만큼 건너뛴 "표준경쟁순위"
+  // 방식을 쓴다(예: 74,74,72 → 1,1,3 — 74점 2명 다음은 3등). _denseRank 참고.
   // 팝업은 일괄 출력과 같은 이유로 window.open() 대신 Blob+링크 클릭 방식을 쓴다.
-  // ★ 2026-09-13 추가: 기관관리자·선생님은 클릭 시 "우리 기관만" 또는 "모든 기관(다른
-  // 기관 포함)"을 선택할 수 있다(최종관리자는 원래부터 항상 전체 기관이 보이므로 물어보지
-  // 않는다). 통계표 제목·헤더에도 어느 범위로 생성됐는지 표기한다.
+  // ★ 2026-09-15(422) 수정: 예전엔 기관관리자·선생님에게만 confirm() 하나로 "우리 기관/
+  // 전체 기관"을 물었고 최종관리자는 항상 전체 기관 고정이었는데, "최종관리자·기관관리자·
+  // 선생님 모두 전체기관/우리기관/우리반 중 골라서 볼 수 있게 해달라"는 요청으로 라디오
+  // 선택 모달(_gg_openExamStatsScopeModal)로 교체 — 역할과 무관하게 항상 3가지 범위를
+  // 고를 수 있다. 통계표 제목·헤더에도 어느 범위로 생성됐는지 표기한다.
   window._gg_printExamStats=async function(){
     var ifr=document.getElementById('challenger-iframe');
     if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
     var cw=ifr.contentWindow, cd=cw.document;
     var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
     var liveDate=liveDateEl?liveDateEl.value:'', liveName=liveNameEl?liveNameEl.value:'';
+    _gg_openExamStatsScopeModal(liveDate, liveName);
+  };
 
-    var _isSuperAdmin = ST.currentUser && ST.currentUser.role==='admin';
-    var orgScope='mine', extraStudents=[], scopeLabel='';
-    if(!_isSuperAdmin){
-      var wantAll=confirm('같은 회차(같은 응시일·시험명)를 치른 "다른 기관" 학생들까지 모두 포함해서 통계표를 만들까요?\n\n확인: 모든 기관 포함\n취소: 우리 기관 학생만');
-      if(wantAll){
-        // ★ 2026-09-13 추가: "확인"을 누른 뒤 전체 학생 컬렉션을 조회해오는 동안(수 초 소요)
-        // 화면에 아무 변화가 없어 "안 눌린 줄" 알고 다른 걸 누르게 된다는 신고 → 조회 시작
-        // 즉시 토스트로 진행 중임을 알리고, 조회가 끝나는 순간(성공/실패 무관) 바로 닫는다.
+  // ★ 2026-09-15(422) 추가: 회차 통계표 범위 선택 모달. 현재 보고 있는 학생(cur)의 소속
+  // 기관·반을 기준으로 "우리 기관"="cur와 같은 기관", "우리 반"="cur와 같은 기관+같은
+  // 반(className, 자유서술 필드)"을 계산해 보여준다. cur에 반 정보가 없으면(className
+  // 빈 값) "우리 반만"은 disabled 처리해 애매한 결과를 막는다.
+  var _ggExamStatsScopePending=null;
+  function _gg_openExamStatsScopeModal(liveDate, liveName){
+    var cur=ST.sel||ST.adminSel;
+    if(!cur){ alert('학생을 먼저 선택해주세요.'); return; }
+    _ggExamStatsScopePending={liveDate:liveDate, liveName:liveName};
+    var curOrgName=_gg_getOrgName(cur)||'(기관 미확인)';
+    var curClassName=String(cur.className||'').trim();
+
+    var overlay=document.getElementById('sg-examstats-scope-overlay');
+    if(!overlay){
+      overlay=document.createElement('div');
+      overlay.id='sg-examstats-scope-overlay';
+      overlay.style.cssText='display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;align-items:center;justify-content:center;padding:16px';
+      overlay.innerHTML='<div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:20px 22px" id="sg-examstats-scope-body"></div>';
+      overlay.onclick=function(e){ if(e.target===overlay) overlay.style.display='none'; };
+      document.body.appendChild(overlay);
+    }
+    var body=document.getElementById('sg-examstats-scope-body');
+    body.innerHTML=
+      '<div style="font-size:15px;font-weight:800;margin-bottom:4px">📊 회차 통계표 범위 선택</div>'+
+      '<div style="font-size:11.5px;color:#888;margin-bottom:14px">같은 회차(같은 응시일·시험명)를 치른 학생 중 어디까지 포함할지 선택해주세요.</div>'+
+      '<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 4px;cursor:pointer">'
+        +'<input type="radio" name="sg-examstats-scope" value="all" checked style="margin-top:3px">'
+        +'<span><b>전체 기관</b><br><span style="font-size:11.5px;color:#888">다른 기관 학생까지 모두 포함해서 통계표를 만듭니다.</span></span></label>'+
+      '<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 4px;cursor:pointer">'
+        +'<input type="radio" name="sg-examstats-scope" value="org" style="margin-top:3px">'
+        +'<span><b>우리 기관만</b><br><span style="font-size:11.5px;color:#888">'+esc(curOrgName)+' 소속 학생만 포함합니다.</span></span></label>'+
+      '<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 4px;cursor:'+(curClassName?'pointer':'not-allowed')+';opacity:'+(curClassName?'1':'0.5')+'">'
+        +'<input type="radio" name="sg-examstats-scope" value="class" '+(curClassName?'':'disabled')+' style="margin-top:3px">'
+        +'<span><b>우리 반만</b><br><span style="font-size:11.5px;color:#888">'+(curClassName?(esc(curOrgName)+' · '+esc(curClassName)+' 반 학생만 포함합니다.'):'현재 학생에게 반 정보가 없어 선택할 수 없습니다.')+'</span></span></label>'+
+      '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">'
+        +'<button type="button" onclick="document.getElementById(\'sg-examstats-scope-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;color:#555;border-radius:8px;padding:8px 14px;font-size:12.5px;cursor:pointer">취소</button>'
+        +'<button type="button" onclick="_gg_confirmExamStatsScope()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer">통계표 만들기</button>'
+      +'</div>';
+    overlay.style.display='flex';
+  }
+
+  // ★ 2026-09-15(422): onclick="" 속성 안의 코드는 이 파일의 클로저(IIFE) 밖, 전역
+  // 스코프에서 실행되므로(예: onclick="_gg_confirmExamStatsScope()") 이 함수는 반드시
+  // window에 명시적으로 걸어둬야 버튼 클릭이 동작한다(_gg_printExamStats와 동일한 이유).
+  window._gg_confirmExamStatsScope = async function _gg_confirmExamStatsScope(){
+    var overlay=document.getElementById('sg-examstats-scope-overlay');
+    var checked=overlay&&overlay.querySelector('input[name="sg-examstats-scope"]:checked');
+    var scope=checked?checked.value:'all';
+    var pending=_ggExamStatsScopePending||{liveDate:'',liveName:''};
+    if(overlay) overlay.style.display='none';
+
+    var orgScope=scope, extraStudents=[], scopeLabel='';
+    if(scope==='all'){
+      scopeLabel=' (전체 기관 포함)';
+      var _isSuperAdmin = ST.currentUser && ST.currentUser.role==='admin';
+      if(!_isSuperAdmin){
+        // ★ 기관관리자·선생님 계정은 ST.students에 다른 기관 학생이 아예 없어 별도 조회가
+        // 필요하다(최종관리자는 ST.students에 이미 전체 기관이 실려있어 조회 불필요).
+        // 조회에 수 초 걸릴 수 있어 토스트로 진행 중임을 알린다.
         if(typeof toast==='function') toast('⏳ 다른 기관 학생 데이터를 조회하는 중입니다... 잠시만 기다려주세요.', 30000);
-        var _fetched=await _gg_fetchOtherOrgExamStudents(liveDate||(ST.sel||ST.adminSel||{}).challengerData?.lastTestDate, liveName||(ST.sel||ST.adminSel||{}).challengerData?.lastTestName);
+        var cur0=ST.sel||ST.adminSel||{};
+        var _fetched=await _gg_fetchOtherOrgExamStudents(pending.liveDate||cur0.challengerData?.lastTestDate, pending.liveName||cur0.challengerData?.lastTestName);
         var _loadingToastEl=document.getElementById('admin-toast');
         if(_loadingToastEl) _loadingToastEl.style.display='none';
         if(_fetched===null){
           alert('다른 기관 학생 데이터를 불러오는 중 오류가 발생했습니다. 우리 기관 학생만으로 통계표를 만듭니다.');
+          orgScope='org'; scopeLabel=' (우리 기관만)';
         } else {
-          orgScope='all'; extraStudents=_fetched; scopeLabel=' (전체 기관 포함)';
+          extraStudents=_fetched;
           if(typeof toast==='function') toast('✅ 조회 완료 · 통계표를 생성합니다.', 1500);
         }
       }
+    } else if(scope==='org'){
+      scopeLabel=' (우리 기관만)';
+    } else if(scope==='class'){
+      scopeLabel=' (우리 반만)';
     }
+    _gg_buildExamStatsHtml(pending.liveDate, pending.liveName, orgScope, extraStudents, scopeLabel);
+  };
+
+  function _gg_buildExamStatsHtml(liveDate, liveName, orgScope, extraStudents, scopeLabel){
     var info=_batchTargets(liveDate, liveName, false, orgScope, extraStudents);
     var targets=info.targets;
     if(!targets.length){alert('통계표를 만들 학생을 찾지 못했습니다.');return;}
@@ -43956,8 +44058,16 @@ function generateReport() {
       var wrongRank=_denseRank(g.rows,'wrong',false);
       var displayRows=g.rows.slice().sort(function(a,b){ return scoreRank[a._i]-scoreRank[b._i]; });
 
-      // 성적순위 1~3위(동점자는 _denseRank가 같은 순위를 부여하므로 그대로 모으면 전원 포함됨)
-      var topBlocks=[1,2,3].map(function(rank){
+      // 상위 3개 등수 그룹(동점자는 _denseRank가 같은 등수를 부여하므로 그대로 모으면
+      // 전원 포함됨). ★ 2026-09-15(423) 수정: 예전(밀집 순위)엔 등수가 1,2,3처럼 항상
+      // 연속이라 [1,2,3]으로 바로 필터링했지만, 표준경쟁순위로 바뀌면서 동점자가 있으면
+      // 등수가 1,11,16처럼 건너뛸 수 있어 그대로 쓰면 TOP2·TOP3 구간이 통째로 비어버림
+      // → "실제 등수값이 1/2/3인 사람"이 아니라 "상위 3개 등수 그룹"을 뽑도록 변경,
+      // 표제도 그 그룹의 실제 등수를 그대로 표시(예: "TOP11").
+      var _distinctRanks=[]; var _seenRanks={};
+      displayRows.forEach(function(r){ var rk=scoreRank[r._i]; if(!_seenRanks[rk]){_seenRanks[rk]=true;_distinctRanks.push(rk);} });
+      _distinctRanks.sort(function(a,b){return a-b;});
+      var topBlocks=_distinctRanks.slice(0,3).map(function(rank){
         var rows=displayRows.filter(function(r){return scoreRank[r._i]===rank;});
         if(!rows.length) return '';
         return '<h3>'+_statEsc(g.label)+' TOP'+rank+'</h3>'+_statTableHtml(rows,scoreRank,wrongRank);
@@ -43985,7 +44095,8 @@ function generateReport() {
       ? _orgHeaderOrder.map(function(on){ return (on?_statEsc(on):'기관 미확인')+' · '+_orgHeaderCounts[on]+'명'; }).join(', ')
       : (targets.length+'명');
 
-    var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계'+(orgScope==='all'?'_전체기관':'');
+    var _scopeSuffix=orgScope==='all'?'_전체기관':(orgScope==='class'?'_우리반':(orgScope==='org'?'_우리기관':''));
+    var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_학생통계'+_scopeSuffix;
     var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_statEsc(title)+'</title>'+
       '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px}h4.stat-org-sub{font-size:12.5px;margin:12px 0 4px;color:#0f766e;font-weight:800}table.stat-table{width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:10px;font-size:11.5px}table.stat-table th,table.stat-table td{border:1px solid #e2e8f0;padding:5px 6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}table.stat-table td:nth-child(3),table.stat-table td:nth-child(5){white-space:normal;word-break:keep-all;overflow:visible;text-overflow:clip}table.stat-table th{background:#f0fdfa;color:#0f766e}@media print{body{padding:8mm}table.stat-table{font-size:10.5px}table.stat-table th,table.stat-table td{padding:4px 5px}h4.stat-org-sub{font-size:11px}}</style>'+
       '</head><body>'+
