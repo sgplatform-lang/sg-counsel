@@ -2317,7 +2317,13 @@ function renderChallengerAnswerInput(){
   // 걸려 숨어버리는 문제가 있었다 — 이제 관리자 쪽에서 기관별로 반 제한을 따로 저장하므로
   // (classNamesByOrg), 내 기관(CU.orgId)에 대해 저장된 값만 확인한다(구버전 시험처럼
   // classNamesByOrg가 아예 없으면 예전 방식대로 classNames를 그대로 적용).
+  // ★ 2026-09-15(413) 추가: 관리자가 "🙈 학생 숨김" 토글을 켠 시험(hiddenFromStudent)은
+  // 이 "시험 선택" 목록에서만 제외한다 — 이미 진행 중이던 학생(_chgAnsCurrentExamEntry는
+  // 이 필터를 거치지 않는 _chgAnsCatalog 원본을 그대로 조회)이나, 이미 제출한 답안 목록
+  // (chgAnsSubmittedListHtml, 학생 자신의 challengerData 기반이라 카탈로그와 무관)에는
+  // 전혀 영향을 주지 않는다 — 새로 시험을 "선택"하려는 경우에만 안 보이게 된다.
   const catalogList=(_chgAnsCatalog||[]).filter(function(e){
+    if(e.hiddenFromStudent) return false;
     if(!(!e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0))) return false;
     const clsForMyOrg = e.classNamesByOrg ? (e.classNamesByOrg[CU.orgId]||[]) : (e.classNames||[]);
     if(clsForMyOrg.length && !clsForMyOrg.includes(CU.className)) return false;
