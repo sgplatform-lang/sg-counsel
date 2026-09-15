@@ -2983,6 +2983,67 @@ function renderCheckStatusPage(){
   </div>`;
 }
 
+// ══ 챌린저 학생입력 미확인 표시(빨간점) ══
+// ★ 2026-09-15(426) 신규: 학생이 학생용 페이지에서 챌린저 답안·AAR·오답원인을 입력하면
+// (학생용 chgScheduleSave가 challengerData._chgLastSubmitAt에 저장시각을 찍어줌) 관리자
+// 좌측 학생명단 + 학생상세 "챌린저" 탭에 빨간점이 뜨고, 그 학생을 확인(챌린저 탭 진입)하면
+// 사라진다. 단, "확인" 상태는 최종관리자/기관관리자/선생님(개인별) 각자 독립적으로 관리한다
+// — 한 역할이 확인해도 다른 역할·다른 선생님 계정에는 계속 빨간점이 남는다(요청사항).
+// 저장 위치: 학생 문서에 _chgReadAdmin(최종관리자 전체 공용, 숫자), _chgReadOrg(그 기관
+// 소속 기관관리자 전체 공용, 숫자), _chgReadTeachers(선생님 이름→숫자 맵) 3가지 필드.
+// ref.update()로 이 필드들만 부분 갱신한다 — fbSave()의 ref.set() 전체 문서 교체 방식은
+// 다른 화면에서 저장 중인 최신 데이터를 이 필드 갱신 하나 때문에 덮어쓸 위험이 있어 피한다.
+function _chgLastSubmitAt(s){
+  return (s && s.challengerData && s.challengerData._chgLastSubmitAt) || 0;
+}
+function _chgHasUnread(s){
+  const lastSubmit = _chgLastSubmitAt(s);
+  if(!lastSubmit) return false;
+  const role = ST.currentUser?.role;
+  if(role==='admin') return lastSubmit > (s._chgReadAdmin||0);
+  if(role==='orgAdmin') return lastSubmit > (s._chgReadOrg||0);
+  if(role==='teacher'){
+    const name = ST.currentUser?.name||'';
+    if(!name) return false;
+    const reads = s._chgReadTeachers||{};
+    return lastSubmit > (reads[name]||0);
+  }
+  return false;
+}
+async function _gg_markChallengerRead(s){
+  if(!s || !s.id) return;
+  const lastSubmit = _chgLastSubmitAt(s);
+  if(!lastSubmit) return; // 학생이 입력한 적 자체가 없으면 표시할 것도 없음
+  const role = ST.currentUser?.role;
+  const idx = ST.students.findIndex(x=>String(x.id)===String(s.id));
+  let patch=null;
+  if(role==='admin'){
+    if((s._chgReadAdmin||0) >= lastSubmit) return; // 이미 확인됨
+    s._chgReadAdmin = lastSubmit;
+    if(idx>=0) ST.students[idx]._chgReadAdmin = lastSubmit;
+    patch = {_chgReadAdmin: lastSubmit};
+  } else if(role==='orgAdmin'){
+    if((s._chgReadOrg||0) >= lastSubmit) return;
+    s._chgReadOrg = lastSubmit;
+    if(idx>=0) ST.students[idx]._chgReadOrg = lastSubmit;
+    patch = {_chgReadOrg: lastSubmit};
+  } else if(role==='teacher'){
+    const name = ST.currentUser?.name||'';
+    if(!name) return;
+    const reads = Object.assign({}, s._chgReadTeachers||{});
+    if((reads[name]||0) >= lastSubmit) return;
+    reads[name] = lastSubmit;
+    s._chgReadTeachers = reads;
+    if(idx>=0) ST.students[idx]._chgReadTeachers = reads;
+    patch = {_chgReadTeachers: reads};
+  } else return;
+  if(FB_USE()){
+    try{
+      await window._fb.db.collection('students').doc(String(s.id)).update(patch);
+    }catch(e){ console.warn('[SG] 챌린저 확인표시 저장 실패:', e.message); }
+  }
+}
+
 // ══ 메인 ══
 function renderMain(){
   const isAdmin = ST.currentUser?.role==='admin';
@@ -3125,7 +3186,10 @@ function renderMain(){
           <button class="btn-b" style="padding:7px 16px;font-size:12px" onclick="(async()=>{ST._authLoading=true;render();await fbLoadAll_all();ST._authLoading=false;render();})()">🔄 다시 시도</button>
         </div>`:filt.map(s=>{const a=gAvg(s.subjects);return`<div class="scard${String(ST.sel?.id)===String(s.id)?' act':''}" onclick="(function(){const _s=ST.students.find(x=>String(x.id)==='${s.id}');ST.sel=_s;ST.tab='overview';ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;ST._eraseMode=false;ST._stratSelKey=null;ST._inspSelKey=null;ST.jeongsi={mockSrc:'auto',mockTest:null,mockTests:[],areas:[],tier:'전체',계열:'전체',calc:null,manualScores:{},국어선택:'',수학선택:'',탐구1과목:'',탐구2과목:'',영어등급:''};render();})()">
           <div style="display:flex;gap:8px;align-items:center">
-            <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0">${esc(s.avatar)}</div>
+            <div style="position:relative;flex-shrink:0">
+              <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff">${esc(s.avatar)}</div>
+              ${_chgHasUnread(s)?'<span title="챌린저 새 입력" style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>':''}
+            </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:700">${esc(s.name)}</span><span style="font-size:10px;color:${gc(a)};font-weight:700">${a.toFixed(1)}등급</span></div>
               <div style="font-size:10px;color:#777">${esc(s.school)} · ${esc(s.grade)}</div>
@@ -3246,13 +3310,14 @@ function renderDetail(s){
       <div style="display:flex;align-items:stretch">
         ${mainTabs.map(({id,label,icon,sub})=>{
           const isAct = activeMain===id;
-          return`<button onclick="ST.tab='${id}';${id==='weekly'?'ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;':''}ST._eraseMode=false;render()"
+          const isUnreadTab = id==='challenger' && _chgHasUnread(s);
+          return`<button onclick="ST.tab='${id}';${id==='weekly'?'ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;':''}${id==='challenger'?`_gg_markChallengerRead(ST.students.find(x=>String(x.id)==='${s.id}'));`:''}ST._eraseMode=false;render()"
             style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:12px 4px 10px;border:none;cursor:pointer;transition:all .15s;
               background:${isAct?'#3b5bdb':'transparent'};
               color:${isAct?'#fff':'#666'};
               border-right:1.5px solid #e8eaf6;">
             <div style="display:flex;align-items:center;gap:5px">
-              <span style="font-size:16px;line-height:1">${icon}</span>
+              <span style="font-size:16px;line-height:1;position:relative">${icon}${isUnreadTab?'<span title="챌린저 새 입력" style="position:absolute;top:-3px;right:-6px;width:8px;height:8px;background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>':''}</span>
               <span style="font-size:13px;font-weight:${isAct?800:700};white-space:nowrap;letter-spacing:-0.3px">${label}</span>
             </div>
             ${sub?`<span style="font-size:8px;${isAct?'color:#c5d3ff':'color:#bbb'};font-weight:500">▼ 세부메뉴</span>`:'<span style="font-size:8px;opacity:0">ㅡ</span>'}
@@ -18561,7 +18626,10 @@ function bindEvents(){
         const a=gAvg(s.subjects);
         return`<div class="scard${String(ST.sel?.id||ST.adminSel?.id)===String(s.id)?' act':''}" onclick="(function(){const _s=ST.students.find(x=>String(x.id)==='${s.id}');if(ST.page==='admin'){ST.adminSel=_s;ST._stratSelKey=null;ST._inspSelKey=null;ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;ST.weekTab='tt';ST._mainScrollY=0;}else{ST.sel=_s;ST.tab='overview';ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;ST._eraseMode=false;ST._stratSelKey=null;ST._inspSelKey=null;}render();})()">
           <div style="display:flex;gap:8px;align-items:center">
-            <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0">${esc(s.avatar)}</div>
+            <div style="position:relative;flex-shrink:0">
+              <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff">${esc(s.avatar)}</div>
+              ${_chgHasUnread(s)?'<span title="챌린저 새 입력" style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>':''}
+            </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:700">${esc(s.name)}</span><span style="font-size:10px;color:${gc(a)};font-weight:700">${a.toFixed(1)}등급</span></div>
               <div style="font-size:10px;color:#777">${esc(s.school)} · ${esc(s.grade)}</div>
