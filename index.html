@@ -43941,9 +43941,9 @@ function generateReport() {
   function _gg_openExamStatsScopeModal(liveDate, liveName){
     var cur=ST.sel||ST.adminSel;
     if(!cur){ alert('학생을 먼저 선택해주세요.'); return; }
-    _ggExamStatsScopePending={liveDate:liveDate, liveName:liveName};
     var curOrgName=_gg_getOrgName(cur)||'(기관 미확인)';
     var curClassName=String(cur.className||'').trim();
+    _ggExamStatsScopePending={liveDate:liveDate, liveName:liveName, curOrgName:curOrgName, curClassName:curClassName};
 
     var overlay=document.getElementById('sg-examstats-scope-overlay');
     if(!overlay){
@@ -43954,25 +43954,50 @@ function generateReport() {
       overlay.onclick=function(e){ if(e.target===overlay) overlay.style.display='none'; };
       document.body.appendChild(overlay);
     }
+    _gg_renderExamStatsScopeBody('all');
+    overlay.style.display='flex';
+  }
+
+  // ★ 2026-09-15(424) 추가: 라디오 옆 텍스트를 감싼 <span>에 flex:1이 없어서 flex 행
+  // 안에서 텍스트가 남는 폭을 다 못 쓰고 좁게 줄바꿈되어(내용 폭이 제각각) 정렬이
+  // 어긋나 보인다는 지적 → 옵션마다 카드형 박스(테두리)로 감싸고, 라디오/제목/설명을
+  // grid(라디오 열 고정폭 + 내용 열 flex)로 재구성해 텍스트가 항상 같은 폭으로 줄바꿈되고
+  // 라디오가 제목 첫 줄과 나란히 정렬되도록 정리. 선택된 옵션은 테두리·배경으로도
+  // 강조해 지금 뭐가 골라져 있는지 한눈에 보이게 한다(선택 변경 시 _gg_examStatsScopeRerender
+  // 가 이 함수를 다시 호출해 강조만 다시 그림 — liveDate/liveName 등 pending 값은 그대로 둠).
+  function _gg_renderExamStatsScopeBody(selectedValue){
+    var pending=_ggExamStatsScopePending||{};
+    var curOrgName=pending.curOrgName||'(기관 미확인)', curClassName=pending.curClassName||'';
+    var _optRow=function(value, title, desc, disabled){
+      var checked=(value===selectedValue);
+      return '<label style="display:grid;grid-template-columns:20px 1fr;column-gap:10px;align-items:start;'
+        +'border:1.5px solid '+(checked?'#0f766e':'#e2e8f0')+';border-radius:10px;padding:12px 14px;margin-bottom:8px;'
+        +'cursor:'+(disabled?'not-allowed':'pointer')+';opacity:'+(disabled?'0.5':'1')+';background:'+(checked?'#f0fdfa':'#fff')+'">'
+        +'<input type="radio" name="sg-examstats-scope" value="'+value+'" '+(checked?'checked':'')+' '+(disabled?'disabled':'')
+          +' onchange="_gg_examStatsScopeRerender()" style="width:16px;height:16px;margin:1px 0 0;cursor:inherit">'
+        +'<span style="min-width:0"><span style="display:block;font-size:13.5px;font-weight:700;color:#0f172a;margin-bottom:2px">'+title+'</span>'
+          +'<span style="display:block;font-size:11.5px;color:#888;line-height:1.5">'+desc+'</span></span>'
+        +'</label>';
+    };
     var body=document.getElementById('sg-examstats-scope-body');
+    if(!body) return;
     body.innerHTML=
       '<div style="font-size:15px;font-weight:800;margin-bottom:4px">📊 회차 통계표 범위 선택</div>'+
-      '<div style="font-size:11.5px;color:#888;margin-bottom:14px">같은 회차(같은 응시일·시험명)를 치른 학생 중 어디까지 포함할지 선택해주세요.</div>'+
-      '<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 4px;cursor:pointer">'
-        +'<input type="radio" name="sg-examstats-scope" value="all" checked style="margin-top:3px">'
-        +'<span><b>전체 기관</b><br><span style="font-size:11.5px;color:#888">다른 기관 학생까지 모두 포함해서 통계표를 만듭니다.</span></span></label>'+
-      '<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 4px;cursor:pointer">'
-        +'<input type="radio" name="sg-examstats-scope" value="org" style="margin-top:3px">'
-        +'<span><b>우리 기관만</b><br><span style="font-size:11.5px;color:#888">'+esc(curOrgName)+' 소속 학생만 포함합니다.</span></span></label>'+
-      '<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 4px;cursor:'+(curClassName?'pointer':'not-allowed')+';opacity:'+(curClassName?'1':'0.5')+'">'
-        +'<input type="radio" name="sg-examstats-scope" value="class" '+(curClassName?'':'disabled')+' style="margin-top:3px">'
-        +'<span><b>우리 반만</b><br><span style="font-size:11.5px;color:#888">'+(curClassName?(esc(curOrgName)+' · '+esc(curClassName)+' 반 학생만 포함합니다.'):'현재 학생에게 반 정보가 없어 선택할 수 없습니다.')+'</span></span></label>'+
-      '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">'
+      '<div style="font-size:11.5px;color:#888;margin-bottom:14px;line-height:1.5">같은 회차(같은 응시일·시험명)를 치른 학생 중 어디까지 포함할지 선택해주세요.</div>'+
+      _optRow('all','전체 기관','다른 기관 학생까지 모두 포함해서 통계표를 만듭니다.',false)+
+      _optRow('org','우리 기관만',esc(curOrgName)+' 소속 학생만 포함합니다.',false)+
+      _optRow('class','우리 반만',curClassName?(esc(curOrgName)+' · '+esc(curClassName)+' 반 학생만 포함합니다.'):'현재 학생에게 반 정보가 없어 선택할 수 없습니다.',!curClassName)+
+      '<div style="display:flex;gap:8px;margin-top:6px;justify-content:flex-end">'
         +'<button type="button" onclick="document.getElementById(\'sg-examstats-scope-overlay\').style.display=\'none\'" style="border:none;background:#f1f5f9;color:#555;border-radius:8px;padding:8px 14px;font-size:12.5px;cursor:pointer">취소</button>'
         +'<button type="button" onclick="_gg_confirmExamStatsScope()" style="border:none;background:#0f766e;color:#fff;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer">통계표 만들기</button>'
       +'</div>';
-    overlay.style.display='flex';
   }
+  // onchange="" 속성은 전역 스코프에서 실행되므로 window에 걸어둔다(아래 _gg_confirmExamStatsScope와 동일 이유).
+  window._gg_examStatsScopeRerender=function(){
+    var overlay=document.getElementById('sg-examstats-scope-overlay');
+    var checked=overlay&&overlay.querySelector('input[name="sg-examstats-scope"]:checked');
+    _gg_renderExamStatsScopeBody(checked?checked.value:'all');
+  };
 
   // ★ 2026-09-15(422): onclick="" 속성 안의 코드는 이 파일의 클로저(IIFE) 밖, 전역
   // 스코프에서 실행되므로(예: onclick="_gg_confirmExamStatsScope()") 이 함수는 반드시
@@ -44005,10 +44030,28 @@ function generateReport() {
           if(typeof toast==='function') toast('✅ 조회 완료 · 통계표를 생성합니다.', 1500);
         }
       }
-    } else if(scope==='org'){
-      scopeLabel=' (우리 기관만)';
-    } else if(scope==='class'){
-      scopeLabel=' (우리 반만)';
+    } else if(scope==='org' || scope==='class'){
+      scopeLabel=scope==='org'?' (우리 기관만)':' (우리 반만)';
+      // ★ 2026-09-15(425) 수정: "선생님" 계정은 ST.students 자체가 "내 기관 전체"가 아니라
+      // "내 기관 중 나에게 배정된 학생"으로 한 번 더 좁혀져 있다(위 role==='teacher' 로드
+      // 로직 참고). 그래서 "우리 기관만"을 골라도 실제로는 "내 담당 학생만"만 집계되는
+      // 문제가 있었다 — 기관관리자(ST.students=기관 전체)·최종관리자(ST.students=전체
+      // 기관)는 원래도 문제없었다. 선생님 계정일 때만 다른 기관 조회와 같은 방식으로
+      // 전체 컬렉션을 받아와 풀에 합쳐주면, 이후 _batchTargets의 기관/반 필터가 그 중
+      // 우리 기관(또는 우리 반)만 정확히 골라낸다.
+      if(ST.currentUser && ST.currentUser.role==='teacher'){
+        if(typeof toast==='function') toast('⏳ 우리 기관 학생 데이터를 조회하는 중입니다... 잠시만 기다려주세요.', 30000);
+        var cur1=ST.sel||ST.adminSel||{};
+        var _fetched1=await _gg_fetchOtherOrgExamStudents(pending.liveDate||cur1.challengerData?.lastTestDate, pending.liveName||cur1.challengerData?.lastTestName);
+        var _loadingToastEl1=document.getElementById('admin-toast');
+        if(_loadingToastEl1) _loadingToastEl1.style.display='none';
+        if(_fetched1===null){
+          alert('기관 학생 데이터를 불러오는 중 오류가 발생했습니다. 내가 담당한 학생만으로 통계표를 만듭니다.');
+        } else {
+          extraStudents=_fetched1;
+          if(typeof toast==='function') toast('✅ 조회 완료 · 통계표를 생성합니다.', 1500);
+        }
+      }
     }
     _gg_buildExamStatsHtml(pending.liveDate, pending.liveName, orgScope, extraStudents, scopeLabel);
   };
