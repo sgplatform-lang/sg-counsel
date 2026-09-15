@@ -33216,8 +33216,13 @@ function _examcatSimpleApply(){
 // 배포가 먼저 돼 있어야 동작하며, 배포 전에는 아래에서 "서버 함수가 아직 배포되지
 // 않았거나…" 오류로 안내됨).
 let EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'' };
+// ★ 2026-09-14(416) 추가: AI가 가끔 정답/해설을 잘못 뽑아내는 경우가 있어(사용자 신고), 결과를
+// "문항별 단원/유형" 칸에 바로 밀어넣지 않고 표 형태로 미리보기+칸별 수정을 거치게 한다.
+// null이면 미리보기 패널 자체가 안 뜸(분석 전 상태이거나, 반영/취소로 닫힌 상태).
+let EXAMCAT_aiPreviewRows = null;
 function _examcatAiReset(){
   EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'' };
+  EXAMCAT_aiPreviewRows = null;
 }
 function _examcatAiReadFileAsBase64(file){
   return new Promise(function(resolve,reject){
@@ -33238,9 +33243,12 @@ function _examcatAiSetAFile(input){
   const label=document.getElementById('examcat-ai-afile-label');
   if(label) label.textContent = EXAMCAT_aiState.aFile ? ('📄 '+EXAMCAT_aiState.aFile.name) : '📁 정답지 PDF 선택(선택, 문제지에 정답이 함께 있으면 생략 가능)';
 }
+function _examcatAiZoneHtml(){
+  return `<div id="examcat-ai-zone">${_examcatAiPanelHtml()}${_examcatAiPreviewPanelHtml()}</div>`;
+}
 function _examcatAiRerender(){
-  const wrap=document.getElementById('examcat-ai-panel');
-  if(wrap) wrap.outerHTML=_examcatAiPanelHtml();
+  const wrap=document.getElementById('examcat-ai-zone');
+  if(wrap) wrap.outerHTML=_examcatAiZoneHtml();
 }
 function _examcatAiPanelHtml(){
   const subjOptions=[['KOR','국어'],['MATH','수학'],['ENG','영어'],['HIST','한국사'],['INQ','탐구']];
@@ -33281,23 +33289,189 @@ async function _examcatAiAnalyze(){
       subjCode: st.subj, subjName: subjNameMap[st.subj]||st.subj, elective: st.elective||'',
       questionPdfBase64: questionPdfBase64, answerPdfBase64: answerPdfBase64,
     });
-    const ta=document.getElementById('examcat-itemmeta');
-    if(ta){
-      if(ta.value.trim() && !confirm('이미 "문항별 단원/유형" 칸에 내용이 있습니다. AI 분석 결과로 덮어쓸까요?\n(기존 내용은 사라집니다)')){
-        st.busy=false; st.statusMsg=''; _examcatAiRerender(); return;
-      }
-      ta.value = result.itemMetaText||'';
+    // ★ 2026-09-14(416) 변경: 예전엔 여기서 바로 examcat-itemmeta 칸에 텍스트를 채웠는데,
+    // "AI가 가끔 정답을 잘못 뽑는데 텍스트칸만 보면 확인·수정이 어렵다"는 신고를 받아,
+    // 바로 밀어넣지 않고 표 형태 미리보기(EXAMCAT_aiPreviewRows)를 먼저 띄운다 —
+    // 사용자가 표에서 확인/수정하거나 엑셀로 내려받아 고친 뒤 "반영" 버튼을 눌러야
+    // 비로소 examcat-itemmeta 칸에 들어간다.
+    const rows=_examcatAiParseRows(result.itemMetaText||'');
+    if(!rows.length){
+      st.busy=false; st.statusMsg='';
+      _examcatAiRerender();
+      alert('AI 분석 결과에서 문항을 하나도 찾지 못했습니다. PDF 내용을 확인하고 다시 시도해주세요.');
+      return;
     }
+    EXAMCAT_aiPreviewRows=rows;
     st.busy=false;
-    st.statusMsg = result.truncated ? '⚠️ 응답이 길어 일부만 반영됐을 수 있습니다 — 아래 내용을 꼭 확인해주세요.' : '✅ 분석 완료! 아래 "문항별 단원/유형" 칸 내용을 확인해주세요.';
+    st.statusMsg = result.truncated ? '⚠️ 응답이 길어 일부만 반영됐을 수 있습니다 — 아래 미리보기에서 문항 수와 내용을 꼭 확인해주세요.' : '✅ 분석 완료! 아래 미리보기에서 내용을 확인·수정한 뒤 "문항별 단원/유형 칸에 반영" 버튼을 눌러주세요.';
     _examcatAiRerender();
-    toast('✅ AI 분석 결과를 문항유형 칸에 채웠습니다. 내용 확인 후 저장해주세요.');
+    toast('✅ AI 분석 완료! 아래 미리보기에서 정답 등을 확인한 뒤 반영해주세요.');
   }catch(e){
     st.busy=false;
     st.statusMsg='';
     _examcatAiRerender();
     alert('AI 분석 중 오류가 발생했습니다.\n\n'+(e&&e.message?e.message:e)+'\n\n서버 함수가 아직 배포되지 않았거나, PDF 용량이 너무 크거나, 네트워크 문제일 수 있습니다.');
   }
+}
+// ── AI 분석 결과 미리보기·수정 표 (416) ──────────────────────────────────
+// AI 서버 함수(buildPrompt, sg-cloud-functions/functions/index.js)가 만드는 10칸 형식
+// "과목코드\t과목명\t선택과목\t문항\t대영역\t세부단원\t유형\t배점\t정답\t해설"을 그대로 파싱한다.
+// (_sgParseItemMetaText는 대영역/세부단원/유형을 " · "로 합쳐버려 되돌릴 수 없으므로 재사용하지 않음)
+function _examcatAiParseRows(text){
+  const rows=[];
+  String(text||'').replace(/\r\n?/g,'\n').split('\n').forEach(function(line){
+    if(!line.trim()) return;
+    const c=line.split('\t');
+    if(c[0]==='과목코드') return; // 혹시 모델이 헤더를 함께 출력했으면 걸러내기
+    rows.push({
+      subjCode:c[0]||'', subjName:c[1]||'', elective:c[2]||'', no:c[3]||'',
+      big:c[4]||'', detail:c[5]||'', type:c[6]||'', points:c[7]||'',
+      answer:c[8]||'', explain:(c[9]||'').replace(/⏎/g,'\n')
+    });
+  });
+  return rows;
+}
+function _examcatAiRowsToText(rows){
+  return (rows||[]).map(function(r){
+    return [r.subjCode,r.subjName,r.elective,r.no,r.big,r.detail,r.type,r.points,r.answer,String(r.explain||'').replace(/\r?\n/g,'⏎')].join('\t');
+  }).join('\n');
+}
+function _examcatAiPreviewSyncFromDom(){
+  const body=document.getElementById('examcat-ai-preview-rows');
+  if(!body || !EXAMCAT_aiPreviewRows) return;
+  const rowEls=body.querySelectorAll('[data-ai-row]');
+  rowEls.forEach(function(rowEl,i){
+    const r=EXAMCAT_aiPreviewRows[i]; if(!r) return;
+    r.no=(rowEl.querySelector('[data-f="no"]')||{}).value||'';
+    r.big=(rowEl.querySelector('[data-f="big"]')||{}).value||'';
+    r.detail=(rowEl.querySelector('[data-f="detail"]')||{}).value||'';
+    r.type=(rowEl.querySelector('[data-f="type"]')||{}).value||'';
+    r.points=(rowEl.querySelector('[data-f="points"]')||{}).value||'';
+    r.answer=(rowEl.querySelector('[data-f="answer"]')||{}).value||'';
+    r.explain=(rowEl.querySelector('[data-f="explain"]')||{}).value||'';
+  });
+}
+function _examcatAiPreviewRowsHtml(){
+  return (EXAMCAT_aiPreviewRows||[]).map(function(r,i){
+    return `<tr data-ai-row>
+      <td style="padding:3px"><input data-f="no" value="${esc(r.no)}" style="width:36px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
+      <td style="padding:3px"><input data-f="big" value="${esc(r.big)}" style="width:84px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
+      <td style="padding:3px"><input data-f="detail" value="${esc(r.detail)}" style="width:110px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
+      <td style="padding:3px"><input data-f="type" value="${esc(r.type)}" style="width:110px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
+      <td style="padding:3px"><input data-f="points" value="${esc(r.points)}" style="width:38px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
+      <td style="padding:3px"><input data-f="answer" value="${esc(r.answer)}" style="width:56px;border:1.5px solid #f59e0b;border-radius:4px;padding:4px;font-size:11.5px;font-weight:700;background:#fffbeb"></td>
+      <td style="padding:3px"><textarea data-f="explain" style="width:240px;min-height:34px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11px;font-family:inherit">${esc(r.explain)}</textarea></td>
+      <td style="padding:3px;text-align:center"><button type="button" onclick="_examcatAiPreviewRemoveRow(${i})" title="이 문항 삭제" style="border:none;background:#fee2e2;color:#dc2626;border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+function _examcatAiPreviewRemoveRow(i){
+  _examcatAiPreviewSyncFromDom();
+  if(!EXAMCAT_aiPreviewRows) return;
+  EXAMCAT_aiPreviewRows.splice(i,1);
+  _examcatAiRerender();
+}
+function _examcatAiPreviewPanelHtml(){
+  if(!EXAMCAT_aiPreviewRows) return '';
+  return `<div id="examcat-ai-preview" style="margin-bottom:14px;border:1.5px solid #f59e0b;border-radius:10px;padding:12px;background:#fffbeb">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+      <div style="font-size:12.5px;font-weight:700;color:#0f172a">🔍 AI 분석 결과 미리보기·수정 (총 ${EXAMCAT_aiPreviewRows.length}문항 — <span style="color:#b45309">정답</span> 칸은 특히 꼭 확인해주세요)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" onclick="_examcatAiPreviewDownloadXlsx()" style="background:#fff;border:1px solid #f59e0b;color:#b45309;border-radius:6px;padding:5px 10px;font-size:11.5px;cursor:pointer">📥 엑셀로 다운로드</button>
+        <label style="background:#fff;border:1px solid #f59e0b;color:#b45309;border-radius:6px;padding:5px 10px;font-size:11.5px;cursor:pointer">📤 수정한 엑셀 업로드<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="_examcatAiPreviewUploadXlsx(this)"></label>
+      </div>
+    </div>
+    <p style="font-size:11px;color:#92400e;margin:0 0 8px">화면 표에서 칸을 직접 고쳐도 되고, "엑셀로 다운로드" → 엑셀에서 편하게 수정 → "수정한 엑셀 업로드"로 다시 불러와도 됩니다(다운로드 받은 파일의 칸 구성을 그대로 유지해주세요: 문항/대영역/세부단원/유형/배점/정답/해설).</p>
+    <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11.5px;width:100%">
+      <thead><tr style="background:#fef3c7;text-align:left">
+        <th style="padding:3px">문항</th><th style="padding:3px">대영역</th><th style="padding:3px">세부단원</th><th style="padding:3px">유형</th><th style="padding:3px">배점</th><th style="padding:3px">정답</th><th style="padding:3px">해설</th><th></th>
+      </tr></thead>
+      <tbody id="examcat-ai-preview-rows">${_examcatAiPreviewRowsHtml()}</tbody>
+    </table></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button type="button" onclick="_examcatAiPreviewApply()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">✅ 이 내용으로 "문항별 단원/유형" 칸에 반영</button>
+      <button type="button" onclick="_examcatAiPreviewCancel()" style="background:#f1f5f9;color:#555;border:none;border-radius:6px;padding:7px 16px;font-size:12px;cursor:pointer">닫기</button>
+    </div>
+  </div>`;
+}
+function _examcatAiPreviewApply(){
+  _examcatAiPreviewSyncFromDom();
+  if(!EXAMCAT_aiPreviewRows || !EXAMCAT_aiPreviewRows.length){ alert('반영할 문항이 없습니다.'); return; }
+  const ta=document.getElementById('examcat-itemmeta');
+  if(!ta) return;
+  if(ta.value.trim() && !confirm('이미 "문항별 단원/유형" 칸에 내용이 있습니다. 미리보기 내용으로 덮어쓸까요?\n(기존 내용은 사라집니다)')) return;
+  ta.value=_examcatAiRowsToText(EXAMCAT_aiPreviewRows);
+  EXAMCAT_aiPreviewRows=null;
+  EXAMCAT_aiState.statusMsg='';
+  _examcatAiRerender();
+  toast('✅ 미리보기 내용을 문항유형 칸에 반영했습니다. 저장 전 다시 한번 확인해주세요.');
+}
+function _examcatAiPreviewCancel(){
+  if(!confirm('미리보기를 닫을까요? (아직 "문항별 단원/유형" 칸에 반영하지 않은 수정 내용은 사라집니다)')) return;
+  EXAMCAT_aiPreviewRows=null;
+  _examcatAiRerender();
+}
+function _examcatAiPreviewDownloadXlsx(){
+  _examcatAiPreviewSyncFromDom();
+  if(!EXAMCAT_aiPreviewRows || !EXAMCAT_aiPreviewRows.length) return;
+  function doExport(){
+    const header=['문항','대영역','세부단원','유형','배점','정답','해설'];
+    const aoa=[header].concat(EXAMCAT_aiPreviewRows.map(function(r){
+      return [r.no,r.big,r.detail,r.type,r.points,r.answer,r.explain];
+    }));
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'문항유형DB');
+    const subjNameMap={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+    const st=EXAMCAT_aiState;
+    XLSX.writeFile(wb,'AI분석_'+(subjNameMap[st.subj]||st.subj)+'_'+(new Date().toISOString().slice(0,10))+'.xlsx');
+  }
+  if(typeof XLSX!=='undefined'){ doExport(); }
+  else { const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=doExport; document.head.appendChild(sc); }
+}
+function _examcatAiPreviewUploadXlsx(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const name=(file.name||'').toLowerCase();
+  const st=EXAMCAT_aiState;
+  const subjNameMap={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+  const subjCode=st.subj, subjName=subjNameMap[st.subj]||st.subj, elective=st.elective||'';
+  function fromAoa(all){
+    let rows=all;
+    if(rows.length && String((rows[0]||[])[0]||'').trim()==='문항') rows=rows.slice(1); // 헤더 줄 건너뛰기
+    const out=rows.filter(function(r){ return r && r[0]!=null && String(r[0]).trim()!==''; }).map(function(r){
+      return { subjCode:subjCode, subjName:subjName, elective:elective,
+        no:String(r[0]==null?'':r[0]), big:String(r[1]==null?'':r[1]), detail:String(r[2]==null?'':r[2]), type:String(r[3]==null?'':r[3]),
+        points:String(r[4]==null?'':r[4]), answer:String(r[5]==null?'':r[5]), explain:String(r[6]==null?'':r[6]) };
+    });
+    if(!out.length){ alert('엑셀에서 문항을 하나도 찾지 못했습니다. 다운로드했던 양식 그대로(문항/대영역/세부단원/유형/배점/정답/해설 7칸) 수정해서 다시 올려주세요.'); input.value=''; return; }
+    EXAMCAT_aiPreviewRows=out;
+    _examcatAiRerender();
+    toast('✅ 엑셀에서 '+out.length+'개 문항을 불러왔습니다. 내용 확인 후 반영해주세요.');
+  }
+  if(name.endsWith('.csv')){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      const text=String(e.target.result||'');
+      const all=text.replace(/\r\n?/g,'\n').split('\n').filter(function(l){return l.length;}).map(function(l){ return l.split(','); });
+      fromAoa(all);
+    };
+    reader.readAsText(file,'UTF-8');
+    return;
+  }
+  function doRead(){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const all=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        fromAoa(all);
+      }catch(err){ alert('엑셀 파일을 읽는 데 실패했습니다: '+(err&&err.message?err.message:err)); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  if(typeof XLSX!=='undefined'){ doRead(); }
+  else { const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=doRead; document.head.appendChild(sc); }
 }
 function _examcatRenderForm(){
   const el=document.getElementById('examcat-form');
@@ -33312,7 +33486,7 @@ function _examcatRenderForm(){
       <input id="examcat-name" placeholder="시험명/회차 (예: 1회 고2 챌린저 모의고사_영어)" value="${isEdit?esc(e.examName||''):''}" style="flex:1;min-width:260px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px">
       <input id="examcat-date" placeholder="기본 응시일 (예: 2026-08-26)" value="${isEdit?esc(e.defaultDate||''):''}" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;width:190px">
     </div>
-    ${_examcatAiPanelHtml()}
+    ${_examcatAiZoneHtml()}
     ${_examcatSimplePanelHtml()}
     <div style="margin-bottom:10px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">📚 문항별 단원/유형 (기존 문항 DB 엑셀 그대로 붙여넣기 가능)</div>
