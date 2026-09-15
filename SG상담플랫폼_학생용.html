@@ -1588,6 +1588,13 @@ function chgScheduleSave(){
         'challengerData.meta.target': (cd.meta&&cd.meta.target)||'',
         '_t': Date.now()
       };
+      // ★ 2026-09-15(426, 관리자 연동) 추가: 학생이 챌린저 답안·AAR·오답원인을 실제로
+      // 입력했을 때만(과목이 최소 1개 이상 있을 때만) 관리자 화면의 "새 입력 빨간점"
+      // 표시용 타임스탬프를 함께 찍는다. 관리자는 이 값과 역할별 확인시각을 비교해
+      // 최종관리자/기관관리자/선생님 각각 독립적으로 빨간점을 표시·해제한다.
+      if(Array.isArray(cd.lastSubjects) && cd.lastSubjects.length){
+        partial['challengerData._chgLastSubmitAt'] = Date.now();
+      }
       try{
         await ref.update(partial);
       }catch(e2){
