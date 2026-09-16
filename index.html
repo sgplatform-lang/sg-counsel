@@ -1484,6 +1484,156 @@ function RM_deleteCustomSurveySubmission(id){
   if(FB_USE()) window._fb.delete('customSurveySubmissions', id).catch(function(e){ alert('⚠️ 삭제가 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다). 새로고침하면 다시 나타날 수 있습니다.\n\n'+(e&&e.message?e.message:'')); });
   render();
 }
+// ══════════════════════════════════════════════════════════════════
+// ★ 2026-09-16(430 13차) 신규: 상단 알림벨. 좌측 학생명단의 챌린저 "빨간점"이 학생별로
+// 여기저기 흩어져 보여서 헷갈린다는 요청으로, 챌린저 새 입력(학생별)과 설문조사
+// (사전조사서/챌린저FINAL70/커스텀 설문) 미확인 제출을 상단 알림 드롭다운 하나로 모은다.
+// 좌측 명단의 "기관 선택(필터)" 드롭다운과는 무관하게, 이 역할이 볼 수 있는 전체 범위
+// 기준으로 집계한다(최종관리자=전체, 기관관리자=자기 기관, 선생님=자기 담당 학생).
+// ══════════════════════════════════════════════════════════════════
+function _sgNotifVisibleStudents(){
+  const cu=ST.currentUser||{};
+  const role=cu.role;
+  if(role==='admin') return ST.students||[];
+  if(role==='orgAdmin'){
+    const orgId=ST.currentOrg?.id||null;
+    return (ST.students||[]).filter(function(s){ return s.orgId===orgId; });
+  }
+  const curUserName=cu.name||'';
+  const teacher2=(ST.teachers||[]).find(function(t){ return String(t.id)===String(cu.teacherId); });
+  return (ST.students||[]).filter(function(s){
+    const sc=[...(s.counselors||[])];
+    if(s.counselor && !sc.includes(s.counselor)) sc.unshift(s.counselor);
+    if(sc.length===0) return false;
+    if(sc.includes(curUserName)) return true;
+    if(teacher2 && sc.includes(teacher2.name)) return true;
+    return false;
+  });
+}
+function _sgBuildNotifications(){
+  const list=[];
+  _sgNotifVisibleStudents().forEach(function(s){
+    if(_chgHasUnread(s)){
+      list.push({type:'challenger', key:'chg:'+s.id, studentId:s.id, label:(s.name||''), count:_chgUnreadCount(s)});
+    }
+  });
+  const presurveyCount=(ST.preSurveySubmissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
+  if(presurveyCount) list.push({type:'presurvey', key:'presurvey', label:'사전조사서', count:presurveyCount});
+  const cf70Count=(ST.challengerF70Submissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
+  if(cf70Count) list.push({type:'cf70', key:'cf70', label:'챌린저FINAL70', count:cf70Count});
+  (ST.customSurveys||[]).forEach(function(sv){
+    const c=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(sv.id) && x.status!=='reviewed'; }).length;
+    if(c) list.push({type:'customSurvey', key:'custom:'+sv.id, surveyId:sv.id, label:(sv.title||'제목없음'), count:c});
+  });
+  return list;
+}
+// ★ 알림 데이터(사전조사서/CF70/커스텀설문)는 "설문조사함"을 열어야만 지연로딩되던 것을,
+// 로그인 직후에도 알림벨 숫자가 뜨도록 세션당 한 번만 미리 백그라운드로 불러온다.
+function _sgEnsureNotifDataLoaded(){
+  if(ST._notifDataLoaded) return;
+  ST._notifDataLoaded=true;
+  Promise.all([_ensurePreSurveyLoaded(), _ensureChallengerF70Loaded(), _ensureCustomSurveysLoaded(), _ensureCustomSurveySubmissionsLoaded()]).then(function(){ render(); });
+}
+async function _sgNotifMarkChallengerReadInner(studentId){
+  const s=(ST.students||[]).find(function(x){ return String(x.id)===String(studentId); });
+  if(s) await _gg_markChallengerRead(s);
+}
+async function _sgNotifMarkTypeReviewedInner(type, surveyId){
+  let arr, col;
+  if(type==='presurvey'){ arr=ST.preSurveySubmissions||[]; col='preSurveySubmissions'; }
+  else if(type==='cf70'){ arr=ST.challengerF70Submissions||[]; col='challengerFinal70Submissions'; }
+  else if(type==='customSurvey'){ arr=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); }); col='customSurveySubmissions'; }
+  else return;
+  const targets=arr.filter(function(x){ return x.status!=='reviewed'; });
+  for(const p of targets){
+    p.status='reviewed';
+    if(FB_USE()){
+      try{ await window._fb.set(col, p.id, p); }catch(e){ console.warn('[SG] 알림 확인 저장 실패:', e.message); }
+    }
+  }
+}
+// 알림 1건 "확인"(개별 닫기)
+async function _sgNotifMarkOne(type, idOrStudentId){
+  if(type==='challenger') await _sgNotifMarkChallengerReadInner(idOrStudentId);
+  else if(type==='customSurvey') await _sgNotifMarkTypeReviewedInner('customSurvey', idOrStudentId);
+  else await _sgNotifMarkTypeReviewedInner(type);
+  render();
+}
+// "전체 확인"
+async function _sgNotifMarkAll(){
+  const notifs=_sgBuildNotifications();
+  for(const n of notifs){
+    if(n.type==='challenger') await _sgNotifMarkChallengerReadInner(n.studentId);
+    else if(n.type==='customSurvey') await _sgNotifMarkTypeReviewedInner('customSurvey', n.surveyId);
+    else await _sgNotifMarkTypeReviewedInner(n.type);
+  }
+  render();
+}
+function toggleSgNotifPanel(e){
+  if(e) e.stopPropagation();
+  ST._notifOpen=!ST._notifOpen;
+  render();
+}
+function closeSgNotifPanel(){
+  if(ST._notifOpen){ ST._notifOpen=false; render(); }
+}
+// ★ 2026-09-16(430 17차) 추가: 상단 헤더가 여러 관리용 버튼(백업/내보내기/가져오기/
+// 복원/연결상태/API)으로 너무 복잡해 보인다는 요청 → 자주 안 쓰는 것들을 "⚙ 부가기능"
+// 드롭다운 하나로 모은다(최종관리자 전용, 기존 기능 그대로 재사용). 알림벨과 동일한
+// 열림/바깥클릭 닫힘 패턴.
+function toggleHeaderMorePanel(e){ if(e) e.stopPropagation(); ST._headerMoreOpen=!ST._headerMoreOpen; render(); }
+function closeHeaderMorePanel(){ if(ST._headerMoreOpen){ ST._headerMoreOpen=false; render(); } }
+function _sgHeaderMoreHtml(){
+  const fbOn = typeof FB_USE==='function'&&FB_USE();
+  const itemStyle='display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;padding:7px 8px;font-size:12px;color:#333;cursor:pointer;border-radius:6px';
+  return `<div style="position:relative">
+    <button id="sgHeaderMoreBtn" onclick="toggleHeaderMorePanel(event)" title="부가기능" style="background:#fff;border:1.5px solid #e0e3ef;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:#555;cursor:pointer">⚙ 부가기능</button>
+    ${ST._headerMoreOpen?`<div id="sgHeaderMorePanel" style="position:absolute;top:calc(100% + 6px);right:0;width:210px;background:#fff;border:1px solid #e0e3ef;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);z-index:200;padding:6px">
+      <div style="padding:6px 8px;font-size:11px;color:#888;border-bottom:1px solid #f0f0f0;margin-bottom:4px">${fbOn?'🟢 Firebase 연결됨':'🟡 로컬 모드'}</div>
+      <button onclick="closeHeaderMorePanel();backupData()" style="${itemStyle}">💾 데이터 백업</button>
+      <button onclick="closeHeaderMorePanel();_gg_exportData()" style="${itemStyle}">📥 내보내기</button>
+      <button id="_gg_importBtn" onclick="closeHeaderMorePanel();_gg_importData()" style="${itemStyle}">📤 가져오기</button>
+      <button onclick="closeHeaderMorePanel();restoreData()" style="${itemStyle}">📥 데이터 복원</button>
+      <div style="border-top:1px solid #f0f0f0;margin:4px 0"></div>
+      <button onclick="closeHeaderMorePanel();openApiModal()" style="${itemStyle}">⚙️ API 설정</button>
+    </div>`:''}
+  </div>`;
+}
+// 알림 목록에서 학생을 클릭하면 해당 학생의 챌린저 탭으로 바로 이동 + 읽음 처리
+function _sgNotifOpenStudent(studentId){
+  const s=(ST.students||[]).find(function(x){ return String(x.id)===String(studentId); });
+  if(!s) return;
+  ST.sel=s; ST.tab='challenger'; ST.weekYear=null; ST.weekMonth=null; ST.weekWeek=null; ST._eraseMode=false;
+  ST._notifOpen=false;
+  _gg_markChallengerRead(s).then(render);
+  render();
+}
+// 상단 헤더 알림벨 버튼+드롭다운 HTML. renderMain()에서 호출됨(호출될 때마다 알림 데이터
+// 최초 1회 백그라운드 로딩도 함께 트리거).
+function _sgNotifBellHtml(){
+  _sgEnsureNotifDataLoaded();
+  const notifs=_sgBuildNotifications();
+  const count=notifs.length;
+  const rowsHtml = notifs.length ? notifs.map(function(n){
+    const markId = n.type==='customSurvey' ? n.surveyId : (n.studentId||'');
+    const suffix = n.type==='challenger' ? ' 챌린저' : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;${n.type==='challenger'?'cursor:pointer':''}" ${n.type==='challenger'?`onclick="_sgNotifOpenStudent('${n.studentId}')"`:''}>
+      <span style="min-width:20px;height:20px;border-radius:50%;background:#e53935;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${n.count>99?'99+':n.count}</span>
+      <span style="flex:1;font-size:12px;color:#333;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.label)}${suffix}</span>
+      <button onclick="event.stopPropagation();_sgNotifMarkOne('${n.type}','${esc(String(markId))}')" style="background:#f4f6fb;border:1px solid #e0e3ef;color:#666;font-size:10px;font-weight:700;border-radius:6px;padding:3px 7px;cursor:pointer;flex-shrink:0">확인</button>
+    </div>`;
+  }).join('') : `<div style="padding:20px 10px;text-align:center;color:#999;font-size:12px">새 알림이 없습니다</div>`;
+  return `<div style="position:relative">
+    <button id="sgNotifBellBtn" onclick="toggleSgNotifPanel(event)" title="알림" style="position:relative;background:#fff;border:1.5px solid #e0e3ef;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;line-height:1">🔔${count?`<span style="position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;background:#e53935;border-radius:8px;border:1.5px solid #fff;color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1">${count>99?'99+':count}</span>`:''}</button>
+    ${ST._notifOpen?`<div id="sgNotifPanel" style="position:absolute;top:calc(100% + 6px);right:0;width:300px;max-height:380px;overflow-y:auto;background:#fff;border:1px solid #e0e3ef;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);z-index:200;padding:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px 8px;border-bottom:1px solid #f0f0f0;margin-bottom:6px">
+        <span style="font-size:12.5px;font-weight:800;color:#1a1a2e">🔔 알림${notifs.length?' ('+notifs.length+')':''}</span>
+        ${notifs.length?`<button onclick="event.stopPropagation();_sgNotifMarkAll()" style="background:none;border:none;color:#3b5bdb;font-size:11px;font-weight:700;cursor:pointer">전체 확인</button>`:''}
+      </div>
+      ${rowsHtml}
+    </div>`:''}
+  </div>`;
+}
 function deleteCustomSurvey(id){
   if(!confirm('이 설문을 삭제하시겠습니까?\n이미 제출된 응답은 삭제되지 않지만, 설문을 지우면 설문조사함에서 더 이상 확인할 수 없게 됩니다.')) return;
   ST.customSurveys=(ST.customSurveys||[]).filter(function(x){ return String(x.id)!==String(id); });
@@ -1711,8 +1861,8 @@ function openCustomSurveyForm(orgId, existing){
     const isChoice = q.type==='radio' || q.type==='checkbox';
     return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;background:#fafbfc">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-        <input class="csf-q-label" data-idx="${idx}" value="${esc(q.label||'')}" placeholder="질문 내용" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12.5px">
-        <select class="csf-q-type" data-idx="${idx}" style="border:1px solid #ddd;border-radius:6px;padding:6px 6px;font-size:12px">
+        <input class="csf-q-label" data-idx="${idx}" value="${esc(q.label||'')}" placeholder="질문 내용" style="flex:1 1 0%;min-width:0;width:auto;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12.5px">
+        <select class="csf-q-type" data-idx="${idx}" style="flex:0 0 auto;width:auto;border:1px solid #ddd;border-radius:6px;padding:6px 6px;font-size:12px">
           <option value="text" ${(q.type==='text'||!q.type)?'selected':''}>단답형</option>
           <option value="textarea" ${q.type==='textarea'?'selected':''}>장문형</option>
           <option value="radio" ${q.type==='radio'?'selected':''}>객관식(단일)</option>
@@ -3471,6 +3621,40 @@ function _chgHasUnread(s){
   }
   return false;
 }
+// ★ 2026-09-16(430 12차) 신규: 빨간점 안에 "몇 개의 새 회차(시험)"를 아직 안 읽었는지
+// 숫자로 표기하기 위한 카운트. challengerData.history의 각 회차 저장 기록(rec.savedAt —
+// 학생용 chgArchiveRound에서 이번에 새로 추가)이 역할별 마지막 확인시각(_chgReadAdmin 등)
+// 보다 최신인 개수를 센다. savedAt이 없는(이 기능 추가 이전에 저장된) 과거 회차는 세지
+// 않는다 — 이미 그 전에 확인됐을 것으로 간주. 학생이 "회차 저장"을 아직 안 하고 입력만
+// 계속하고 있는 경우(=_chgHasUnread는 true인데 셀 수 있는 새 회차가 0개인 경우) 최소
+// 1로 표시해 기존 "빨간점만 뜨는" 동작과 호환되게 한다.
+function _chgUnreadCount(s){
+  if(!_chgHasUnread(s)) return 0;
+  const hist=(s.challengerData && Array.isArray(s.challengerData.history)) ? s.challengerData.history : [];
+  const role=ST.currentUser?.role;
+  let readTs=0;
+  if(role==='admin') readTs=s._chgReadAdmin||0;
+  else if(role==='orgAdmin') readTs=s._chgReadOrg||0;
+  else if(role==='teacher'){
+    const name=ST.currentUser?.name||'';
+    readTs=(s._chgReadTeachers&&s._chgReadTeachers[name])||0;
+  }
+  const cnt=hist.filter(function(h){ return h && h.savedAt && h.savedAt>readTs; }).length;
+  return cnt>0 ? cnt : 1;
+}
+// ★ 2026-09-16(430 12차) 신규: 위 카운트를 반영한 빨간점 배지 HTML. 2건 이상이면 숫자가
+// 들어간 좀 더 큰 배지로, 1건(또는 회차저장 이력이 없는 진행중 입력)이면 기존과 동일한
+// 작은 점으로 표시한다. variant='avatar'(좌측 명단 아바타, 조금 더 큼) | 'tab'(탭 아이콘, 작음)
+function _chgUnreadBadgeHtml(s, variant){
+  const c=_chgUnreadCount(s);
+  if(!c) return '';
+  if(c>=2){
+    const pos = variant==='tab' ? 'top:-5px;right:-8px;min-width:13px;height:13px;font-size:8px;' : 'top:-5px;right:-5px;min-width:14px;height:14px;font-size:9px;';
+    return `<span title="챌린저 새 입력 ${c}건" style="position:absolute;${pos}padding:0 3px;background:#e53935;border-radius:8px;border:1.5px solid #fff;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1">${c}</span>`;
+  }
+  const pos = variant==='tab' ? 'top:-3px;right:-6px;width:8px;height:8px;' : 'top:-2px;right:-2px;width:9px;height:9px;';
+  return `<span title="챌린저 새 입력" style="position:absolute;${pos}background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>`;
+}
 // ★ 2026-09-16(430) 신규: 빨간점(챌린저 미확인)이 있는 학생을 좌측 학생명단 맨 위로
 // 올려서 매니저가 놓치지 않게 한다. Array.prototype.sort는 최신 JS 엔진에서 안정 정렬이
 // 보장되므로, 미확인 여부만 비교하면 같은 그룹 내에서는 기존 순서(이름순 등)가 그대로 유지된다.
@@ -3561,6 +3745,7 @@ function renderMain(){
   // 최종관리자 기관 필터
   const allOrgs = isAdmin ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
   if(!ST.filterOrg) ST.filterOrg='전체';
+  if(!ST.filterClass) ST.filterClass='전체';
   const viewStudents = isAdmin
     ? (ST.filterOrg==='전체' ? ST.students : ST.filterOrg==='기관없음'
         ? ST.students.filter(s=>!s.orgId)
@@ -3574,7 +3759,10 @@ function renderMain(){
         if(teacher2 && sc.includes(teacher2.name)) return true;
         return false;
       });
-  const filt=_sortStudentsUnreadFirst(viewStudents.filter(s=>s.id&&s.name).filter(s=>((s.name||'').includes(ST.search)||(s.school||'').includes(ST.search))&&(ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC)))));
+  // ★ 2026-09-16(430 12차) 신규: 좌측 학생명단 반(className, 자유서술 필드)별 조회.
+  // 현재 화면 범위(viewStudents, 기관/담당학생 스코프 반영됨) 안에서만 반 목록을 뽑는다.
+  const classOptions=[...new Set(viewStudents.map(s=>s.className).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const filt=_sortStudentsUnreadFirst(viewStudents.filter(s=>s.id&&s.name).filter(s=>((s.name||'').includes(ST.search)||(s.school||'').includes(ST.search))&&(ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC)))&&(ST.filterClass==='전체'||s.className===ST.filterClass)));
   return`<div class="hdr">
     <div class="logo-area">
       <div onclick="ST.page='main';render()" style="cursor:pointer;display:flex;align-items:center;gap:8px">
@@ -3594,12 +3782,12 @@ function renderMain(){
     </div>
     <div style="display:flex;gap:4px;align-items:center">
       ${isAdmin?`<div class="deskonly" style="display:flex;align-items:center;gap:3px">
-        <select onchange="ST.filterOrg=this.value;ST.sel=null;render()" style="border:1.5px solid #f59e0b60;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;color:#d97706;background:#fff8e1;outline:none;cursor:pointer;max-width:120px">
-          <option value="전체" ${ST.filterOrg==='전체'?'selected':''}>🏫 전체</option>
+        <select onchange="ST.filterOrg=this.value;ST.sel=null;render()" style="border:1px solid #ddd;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;color:#333;background:#fff;outline:none;cursor:pointer;max-width:120px">
+          <option value="전체" ${ST.filterOrg==='전체'?'selected':''}>전체</option>
           <option value="기관없음" ${ST.filterOrg==='기관없음'?'selected':''}>기관없음</option>
           ${allOrgs.map(o=>`<option value="${esc(o.id)}" ${ST.filterOrg===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}
         </select>
-        <select onchange="ST.filterC=this.value;render()" style="border:1.5px solid #c5cae9;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;color:#3b5bdb;background:#eef1ff;outline:none;cursor:pointer;max-width:120px">
+        <select onchange="ST.filterC=this.value;render()" style="border:1px solid #ddd;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;color:#333;background:#fff;outline:none;cursor:pointer;max-width:120px">
           ${filters.map(c=>`<option value="${esc(c)}" ${ST.filterC===c?'selected':''}>${esc(c)}</option>`).join('')}
         </select>
         <span style="font-size:9px;color:#aaa">${filt.length}명</span>
@@ -3612,20 +3800,15 @@ function renderMain(){
         <button onclick="refreshFromFirebase()" title="최신 데이터 불러오기" style="background:transparent;border:none;color:#aaa;font-size:13px;cursor:pointer">🔄</button>
         ${(()=>{
         const isOA=ST.currentUser?.role==='orgAdmin';
-        return (isOA?`
+        return isOA?`
           <button onclick="openBulkImport()" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📋 일괄등록</button>
           <button onclick="openSForm(null)" style="background:#3b5bdb;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">+ 학생 추가</button>
-        `:'') + (isAdmin?`
-          <button onclick="backupData()" title="데이터 백업" style="background:#eef1ff;color:#3b5bdb;border:1.5px solid #c5cae9;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">💾</button>
-          <button onclick="_gg_exportData()" title="로컬 데이터를 JSON으로 내보내기 (로컬 파일에서 사용)" style="background:#f0fdf4;color:#0f9d58;border:1.5px solid #86efac;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">📥 내보내기</button>
-          <button id="_gg_importBtn" onclick="_gg_importData()" title="JSON 파일을 Firebase에 업로드 (GitHub Pages에서 사용)" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer">📤 가져오기</button>
-          <button onclick="restoreData()" title="데이터 복원" style="background:#fff8e1;color:#d97706;border:1.5px solid #fde68a;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer">📥</button>
-          <span title="${typeof FB_USE==='function'&&FB_USE()?'Firebase 연결됨':'로컬 모드'}" style="font-size:13px;cursor:default">${typeof FB_USE==='function'&&FB_USE()?'🟢':'🟡'}</span>
-        `:'');
+        `:'';
       })()}
 
       </div>
-      ${isAdmin?`<button style="background:#fff3e0;color:#f59e0b;border:1.5px solid #ffe0b2;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700" onclick="openApiModal()">⚙️ API</button>`:''}
+      <!-- ★ 430(17차): 백업/내보내기/가져오기/복원/연결상태/API를 "⚙ 부가기능" 드롭다운 하나로 통합(헤더 정리) -->
+      ${isAdmin?_sgHeaderMoreHtml():''}
       ${(()=>{
         const teacher2=ST.currentUser?.role==='teacher'?ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId)):null;
         const perms=teacher2?.permissions||[];
@@ -3635,12 +3818,17 @@ function renderMain(){
           <button class="btn-b" style="padding:6px 13px;font-size:11px;border-radius:20px" onclick="openSForm(null)">+ 학생 추가</button>
         `:'';
       })()}
+      ${_sgNotifBellHtml()}
     </div>
   </div>
   <div class="layout">
     <div class="sidebar">
       <div style="padding:10px">
-        <input class="inp" id="search_input" placeholder="이름/학교 검색..." value="${esc(ST.search)}" style="font-size:12px;margin-bottom:6px">
+        <input class="inp" id="search_input" placeholder="이름/학교 검색..." value="${esc(ST.search)}" style="font-size:12px;padding:9px 10px;margin-bottom:6px">
+        ${classOptions.length?`<select id="filterClassSel" onchange="ST.filterClass=this.value;render()" style="width:100%;font-size:12px;padding:9px 10px;border:1.5px solid #dde1f0;border-radius:8px;margin-bottom:6px;color:#333;background:#fff;cursor:pointer;box-sizing:border-box">
+          <option value="전체" ${ST.filterClass==='전체'?'selected':''}>반별 구분</option>
+          ${classOptions.map(c=>`<option value="${esc(c)}" ${ST.filterClass===c?'selected':''}>${esc(c)}</option>`).join('')}
+        </select>`:''}
         <div style="font-size:10px;color:#888">${ST._authLoading?'불러오는 중...':`총 ${filt.length}명`}</div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0 10px 10px">
@@ -3655,7 +3843,6 @@ function renderMain(){
           <div style="display:flex;gap:8px;align-items:center">
             <div style="position:relative;flex-shrink:0">
               <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff">${esc(s.avatar)}</div>
-              ${_chgHasUnread(s)?'<span title="챌린저 새 입력" style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>':''}
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:700">${esc(s.name)}</span><span style="font-size:10px;color:${gc(a)};font-weight:700">${a.toFixed(1)}등급</span></div>
@@ -3783,7 +3970,7 @@ function renderDetail(s){
               color:${isAct?'#fff':'#666'};
               border-right:1.5px solid #e8eaf6;">
             <div style="display:flex;align-items:center;gap:5px">
-              <span style="font-size:16px;line-height:1;position:relative">${icon}${isUnreadTab?'<span title="챌린저 새 입력" style="position:absolute;top:-3px;right:-6px;width:8px;height:8px;background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>':''}</span>
+              <span style="font-size:16px;line-height:1;position:relative">${icon}${id==='challenger'?_chgUnreadBadgeHtml(s,'tab'):''}</span>
               <span style="font-size:13px;font-weight:${isAct?800:700};white-space:nowrap;letter-spacing:-0.3px">${label}</span>
             </div>
             ${sub?`<span style="font-size:8px;${isAct?'color:#c5d3ff':'color:#bbb'};font-weight:500">▼ 세부메뉴</span>`:'<span style="font-size:8px;opacity:0">ㅡ</span>'}
@@ -11248,7 +11435,8 @@ function LS_studentInfoBoxHtml(s){
 function renderLearningStyle(s){
   const sub=ST.lsSubTab||'basic';
   const body = sub==='report' ? LS_renderReport(s) : sub==='stats' ? LS_renderStats(s) : LS_renderBasic(s);
-  return LS_bannerHtml(sub) + `<div style="max-width:900px;margin:0 auto">${body}</div>`;
+  // ★ 430(18차): 챌린저/입시상담과 동일하게 좌우 여백 없이 전체 폭 사용
+  return LS_bannerHtml(sub) + `<div style="max-width:none">${body}</div>`;
 }
 function LS_renderBasic(s){
   const todayStr=new Date().toISOString().slice(0,10);
@@ -16436,7 +16624,7 @@ function renderRoadmapConsult(s){
       </div>
     </div>`;
   }).join('');
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="font-size:15px;font-weight:900;color:#1a1a2e;margin-bottom:4px">📁 ${esc(s.name||'')} 학생 상담리포트 이력 (${list.length}건)</div>
     <div style="font-size:12px;color:#888;margin-bottom:18px">저장된 입시상담(로드맵) 리포트를 최신순으로 보여줍니다. "📝 기본상담" 탭에서 리포트 생성 후 저장하면 여기에 쌓입니다.</div>
     ${list.length ? rows : `<div style="text-align:center;padding:48px;color:#888">
@@ -16705,7 +16893,7 @@ function renderRoadmapSchool(s){
   }
   const list=ST.schoolCatalog||[];
   const regions=Array.from(new Set(list.map(function(p){ return p.region; }).filter(function(r){ return r; }))).sort();
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div>
         <div style="font-size:15px;font-weight:900;color:#1a1a2e">🏫 고등학교 정보</div>
@@ -16828,7 +17016,7 @@ function renderRoadmapInbox(){
       </div>
     </div>`;
   }).join('');
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div>
         <div style="font-size:15px;font-weight:900;color:#1a1a2e">📥 사전조사 받은함</div>
@@ -16986,7 +17174,7 @@ function RM_surveyReportHtml(id){
       ${row('특이사항/메모', p.memo)}
     </table>
   </div>`;
-  return `<div style="max-width:820px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <button onclick="ST._surveyView='list';render()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer">← 목록으로</button>
       <div style="display:flex;gap:6px">
@@ -17107,7 +17295,7 @@ function RM_cf70ListHtml(){
       </div>
     </div>`;
   }).join('');
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="margin-bottom:6px">
       <div style="font-size:15px;font-weight:900;color:#1a1a2e">🏆 챌린저 FINAL70</div>
       <div style="font-size:11px;color:#777;margin-top:2px">총 ${list.length}건 (미확인 ${unreadCount}건) — 챌린저 실전모의고사 신청 학생의 사전진단 설문입니다. "📄 개인 리포트 보기"에서 전달사항을 작성하고 PDF/인쇄할 수 있습니다.</div>
@@ -17143,7 +17331,7 @@ function RM_cf70DashboardHtml(){
   function statCard(title,html){
     return '<div style="background:#fff;border:1px solid #e8eaf6;border-radius:12px;padding:16px 18px"><div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:10px">'+title+'</div>'+html+'</div>';
   }
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="margin-bottom:6px">
       <div style="font-size:15px;font-weight:900;color:#1a1a2e">🏆 챌린저 FINAL70</div>
       <div style="font-size:11px;color:#777;margin-top:2px">전체 신청 학생 통계 대시보드입니다.</div>
@@ -17206,7 +17394,7 @@ function RM_cf70ReportHtml(id){
       ${row('개인 처방 확인', p.finalPlanAck)}
     </table>
   </div>`;
-  return `<div style="max-width:820px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <button onclick="ST._cf70View='list';render()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer">← 목록으로</button>
       <div style="display:flex;gap:6px">
@@ -17427,35 +17615,44 @@ function renderRoadmapSurveyMgmt(){
   const orgId=_rmSurveyMgmtMyOrgId();
   const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
   const orgName=(orgs.find(function(o){ return String(o.id)===String(orgId); })||{}).name||'';
-  const surveys=(ST.customSurveys||[]).filter(function(s){ return String(s.orgId)===String(orgId); }).sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+  // ★ 2026-09-16 수정: 최종관리자가 기관을 선택하지 않았을 때 지금까지는 "기관을 먼저
+  // 선택해주세요"만 뜨고 이미 만들어둔 설문이 전혀 안 보였다(11차 때 설문조사함 허브는
+  // 이미 이렇게 고쳤는데, 관리 화면은 놓쳤던 부분) — 최종관리자는 기관 미선택 시 전체 기관의
+  // 설문을 다 볼 수 있어야 하므로, 이 경우에만 orgId 필터를 건너뛰고 전체를 보여준다.
+  const showAllOrgs = isAdminRole && !orgId;
+  const surveys=(ST.customSurveys||[]).filter(function(s){ return showAllOrgs || String(s.orgId)===String(orgId); }).sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
 
   const cardsHtml = surveys.length ? surveys.map(function(s){
+    // ★ 전체 기관을 함께 보여줄 때는 필터로 선택된 orgId가 없으므로, 수정/링크복사/카톡파일
+    // 모두 그 설문 "자신의" orgId(s.orgId)를 써야 한다(필터 orgId를 쓰면 전체보기 상태에서
+    // 빈 문자열이 저장돼 설문의 기관 소속이 날아가는 사고가 날 수 있음).
+    const sOrgName=showAllOrgs?((orgs.find(function(o){ return String(o.id)===String(s.orgId); })||{}).name||''):orgName;
     return `<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:16px 18px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div>
           <div style="font-size:14px;font-weight:800;color:#1a1a2e">${esc(s.title)}</div>
-          <div style="font-size:11px;color:#888;margin-top:3px">문항 ${(s.questions||[]).length}개 · ${s.createdAt?new Date(s.createdAt).toLocaleDateString('ko-KR'):''} 생성</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">${showAllOrgs?`<span style="background:#eef1ff;color:#3b5bdb;border-radius:8px;padding:1px 7px;font-weight:700;margin-right:5px">🏫 ${esc(sOrgName||'기관 미상')}</span>`:''}문항 ${(s.questions||[]).length}개 · ${s.createdAt?new Date(s.createdAt).toLocaleDateString('ko-KR'):''} 생성</div>
         </div>
         ${canManage?`<div style="display:flex;gap:5px;flex-shrink:0">
-          <button onclick='openCustomSurveyForm(${JSON.stringify(orgId)}, (ST.customSurveys||[]).find(function(x){return x.id===${JSON.stringify(s.id)};}))' style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">✏ 수정</button>
+          <button onclick='openCustomSurveyForm(${JSON.stringify(s.orgId)}, (ST.customSurveys||[]).find(function(x){return x.id===${JSON.stringify(s.id)};}))' style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">✏ 수정</button>
           <button onclick="deleteCustomSurvey('${esc(s.id)}')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑</button>
         </div>`:''}
       </div>
-      <div style="display:flex;gap:6px;margin-top:10px">
-        <button type="button" onclick="copyCustomSurveyLink('${esc(orgId)}','${esc(s.id)}','${esc(s.title).replace(/'/g,"\\'")}')" style="flex:1;background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer">🔗 링크복사</button>
-        <button type="button" onclick="downloadCustomSurveyRedirectPage('${esc(orgId)}','${esc(orgName).replace(/'/g,"\\'")}','${esc(s.id)}','${esc(s.title).replace(/'/g,"\\'")}')" style="flex:1;background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer">📇 카톡파일</button>
+      <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end">
+        <button type="button" onclick="copyCustomSurveyLink('${esc(s.orgId)}','${esc(s.id)}','${esc(s.title).replace(/'/g,"\\'")}')" style="background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:14px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🔗 링크복사</button>
+        <button type="button" onclick="downloadCustomSurveyRedirectPage('${esc(s.orgId)}','${esc(sOrgName).replace(/'/g,"\\'")}','${esc(s.id)}','${esc(s.title).replace(/'/g,"\\'")}')" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:14px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">📇 카톡파일</button>
       </div>
     </div>`;
   }).join('') : '<div style="text-align:center;padding:40px;color:#888"><div style="font-size:36px;margin-bottom:10px">📋</div><div style="font-size:13.5px">아직 만든 설문이 없습니다.</div></div>';
 
-  return `<div style="max-width:720px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="margin-bottom:14px">
       <div style="font-size:15px;font-weight:900;color:#1a1a2e">⚙️ 설문조사 관리</div>
       <div style="font-size:11px;color:#777;margin-top:2px">직접 질문을 구성해 새 설문을 만들고, 만든 설문의 링크를 공유하세요. 제출된 결과는 "📥 설문조사함"에서 확인합니다.</div>
     </div>
-    ${isAdminRole?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택:</span><select id="rmSurveyMgmtOrgFilter" onchange="RM_onSurveyMgmtOrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:160px">${RM_surveyMgmtOrgFilterOptionsHtml()}</select></div>`:''}
-    ${!orgId?`<div style="text-align:center;padding:40px;color:#888">${isAdminRole?'↑ 기관을 먼저 선택해주세요':'기관 정보를 확인할 수 없습니다'}</div>`:`
-      ${canManage?`<button onclick="openCustomSurveyForm('${esc(orgId)}', null)" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:14px">+ 새 설문 만들기</button>`:''}
+    ${isAdminRole?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택(새 설문 만들기 전용):</span><select id="rmSurveyMgmtOrgFilter" onchange="RM_onSurveyMgmtOrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:160px">${RM_surveyMgmtOrgFilterOptionsHtml()}</select></div>`:''}
+    ${(!isAdminRole && !orgId)?'<div style="text-align:center;padding:40px;color:#888">기관 정보를 확인할 수 없습니다</div>':`
+      ${canManage?(orgId?`<button onclick="openCustomSurveyForm('${esc(orgId)}', null)" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:14px">+ 새 설문 만들기</button>`:`<div style="font-size:11px;color:#aaa;margin-bottom:14px">↑ 특정 기관을 선택하면 그 기관의 새 설문을 만들 수 있습니다. 아래는 전체 기관의 설문입니다.</div>`):''}
       ${cardsHtml}
     `}
   </div>`;
@@ -17517,6 +17714,309 @@ function RM_customSurveyDetailHtml(p){
     +(p.answers||[]).map(function(a){ return row(a.label, a.value); }).join('')
     +'</div>';
 }
+// ★ 2026-09-16 추가: 커스텀 설문 결과 화면은 그동안 제출자별 개별 응답 목록만 보여줘서,
+// 응답이 쌓여도 "전체적으로 어떤 답이 많은지" 한눈에 알 방법이 없었다(사용자 지적: "설문에
+// 대한 통계표가 항상 확인이 되어야 설문에 의미가 있고 활용이 가능하다"). 객관식(단일)/체크박스
+// (복수) 문항은 선택지별 응답 건수·비율을 막대바로, 단답형/장문형 문항은 실제 응답 텍스트를
+// 목록으로 모아서 보여준다. 토글 없이 개별 응답 목록 위에 항상 노출한다.
+function RM_customSurveyStatsHtml(survey, list){
+  const total=list.length;
+  const qHtml=(survey.questions||[]).map(function(q){
+    const answers=list.map(function(p){
+      const a=(p.answers||[]).find(function(x){ return String(x.qId)===String(q.id); });
+      return a&&a.value?a.value:'';
+    }).filter(Boolean);
+    const answeredCount=answers.length;
+    let bodyHtml;
+    if(q.type==='radio'||q.type==='checkbox'){
+      const counts={};
+      (q.options||[]).forEach(function(o){ counts[o]=0; });
+      answers.forEach(function(v){
+        v.split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(opt){
+          counts[opt]=(counts[opt]||0)+1;
+        });
+      });
+      const maxCount=Math.max(1,...Object.values(counts));
+      bodyHtml=Object.keys(counts).map(function(opt){
+        const c=counts[opt];
+        const pct=answeredCount?Math.round(c/answeredCount*100):0;
+        const barPct=Math.round(c/maxCount*100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+          <div style="width:160px;flex-shrink:0;font-size:12px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(opt)}">${esc(opt)}</div>
+          <div style="flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:16px">
+            <div style="width:${barPct}%;background:#3b5bdb;height:100%;border-radius:6px"></div>
+          </div>
+          <div style="width:78px;flex-shrink:0;font-size:11.5px;color:#666;text-align:right">${c}건 (${pct}%)</div>
+        </div>`;
+      }).join('') || '<div style="font-size:11.5px;color:#aaa">선택지가 없는 문항입니다</div>';
+    } else {
+      bodyHtml=answers.length
+        ? '<div style="max-height:170px;overflow-y:auto;border:1px solid #f1f5f9;border-radius:8px">'+answers.map(function(v){ return '<div style="font-size:12px;color:#333;padding:6px 10px;border-top:1px solid #f1f5f9;white-space:pre-wrap">'+esc(v)+'</div>'; }).join('')+'</div>'
+        : '<div style="font-size:11.5px;color:#aaa">아직 응답이 없습니다</div>';
+    }
+    return `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f1f5f9">
+      <div style="font-size:12.5px;font-weight:800;color:#333;margin-bottom:7px">${esc(q.label||'(제목 없는 문항)')} <span style="font-size:10.5px;color:#aaa;font-weight:400">· 응답 ${answeredCount}건${q.required?' · 필수':''}</span></div>
+      ${bodyHtml}
+    </div>`;
+  }).join('');
+  return `<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <div style="font-size:14px;font-weight:900;color:#1a1a2e">📊 설문 통계</div>
+        <div style="font-size:11px;color:#888">총 응답 ${total}건 기준</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button type="button" onclick="RM_printSurveyStats(${JSON.stringify(survey.id)})" style="background:#fff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">🖨 인쇄/PDF</button>
+        <button type="button" onclick="RM_exportSurveyStatsExcel(${JSON.stringify(survey.id)})" style="background:#fff;color:#16a34a;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">📊 엑셀 다운로드</button>
+      </div>
+    </div>
+    ${(survey.questions||[]).length ? qHtml : '<div style="font-size:12px;color:#aaa">문항이 없는 설문입니다</div>'}
+  </div>`;
+}
+// ★ 2026-09-16 추가: 챌린저 "회차 통계표"처럼, 문항별 집계뿐 아니라 응답자 순서(제출
+// 시각 오름차순)대로 한 줄씩 나열한 표도 항상 함께 보여달라는 요청 — 설문에 참여한
+// 사람들의 답변을 한눈에 훑어볼 수 있어야 통계가 실제로 활용 가능하다는 취지.
+function RM_customSurveyRespondentTableHtml(survey, list){
+  const qs=survey.questions||[];
+  if(!qs.length) return '';
+  const ordered=list.slice().sort(function(a,b){ return (a.submittedAt||'').localeCompare(b.submittedAt||''); });
+  const theadCols=qs.map(function(q){ return `<th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${esc(q.label||'')}">${esc(q.label||'(제목없음)')}</th>`; }).join('');
+  const rowsHtml=ordered.map(function(p,i){
+    const cells=qs.map(function(q){
+      const a=(p.answers||[]).find(function(x){ return String(x.qId)===String(q.id); });
+      const v=a&&a.value?a.value:'';
+      return `<td style="padding:6px 8px;border:1px solid #eef0f6;font-size:11.5px;white-space:pre-wrap;word-break:break-word">${v?esc(v):'<span style="color:#ccc">-</span>'}</td>`;
+    }).join('');
+    return `<tr>
+      <td style="padding:6px 8px;border:1px solid #eef0f6;font-size:11.5px;color:#888;text-align:center">${i+1}</td>
+      <td style="padding:6px 8px;border:1px solid #eef0f6;font-size:12px;font-weight:700;white-space:nowrap">${esc(p.name||'이름 미입력')}</td>
+      <td style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#999;white-space:nowrap">${esc((p.submittedAt||'').slice(0,16).replace('T',' '))}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+  // ★ 430(18차): 응답이 0건이어도(아직 아무도 제출 안 한 새 설문) 표 자체는 항상 보여주고,
+  // 본문에만 안내 문구를 표시한다 — 예전엔 총 응답 0건이면 표 섹션 자체가 통째로 사라져서
+  // "표가 아예 안 만들어진 것"처럼 보였다.
+  const emptyRow=`<tr><td colspan="${3+qs.length}" style="padding:20px 8px;text-align:center;color:#aaa;font-size:12px;border:1px solid #eef0f6">아직 제출된 응답이 없습니다</td></tr>`;
+  return `<div style="overflow-x:auto;border:1px solid #eef0f6;border-radius:10px">
+      <table style="border-collapse:collapse;width:100%;min-width:${480+qs.length*140}px">
+        <thead><tr style="background:#f7f8fc">
+          <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666">#</th>
+          <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666">이름</th>
+          <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666">제출일시</th>
+          ${theadCols}
+        </tr></thead>
+        <tbody>${rowsHtml||emptyRow}</tbody>
+      </table>
+    </div>`;
+}
+// ★ 430(19차) 추가: 응답자별 전체보기 표를 "설문 통계"(문항별 집계) 아래에 딸린 부속물이
+// 아니라, 맨 위에 오는 독립 섹션으로 분리해달라는 요청 — 표 자체(RM_customSurveyRespondentTableHtml)는
+// 그대로 재사용하고, 이 함수가 제목·건수·인쇄/엑셀 버튼을 갖춘 카드로 감싸서 화면 최상단에 배치한다.
+// 인쇄(RM_printSurveyRespondents)/엑셀(RM_exportSurveyRespondentsExcel)도 "설문 통계" 쪽과
+// 완전히 독립된 별도 함수로 분리해, 이 표만 따로 뽑아볼 수 있게 한다.
+function RM_customSurveyRespondentBlockHtml(survey, list){
+  const qs=survey.questions||[];
+  if(!qs.length) return '';
+  return `<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <div style="font-size:14px;font-weight:900;color:#1a1a2e">🗂 응답자별 전체보기</div>
+        <div style="font-size:11px;color:#888">(제출 순서) · 총 ${list.length}건</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button type="button" onclick="RM_printSurveyRespondents(${JSON.stringify(survey.id)})" style="background:#fff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">🖨 인쇄/PDF</button>
+        <button type="button" onclick="RM_exportSurveyRespondentsExcel(${JSON.stringify(survey.id)})" style="background:#fff;color:#16a34a;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">📊 엑셀 다운로드</button>
+      </div>
+    </div>
+    ${RM_customSurveyRespondentTableHtml(survey, list)}
+  </div>`;
+}
+// ★ 설문 통계를 별도 창으로 열어 인쇄(브라우저 인쇄 대화상자에서 "PDF로 저장" 선택 가능)
+// — 챌린저 "회차 통계표"/"오답노트 출력"과 동일한 Blob+새창+자동 인쇄 패턴을 재사용한다.
+function _svEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+// ★ 430(19차) 수정: 예전엔 이 인쇄가 문항별 통계+응답자별 표를 한 문서에 같이 담았는데,
+// 이제 응답자별 표는 RM_printSurveyRespondents로 완전히 분리됐다 — 이 함수는 문항별
+// 통계만 독립적으로 인쇄한다.
+window.RM_printSurveyStats=function(surveyId){
+  const survey=(ST.customSurveys||[]).find(function(s){ return String(s.id)===String(surveyId); });
+  if(!survey){ alert('설문 정보를 찾지 못했습니다.'); return; }
+  // ★ 430(18차): 아직 제출된 응답이 0건이어도(새로 만든 설문 등) 인쇄 버튼이 막히지 않고
+  // 문항별 통계가 담긴 리포트를 그대로 열어준다(예전엔 여기서 alert 후 중단됐음).
+  const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); });
+  const qs=survey.questions||[];
+
+  const qSections=qs.map(function(q){
+    const answers=list.map(function(p){
+      const a=(p.answers||[]).find(function(x){ return String(x.qId)===String(q.id); });
+      return a&&a.value?a.value:'';
+    }).filter(Boolean);
+    const answeredCount=answers.length;
+    let body;
+    if(q.type==='radio'||q.type==='checkbox'){
+      const counts={};
+      (q.options||[]).forEach(function(o){ counts[o]=0; });
+      answers.forEach(function(v){ v.split(',').map(function(s){return s.trim();}).filter(Boolean).forEach(function(opt){ counts[opt]=(counts[opt]||0)+1; }); });
+      body='<table class="sv-opt-table"><thead><tr><th>선택지</th><th>건수</th><th>비율</th></tr></thead><tbody>'+
+        Object.keys(counts).map(function(opt){
+          const c=counts[opt]; const pct=answeredCount?Math.round(c/answeredCount*100):0;
+          return '<tr><td>'+_svEsc(opt)+'</td><td>'+c+'건</td><td>'+pct+'%</td></tr>';
+        }).join('')+'</tbody></table>';
+    } else {
+      body=answers.length
+        ? '<ul class="sv-text-list">'+answers.map(function(v){ return '<li>'+_svEsc(v).replace(/\n/g,'<br>')+'</li>'; }).join('')+'</ul>'
+        : '<div class="sv-empty">응답 없음</div>';
+    }
+    return '<div class="sv-q-block"><div class="sv-q-title">'+_svEsc(q.label||'(제목 없는 문항)')+' <span class="sv-q-meta">· 응답 '+answeredCount+'건'+(q.required?' · 필수':'')+'</span></div>'+body+'</div>';
+  }).join('');
+
+  const title='설문_'+(survey.title||'설문')+'_통계';
+  const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_svEsc(title)+'</title><style>'+
+    'body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:22px;color:#1a1a1a}'+
+    'h1{font-size:18px;margin-bottom:4px}h2{font-size:12.5px;color:#64748b;font-weight:500;margin:0 0 18px}'+
+    '.sv-q-block{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;break-inside:avoid;page-break-inside:avoid}'+
+    '.sv-q-title{font-size:13px;font-weight:800;margin-bottom:6px}.sv-q-meta{font-size:10.5px;color:#94a3b8;font-weight:400}'+
+    'table.sv-opt-table{border-collapse:collapse;font-size:11.5px;width:100%;max-width:420px}'+
+    'table.sv-opt-table th,table.sv-opt-table td{border:1px solid #e2e8f0;padding:4px 8px;text-align:center}'+
+    'table.sv-opt-table th{background:#eef1ff}'+
+    '.sv-text-list{margin:4px 0;padding-left:18px;font-size:11.5px}.sv-text-list li{margin-bottom:3px}'+
+    '.sv-empty{color:#aaa;font-size:11.5px}'+
+    '@media print{body{padding:8mm}}'+
+    '</style></head><body>'+
+    '<h1>설문 통계 리포트</h1><h2>'+_svEsc(survey.title||'')+' · 총 응답 '+list.length+'건</h2>'+
+    qSections+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
+    '</body></html>';
+
+  try{
+    var blob=new Blob([html],{type:'text/html'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.target='_blank'; a.rel='noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  }catch(e){
+    console.error('[SG] 설문 통계 인쇄 오류',e);
+    alert('통계표를 여는 중 오류가 발생했습니다.\n'+(e&&e.message?e.message:e));
+  }
+};
+// ★ 430(19차) 신규: 응답자별 전체보기 표만 독립적으로 인쇄한다(설문 통계 인쇄와 완전 분리).
+window.RM_printSurveyRespondents=function(surveyId){
+  const survey=(ST.customSurveys||[]).find(function(s){ return String(s.id)===String(surveyId); });
+  if(!survey){ alert('설문 정보를 찾지 못했습니다.'); return; }
+  const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); });
+  const qs=survey.questions||[];
+  const ordered=list.slice().sort(function(a,b){ return (a.submittedAt||'').localeCompare(b.submittedAt||''); });
+
+  const theadCols=qs.map(function(q){ return '<th>'+_svEsc(q.label||'')+'</th>'; }).join('');
+  const bodyRows=ordered.map(function(p,i){
+    const cells=qs.map(function(q){
+      const a=(p.answers||[]).find(function(x){ return String(x.qId)===String(q.id); });
+      const v=a&&a.value?a.value:'';
+      return '<td>'+(v?_svEsc(v):'-')+'</td>';
+    }).join('');
+    return '<tr><td>'+(i+1)+'</td><td>'+_svEsc(p.name||'이름 미입력')+'</td><td>'+_svEsc((p.submittedAt||'').slice(0,16).replace('T',' '))+'</td>'+cells+'</tr>';
+  }).join('') || '<tr><td colspan="'+(3+qs.length)+'" style="text-align:center;color:#aaa;padding:14px">아직 제출된 응답이 없습니다</td></tr>';
+
+  const title='설문_'+(survey.title||'설문')+'_응답자별';
+  const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_svEsc(title)+'</title><style>'+
+    'body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:22px;color:#1a1a1a}'+
+    'h1{font-size:18px;margin-bottom:4px}h2{font-size:12.5px;color:#64748b;font-weight:500;margin:0 0 18px}'+
+    'table.sv-resp-table{border-collapse:collapse;width:100%;font-size:10.5px;table-layout:fixed}'+
+    'table.sv-resp-table th,table.sv-resp-table td{border:1px solid #e2e8f0;padding:4px 6px;word-break:break-word}'+
+    'table.sv-resp-table th{background:#f7f8fc}'+
+    '@media print{body{padding:8mm}table.sv-resp-table{font-size:9.5px}}'+
+    '</style></head><body>'+
+    '<h1>설문 응답자별 전체보기</h1><h2>'+_svEsc(survey.title||'')+' · 제출 순서 · 총 응답 '+list.length+'건</h2>'+
+    '<table class="sv-resp-table"><thead><tr><th>#</th><th>이름</th><th>제출일시</th>'+theadCols+'</tr></thead><tbody>'+bodyRows+'</tbody></table>'+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
+    '</body></html>';
+
+  try{
+    var blob=new Blob([html],{type:'text/html'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.target='_blank'; a.rel='noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  }catch(e){
+    console.error('[SG] 설문 응답자별 인쇄 오류',e);
+    alert('표를 여는 중 오류가 발생했습니다.\n'+(e&&e.message?e.message:e));
+  }
+};
+// ★ 엑셀 변환: 기존 파일 전역에서 이미 쓰고 있는 SheetJS(XLSX) 지연로딩 패턴(cdnjs, 이미 로드돼
+// 있으면 즉시 실행)을 그대로 재사용한다. ★ 430(19차) 수정: 응답자별 시트는 이제
+// RM_exportSurveyRespondentsExcel로 분리됐으므로, 이 함수는 문항별 집계 시트 하나만 내려받는다.
+window.RM_exportSurveyStatsExcel=function(surveyId){
+  const survey=(ST.customSurveys||[]).find(function(s){ return String(s.id)===String(surveyId); });
+  if(!survey){ alert('설문 정보를 찾지 못했습니다.'); return; }
+  // ★ 430(18차): 인쇄와 동일하게, 응답 0건이어도(새로 만든 설문 등) 엑셀 다운로드가 막히지 않고
+  // 집계값 0인 시트를 그대로 내려받게 한다(예전엔 여기서 alert 후 중단됐음).
+  const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); });
+  const qs=survey.questions||[];
+
+  function doExport(){
+    const aoa2=[['문항','선택지/구분','건수','비율(%)']];
+    qs.forEach(function(q){
+      const answers=list.map(function(p){ const a=(p.answers||[]).find(function(x){ return String(x.qId)===String(q.id); }); return a&&a.value?a.value:''; }).filter(Boolean);
+      const answeredCount=answers.length;
+      if(q.type==='radio'||q.type==='checkbox'){
+        const counts={};
+        (q.options||[]).forEach(function(o){ counts[o]=0; });
+        answers.forEach(function(v){ v.split(',').map(function(s){return s.trim();}).filter(Boolean).forEach(function(opt){ counts[opt]=(counts[opt]||0)+1; }); });
+        Object.keys(counts).forEach(function(opt){
+          const c=counts[opt]; const pct=answeredCount?Math.round(c/answeredCount*100):0;
+          aoa2.push([q.label||'', opt, c, pct]);
+        });
+      } else {
+        aoa2.push([q.label||'', '(서술형 - 응답자별 시트 참고)', answeredCount, '']);
+      }
+    });
+    const ws2=XLSX.utils.aoa_to_sheet(aoa2);
+    ws2['!cols']=[{wch:24},{wch:20},{wch:8},{wch:10}];
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws2,'문항별집계');
+    const dateStr=new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'');
+    XLSX.writeFile(wb,(survey.title||'설문')+'_통계_'+dateStr+'.xlsx');
+  }
+  if(typeof XLSX!=='undefined'){ doExport(); }
+  else { const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=doExport; document.head.appendChild(sc); }
+};
+// ★ 430(19차) 신규: 응답자별 전체보기 표만 독립적으로 엑셀로 내려받는다.
+window.RM_exportSurveyRespondentsExcel=function(surveyId){
+  const survey=(ST.customSurveys||[]).find(function(s){ return String(s.id)===String(surveyId); });
+  if(!survey){ alert('설문 정보를 찾지 못했습니다.'); return; }
+  const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); });
+  const qs=survey.questions||[];
+  const ordered=list.slice().sort(function(a,b){ return (a.submittedAt||'').localeCompare(b.submittedAt||''); });
+
+  function doExport(){
+    const header=['#','이름','제출일시'].concat(qs.map(function(q){ return q.label||'(제목없음)'; }));
+    const aoa=[header];
+    ordered.forEach(function(p,i){
+      const row=[i+1, p.name||'', (p.submittedAt||'').slice(0,16).replace('T',' ')];
+      qs.forEach(function(q){
+        const a=(p.answers||[]).find(function(x){ return String(x.qId)===String(q.id); });
+        row.push(a&&a.value?a.value:'');
+      });
+      aoa.push(row);
+    });
+    const ws1=XLSX.utils.aoa_to_sheet(aoa);
+    ws1['!cols']=[{wch:5},{wch:12},{wch:16}].concat(qs.map(function(){ return {wch:22}; }));
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws1,'응답자별');
+    const dateStr=new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'');
+    XLSX.writeFile(wb,(survey.title||'설문')+'_응답자별_'+dateStr+'.xlsx');
+  }
+  if(typeof XLSX!=='undefined'){ doExport(); }
+  else { const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=doExport; document.head.appendChild(sc); }
+};
 function RM_customSurveySubmissionsHtml(surveyId){
   const survey=(ST.customSurveys||[]).find(function(s){ return String(s.id)===String(surveyId); });
   const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); }).sort(function(a,b){ return (b.submittedAt||'').localeCompare(a.submittedAt||''); });
@@ -17539,11 +18039,14 @@ function RM_customSurveySubmissionsHtml(surveyId){
       </div>
     </div>`;
   }).join('');
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="margin-bottom:12px">
       <div style="font-size:15px;font-weight:900;color:#1a1a2e">📝 ${esc(survey?survey.title:'설문')}</div>
       <div style="font-size:11px;color:#777;margin-top:2px">총 ${list.length}건 (미확인 ${unreadCount}건)</div>
     </div>
+    ${survey ? RM_customSurveyRespondentBlockHtml(survey, list) : ''}
+    ${survey ? RM_customSurveyStatsHtml(survey, list) : ''}
+    <div style="font-size:12.5px;font-weight:800;color:#333;margin-bottom:8px">🗂 개별 응답</div>
     ${list.length ? rows : `<div style="text-align:center;padding:48px;color:#888"><div style="font-size:40px;margin-bottom:12px">📥</div><div style="font-size:14px">아직 제출된 응답이 없습니다</div></div>`}
   </div>`;
 }
@@ -17572,7 +18075,14 @@ function renderRoadmapSurveyHub(){
   const newCf70Count=(ST.challengerF70Submissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
   const surveyTotal=(ST.preSurveySubmissions||[]).length;
   const cf70Total=(ST.challengerF70Submissions||[]).length;
-  const customList=orgId ? (ST.customSurveys||[]).filter(function(s){ return String(s.orgId)===String(orgId); }) : [];
+  // ★ 2026-09-16(430 11차) 수정: 커스텀 설문 카드 목록은 "링크 생성용 기관 선택"과는 별개로
+  // 봐야 한다 — 최종관리자는 기관을 선택하지 않아도(또는 무엇을 선택했든) 항상 전체 기관의
+  // 커스텀 설문을 다 봐야 하고, 기관관리자·선생님은 자기 기관에서 만든 설문만 보면 된다.
+  // (기존엔 admin도 orgId(=드롭다운 선택값)가 있어야만 필터링해서 보여줘서, 기관을 선택하지
+  // 않았거나 특정 기관을 선택한 경우 다른 기관 설문이 설문조사함에 아예 안 보이던 버그)
+  const customList = isAdminRole
+    ? (ST.customSurveys||[])
+    : (orgId ? (ST.customSurveys||[]).filter(function(s){ return String(s.orgId)===String(orgId); }) : []);
   const customCardsHtml=customList.map(function(s){
     const subs=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(s.id); });
     const unread=subs.filter(function(x){ return x.status!=='reviewed'; }).length;
@@ -17585,7 +18095,7 @@ function renderRoadmapSurveyHub(){
       <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#7c3aed;font-weight:700">결과 확인 →</span></div>
     </div>`;
   }).join('');
-  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+  return `<div style="max-width:none;padding-bottom:40px">
     <div style="margin-bottom:14px">
       <div style="font-size:15px;font-weight:900;color:#1a1a2e">📥 설문조사함</div>
       <div style="font-size:11px;color:#777;margin-top:2px">학생·학부모용 웹폼에서 제출된 설문을 종류별로 확인합니다. 카드를 누르면 결과 확인 화면으로 들어가고, "🔗 링크복사"로 이 기관의 설문 링크를 바로 공유할 수 있습니다. 새 설문은 "⚙️ 설문조사 관리"에서 만들 수 있습니다.</div>
@@ -17755,7 +18265,7 @@ function renderRoadmapReport(s){
         .map(function(o){ return '<option value="'+o.idx+'">'+esc(o.label)+'</option>'; }).join('')
     : '<option value="">저장된 회차 없음</option>';
 
-  return '<div id="rmBasicFormRoot" style="max-width:960px;margin:0 auto;padding-bottom:40px">'
+  return '<div id="rmBasicFormRoot" style="max-width:none;padding-bottom:40px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px">'
     +'<div style="font-size:17px;font-weight:900;color:#1a1a2e">🧭 입시 로드맵 리포트</div>'
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap">'
@@ -19254,6 +19764,31 @@ function bindEvents(){
     b.addEventListener('click',()=>{ST.filterC=b.dataset.filter;render();});
   });
 
+  // ★ 2026-09-16(430 13차) 신규: 알림벨 드롭다운 바깥을 클릭하면 닫히게(문서 전체에 1회만 등록)
+  if(!document._sgNotifOutsideBound){
+    document._sgNotifOutsideBound = true;
+    document.addEventListener('click', function(e){
+      if(!ST._notifOpen) return;
+      const panel = document.getElementById('sgNotifPanel');
+      const btn = document.getElementById('sgNotifBellBtn');
+      if(panel && panel.contains(e.target)) return;
+      if(btn && btn.contains(e.target)) return;
+      closeSgNotifPanel();
+    });
+  }
+  // ★ 2026-09-16(430 17차) 신규: 헤더 "⚙ 부가기능" 드롭다운도 동일하게 바깥 클릭 시 닫힘
+  if(!document._sgHeaderMoreOutsideBound){
+    document._sgHeaderMoreOutsideBound = true;
+    document.addEventListener('click', function(e){
+      if(!ST._headerMoreOpen) return;
+      const panel = document.getElementById('sgHeaderMorePanel');
+      const btn = document.getElementById('sgHeaderMoreBtn');
+      if(panel && panel.contains(e.target)) return;
+      if(btn && btn.contains(e.target)) return;
+      closeHeaderMorePanel();
+    });
+  }
+
   // ── 검색창 IME 처리 (한글 자모 분리 방지 - 완전 재작성) ──
   const si = document.getElementById('search_input');
   if(si && !si._bound){
@@ -19310,7 +19845,8 @@ function bindEvents(){
         : ST.students;
       const filt2 = _sortStudentsUnreadFirst(viewStudents2.filter(s=>s.id&&s.name).filter(s=>
         ((s.name||'').includes(ST.search)||(s.school||'').includes(ST.search)) &&
-        (ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC)))
+        (ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC))) &&
+        (ST.filterClass==='전체'||s.className===ST.filterClass)
       ));
       // 리스트 HTML만 교체
       listEl.innerHTML = filt2.map(s=>{
@@ -19319,7 +19855,6 @@ function bindEvents(){
           <div style="display:flex;gap:8px;align-items:center">
             <div style="position:relative;flex-shrink:0">
               <div style="width:34px;height:34px;border-radius:9px;background:${s.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff">${esc(s.avatar)}</div>
-              ${_chgHasUnread(s)?'<span title="챌린저 새 입력" style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;background:#e53935;border-radius:50%;border:1.5px solid #fff"></span>':''}
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:700">${esc(s.name)}</span><span style="font-size:10px;color:${gc(a)};font-weight:700">${a.toFixed(1)}등급</span></div>
@@ -28349,15 +28884,19 @@ const __CHALLENGER_HTML__ = `<!DOCTYPE html>
 <title>CHALLENGER AAR | 실전모의고사 정밀분석 시스템</title>
 <style>
 :root{--ink:#172033;--muted:#667085;--line:#d8e2ee;--bg:#f6f9fc;--brand:#0f766e;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--green:#16a34a;--purple:#7c3aed}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif;line-height:1.5}.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 80px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif;line-height:1.5}.wrap{max-width:none;margin:0;padding:20px 28px 80px}
 .hero{background:#fff;border:1px solid var(--line);border-top:7px solid var(--brand);border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)}.hero h1{margin:0;font-size:28px}.hero p{margin:6px 0 0;color:var(--muted)}
-.tabs{display:flex;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:20;background:rgba(246,249,252,.96);padding:10px 0}.tab{border:1px solid var(--line);background:white;color:#475467;border-radius:999px;padding:10px 14px;font-weight:800;cursor:pointer}.tab.active{background:var(--brand);color:white;border-color:var(--brand)}
+.tabs{display:flex;gap:2px;flex-wrap:wrap;position:sticky;top:0;z-index:20;background:#fff;padding:0;border-bottom:2px solid var(--line);min-height:56px}.tab{border:none;border-bottom:4px solid transparent;background:transparent;color:#64748b;border-radius:0;padding:18px 18px;font-weight:700;font-size:14.5px;cursor:pointer;margin-bottom:-2px}.tab.active{background:transparent;color:var(--brand);border-bottom-color:var(--brand);font-weight:800}.tab:hover{color:var(--brand)}
+.tab-more-btn{border:none;border-bottom:4px solid transparent;background:transparent;color:#64748b;border-radius:0;padding:18px 18px;font-weight:700;font-size:14.5px;cursor:pointer;margin-bottom:-2px}.tab-more-btn.open{background:transparent;color:var(--brand);border-bottom-color:var(--brand);font-weight:800}.tab-more-btn:hover{color:var(--brand)}
+.chg-more-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.15);padding:8px;flex-direction:column;gap:4px;z-index:50;min-width:170px}
+.chg-more-menu.open{display:flex}.chg-more-menu .tab{border-radius:9px;text-align:left;width:100%;border:1px solid var(--line);background:#fff;color:#475467;padding:9px 12px;margin-bottom:0;font-size:13px}.chg-more-menu .tab:hover{background:#f1f5f9;color:#475467}.chg-more-menu .tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.chg-round-bar{padding:12px 16px;margin-bottom:14px;background:#f8fafc}.chg-round-bar-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.chg-round-bar-label{font-weight:800;font-size:13px;color:#344054;white-space:nowrap;display:flex;align-items:center;gap:4px;margin:0}.chg-round-bar-row select{width:auto;min-width:180px;max-width:260px;padding:7px 10px;font-size:13px}.chg-round-bar-row button{padding:7px 12px;font-size:12.5px;white-space:nowrap}.chg-round-bar-divider{width:1px;height:20px;background:var(--line);margin:0 2px}.chg-round-bar-hint{font-size:11px;color:#94a3b8;margin-left:auto}@media(max-width:900px){.chg-round-bar-hint{margin-left:0;flex-basis:100%}}
 .panel{display:none}.panel.active{display:block}.card{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(15,23,42,.05)}
 h2{font-size:21px;margin:0 0 12px}h3{font-size:17px;margin:0 0 10px}h4{font-size:15px;margin:0 0 8px;color:var(--brand)}.sub,.muted{color:var(--muted);font-size:13px}.small{font-size:12px}
 .grid{display:grid;gap:10px}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:900px){.g3,.g4{grid-template-columns:1fr}.wrap{padding:12px}.tabs{position:static}}
 label{font-size:13px;font-weight:800;color:#344054;display:block;margin-bottom:4px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fff;font-size:14px}textarea{min-height:58px;resize:vertical}
 button{border:0;border-radius:11px;padding:9px 13px;font-weight:800;background:var(--brand);color:white;cursor:pointer}button.secondary{background:#e2e8f0;color:#111827}button.ghost{background:#fff;color:var(--brand);border:1px solid var(--brand)}button.warn{background:var(--red)}button:active{transform:scale(.98)}button.clicked{box-shadow:0 0 0 3px rgba(15,118,110,.18)}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.right{margin-left:auto}.subject-card{border-left:6px solid var(--brand)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.right{margin-left:auto}.subject-card{border-left:6px solid var(--brand)}.subject-card-label{font-size:13px;font-weight:600;color:var(--muted)}.subject-card-summary{margin-top:6px;font-size:12.5px;color:var(--muted)}.subject-card.collapsed{padding-bottom:14px}#subjects{overflow-anchor:none}
 .item-row{display:grid;grid-template-columns:60px 1fr 70px 1.5fr 1fr 1fr 1.2fr 40px;gap:7px;margin-bottom:7px;align-items:start}@media(max-width:1050px){.item-row{grid-template-columns:1fr}}
 .pill{display:inline-block;border-radius:999px;padding:3px 8px;font-size:12px;font-weight:900;margin:1px;background:#edf2f7}.pill.red{background:#fee2e2;color:#991b1b}.pill.amber{background:#fef3c7;color:#92400e}.pill.green{background:#dcfce7;color:#166534}.pill.blue{background:#dbeafe;color:#1e40af}.pill.purple{background:#ede9fe;color:#5b21b6}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#f8fafc;border:1px solid var(--line);border-radius:13px;padding:8px 10px;font-size:13px;margin:8px 0}.bar b{color:#101828}
@@ -28609,14 +29148,12 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 .hero.final-hero{
   position:relative;
   overflow:hidden;
-  background:
-    radial-gradient(circle at 88% 18%, rgba(15,118,110,.14), transparent 25%),
-    linear-gradient(135deg,#061d38 0%,#08233f 38%,#0f766e 100%);
-  color:#fff;
-  border:0;
-  border-top:0;
-  padding:30px 32px;
-  box-shadow:0 16px 40px rgba(6,29,56,.20);
+  background:linear-gradient(135deg,#f4faf9 0%,#eef6f5 100%);
+  color:var(--ink);
+  border:1px solid #dceae7;
+  border-top:5px solid var(--brand);
+  padding:24px 28px;
+  box-shadow:0 6px 18px rgba(15,23,42,.05);
 }
 .hero.final-hero:before{
   content:"";
@@ -28626,7 +29163,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   width:260px;
   height:260px;
   border-radius:50%;
-  border:34px solid rgba(255,255,255,.08);
+  border:34px solid rgba(15,118,110,.05);
 }
 .hero.final-hero:after{
   content:"";
@@ -28636,15 +29173,16 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   width:220px;
   height:220px;
   border-radius:50%;
-  background:rgba(241,214,154,.10);
+  background:rgba(15,118,110,.04);
 }
 .hero-final-inner{position:relative;z-index:2}
 .hero-kicker{
   display:inline-flex;
   align-items:center;
   gap:8px;
-  border:1px solid rgba(241,214,154,.52);
-  color:#f1d69a;
+  border:1px solid rgba(15,118,110,.30);
+  color:var(--brand);
+  background:rgba(15,118,110,.06);
   border-radius:999px;
   padding:5px 11px;
   font-size:12px;
@@ -28653,33 +29191,18 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   margin-bottom:12px;
 }
 .hero.final-hero h1{
-  color:#fff;
-  font-size:34px;
-  letter-spacing:-1.4px;
-  line-height:1.16;
+  color:#0f2a26;
+  font-size:28px;
+  letter-spacing:-1.2px;
+  line-height:1.2;
   margin:0;
 }
-.hero-title-accent{color:#f1d69a}
+.hero-title-accent{color:var(--brand)}
 .hero.final-hero p{
-  color:#dbeafe;
-  font-size:14px;
+  color:#3f5b56;
+  font-size:13.5px;
   max-width:760px;
   margin:10px 0 0;
-}
-.hero-meta{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top:16px;
-}
-.hero-meta span{
-  border:1px solid rgba(255,255,255,.20);
-  background:rgba(255,255,255,.10);
-  color:#fff;
-  border-radius:999px;
-  padding:6px 10px;
-  font-size:12px;
-  font-weight:800;
 }
 .progress-box{margin-top:12px;border:1px solid var(--line);border-left:6px solid var(--purple);border-radius:14px;background:#faf8ff;padding:12px}.progress-box summary{cursor:pointer;font-weight:900;color:#4c1d95}.progress-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}@media(max-width:900px){.progress-grid{grid-template-columns:1fr}}.progress-note{background:#fff;border:1px solid #ddd6fe;border-radius:11px;padding:9px;font-size:12px;color:#5b21b6}.progress-report{border:1px solid #ddd6fe;border-left:6px solid var(--purple);border-radius:14px;padding:12px;background:#fff;margin:10px 0}.progress-report h4{color:#6d28d9}.footer-clean-note{
   text-align:center;
@@ -28963,16 +29486,10 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
     <div class="hero-kicker">CHALLENGER AAR · PRACTICAL MOCK EXAM ANALYSIS</div>
     <h1>챌린저 <span class="hero-title-accent">실전모의고사 정밀분석 시스템</span></h1>
     <p>자동채점으로 오답번호를 빠르게 확정하고, 매니저 상담을 통해 오답원인·행동강령·주간 처방전으로 연결하는 실전형 분석 시스템입니다.</p>
-    <div class="hero-meta">
-      <span>정답표/자동채점</span>
-      <span>오답번호 자동 반영</span>
-      <span>QR 복기 연계</span>
-      <span>주간 리포트 출력</span><span>진도 보정 해석</span>
-    </div>
   </div>
 </header>
-<nav class="tabs no-print">
-<button class="tab" onclick="showTab(&#39;omrAutomationPanel&#39;)">★ OMR 자동화</button><button class="tab active" onclick="showTab(&#39;input&#39;)">1. 기본 입력</button><button class="tab" onclick="showTab(&#39;answerKeyPanel&#39;)">2. 단일 자동채점</button><button class="tab" onclick="showTab(&#39;batchGradingPanel&#39;)">3. 다학생 일괄채점</button><button class="tab" onclick="showTab(&#39;qrAdminPanel&#39;)">4. QR 회차</button><button class="tab" onclick="showTab(&#39;studentReflectionPanel&#39;)">5. 학생 복기</button><button class="tab" onclick="showTab(&#39;reflectionApplyPanel&#39;)">6. 복기 반영</button><button class="tab" onclick="showTab(&#39;weekly&#39;)">7. 상담리포트</button><button class="tab" onclick="showTab(&#39;aarPanel&#39;)">8. 매니저 AAR</button><button class="tab" onclick="showTab(&#39;statsPanel&#39;)">📊 학생 통계</button>
+<nav class="tabs no-print" style="position:relative">
+<button class="tab active" data-tabid="input" onclick="showTab(&#39;input&#39;)">📝 기본 입력</button><button class="tab" data-tabid="weekly" onclick="showTab(&#39;weekly&#39;)">📄 결과리포트</button><button class="tab" data-tabid="statsPanel" onclick="showTab(&#39;statsPanel&#39;)">📊 학생 통계</button><button type="button" class="tab-more-btn" onclick="toggleChgMoreMenu(event)">🔧 부가기능</button><div id="chgMoreMenu" class="chg-more-menu"><button class="tab" data-tabid="omrAutomationPanel" onclick="showTab(&#39;omrAutomationPanel&#39;);closeChgMoreMenu()">OMR 자동화</button><button class="tab" data-tabid="answerKeyPanel" onclick="showTab(&#39;answerKeyPanel&#39;);closeChgMoreMenu()">단일 자동채점</button><button class="tab" data-tabid="batchGradingPanel" onclick="showTab(&#39;batchGradingPanel&#39;);closeChgMoreMenu()">다학생 일괄채점</button><button class="tab" data-tabid="qrAdminPanel" onclick="showTab(&#39;qrAdminPanel&#39;);closeChgMoreMenu()">QR 회차</button><button class="tab" data-tabid="studentReflectionPanel" onclick="showTab(&#39;studentReflectionPanel&#39;);closeChgMoreMenu()">학생 복기</button><button class="tab" data-tabid="reflectionApplyPanel" onclick="showTab(&#39;reflectionApplyPanel&#39;);closeChgMoreMenu()">복기 반영</button><button class="tab" data-tabid="aarPanel" onclick="showTab(&#39;aarPanel&#39;);closeChgMoreMenu()">매니저 AAR</button></div>
 </nav>
 
 
@@ -29217,17 +29734,21 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
 <div><label>다음 회차 확인 포인트</label><input id="nextCheck" value="선택 미션 이행 여부와 중반 이후 마무리 개선 확인"><div class="quicktags"><span class="quicktag" onclick="appendField(&#39;nextCheck&#39;,&#39;선택 미션 이행 여부 확인&#39;)">미션 이행</span><span class="quicktag" onclick="appendField(&#39;nextCheck&#39;,&#39;정답률 목표 달성 여부 확인&#39;)">정답률 목표</span><span class="quicktag" onclick="appendField(&#39;nextCheck&#39;,&#39;동일 오답원인 재발 여부 확인&#39;)">재발 여부</span><span class="quicktag" onclick="appendField(&#39;nextCheck&#39;,&#39;문제풀이순서 유지 여부 확인&#39;)">풀이순서 유지</span></div></div>
 </div>
 </div>
+<div class="card chg-round-bar no-print">
+  <div class="chg-round-bar-row">
+    <label class="chg-round-bar-label">📂 과거 저장 회차</label>
+    <select id="historyLoadSelect"></select>
+    <button class="ghost" onclick="loadHistoryRound();markClicked(event)">선택 회차 불러오기</button>
+    <button class="warn" onclick="deleteHistoryRound();markClicked(event)">선택 회차 삭제</button>
+    <span class="chg-round-bar-divider"></span>
+    <button class="secondary" onclick="saveSession();markClicked(event)">💾 현재 회차 저장 후 누적 반영</button>
+    <span class="chg-round-bar-hint">※ 불러오면 현재 입력 중인 내용은 사라집니다(먼저 저장하세요)</span>
+  </div>
+</div>
 <div class="card"><div class="row"><h2>이번 회차 과목별 입력</h2><button class="right" onclick="addSubject();markClicked(event)">+ 과목 추가</button></div><div id="subjects"><div class="card subject-card" data-sid="s1"><div class="row"><h3>과목 입력</h3><button class="secondary right" onclick="removeSubject(&#39;s1&#39;);markClicked(event)">삭제</button></div><div class="grid g4"><div><label>과목</label><select class="subject" onchange="syncSubject(&#39;s1&#39;);let ss=state.subjects.find(x=&gt;x.sid===&#39;s1&#39;);ss.items.forEach(i=&gt;i.reasons=[]);renderSubjects()"><option value="KOR" selected="">국어</option><option value="MATH">수학</option><option value="ENG">영어</option><option value="INQ">탐구</option><option value="HIST">한국사</option><option value="LANG">제2외국어</option></select></div><div><label>세부 과목</label><input class="detail" value="화작" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>실력 수준</label><select class="level" onchange="syncSubject(&#39;s1&#39;)"><option>상위권</option><option selected="">중위권</option><option>하위권</option><option>불안정권</option></select></div><div><label>이번 회차 집중 여부</label><select class="focus" onchange="syncSubject(&#39;s1&#39;)"><option selected="">집중</option><option>유지</option><option>관찰</option><option>보류</option></select></div><div><label>문항 처리 범위</label><select class="processRange" onchange="syncSubject(&#39;s1&#39;)"><option>전체 오답 분석</option><option>고난도/킬러 제외</option><option selected="">중하 난이도 정답률 집중</option><option>집중 과목 핵심문항만</option></select></div><div><label>난이도 선별</label><select class="difficultySelect" onchange="syncSubject(&#39;s1&#39;)"><option>하~중 난이도 우선</option><option selected="">중상 난이도 선별</option><option>4점 중간 난도까지</option><option>고난도/킬러 제외</option><option>킬러 포함 심화</option></select></div><div><label>정답률 목표</label><select class="accuracyTarget" onchange="syncSubject(&#39;s1&#39;)"><option>정답률 60% 이상</option><option>정답률 70% 이상</option><option selected="">정답률 80% 이상</option><option>실수 문항 0개</option><option>선별 문항 전부 맞히기</option></select></div><div><label>오답개수</label><input class="wrongCount" type="number" value="5" placeholder="없으면 자동" oninput="syncSubject(&#39;s1&#39;)"></div></div><div class="grid g4" style="margin-top:10px"><div><label>성적</label><input class="score" type="number" value="84" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>등급</label><input class="grade" value="2등급" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>백분위</label><input class="percentile" type="number" value="91" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>목표 성적</label><input class="targetScore" type="number" value="92" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>목표등급</label><input class="targetGrade" value="1등급" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>목표백분위</label><input class="targetPercentile" type="number" value="96" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>문제풀이순서</label><select class="order" onchange="syncSubject(&#39;s1&#39;)"><option selected="">번호 순서대로</option><option>쉬운 문제부터 선별해서</option><option>선택과목부터</option><option>공통부터</option><option>화작/언매→독서론→문학→독서</option><option>직접 입력</option></select></div><div><label>문제풀이순서 직접 입력</label><input class="orderMemo" value="" oninput="syncSubject(&#39;s1&#39;)"></div><div><label>시간부족</label><select class="time" onchange="syncSubject(&#39;s1&#39;)"><option selected="">없음</option><option>약간</option><option>뚜렷함</option><option>심각</option></select></div><div><label>집중/멘탈</label><select class="mental" onchange="syncSubject(&#39;s1&#39;)"><option selected="">안정</option><option>후반 저하</option><option>특정 문항 이후 흔들림</option><option>불안/당황</option><option>포기감</option></select></div></div><div style="margin-top:12px"><label>틀린 문항별 오답 원인</label><div class="item-row"><input class="no" placeholder="문항" value="12" oninput="syncSubject(&#39;s1&#39;)"><input class="unit" placeholder="단원/유형" value="독서" oninput="syncSubject(&#39;s1&#39;)"><select class="diff" onchange="syncSubject(&#39;s1&#39;)"><option>하</option><option selected="">중</option><option>상</option><option>최상</option><option>킬러</option></select><button class="ghost" onclick="openReasonModal(&#39;s1&#39;,0);markClicked(event)">오답원인 선택</button><div class="reason-summary">끝까지 못읽어서, 선지 판단 미스</div><input class="imemo" placeholder="상황메모" value="발문 마지막 조건 확인 전 선지 선택" oninput="syncSubject(&#39;s1&#39;)"><button class="secondary" onclick="removeItem(&#39;s1&#39;,0);markClicked(event)">×</button></div><div class="item-row"><input class="no" placeholder="문항" value="18" oninput="syncSubject(&#39;s1&#39;)"><input class="unit" placeholder="단원/유형" value="문학" oninput="syncSubject(&#39;s1&#39;)"><select class="diff" onchange="syncSubject(&#39;s1&#39;)"><option>하</option><option selected="">중</option><option>상</option><option>최상</option><option>킬러</option></select><button class="ghost" onclick="openReasonModal(&#39;s1&#39;,1);markClicked(event)">오답원인 선택</button><div class="reason-summary">선지 판단 미스</div><input class="imemo" placeholder="상황메모" value="근거 확인 부족" oninput="syncSubject(&#39;s1&#39;)"><button class="secondary" onclick="removeItem(&#39;s1&#39;,1);markClicked(event)">×</button></div><button class="ghost" onclick="addItem(&#39;s1&#39;);markClicked(event)">+ 문항 추가</button></div><details class="progress-box" open=""><summary>학습 진도 · 미학습 범위 · 점수 해석 보정</summary><div class="progress-grid"><div><label>현재 준비도</label><select class="preparationLevel" onchange="syncSubject(&#39;s1&#39;)"><option selected="">전 범위 실전 준비 완료</option><option>개념 완료·실전 연습 부족</option><option>주요 단원만 학습</option><option>개념 학습 진행 중</option><option>거의 준비하지 못함</option></select></div><div><label>미학습 문항 수</label><select class="unlearnedCount" onchange="syncSubject(&#39;s1&#39;)"><option selected="">0</option><option>1~2</option><option>3~5</option><option>6개 이상</option></select></div><div><label>학습 완료 범위 오답 수</label><select class="learnedErrorCount" onchange="syncSubject(&#39;s1&#39;)"><option selected="">0</option><option>1~2</option><option>3~5</option><option>6개 이상</option></select></div><div><label>학습 완료 단원/영역</label><textarea class="completedUnits" oninput="syncSubject(&#39;s1&#39;)" placeholder="예: 수학Ⅰ 수열, 수학Ⅱ 미분 / 독서 사회·문학 현대시"></textarea></div><div><label>학습 중 단원/영역</label><textarea class="inProgressUnits" oninput="syncSubject(&#39;s1&#39;)" placeholder="예: 적분 기본유형 / 언어와매체 문법"></textarea></div><div><label>미학습 단원/영역</label><textarea class="unlearnedUnits" oninput="syncSubject(&#39;s1&#39;)" placeholder="예: 미적분 적분법 / 탐구 유전"></textarea></div><div><label>시험 후 확인된 부족 단원</label><textarea class="weakUnits" oninput="syncSubject(&#39;s1&#39;)" placeholder="단원명과 관련 문항을 함께 기록"></textarea></div><div><label>집중 붕괴 시점</label><select class="concentrationBreak" onchange="syncSubject(&#39;s1&#39;)"><option selected="">없음</option><option>초반</option><option>중반</option><option>후반</option><option>마지막 10분</option><option>여러 번 반복</option></select></div><div><label>집중 회복 결과</label><select class="recoveryResult" onchange="syncSubject(&#39;s1&#39;)"><option selected="">해당 없음</option><option>10초 리셋 후 바로 회복</option><option>문제 이동 후 회복</option><option>부분 회복</option><option>회복 실패</option></select></div></div><div style="margin-top:9px"><label>점수 해석 기준</label><select class="scoreBasis" onchange="syncSubject(&#39;s1&#39;)"><option selected="">전 범위 학습 완료 상태의 실전 점수</option><option>일부 미학습 범위가 반영된 점수</option><option>주요 단원만 학습한 상태의 점수</option><option>개념 완료·문제풀이 부족 상태의 점수</option><option>진도보다 시험 운영 영향이 큰 점수</option><option>진도와 시험 운영이 함께 반영된 점수</option></select></div><div class="progress-note">실제 원점수는 그대로 유지합니다. 이 항목은 진도 부족과 시험 운영 실패를 구분해 리포트 문구를 보정하는 데 사용됩니다.</div></details><details class="situation-box" open=""><summary>CHALLENGER AAR 상황 분석 · 행동강령 확정</summary><div class="situation-grid"><div><label>시스템 추천 상황 유형</label><input class="situationType" value="안정 수행형" readonly=""></div><div><label>주요 영향 요인</label><input class="primaryFactor" value="특별한 위험 요인 없음" readonly=""></div><div><label>진도 영향</label><input class="progressImpact" value="낮음" readonly=""></div><div><label>시험 운영 영향</label><input class="operationImpact" value="낮음" readonly=""></div><div><label>매니저 최종 상황 유형</label><select class="managerSituationType" onchange="syncSubject(&#39;s1&#39;)"><option value="" selected="">시스템 추천 후 선택</option><option value="진도 부족형">진도 부족형</option><option value="개념 미완성형">개념 미완성형</option><option value="학습 후 인출 실패형">학습 후 인출 실패형</option><option value="문제 적용 부족형">문제 적용 부족형</option><option value="시간 배분 실패형">시간 배분 실패형</option><option value="고난도 집착형">고난도 집착형</option><option value="정확도·실수형">정확도·실수형</option><option value="집중 회복 실패형">집중 회복 실패형</option><option value="장시간 시험 체력형">장시간 시험 체력형</option><option value="과목 간 감정 전이형">과목 간 감정 전이형</option><option value="미준비 과목 완주 부족형">미준비 과목 완주 부족형</option><option value="복합 원인형">복합 원인형</option><option value="안정 수행형">안정 수행형</option></select></div><div><label>매니저 확정 상태</label><select class="managerConfirmed" onchange="syncSubject(&#39;s1&#39;)"><option selected="">미확정</option><option>추천 그대로 적용</option><option>수정 후 확정</option><option>이번 회차 보류</option></select></div></div><div class="situation-result"><label>시스템 추천 행동강령</label><textarea class="recommendedActions" readonly="">현재 풀이 순서와 시간 운영을 유지한다.
 다음 회차에는 동일 전략의 재현 여부만 확인한다.</textarea><label style="margin-top:8px">매니저 최종 행동강령 · 학생에게는 1~2개만 제시</label><textarea class="managerActions" oninput="syncSubject(&#39;s1&#39;)" placeholder="추천 문구를 확인하고 학생 상황에 맞게 최종 확정하세요"></textarea><label style="margin-top:8px">다음 회차 확인 기준</label><textarea class="nextCriteria" oninput="syncSubject(&#39;s1&#39;)" placeholder="예: 미완료 문항 감소 / 집중 붕괴 시점 지연 / 10초 리셋 실행 여부">동일 전략 재현 / 마킹 완료 / 붕괴 없이 완주</textarea><div class="row no-print" style="margin-top:9px"><button type="button" onclick="recommendSituation(&#39;s1&#39;);markClicked(event)">상황 분석 추천</button><button type="button" class="ghost" onclick="applySituationRecommendation(&#39;s1&#39;);markClicked(event)">추천 행동강령 적용</button></div></div><div class="manager-confirm">점수는 수정하지 않습니다. 진도 영향과 시험 운영 영향을 분리한 뒤, 시스템 추천을 매니저가 최종 확정합니다.</div></details><div style="margin-top:12px"><label>매니저 수정/추가 메모</label><textarea class="memo" oninput="syncSubject(&#39;s1&#39;)" placeholder="아래 옵션 태그를 눌러 자동 삽입 후 학생 상황에 맞게 수정하세요"></textarea><div class="memo-tools"><b>빠른 메모 옵션</b><div class="quicktags"><span class="quicktag" onclick="appendSubjectMemo(&#39;s1&#39;,&#39;reason&#39;)">오답원인 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s1&#39;,&#39;action&#39;)">핵심행동 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s1&#39;,&#39;range&#39;)">처리범위 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s1&#39;,&#39;items&#39;)">문항·단원 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s1&#39;,&#39;student&#39;)">학생용 한 줄 처방</span></div></div></div></div><div class="card subject-card" data-sid="s2"><div class="row"><h3>과목 입력</h3><button class="secondary right" onclick="removeSubject(&#39;s2&#39;);markClicked(event)">삭제</button></div><div class="grid g4"><div><label>과목</label><select class="subject" onchange="syncSubject(&#39;s2&#39;);let ss=state.subjects.find(x=&gt;x.sid===&#39;s2&#39;);ss.items.forEach(i=&gt;i.reasons=[]);renderSubjects()"><option value="KOR">국어</option><option value="MATH" selected="">수학</option><option value="ENG">영어</option><option value="INQ">탐구</option><option value="HIST">한국사</option><option value="LANG">제2외국어</option></select></div><div><label>세부 과목</label><input class="detail" value="미적분" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>실력 수준</label><select class="level" onchange="syncSubject(&#39;s2&#39;)"><option>상위권</option><option selected="">중위권</option><option>하위권</option><option>불안정권</option></select></div><div><label>이번 회차 집중 여부</label><select class="focus" onchange="syncSubject(&#39;s2&#39;)"><option selected="">집중</option><option>유지</option><option>관찰</option><option>보류</option></select></div><div><label>문항 처리 범위</label><select class="processRange" onchange="syncSubject(&#39;s2&#39;)"><option>전체 오답 분석</option><option selected="">고난도/킬러 제외</option><option>중하 난이도 정답률 집중</option><option>집중 과목 핵심문항만</option></select></div><div><label>난이도 선별</label><select class="difficultySelect" onchange="syncSubject(&#39;s2&#39;)"><option>하~중 난이도 우선</option><option>중상 난이도 선별</option><option selected="">4점 중간 난도까지</option><option>고난도/킬러 제외</option><option>킬러 포함 심화</option></select></div><div><label>정답률 목표</label><select class="accuracyTarget" onchange="syncSubject(&#39;s2&#39;)"><option>정답률 60% 이상</option><option selected="">정답률 70% 이상</option><option>정답률 80% 이상</option><option>실수 문항 0개</option><option>선별 문항 전부 맞히기</option></select></div><div><label>오답개수</label><input class="wrongCount" type="number" value="7" placeholder="없으면 자동" oninput="syncSubject(&#39;s2&#39;)"></div></div><div class="grid g4" style="margin-top:10px"><div><label>성적</label><input class="score" type="number" value="72" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>등급</label><input class="grade" value="3등급" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>백분위</label><input class="percentile" type="number" value="78" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>목표 성적</label><input class="targetScore" type="number" value="88" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>목표등급</label><input class="targetGrade" value="2등급" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>목표백분위</label><input class="targetPercentile" type="number" value="90" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>문제풀이순서</label><select class="order" onchange="syncSubject(&#39;s2&#39;)"><option selected="">번호 순서대로</option><option>쉬운 문제부터 선별해서</option><option>선택과목부터</option><option>공통부터</option><option>화작/언매→독서론→문학→독서</option><option>직접 입력</option></select></div><div><label>문제풀이순서 직접 입력</label><input class="orderMemo" value="" oninput="syncSubject(&#39;s2&#39;)"></div><div><label>시간부족</label><select class="time" onchange="syncSubject(&#39;s2&#39;)"><option>없음</option><option>약간</option><option selected="">뚜렷함</option><option>심각</option></select></div><div><label>집중/멘탈</label><select class="mental" onchange="syncSubject(&#39;s2&#39;)"><option selected="">안정</option><option>후반 저하</option><option>특정 문항 이후 흔들림</option><option>불안/당황</option><option>포기감</option></select></div></div><div style="margin-top:12px"><label>틀린 문항별 오답 원인</label><div class="item-row"><input class="no" placeholder="문항" value="22" oninput="syncSubject(&#39;s2&#39;)"><input class="unit" placeholder="단원/유형" value="미분" oninput="syncSubject(&#39;s2&#39;)"><select class="diff" onchange="syncSubject(&#39;s2&#39;)"><option>하</option><option>중</option><option>상</option><option>최상</option><option selected="">킬러</option></select><button class="ghost" onclick="openReasonModal(&#39;s2&#39;,0);markClicked(event)">오답원인 선택</button><div class="reason-summary">공식이 떠오르지 않아서</div><input class="imemo" placeholder="상황메모" value="이번 회차 미션에서는 제외" oninput="syncSubject(&#39;s2&#39;)"><button class="secondary" onclick="removeItem(&#39;s2&#39;,0);markClicked(event)">×</button></div><div class="item-row"><input class="no" placeholder="문항" value="28" oninput="syncSubject(&#39;s2&#39;)"><input class="unit" placeholder="단원/유형" value="적분" oninput="syncSubject(&#39;s2&#39;)"><select class="diff" onchange="syncSubject(&#39;s2&#39;)"><option>하</option><option>중</option><option selected="">상</option><option>최상</option><option>킬러</option></select><button class="ghost" onclick="openReasonModal(&#39;s2&#39;,1);markClicked(event)">오답원인 선택</button><div class="reason-summary">중반이후 마무리 부족, 시간 부족</div><input class="imemo" placeholder="상황메모" value="후반 계산 정리 실패" oninput="syncSubject(&#39;s2&#39;)"><button class="secondary" onclick="removeItem(&#39;s2&#39;,1);markClicked(event)">×</button></div><button class="ghost" onclick="addItem(&#39;s2&#39;);markClicked(event)">+ 문항 추가</button></div><details class="progress-box" open=""><summary>학습 진도 · 미학습 범위 · 점수 해석 보정</summary><div class="progress-grid"><div><label>현재 준비도</label><select class="preparationLevel" onchange="syncSubject(&#39;s2&#39;)"><option selected="">전 범위 실전 준비 완료</option><option>개념 완료·실전 연습 부족</option><option>주요 단원만 학습</option><option>개념 학습 진행 중</option><option>거의 준비하지 못함</option></select></div><div><label>미학습 문항 수</label><select class="unlearnedCount" onchange="syncSubject(&#39;s2&#39;)"><option selected="">0</option><option>1~2</option><option>3~5</option><option>6개 이상</option></select></div><div><label>학습 완료 범위 오답 수</label><select class="learnedErrorCount" onchange="syncSubject(&#39;s2&#39;)"><option selected="">0</option><option>1~2</option><option>3~5</option><option>6개 이상</option></select></div><div><label>학습 완료 단원/영역</label><textarea class="completedUnits" oninput="syncSubject(&#39;s2&#39;)" placeholder="예: 수학Ⅰ 수열, 수학Ⅱ 미분 / 독서 사회·문학 현대시"></textarea></div><div><label>학습 중 단원/영역</label><textarea class="inProgressUnits" oninput="syncSubject(&#39;s2&#39;)" placeholder="예: 적분 기본유형 / 언어와매체 문법"></textarea></div><div><label>미학습 단원/영역</label><textarea class="unlearnedUnits" oninput="syncSubject(&#39;s2&#39;)" placeholder="예: 미적분 적분법 / 탐구 유전"></textarea></div><div><label>시험 후 확인된 부족 단원</label><textarea class="weakUnits" oninput="syncSubject(&#39;s2&#39;)" placeholder="단원명과 관련 문항을 함께 기록"></textarea></div><div><label>집중 붕괴 시점</label><select class="concentrationBreak" onchange="syncSubject(&#39;s2&#39;)"><option selected="">없음</option><option>초반</option><option>중반</option><option>후반</option><option>마지막 10분</option><option>여러 번 반복</option></select></div><div><label>집중 회복 결과</label><select class="recoveryResult" onchange="syncSubject(&#39;s2&#39;)"><option selected="">해당 없음</option><option>10초 리셋 후 바로 회복</option><option>문제 이동 후 회복</option><option>부분 회복</option><option>회복 실패</option></select></div></div><div style="margin-top:9px"><label>점수 해석 기준</label><select class="scoreBasis" onchange="syncSubject(&#39;s2&#39;)"><option selected="">전 범위 학습 완료 상태의 실전 점수</option><option>일부 미학습 범위가 반영된 점수</option><option>주요 단원만 학습한 상태의 점수</option><option>개념 완료·문제풀이 부족 상태의 점수</option><option>진도보다 시험 운영 영향이 큰 점수</option><option>진도와 시험 운영이 함께 반영된 점수</option></select></div><div class="progress-note">실제 원점수는 그대로 유지합니다. 이 항목은 진도 부족과 시험 운영 실패를 구분해 리포트 문구를 보정하는 데 사용됩니다.</div></details><details class="situation-box" open=""><summary>CHALLENGER AAR 상황 분석 · 행동강령 확정</summary><div class="situation-grid"><div><label>시스템 추천 상황 유형</label><input class="situationType" value="고난도 집착형" readonly=""></div><div><label>주요 영향 요인</label><input class="primaryFactor" value="문제 전환 실패·시간 배분" readonly=""></div><div><label>진도 영향</label><input class="progressImpact" value="낮음" readonly=""></div><div><label>시험 운영 영향</label><input class="operationImpact" value="높음" readonly=""></div><div><label>매니저 최종 상황 유형</label><select class="managerSituationType" onchange="syncSubject(&#39;s2&#39;)"><option value="" selected="">시스템 추천 후 선택</option><option value="진도 부족형">진도 부족형</option><option value="개념 미완성형">개념 미완성형</option><option value="학습 후 인출 실패형">학습 후 인출 실패형</option><option value="문제 적용 부족형">문제 적용 부족형</option><option value="시간 배분 실패형">시간 배분 실패형</option><option value="고난도 집착형">고난도 집착형</option><option value="정확도·실수형">정확도·실수형</option><option value="집중 회복 실패형">집중 회복 실패형</option><option value="장시간 시험 체력형">장시간 시험 체력형</option><option value="과목 간 감정 전이형">과목 간 감정 전이형</option><option value="미준비 과목 완주 부족형">미준비 과목 완주 부족형</option><option value="복합 원인형">복합 원인형</option><option value="안정 수행형">안정 수행형</option></select></div><div><label>매니저 확정 상태</label><select class="managerConfirmed" onchange="syncSubject(&#39;s2&#39;)"><option selected="">미확정</option><option>추천 그대로 적용</option><option>수정 후 확정</option><option>이번 회차 보류</option></select></div></div><div class="situation-result"><label>시스템 추천 행동강령</label><textarea class="recommendedActions" readonly="">풀이 진전이 없으면 과목별 제한시간 안에 표시 후 이동한다.
 1차 풀이에서는 해결 가능한 문항을 먼저 확보한다.</textarea><label style="margin-top:8px">매니저 최종 행동강령 · 학생에게는 1~2개만 제시</label><textarea class="managerActions" oninput="syncSubject(&#39;s2&#39;)" placeholder="추천 문구를 확인하고 학생 상황에 맞게 최종 확정하세요"></textarea><label style="margin-top:8px">다음 회차 확인 기준</label><textarea class="nextCriteria" oninput="syncSubject(&#39;s2&#39;)" placeholder="예: 미완료 문항 감소 / 집중 붕괴 시점 지연 / 10초 리셋 실행 여부">미완료 문항 수 감소 / 제한시간 전환 실행 / 쉬운 문항 확보 여부</textarea><div class="row no-print" style="margin-top:9px"><button type="button" onclick="recommendSituation(&#39;s2&#39;);markClicked(event)">상황 분석 추천</button><button type="button" class="ghost" onclick="applySituationRecommendation(&#39;s2&#39;);markClicked(event)">추천 행동강령 적용</button></div></div><div class="manager-confirm">점수는 수정하지 않습니다. 진도 영향과 시험 운영 영향을 분리한 뒤, 시스템 추천을 매니저가 최종 확정합니다.</div></details><div style="margin-top:12px"><label>매니저 수정/추가 메모</label><textarea class="memo" oninput="syncSubject(&#39;s2&#39;)" placeholder="아래 옵션 태그를 눌러 자동 삽입 후 학생 상황에 맞게 수정하세요"></textarea><div class="memo-tools"><b>빠른 메모 옵션</b><div class="quicktags"><span class="quicktag" onclick="appendSubjectMemo(&#39;s2&#39;,&#39;reason&#39;)">오답원인 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s2&#39;,&#39;action&#39;)">핵심행동 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s2&#39;,&#39;range&#39;)">처리범위 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s2&#39;,&#39;items&#39;)">문항·단원 넣기</span><span class="quicktag" onclick="appendSubjectMemo(&#39;s2&#39;,&#39;student&#39;)">학생용 한 줄 처방</span></div></div></div></div></div>
-<div class="row no-print" style="margin-top:8px;gap:8px;align-items:center">
-  <label style="margin:0;font-weight:700;font-size:12px;color:#64748b;">과거 저장 회차</label>
-  <select id="historyLoadSelect" style="max-width:260px"></select>
-  <button class="ghost" onclick="loadHistoryRound();markClicked(event)">📂 선택 회차 불러오기</button>
-  <button class="warn" onclick="deleteHistoryRound();markClicked(event)">🗑 선택 회차 삭제</button>
-  <span style="font-size:11px;color:#94a3b8;">※ 불러오면 현재 입력 중인 내용은 사라집니다(먼저 저장하세요)</span>
 </div>
-<div class="row no-print"><button onclick="generate();showTab(&#39;weekly&#39;);markClicked(event)">분석/행동강령 생성</button><button class="secondary" onclick="saveSession();markClicked(event)">현재 회차 저장 후 누적 반영</button><button class="ghost" id="sampleHistBtn" onclick="__SG_confirmSampleLoad(event)">샘플 과거 회차 불러오기</button><button class="warn" onclick="clearCurrentStudentHistory();markClicked(event)">현재 학생 누적기록 초기화</button></div></div>
 </section>
 
 
@@ -29936,7 +30457,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
 </section>
 
 
-<section id="weekly" class="panel print-target"><div class="card"><div class="row no-print"><h2>8. 상담리포트 (상담용+처방전+누적 통합)</h2><button class="right" onclick="__SG_printSection(this)">한 번에 인쇄/PDF</button></div><div id="weeklyReport"><div class="premium-cover">
+<section id="weekly" class="panel print-target"><div class="card"><div class="row no-print"><h2>결과리포트 (상담용+처방전+누적 통합)</h2><button class="right" onclick="__SG_printSection(this)">한 번에 인쇄/PDF</button></div><div id="weeklyReport"><div class="premium-cover">
   <div class="cover-side">PRECISION<br>ANALYSIS<br>ACHIEVES<br>EXCELLENCE</div>
   <div class="cover-side-list"><div>◎ 정밀 분석</div><div>✓ 실천 처방</div><div>↗ 누적 변화</div></div>
   <div class="cover-accent"></div>
@@ -30069,7 +30590,36 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function toast(msg){let t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500)}function markClicked(e){if(!e)return;e.currentTarget.classList.add('clicked');setTimeout(()=>e.currentTarget.classList.remove('clicked'),600)}
 function appendField(id,txt){let el=$(id);let cur=(el.value||'').trim();el.value=cur?cur+' / '+txt:txt;toast('입력란에 반영했습니다.')}
 function appendSubjectMemo(sid,type){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);let iss=issues(s);let txt='';if(type==='reason')txt=iss.map(i=>i.tag).join(' / ')||'오답원인 미선택';if(type==='action')txt=iss.slice(0,2).map(i=>actionFor(s,i.tag)).join(' / ')||'행동강령 생성 전';if(type==='range')txt=\`\${s.processRange} · \${s.difficultySelect} · \${s.accuracyTarget}\`;if(type==='items')txt=iss.map(i=>\`\${i.items.join(', ')}번 \${[...new Set(i.units)].join(', ')}\`).join(' / ')||'문항·단원 미입력';if(type==='student')txt=\`이번 회차는 \${name(s)}에서 \${s.difficultySelect} 범위만 완료하고 \${s.accuracyTarget} 달성을 확인한다.\`;s.memo=((s.memo||'')+(s.memo?'\\n':'')+txt).trim();renderSubjects();toast('매니저 메모에 반영했습니다.')}
-function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let ids=['omrAutomationPanel','input','answerKeyPanel','batchGradingPanel','qrAdminPanel','studentReflectionPanel','reflectionApplyPanel','weekly','aarPanel','statsPanel'];let i=ids.indexOf(id);if(i>-1)document.querySelectorAll('.tab')[i].classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR();if(id==='statsPanel')renderStatsPanel()}
+function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));$(id).classList.add('active');let activeBtn=document.querySelector('.tab[data-tabid="'+id+'"]');if(activeBtn)activeBtn.classList.add('active');if(id==='weekly')renderWeekly();if(id==='aarPanel')renderAAR();if(id==='statsPanel')renderStatsPanel()}
+// ★ 2026-09-16(430 12차) 신규: 자주 안 쓰는 탭(OMR자동화/단일채점/일괄채점/QR회차/학생복기/
+// 복기반영/매니저AAR)을 "🔧 부가기능" 드롭다운 안으로 옮기면서 추가한 토글 함수들.
+// 위 showTab()이 예전에는 .tab을 화면에 보이는 순서(배열 인덱스)로 찾았는데, 드롭다운
+// 안에 일부 탭 버튼이 중첩되면서 그 방식이 깨져서 각 버튼의 data-tabid 속성으로 직접
+// 찾도록 바꿨다(순서·중첩 위치와 무관하게 항상 정확히 매칭됨).
+function toggleChgMoreMenu(e){
+  if(e)e.stopPropagation();
+  const m=$('chgMoreMenu'),b=document.querySelector('.tab-more-btn');
+  if(!m||!b)return;
+  const open=m.classList.contains('open');
+  if(open){m.classList.remove('open');b.classList.remove('open');return;}
+  m.classList.add('open');b.classList.add('open');
+  // ★ 430(19차) 수정: 탭이 너무 많아 nav가 두 줄로 줄바꿈되면, 예전처럼 "nav 전체의 우측
+  // 끝(right:0)"에 고정된 위치는 실제 '부가기능' 버튼 위치와 어긋나 드롭다운이 엉뚱한
+  // 오른쪽에 나타나는 문제가 있었다. 버튼의 실제 화면 좌표를 기준으로 매번 다시 계산해
+  // 줄바꿈 여부와 무관하게 항상 버튼 바로 아래(우측 정렬)에 나타나도록 한다.
+  const nav=b.closest('nav.tabs')||b.parentElement;
+  if(nav){
+    const navRect=nav.getBoundingClientRect();
+    const btnRect=b.getBoundingClientRect();
+    let left=btnRect.right-navRect.left-m.offsetWidth;
+    if(left<0)left=0;
+    m.style.right='auto';
+    m.style.left=left+'px';
+    m.style.top=(btnRect.bottom-navRect.top+4)+'px';
+  }
+}
+function closeChgMoreMenu(){const m=$('chgMoreMenu'),b=document.querySelector('.tab-more-btn');if(m)m.classList.remove('open');if(b)b.classList.remove('open');}
+document.addEventListener('click',function(e){const m=$('chgMoreMenu');if(!m||!m.classList.contains('open'))return;if(!m.contains(e.target)&&!e.target.classList.contains('tab-more-btn'))closeChgMoreMenu();});
 function loadStudent(){ $('studentName').value='홍길동';$('studentSchool').value='합격고등학교 3학년';$('target').value='서울대학교 자유전공학부';$('managerName').value='에이스';toast('학생정보를 불러왔습니다.')}
 // ★ 2026-09-10(401) 수정: 이 함수는 새 과목 카드를 만들 때도 쓰이지만, __SG_initFromHost가
 // 저장돼있던 과목들을 화면에 복원할 때도 한 개씩 이 함수를 거쳐서 state.subjects를 다시 만든다.
@@ -30078,6 +30628,22 @@ function loadStudent(){ $('studentName').value='홍길동';$('studentSchool').va
 // 제출했다는 표시(_studentSelfInput)와 원본 답안(studentAnswers)이 조용히 사라지고 매번 새
 // sid가 발급되는 버그였다 — "분명 학생이 직접 입력했는데 AAR통계/학생답안 화면에는 안 나온다"는
 // 신고의 근본 원인. sid는 기존 값이 있으면 그대로 쓰고, studentAnswers/_studentSelfInput도 그대로 보존한다.
+// ★ 2026-09-16(430 17차) 추가: "이번 회차 과목별 입력" 카드가 과목이 늘어날수록 화면을
+// 많이 차지해 시각적으로 부담스럽다는 요청 → 과목 카드별 접기/펼치기. syncSubject는
+// 매 입력마다 renderSubjects를 다시 호출하지 않으므로(값만 state에 반영) 이 상태를
+// 여기(모듈 스코프)에 별도로 들고 있어야 add/remove 등으로 다시 그려져도 유지된다.
+let _sgSubjectCollapsed={};
+// ★ 430(19차) 수정: _sgSubjectCollapsed[sid]가 false로 명시된 경우에만 "펼침"이고, 그 외
+// (undefined 포함)는 전부 "접힘"으로 간주한다 — 기본 셋팅이 항상 접힌 상태로 시작되도록.
+// 또한 접기/펼치기로 카드 높이가 크게 바뀌면 브라우저의 스크롤 앵커링이 어긋나 화면이
+// 갑자기 튀거나 멈추는 문제가 있어, 재렌더 전후 스크롤 위치를 직접 고정해준다.
+function toggleSubjectCollapse(sid){
+  const wasCollapsed = _sgSubjectCollapsed[sid]!==false;
+  _sgSubjectCollapsed[sid] = wasCollapsed ? false : true;
+  const _sy = window.scrollY||document.documentElement.scrollTop||0;
+  renderSubjects();
+  requestAnimationFrame(function(){ window.scrollTo(0, _sy); });
+}
 function addSubject(p={}){let sid='s'+(++seq);state.subjects.push({sid:(p.sid||sid),subject:p.subject||(['KOR','MATH','ENG'][state.subjects.length]||'INQ'),detail:p.detail||'',level:p.level||'',focus:p.focus||'',processRange:p.processRange||'',difficultySelect:p.difficultySelect||'',accuracyTarget:p.accuracyTarget||'',score:p.score||'',grade:p.grade||'',percentile:p.percentile||'',targetScore:p.targetScore||'',targetGrade:p.targetGrade||'',targetPercentile:p.targetPercentile||'',wrongCount:p.wrongCount||'',totalItemCount:p.totalItemCount||'',order:p.order||'번호 순서대로',orderMemo:p.orderMemo||'',time:p.time||'없음',mental:p.mental||'안정',items:p.items||[{no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false}],preparationLevel:p.preparationLevel||'',completedUnits:p.completedUnits||'',inProgressUnits:p.inProgressUnits||'',unlearnedUnits:p.unlearnedUnits||'',weakUnits:p.weakUnits||'',unlearnedCount:p.unlearnedCount||'',learnedErrorCount:p.learnedErrorCount||'',scoreBasis:p.scoreBasis||'',concentrationBreak:p.concentrationBreak||'',recoveryResult:p.recoveryResult||'',situationType:p.situationType||'',primaryFactor:p.primaryFactor||'',progressImpact:p.progressImpact||'',operationImpact:p.operationImpact||'',recommendedActions:p.recommendedActions||'',studentSituationTypes:p.studentSituationTypes||[],managerSituationType:p.managerSituationType||'',managerActions:p.managerActions||'',nextCriteria:p.nextCriteria||'',managerConfirmed:p.managerConfirmed||'미확정',memo:p.memo||'',aar:p.aar||{},studentAnswers:p.studentAnswers||{},_studentSelfInput:p._studentSelfInput});renderSubjects()}
 function syncSubject(sid){let c=document.querySelector(\`[data-sid="\${sid}"]\`),s=state.subjects.find(x=>x.sid===sid);if(!c||!s)return;['subject','detail','level','focus','processRange','difficultySelect','accuracyTarget','score','grade','percentile','targetScore','targetGrade','targetPercentile','wrongCount','totalItemCount','order','orderMemo','time','mental','preparationLevel','weakUnits','unlearnedCount','learnedErrorCount','concentrationBreak','recoveryResult','primaryFactor','progressImpact','operationImpact','memo'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=(k==='detail')?_cbrNormalizeDetail(e.value):e.value});['completedUnits','inProgressUnits','unlearnedUnits'].forEach(k=>{let e=c.querySelector('.'+k);if(e)s[k]=e.multiple?[...e.selectedOptions].map(o=>o.value).join(', '):e.value});{let e=c.querySelector('.studentSituationTypes');if(e)s.studentSituationTypes=[...e.selectedOptions].map(o=>o.value);}s.items=[...c.querySelectorAll('.item-row')].map((r,i)=>({no:r.querySelector('.no').value,unit:r.querySelector('.unit').value,diff:r.querySelector('.diff').value,reasons:s.items[i]?.reasons||[],memo:r.querySelector('.imemo').value,points:(r.querySelector('.points')||{}).value||'',causePrimary:(r.querySelector('.causePrimary')||{}).value||'',guessedTime:!!(r.querySelector('.guessedTime')||{}).checked,answer:s.items[i]?.answer||'',explanation:s.items[i]?.explanation||'',question:s.items[i]?.question||''}));updateOverallCompliance()}
 function syncAll(){state.subjects.forEach(s=>syncSubject(s.sid))}
@@ -30088,8 +30654,15 @@ const _SG_UNIT_LIST = {
   ENG: ['어휘','주제·제목','주장·요지','빈칸 추론','무관한 문장','글의 순서','문장 삽입','요약문','장문 독해','듣기'],
   INQ: [], HIST: [], LANG: []
 };
-function card(s){let rows=s.items.map((it,i)=>{const _sug=suggestCause(it);const _sugId='cp_'+s.sid+'_'+i;return \`<div class="item-row"><input class="no" placeholder="문항" value="\${esc(it.no)}" oninput="syncSubject('\${s.sid}')"><input class="unit" placeholder="단원/유형" value="\${esc(it.unit)}" oninput="syncSubject('\${s.sid}')"><select class="diff" onchange="syncSubject('\${s.sid}')">\${['하','중','상','최상','킬러'].map(v=>\`<option \${it.diff===v?'selected':''}>\${v}</option>\`).join('')}</select><div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0"><input class="points" type="number" placeholder="배점" title="문항 배점" value="\${esc(it.points)}" style="width:52px;flex:none" oninput="syncSubject('\${s.sid}')"><select id="\${_sugId}" class="causePrimary" title="오답 1차 원인(교정가능점수용)" style="width:auto;flex:none" onchange="syncSubject('\${s.sid}')">\${[['','1차원인'],['K','K 지식부족'],['T','T 시간손실'],['M','M 실수'],['J','J 판단·집착'],['C','C 집중붕괴'],['U','U 판정보류']].map(o=>\`<option value="\${o[0]}" \${(it.causePrimary||'')===o[0]?'selected':''}>\${o[1]}</option>\`).join('')}</select>\${_sug&&!it.causePrimary?\`<span class="small muted" style="white-space:nowrap" title="시스템 추천(참고용) — 최종 판정은 매니저가 선택">추천:\${_SG_CAUSE_LABEL[_sug]} <button type="button" class="ghost" style="padding:2px 6px;font-size:10px" onclick="document.getElementById('\${_sugId}').value='\${_sug}';syncSubject('\${s.sid}');markClicked(event)">적용</button></span>\`:''}<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748b;white-space:nowrap;flex:none"><input type="checkbox" class="guessedTime" style="width:16px;height:16px;flex:none;padding:0;margin:0;-webkit-appearance:checkbox;appearance:checkbox" \${it.guessedTime?'checked':''} onchange="syncSubject('\${s.sid}')">찍음/미응답</label></div><button class="ghost" onclick="openReasonModal('\${s.sid}',\${i});markClicked(event)">오답원인 선택</button><div class="reason-summary">\${esc((it.reasons||[]).join(', ')||'선택 전')}</div><input class="imemo" placeholder="상황메모" value="\${esc(it.memo)}" oninput="syncSubject('\${s.sid}')"><button class="secondary" onclick="removeItem('\${s.sid}',\${i});markClicked(event)">×</button></div>\`}).join('');
-return \`<div class="card subject-card" data-sid="\${s.sid}"><div class="row"><h3>과목 입력</h3><button class="secondary right" onclick="removeSubject('\${s.sid}');markClicked(event)">삭제</button></div><div class="grid g4"><div><label>과목</label><select class="subject" onchange="syncSubject('\${s.sid}');let ss=state.subjects.find(x=>x.sid==='\${s.sid}');ss.items.forEach(i=>i.reasons=[]);renderSubjects()">\${Object.entries(SUBJECTS).map(([k,v])=>\`<option value="\${k}" \${s.subject===k?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>세부 과목</label><input class="detail" value="\${esc(s.detail)}" oninput="syncSubject('\${s.sid}')"></div><div><label>실력 수준</label><select class="level" onchange="syncSubject('\${s.sid}')">\${['','상위권','중위권','하위권','불안정권'].map(v=>\`<option value="\${v}" \${s.level===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>이번 회차 집중 여부</label><select class="focus" onchange="syncSubject('\${s.sid}')">\${['','집중','유지','관찰','보류'].map(v=>\`<option value="\${v}" \${s.focus===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>문항 처리 범위</label><select class="processRange" onchange="syncSubject('\${s.sid}')">\${['','전체 오답 분석','고난도/킬러 제외','중하 난이도 정답률 집중','집중 과목 핵심문항만'].map(v=>\`<option value="\${v}" \${s.processRange===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>난이도 선별</label><select class="difficultySelect" onchange="syncSubject('\${s.sid}')">\${['','하~중 난이도 우선','중상 난이도 선별','4점 중간 난도까지','고난도/킬러 제외','킬러 포함 심화'].map(v=>\`<option value="\${v}" \${s.difficultySelect===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>정답률 목표</label><select class="accuracyTarget" onchange="syncSubject('\${s.sid}')">\${['','정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'].map(v=>\`<option value="\${v}" \${s.accuracyTarget===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>오답개수</label><input class="wrongCount" type="number" value="\${esc(s.wrongCount)}" placeholder="없으면 자동" oninput="syncSubject('\${s.sid}')"></div><div><label>전체 문항 수</label><input class="totalItemCount" type="number" value="\${esc(s.totalItemCount)}" placeholder="예: 45" oninput="syncSubject('\${s.sid}')"></div></div><div class="grid g4" style="margin-top:10px"><div><label>성적</label><input class="score" type="number" value="\${esc(s.score)}" oninput="syncSubject('\${s.sid}')"></div><div><label>등급</label><input class="grade" value="\${esc(s.grade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>백분위</label><input class="percentile" type="number" value="\${esc(s.percentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표 성적</label><input class="targetScore" type="number" value="\${esc(s.targetScore)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표등급</label><input class="targetGrade" value="\${esc(s.targetGrade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표백분위</label><input class="targetPercentile" type="number" value="\${esc(s.targetPercentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>문제풀이순서</label><select class="order" onchange="syncSubject('\${s.sid}')">\${['번호 순서대로','쉬운 문제부터 선별해서','선택과목부터','공통부터','화작/언매→독서론→문학→독서','직접 입력'].map(v=>\`<option \${s.order===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>문제풀이순서 직접 입력</label><input class="orderMemo" value="\${esc(s.orderMemo)}" oninput="syncSubject('\${s.sid}')"></div><div><label>시간부족</label><select class="time" onchange="syncSubject('\${s.sid}')">\${['없음','약간','뚜렷함','심각'].map(v=>\`<option \${s.time===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>집중/멘탈</label><select class="mental" onchange="syncSubject('\${s.sid}')">\${['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'].map(v=>\`<option \${s.mental===v?'selected':''}>\${v}</option>\`).join('')}</select></div></div><div style="margin-top:12px"><label>틀린 문항별 오답 원인</label><div class="small muted" style="margin:2px 0 6px">문항별 "1차원인(K/T/M/J/C/U)"을 채워야 실전 수행손실 분석에 반영됩니다. 오답원인 선택/찍음 체크만으로는 반영되지 않습니다.</div>\${rows}<div class="row no-print" style="margin-top:6px;gap:8px"><button class="ghost" onclick="addItem('\${s.sid}');markClicked(event)">+ 문항 추가</button><button class="ghost" title="문항별 오답원인·찍음 체크를 바탕으로 시스템이 추천한 1차원인을, 아직 비어있는 문항에 한해 한번에 반영합니다" onclick="applyAllSuggestedCauses('\${s.sid}');markClicked(event)">⚡ 추천 1차원인 일괄 적용</button></div></div><div style="margin-top:12px"><label>매니저 수정/추가 메모</label><textarea class="memo" oninput="syncSubject('\${s.sid}')" placeholder="아래 옵션 태그를 눌러 자동 삽입 후 학생 상황에 맞게 수정하세요">\${esc(s.memo)}</textarea><div class="memo-tools"><b>빠른 메모 옵션</b><div class="quicktags"><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','reason')">오답원인 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','action')">핵심행동 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','range')">처리범위 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','items')">문항·단원 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','student')">학생용 한 줄 처방</span></div></div></div></div>\`}
+function card(s){
+let collapsed=_sgSubjectCollapsed[s.sid]!==false;
+let _cardLabel=(SUBJECTS[s.subject]||s.subject)+(s.detail?'('+s.detail+')':'');
+let _cardWrongCnt=s.wrongCount||(s.items||[]).filter(it=>it&&it.no).length||0;
+if(collapsed){
+  return \`<div class="card subject-card collapsed" data-sid="\${s.sid}"><div class="row"><h3>과목 입력 <span class="subject-card-label">· \${esc(_cardLabel)}</span></h3><div style="display:flex;gap:6px;align-items:center"><button type="button" class="ghost" onclick="toggleSubjectCollapse('\${s.sid}');markClicked(event)">▸ 펼치기</button><button class="secondary" onclick="removeSubject('\${s.sid}');markClicked(event)">삭제</button></div></div><div class="subject-card-summary">오답 \${_cardWrongCnt}개\${s.score?' · 성적 '+esc(String(s.score)):''}\${s.level?' · '+esc(s.level):''}</div></div>\`;
+}
+let rows=s.items.map((it,i)=>{const _sug=suggestCause(it);const _sugId='cp_'+s.sid+'_'+i;return \`<div class="item-row"><input class="no" placeholder="문항" value="\${esc(it.no)}" oninput="syncSubject('\${s.sid}')"><input class="unit" placeholder="단원/유형" value="\${esc(it.unit)}" oninput="syncSubject('\${s.sid}')"><select class="diff" onchange="syncSubject('\${s.sid}')">\${['하','중','상','최상','킬러'].map(v=>\`<option \${it.diff===v?'selected':''}>\${v}</option>\`).join('')}</select><div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0"><input class="points" type="number" placeholder="배점" title="문항 배점" value="\${esc(it.points)}" style="width:52px;flex:none" oninput="syncSubject('\${s.sid}')"><select id="\${_sugId}" class="causePrimary" title="오답 1차 원인(교정가능점수용)" style="width:auto;flex:none" onchange="syncSubject('\${s.sid}')">\${[['','1차원인'],['K','K 지식부족'],['T','T 시간손실'],['M','M 실수'],['J','J 판단·집착'],['C','C 집중붕괴'],['U','U 판정보류']].map(o=>\`<option value="\${o[0]}" \${(it.causePrimary||'')===o[0]?'selected':''}>\${o[1]}</option>\`).join('')}</select>\${_sug&&!it.causePrimary?\`<span class="small muted" style="white-space:nowrap" title="시스템 추천(참고용) — 최종 판정은 매니저가 선택">추천:\${_SG_CAUSE_LABEL[_sug]} <button type="button" class="ghost" style="padding:2px 6px;font-size:10px" onclick="document.getElementById('\${_sugId}').value='\${_sug}';syncSubject('\${s.sid}');markClicked(event)">적용</button></span>\`:''}<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748b;white-space:nowrap;flex:none"><input type="checkbox" class="guessedTime" style="width:16px;height:16px;flex:none;padding:0;margin:0;-webkit-appearance:checkbox;appearance:checkbox" \${it.guessedTime?'checked':''} onchange="syncSubject('\${s.sid}')">찍음/미응답</label></div><button class="ghost" onclick="openReasonModal('\${s.sid}',\${i});markClicked(event)">오답원인 선택</button><div class="reason-summary">\${esc((it.reasons||[]).join(', ')||'선택 전')}</div><input class="imemo" placeholder="상황메모" value="\${esc(it.memo)}" oninput="syncSubject('\${s.sid}')"><button class="secondary" onclick="removeItem('\${s.sid}',\${i});markClicked(event)">×</button></div>\`}).join('');
+return \`<div class="card subject-card" data-sid="\${s.sid}"><div class="row"><h3>과목 입력 <span class="subject-card-label">· \${esc(_cardLabel)}</span></h3><div style="display:flex;gap:6px;align-items:center" class="right"><button type="button" class="ghost" onclick="toggleSubjectCollapse('\${s.sid}');markClicked(event)">▴ 접기</button><button class="secondary" onclick="removeSubject('\${s.sid}');markClicked(event)">삭제</button></div></div><div class="grid g4"><div><label>과목</label><select class="subject" onchange="syncSubject('\${s.sid}');let ss=state.subjects.find(x=>x.sid==='\${s.sid}');ss.items.forEach(i=>i.reasons=[]);renderSubjects()">\${Object.entries(SUBJECTS).map(([k,v])=>\`<option value="\${k}" \${s.subject===k?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>세부 과목</label><input class="detail" value="\${esc(s.detail)}" oninput="syncSubject('\${s.sid}')"></div><div><label>실력 수준</label><select class="level" onchange="syncSubject('\${s.sid}')">\${['','상위권','중위권','하위권','불안정권'].map(v=>\`<option value="\${v}" \${s.level===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>이번 회차 집중 여부</label><select class="focus" onchange="syncSubject('\${s.sid}')">\${['','집중','유지','관찰','보류'].map(v=>\`<option value="\${v}" \${s.focus===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>문항 처리 범위</label><select class="processRange" onchange="syncSubject('\${s.sid}')">\${['','전체 오답 분석','고난도/킬러 제외','중하 난이도 정답률 집중','집중 과목 핵심문항만'].map(v=>\`<option value="\${v}" \${s.processRange===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>난이도 선별</label><select class="difficultySelect" onchange="syncSubject('\${s.sid}')">\${['','하~중 난이도 우선','중상 난이도 선별','4점 중간 난도까지','고난도/킬러 제외','킬러 포함 심화'].map(v=>\`<option value="\${v}" \${s.difficultySelect===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>정답률 목표</label><select class="accuracyTarget" onchange="syncSubject('\${s.sid}')">\${['','정답률 60% 이상','정답률 70% 이상','정답률 80% 이상','실수 문항 0개','선별 문항 전부 맞히기'].map(v=>\`<option value="\${v}" \${s.accuracyTarget===v?'selected':''}>\${v||'선택 안 함'}</option>\`).join('')}</select></div><div><label>오답개수</label><input class="wrongCount" type="number" value="\${esc(s.wrongCount)}" placeholder="없으면 자동" oninput="syncSubject('\${s.sid}')"></div><div><label>전체 문항 수</label><input class="totalItemCount" type="number" value="\${esc(s.totalItemCount)}" placeholder="예: 45" oninput="syncSubject('\${s.sid}')"></div></div><div class="grid g4" style="margin-top:10px"><div><label>성적</label><input class="score" type="number" value="\${esc(s.score)}" oninput="syncSubject('\${s.sid}')"></div><div><label>등급</label><input class="grade" value="\${esc(s.grade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>백분위</label><input class="percentile" type="number" value="\${esc(s.percentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표 성적</label><input class="targetScore" type="number" value="\${esc(s.targetScore)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표등급</label><input class="targetGrade" value="\${esc(s.targetGrade)}" oninput="syncSubject('\${s.sid}')"></div><div><label>목표백분위</label><input class="targetPercentile" type="number" value="\${esc(s.targetPercentile)}" oninput="syncSubject('\${s.sid}')"></div><div><label>문제풀이순서</label><select class="order" onchange="syncSubject('\${s.sid}')">\${['번호 순서대로','쉬운 문제부터 선별해서','선택과목부터','공통부터','화작/언매→독서론→문학→독서','직접 입력'].map(v=>\`<option \${s.order===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>문제풀이순서 직접 입력</label><input class="orderMemo" value="\${esc(s.orderMemo)}" oninput="syncSubject('\${s.sid}')"></div><div><label>시간부족</label><select class="time" onchange="syncSubject('\${s.sid}')">\${['없음','약간','뚜렷함','심각'].map(v=>\`<option \${s.time===v?'selected':''}>\${v}</option>\`).join('')}</select></div><div><label>집중/멘탈</label><select class="mental" onchange="syncSubject('\${s.sid}')">\${['안정','후반 저하','특정 문항 이후 흔들림','불안/당황','포기감'].map(v=>\`<option \${s.mental===v?'selected':''}>\${v}</option>\`).join('')}</select></div></div><div style="margin-top:12px"><label>틀린 문항별 오답 원인</label><div class="small muted" style="margin:2px 0 6px">문항별 "1차원인(K/T/M/J/C/U)"을 채워야 실전 수행손실 분석에 반영됩니다. 오답원인 선택/찍음 체크만으로는 반영되지 않습니다.</div>\${rows}<div class="row no-print" style="margin-top:6px;gap:8px"><button class="ghost" onclick="addItem('\${s.sid}');markClicked(event)">+ 문항 추가</button><button class="ghost" title="문항별 오답원인·찍음 체크를 바탕으로 시스템이 추천한 1차원인을, 아직 비어있는 문항에 한해 한번에 반영합니다" onclick="applyAllSuggestedCauses('\${s.sid}');markClicked(event)">⚡ 추천 1차원인 일괄 적용</button></div></div><div style="margin-top:12px"><label>매니저 수정/추가 메모</label><textarea class="memo" oninput="syncSubject('\${s.sid}')" placeholder="아래 옵션 태그를 눌러 자동 삽입 후 학생 상황에 맞게 수정하세요">\${esc(s.memo)}</textarea><div class="memo-tools"><b>빠른 메모 옵션</b><div class="quicktags"><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','reason')">오답원인 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','action')">핵심행동 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','range')">처리범위 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','items')">문항·단원 넣기</span><span class="quicktag" onclick="appendSubjectMemo('\${s.sid}','student')">학생용 한 줄 처방</span></div></div></div></div>\`}
 function openReasonModal(sid,idx){syncSubject(sid);modalTarget={sid,idx,temp:[...(state.subjects.find(s=>s.sid===sid).items[idx].reasons||[])]};let s=state.subjects.find(x=>x.sid===sid);$('reasonChips').innerHTML=(TAGS[s.subject]||[]).map(t=>\`<span class="chip \${modalTarget.temp.includes(t)?'active':''}" onclick="toggleModalReason('\${t.replace(/'/g,"\\\\'")}')">\${t}</span>\`).join('');$('reasonModal').style.display='flex'}
 function toggleModalReason(t){let arr=modalTarget.temp;modalTarget.temp=arr.includes(t)?arr.filter(x=>x!==t):[...arr,t];let s=state.subjects.find(x=>x.sid===modalTarget.sid);$('reasonChips').innerHTML=(TAGS[s.subject]||[]).map(tag=>\`<span class="chip \${modalTarget.temp.includes(tag)?'active':''}" onclick="toggleModalReason('\${tag.replace(/'/g,"\\\\'")}')">\${tag}</span>\`).join('')}
 function saveReasons(){let s=state.subjects.find(x=>x.sid===modalTarget.sid);s.items[modalTarget.idx].reasons=[...modalTarget.temp];closeReasonModal();renderSubjects();toast('오답원인을 저장했습니다.')}function clearModalReasons(){modalTarget.temp=[];toggleModalReason('__dummy__');modalTarget.temp=[];let s=state.subjects.find(x=>x.sid===modalTarget.sid);$('reasonChips').innerHTML=(TAGS[s.subject]||[]).map(tag=>\`<span class="chip" onclick="toggleModalReason('\${tag.replace(/'/g,"\\\\'")}')">\${tag}</span>\`).join('')}function closeReasonModal(){$('reasonModal').style.display='none';modalTarget=null}
@@ -45321,7 +45894,7 @@ function generateReport() {
           return '<div style="margin-bottom:18px"><div style="font-weight:800;font-size:13px;color:#0f766e;border-left:4px solid #0f766e;padding-left:8px;margin-bottom:6px">'+_aarEsc(g.label)+' <span style="font-weight:500;color:#94a3b8;font-size:11px">('+g.rows.length+'명)</span></div>'
             +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f0fdfa"><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">학생</th><th style="border:1px solid #e2e8f0;padding:6px 8px">출처</th><th style="border:1px solid #e2e8f0;padding:6px 8px">점수</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">AAR 자가진단(첫 항목)</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">오답원인(1차)</th><th style="border:1px solid #e2e8f0;padding:6px 8px;text-align:left">오답원인(2차)</th></tr></thead><tbody>'+trs+'</tbody></table></div></div>';
         }).join('');
-        contentHtml+='<div style="font-size:11px;color:#999;margin-top:4px">※ 여기 표시되는 학생은 "이 회차에 채점 기록이 있는" 학생 전원입니다(회차 통계표와 동일 기준). 시스템에 이 회차 채점 기록 자체가 전혀 없는 학생은 목록에 나타나지 않습니다. AAR 자가진단은 첫 항목만 미리보기로 표시되며, 학생별 전체 내용은 그 학생을 선택한 뒤 "📊 AAR통계(이 학생)"로 확인하세요.</div>';
+        contentHtml+='<div style="font-size:11px;color:#999;margin-top:4px">※ 여기 표시되는 학생은 "이 회차에 채점 기록이 있는" 학생 전원입니다(회차 통계표와 동일 기준). 시스템에 이 회차 채점 기록 자체가 전혀 없는 학생은 목록에 나타나지 않습니다. AAR 자가진단은 첫 항목만 미리보기로 표시되며, 학생별 전체 내용은 그 학생을 선택한 뒤 "📊 AAR통계(학생)"로 확인하세요.</div>';
       }
     }
 
@@ -45657,6 +46230,109 @@ function generateReport() {
     }
   };
 
+  // ★ 2026-09-16 추가: "공통오답" — 같은 회차(같은 응시일·시험명)를 치른 전체 학생을
+  // 대상으로, 과목별 문항번호마다 몇 명이 틀렸는지(오답 인원·오답률)와 누가 틀렸는지를
+  // 모아서 보여준다. 오답노트가 "학생 1명의 전체 오답"을 보여준다면, 이건 "문항 1개를
+  // 몇 명이 틀렸는지"를 보여주는 반대 방향의 집계 — 공통으로 많이 틀린 문항(취약 문항)을
+  // 한눈에 찾을 수 있다. state.items는 이미 "틀린 문항"만 담고 있으므로(오답노트/회차
+  // 통계표와 동일 전제) 문항번호별로 등장 횟수만 세면 된다.
+  window._gg_printCommonWrongNotes=async function(){
+    var ifr=document.getElementById('challenger-iframe');
+    if(!ifr||!ifr.contentWindow){alert('챌린저 화면을 먼저 열어주세요.');return;}
+    var cw=ifr.contentWindow, cd=cw.document;
+    var liveDateEl=cd.getElementById('testDate'), liveNameEl=cd.getElementById('testName');
+    var info=_batchTargets(liveDateEl?liveDateEl.value:'', liveNameEl?liveNameEl.value:'', false);
+    var targets=info.targets;
+    if(!targets.length){alert('공통오답을 만들 학생을 찾지 못했습니다.');return;}
+
+    var groups={};
+    targets.forEach(function(stu){
+      var subs=(stu.challengerData&&stu.challengerData.lastSubjects)||[];
+      subs.forEach(function(s){
+        if(!s||!s.subject) return;
+        var score=+s.score||0;
+        var items=(s.items||[]).filter(function(it){return it&&it.no;});
+        var wrong=(s.wrongCount!=null&&s.wrongCount!=='')?+s.wrongCount:items.length;
+        if(!score && !wrong) return; // 응시 안 한 과목은 제외(회차 통계표와 동일 기준)
+        var key=_statGroupKey(s.subject,s.detail);
+        if(!groups[key]) groups[key]={label:_statGroupLabel(s.subject,s.detail), totalTakers:0, qMap:{}};
+        groups[key].totalTakers++;
+        items.forEach(function(it){
+          var no=String(it.no);
+          if(!groups[key].qMap[no]) groups[key].qMap[no]={unit:'', count:0, students:[]};
+          groups[key].qMap[no].count++;
+          groups[key].qMap[no].students.push(stu.name||'');
+          if(!groups[key].qMap[no].unit && it.unit) groups[key].qMap[no].unit=it.unit;
+        });
+      });
+    });
+    var groupKeys=Object.keys(groups);
+    if(!groupKeys.length){alert('공통오답을 만들 과목 데이터가 없습니다.');return;}
+    var order={KOR:0,MATH:1,ENG:2,HIST:3};
+    groupKeys.sort(function(a,b){
+      var oa=(a in order)?order[a]:(a.indexOf('INQ:')===0?4:9);
+      var ob=(b in order)?order[b]:(b.indexOf('INQ:')===0?4:9);
+      return oa-ob || a.localeCompare(b,'ko');
+    });
+
+    // ★ 2026-09-16(430 17차) 수정: 열 순서를 공통오답문항→단원/유형→오답률→오답인원→
+    // 오답 학생명단으로 바꾸고(사용자 요청), 단원/유형에 문항별 상세 단원명(예: "도형 ·
+    // 이등변삼각형의 성질 · ...")처럼 긴 텍스트가 들어가 두 줄로 접혀 보이던 것을
+    // 폭을 넓혀 해결. 오답 학생명단 칸은 과도하게 넓어 보이지 않도록 폭을 줄이고
+    // 한 줄에 다 안 들어가면 자연스럽게 줄바꿈되도록 유지한다.
+    var _cwColgroup='<colgroup><col style="width:9%"><col style="width:30%"><col style="width:10%"><col style="width:10%"><col style="width:41%"></colgroup>';
+    function _cwRowHtml(no,q,total){
+      var pct=total?Math.round(q.count/total*100):0;
+      return '<tr><td>'+_wnEsc(no)+'번</td><td class="cw-unit">'+_wnEsc(q.unit||'-')+'</td><td>'+pct+'%</td><td>'+q.count+'명</td><td class="cw-students">'+_wnEsc(q.students.join(', '))+'</td></tr>';
+    }
+    var sections=groupKeys.map(function(key){
+      var g=groups[key];
+      var nos=Object.keys(g.qMap);
+      if(!nos.length){
+        return '<h3>'+_wnEsc(g.label)+' <span class="cw-meta">(응시 '+g.totalTakers+'명)</span></h3><div class="cw-empty">🎉 이 과목은 공통으로 틀린 문항이 없습니다.</div>';
+      }
+      // 오답 인원이 많은 순(취약 문항 우선), 동률이면 문항번호 오름차순
+      nos.sort(function(a,b){ return g.qMap[b].count-g.qMap[a].count || ((parseInt(a,10)||0)-(parseInt(b,10)||0)); });
+      var rows=nos.map(function(no){ return _cwRowHtml(no,g.qMap[no],g.totalTakers); }).join('');
+      return '<h3>'+_wnEsc(g.label)+' <span class="cw-meta">(응시 '+g.totalTakers+'명 · 오답 발생 '+nos.length+'문항)</span></h3>'+
+        '<table class="cw-table">'+_cwColgroup+'<thead><tr><th>공통오답문항</th><th>단원/유형</th><th>오답률</th><th>오답 인원</th><th>오답 학생명단</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    }).join('');
+
+    var title='챌린저_'+(info.date||'회차')+'_'+(info.name||'')+'_공통오답';
+    var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+_wnEsc(title)+'</title>'+
+      '<style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px;color:#1a1a1a}'+
+      'h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#64748b;font-weight:500;margin-top:0}'+
+      'h3{font-size:15px;margin:22px 0 8px;border-left:4px solid #0f766e;padding-left:8px;break-after:avoid;page-break-after:avoid}'+
+      '.cw-meta{font-size:11px;color:#94a3b8;font-weight:500}'+
+      '.cw-empty{font-size:12px;color:#94a3b8;padding:6px 0 4px}'+
+      'table.cw-table{width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:10px;font-size:11.5px;break-inside:avoid;page-break-inside:avoid}'+
+      'table.cw-table th,table.cw-table td{border:1px solid #e2e8f0;padding:5px 7px;text-align:center;word-break:break-word}'+
+      'table.cw-table th{background:#f0fdfa;color:#0f766e}'+
+      'table.cw-table td.cw-unit{text-align:left}'+
+      'table.cw-table td.cw-students{text-align:left;white-space:normal}'+
+      '@media print{body{padding:8mm}table.cw-table{font-size:10.5px}table.cw-table th,table.cw-table td{padding:4px 6px}}'+
+      '</style></head><body>'+
+      '<h1>CHALLENGER 공통오답 리포트</h1>'+
+      '<h2>회차: '+_wnEsc(info.date||'')+' · '+_wnEsc(info.name||'')+' — 과목별 문항번호마다 몇 명이 틀렸는지(오답률 높은 순)를 보여줍니다</h2>'+
+      sections+
+      '<script>window.onload=function(){setTimeout(function(){window.print();},700);};<\/script>'+
+      '</body></html>';
+
+    try{
+      var blob=new Blob([html],{type:'text/html'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.target='_blank'; a.rel='noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    }catch(e){
+      console.error('[SG] 공통오답 생성 오류',e);
+      alert('공통오답을 여는 중 오류가 발생했습니다.\n'+(e&&e.message?e.message:e));
+    }
+  };
+
   // ★ 2026-08-30 추가: 학생이 "챌린저 답안" 페이지(학생용)에서 문항별로 직접 입력·채점한
   // 결과를 관리자가 과목별로 한눈에 확인할 수 있는 화면. 실제 챌린저 입력 화면(iframe,
   // 별도 파일)은 건드리지 않고, 바깥(이 파일)에서 학생 데이터(ST.students)를 직접 읽어
@@ -45900,28 +46576,23 @@ function generateReport() {
     var d=ifr.contentDocument;
     var nav=d.querySelector('nav.tabs');
     if(!nav) return;
-    if(!d.getElementById('sg-batch-print-all')){
-      var b=d.createElement('button');
-      b.id='sg-batch-print-all';
-      b.className='tab';
-      b.type='button';
-      b.textContent='🖨 전체 학생 상담+처방 일괄 출력';
-      // ★ 기존에는 .tab.active와 완전히 같은 브랜드 색(#0f766e)을 상시 칠해서,
-      // 실제로 선택되지 않았는데도 항상 "선택된 탭"처럼 보이는 문제가 있었다.
-      // 흰 배경 + 테두리만 강조하는 스타일로 바꿔 다른 탭들의 active 표시와 구분한다.
-      b.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
-      b.onclick=function(){window._gg_printAllChallengerReports();};
-      nav.appendChild(b);
-    }
+    // ★ 2026-09-16(430 12차) 수정: 예전엔 항상 nav 맨 끝에 appendChild만 했는데, 네이티브
+    // 탭 배치를 "기본입력·결과리포트·학생통계·부가기능(토글)"로 줄이면서 이 버튼들의
+    // 목표 위치가 서로 달라졌다(회차통계표·학생답안·오답노트출력은 결과리포트 앞, AAR통계
+    // 2개·전체출력은 부가기능 토글 버튼 앞). 각 기준 버튼(data-tabid, .tab-more-btn)을 찾아
+    // 그 앞에 insertBefore로 끼워 넣는다 — 기준 버튼을 못 찾으면(구버전 템플릿 등 예외상황)
+    // 기존처럼 nav 맨 끝에 appendChild로 안전하게 폴백한다.
+    var weeklyBtn = nav.querySelector('[data-tabid="weekly"]');
+    var moreBtn = nav.querySelector('.tab-more-btn');
+    function place(el, beforeEl){ if(beforeEl) nav.insertBefore(el, beforeEl); else nav.appendChild(el); }
     if(!d.getElementById('sg-exam-stats-print')){
       var b2=d.createElement('button');
       b2.id='sg-exam-stats-print';
       b2.className='tab';
       b2.type='button';
       b2.textContent='📊 회차 통계표';
-      b2.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
       b2.onclick=function(){window._gg_printExamStats();};
-      nav.appendChild(b2);
+      place(b2, weeklyBtn);
     }
     if(!d.getElementById('sg-student-answer-view')){
       var b2b=d.createElement('button');
@@ -45930,9 +46601,8 @@ function generateReport() {
       b2b.type='button';
       b2b.textContent='🖊️ 학생답안';
       b2b.title='학생이 "챌린저 답안" 페이지에서 직접 입력·제출한 답안을 과목별로 확인합니다';
-      b2b.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
       b2b.onclick=function(){window._sgOpenStudentAnswerView();};
-      nav.appendChild(b2b);
+      place(b2b, weeklyBtn);
     }
     if(!d.getElementById('sg-wrong-notes-print')){
       var b3=d.createElement('button');
@@ -45940,10 +46610,23 @@ function generateReport() {
       b3.className='tab';
       b3.type='button';
       b3.textContent='📓 오답노트 출력';
-      b3.title='지금 보고 있는 이 학생의 오답노트만 출력합니다';
-      b3.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
+      b3.title='지금 보고 있는 이 학생의 오답노트만 출력합니다(인쇄 대화상자에서 "PDF로 저장"을 고르면 PDF로도 저장됩니다)';
       b3.onclick=function(){window._gg_printWrongNotes({onlyCurrent:true});};
-      nav.appendChild(b3);
+      place(b3, weeklyBtn);
+    }
+    // ★ 2026-09-16 추가: "오답노트 출력"은 학생 한 명씩만 보여줘서, 같은 회차를 치른
+    // 전체 학생들이 공통으로 많이 틀린 문항(공통오답)을 한눈에 확인할 방법이 없었다는
+    // 요청 → 과목별로 문항번호마다 오답 인원·오답률·오답 학생명단을 집계해 보여주는
+    // 별도 탭 신설. "회차 통계표"·"오답노트 출력"과 동일한 새창+자동 인쇄 패턴을 쓴다.
+    if(!d.getElementById('sg-common-wrong-print')){
+      var b3c=d.createElement('button');
+      b3c.id='sg-common-wrong-print';
+      b3c.className='tab';
+      b3c.type='button';
+      b3c.textContent='👥 공통오답';
+      b3c.title='같은 회차를 치른 전체 학생들이 공통으로 틀린 문항을 과목별로 모아 확인·인쇄합니다';
+      b3c.onclick=function(){window._gg_printCommonWrongNotes();};
+      place(b3c, weeklyBtn);
     }
     // ★ 2026-09-10(399) 추가: 상담리포트/오답노트는 행동강령·처방전 등 상담원용 내용이
     // 섞여 있어, 학생이 직접 입력한 점수·AAR자가진단·오답원인만 한눈에 보기 어렵다는
@@ -45953,22 +46636,33 @@ function generateReport() {
       b4.id='sg-aar-stats-mine';
       b4.className='tab';
       b4.type='button';
-      b4.textContent='📊 AAR통계(이 학생)';
+      b4.textContent='📊 AAR통계(학생)';
       b4.title='지금 보고 있는 이 학생이 직접 입력한 점수·AAR자가진단·오답원인만 한눈에 봅니다(상담용 내용 제외)';
-      b4.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
       b4.onclick=function(){window._sgOpenAarStatsView({onlyCurrent:true});};
-      nav.appendChild(b4);
+      place(b4, moreBtn);
     }
     if(!d.getElementById('sg-aar-stats-all')){
       var b5=d.createElement('button');
       b5.id='sg-aar-stats-all';
       b5.className='tab';
       b5.type='button';
-      b5.textContent='📊 AAR통계(전체학생)';
+      b5.textContent='📊 AAR통계(전체)';
       b5.title='같은 회차를 치른 전체 학생의 점수·AAR자가진단·오답원인을 과목별로 비교합니다(상담용 내용 제외)';
-      b5.style.cssText='background:#fff;color:#0f766e;border:1.5px solid #0f766e;font-weight:800';
       b5.onclick=function(){window._sgOpenAarStatsView({onlyCurrent:false});};
-      nav.appendChild(b5);
+      place(b5, moreBtn);
+    }
+    // ★ 2026-09-16(430 17차) 수정: 최상위 탭이 11개까지 늘어나 한 줄에 다 안 들어간다는
+    // 요청으로, 자주 쓰지 않는 "전체 학생 결과일괄 출력"을 다른 부가기능 항목들과 같은
+    // #chgMoreMenu 드롭다운 안으로 옮긴다(top-level에는 더 이상 두지 않음).
+    if(!d.getElementById('sg-batch-print-all')){
+      var b=d.createElement('button');
+      b.id='sg-batch-print-all';
+      b.className='tab';
+      b.type='button';
+      b.textContent='🖨 전체 학생 결과일괄 출력';
+      b.onclick=function(){window._gg_printAllChallengerReports();closeChgMoreMenu();};
+      var moreMenuEl=d.getElementById('chgMoreMenu');
+      if(moreMenuEl) moreMenuEl.appendChild(b); else place(b, moreBtn);
     }
   }
 
