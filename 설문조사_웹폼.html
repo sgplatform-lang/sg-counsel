@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>설문조사</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
+<style>
+  :root{
+    --bg:#F7F7F4;
+    --surface:#FFFFFF;
+    --ink:#1E2A44;
+    --body-text:#33394A;
+    --muted:#7A8093;
+    --line:#DADCE2;
+    --accent:#8B3A3A;
+    --accent-soft:#F3E7E7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--body-text);
+    font-family:'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    line-height:1.6;
+  }
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--body-text)}
+  .sheet{
+    max-width:760px;
+    margin:0 auto;
+    background:var(--surface);
+    padding:56px 64px 72px;
+  }
+  @media (max-width:600px){
+    .sheet{padding:32px 22px 48px;}
+  }
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:8px;
+  }
+  .masthead .org{ font-size:13px; letter-spacing:0.02em; color:var(--muted); }
+  .masthead .date-field{ font-size:13px; color:var(--muted); text-align:right; }
+  h1{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:26px; color:var(--ink); margin:26px 0 6px; }
+  .lede{ font-size:14px; color:var(--muted); max-width:58ch; margin-bottom:28px; }
+  .section{ margin-bottom:32px; }
+  .section-head{ display:flex; align-items:baseline; gap:10px; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:14px; }
+  .section-num{ font-family:'Noto Serif KR', serif; font-weight:600; font-size:15px; color:var(--accent); min-width:20px; }
+  .section-title{ font-family:'Noto Serif KR', serif; font-weight:600; font-size:17px; color:var(--ink); }
+  .section-title .req{ color:var(--accent); font-size:13px; margin-left:4px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px 24px; }
+  @media (max-width:600px){ .grid2{grid-template-columns:1fr;} }
+  .field label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+  .field input, .field select, .field textarea{
+    width:100%; border:none; border-bottom:1px solid var(--line);
+    padding:4px 2px 6px; background:transparent; outline:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-bottom-color:var(--accent); }
+  .field textarea{ resize:vertical; min-height:70px; line-height:1.6; border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .checklist{ display:flex; flex-wrap:wrap; gap:10px 22px; }
+  .check-item{ display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+  .check-item input[type=checkbox], .check-item input[type=radio]{
+    width:16px; height:16px; flex-shrink:0; accent-color:var(--ink); cursor:pointer;
+  }
+  .submit-btn{
+    width:100%; background:var(--ink); color:#fff; border:none; border-radius:12px;
+    padding:18px; font-size:16px; font-weight:700; font-family:inherit; cursor:pointer; margin-top:10px;
+  }
+  .submit-btn:active{ opacity:.85; }
+  .submit-btn:disabled{ background:#aab; cursor:default; }
+  footer{
+    margin-top:24px; padding-top:18px; border-top:1px solid var(--line);
+    font-size:12px; color:var(--muted); display:flex; justify-content:space-between;
+  }
+  .done-screen{ display:none; text-align:center; padding:80px 20px; }
+  .done-screen .mark{ font-size:52px; margin-bottom:18px; }
+  .done-screen h2{ font-family:'Noto Serif KR', serif; font-size:22px; color:var(--ink); margin-bottom:10px; }
+  .done-screen p{ color:var(--muted); font-size:14px; }
+  .err-box{
+    display:none; background:#fdecea; border-left:3px solid #c0392b;
+    padding:12px 16px; font-size:13px; color:#7a2c22; margin-bottom:20px;
+  }
+  .load-screen, .notfound-screen{ text-align:center; padding:80px 20px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="sheet" id="loadScreen">
+  <div class="load-screen">설문을 불러오는 중입니다...</div>
+</div>
+
+<div class="sheet" id="notfoundScreen" style="display:none">
+  <div class="notfound-screen">
+    <div style="font-size:40px;margin-bottom:14px">⚠️</div>
+    <h2 style="font-family:'Noto Serif KR', serif;font-size:20px;color:var(--ink);margin-bottom:8px">설문을 찾을 수 없습니다</h2>
+    <p>링크가 정확한지 다시 확인해주시거나, 설문을 보내주신 분께 문의해주세요.</p>
+  </div>
+</div>
+
+<div class="sheet" id="formSheet" style="display:none">
+  <div class="masthead">
+    <div class="org">SG상담플랫폼 · 입시 컨설팅</div>
+    <div class="date-field" id="todayField"></div>
+  </div>
+  <h1 id="surveyTitleEl">설문조사</h1>
+  <p class="lede" id="surveyLedeEl">아래 항목을 작성해주세요.</p>
+
+  <div class="err-box" id="errBox"></div>
+
+  <form id="surveyForm" onsubmit="return submitSurvey(event)">
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">·</span>
+        <span class="section-title">응답자 정보<span class="req">*이름 필수</span></span>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>이름 *</label><input id="f_name" required></div>
+        <div class="field"><label>연락처</label><input id="f_phone" type="tel" placeholder="예: 010-1234-5678"></div>
+      </div>
+    </div>
+    <div id="dynamicQuestions"></div>
+    <button type="submit" class="submit-btn" id="submitBtn">제출하기</button>
+  </form>
+
+  <footer>
+    <span>SG상담플랫폼</span>
+  </footer>
+</div>
+
+<div class="sheet done-screen" id="doneScreen">
+  <div class="mark">✅</div>
+  <h2>제출이 완료되었습니다</h2>
+  <p>작성해 주셔서 감사합니다.</p>
+</div>
+
+<script>
+// ── Firebase 초기화 (관리자 앱과 동일 프로젝트) ──
+// ★ 2026-09-16 신규: 여러 설문(사전조사서/챌린저FINAL70처럼 고정된 폼이 아니라, 관리자가
+// "설문조사 관리" 탭에서 직접 만든 커스텀 설문)을 매번 새 html 파일 없이 하나의 엔진으로
+// 처리하기 위한 공용 웹폼. URL의 ?survey= 값으로 Firestore(customSurveys)에서 그 설문의
+// 질문 목록을 읽어와 화면을 동적으로 그린다. Firebase SDK가 로드되지 않아도(오프라인 등)
+// 이후 스크립트 실행이 막히지 않도록 감싼다.
+let _db=null;
+const SG_RECAPTCHA_SITE_KEY = '6LcoRrEtAAAAAG2W-Q8g-rhXW7j53hB6peh2DOFZ';
+try{
+  firebase.initializeApp({
+    apiKey: "AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
+    authDomain: "sg-counsel.firebaseapp.com",
+    projectId: "sg-counsel",
+    storageBucket: "sg-counsel.firebasestorage.app",
+    messagingSenderId: "134794459070",
+    appId: "1:134794459070:web:a636cac4df344bd26e2bef"
+  });
+  function _sgActivateAppCheck(){
+    try{
+      if(SG_RECAPTCHA_SITE_KEY && SG_RECAPTCHA_SITE_KEY.indexOf('PASTE_YOUR')!==0){
+        firebase.appCheck().activate(
+          new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),
+          true
+        );
+      }
+    }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):', e.message); }
+  }
+  if(document.body){ _sgActivateAppCheck(); }
+  else { document.addEventListener('DOMContentLoaded', _sgActivateAppCheck); }
+  _db = firebase.firestore();
+  _db.settings({ experimentalAutoDetectLongPolling: true });
+}catch(e){
+  console.warn('Firebase 초기화 실패:', e.message);
+}
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
+}
+
+const params=new URLSearchParams(location.search);
+const ORG_ID_PARAM=params.get('org')||null;
+const SURVEY_ID=params.get('survey')||null;
+let SURVEY=null;
+
+function showScreen(which){
+  $('loadScreen').style.display = which==='load' ? 'block' : 'none';
+  $('notfoundScreen').style.display = which==='notfound' ? 'block' : 'none';
+  $('formSheet').style.display = which==='form' ? 'block' : 'none';
+}
+
+// 질문 유형별 입력 필드 HTML
+function questionFieldHtml(q){
+  const req = q.required ? '<span class="req">*필수</span>' : '';
+  const opts = Array.isArray(q.options) ? q.options : [];
+  let body='';
+  if(q.type==='textarea'){
+    body='<div class="field"><textarea id="cq_'+esc(q.id)+'" rows="4"></textarea></div>';
+  } else if(q.type==='radio'){
+    body='<div class="checklist">'+opts.map(function(o){
+      return '<label class="check-item"><input type="radio" name="cq_'+esc(q.id)+'" value="'+esc(o)+'">'+esc(o)+'</label>';
+    }).join('')+'</div>';
+  } else if(q.type==='checkbox'){
+    body='<div class="checklist">'+opts.map(function(o){
+      return '<label class="check-item"><input type="checkbox" name="cq_'+esc(q.id)+'" value="'+esc(o)+'">'+esc(o)+'</label>';
+    }).join('')+'</div>';
+  } else { // 'text' 기본값
+    body='<div class="field"><input type="text" id="cq_'+esc(q.id)+'"></div>';
+  }
+  return '<div class="section">'
+    +'<div class="section-head"><span class="section-num">·</span><span class="section-title">'+esc(q.label)+req+'</span></div>'
+    +body
+    +'</div>';
+}
+
+function renderQuestions(){
+  const box=$('dynamicQuestions');
+  const qs=(SURVEY.questions||[]);
+  box.innerHTML = qs.map(questionFieldHtml).join('');
+}
+
+function loadSurvey(){
+  $('todayField').textContent='작성일  '+todayStr();
+  if(!SURVEY_ID || !_db){
+    showScreen('notfound');
+    return;
+  }
+  _db.collection('customSurveys').doc(SURVEY_ID).get().then(function(doc){
+    if(!doc.exists){ showScreen('notfound'); return; }
+    SURVEY = Object.assign({id:doc.id}, doc.data());
+    $('surveyTitleEl').textContent = SURVEY.title || '설문조사';
+    if(SURVEY.description){ $('surveyLedeEl').textContent = SURVEY.description; }
+    renderQuestions();
+    showScreen('form');
+  }).catch(function(e){
+    console.warn('설문 로드 실패:', e.message);
+    showScreen('notfound');
+  });
+}
+loadSurvey();
+
+function collectAnswers(){
+  return (SURVEY.questions||[]).map(function(q){
+    let value='';
+    if(q.type==='textarea'){
+      const el=$('cq_'+q.id); value = el ? el.value.trim() : '';
+    } else if(q.type==='radio'){
+      const el=document.querySelector('input[name="cq_'+q.id+'"]:checked'); value = el ? el.value : '';
+    } else if(q.type==='checkbox'){
+      value = Array.from(document.querySelectorAll('input[name="cq_'+q.id+'"]:checked')).map(function(e){ return e.value; }).join(', ');
+    } else {
+      const el=$('cq_'+q.id); value = el ? el.value.trim() : '';
+    }
+    return { qId:q.id, label:q.label, type:q.type, value:value };
+  });
+}
+
+function findMissingRequired(answers){
+  const missing=[];
+  (SURVEY.questions||[]).forEach(function(q, i){
+    if(q.required && !(answers[i] && answers[i].value)) missing.push(q.label);
+  });
+  return missing;
+}
+
+function submitSurvey(ev){
+  ev.preventDefault();
+  const errBox=$('errBox');
+  errBox.style.display='none';
+  const name=$('f_name').value.trim();
+  if(!name){ errBox.textContent='이름을 입력해주세요.'; errBox.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); return false; }
+
+  const answers=collectAnswers();
+  const missing=findMissingRequired(answers);
+  if(missing.length){
+    errBox.textContent='다음 항목을 입력해주세요: '+missing.join(', ');
+    errBox.style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+    return false;
+  }
+
+  const btn=$('submitBtn');
+  btn.disabled=true; btn.textContent='제출 중...';
+
+  if(!_db){
+    errBox.textContent='온라인 제출 기능을 불러오지 못했습니다(네트워크 상태를 확인해주세요).';
+    errBox.style.display='block';
+    btn.disabled=false; btn.textContent='제출하기';
+    window.scrollTo({top:0,behavior:'smooth'});
+    return false;
+  }
+
+  const id='cs_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  const data={
+    id: id,
+    surveyId: SURVEY_ID,
+    surveyTitle: SURVEY.title||'',
+    orgId: SURVEY.orgId || ORG_ID_PARAM || null,
+    name: name,
+    phone: $('f_phone').value.trim(),
+    submittedAt: new Date().toISOString(),
+    status: 'new',
+    answers: answers
+  };
+  _db.collection('customSurveySubmissions').doc(id).set(data)
+    .then(function(){
+      $('formSheet').style.display='none';
+      $('doneScreen').style.display='block';
+      window.scrollTo({top:0,behavior:'smooth'});
+    })
+    .catch(function(e){
+      errBox.textContent='제출 중 오류가 발생했습니다: '+e.message+' (네트워크 상태를 확인하고 다시 시도해주세요.)';
+      errBox.style.display='block';
+      btn.disabled=false; btn.textContent='제출하기';
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  return false;
+}
+</script>
+</body>
+</html>
