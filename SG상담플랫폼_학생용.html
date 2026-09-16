@@ -372,7 +372,7 @@ window.addEventListener('popstate', function(e){
   const st = e.state;
 
   // 로그인 상태 + 첫화면(기본탭)인지 판단
-  const isFirstScreen = !!CU && (curTab === 'timetable' || curTab === 'test');
+  const isFirstScreen = !!CU && (curTab === 'timetable');
 
   if(isFirstScreen){
     if(window.confirm('SG상담플랫폼을 종료하시겠습니까?')){
@@ -418,7 +418,7 @@ function render(){
     ${renderHdr()}
     <div class="content" id="content">
       <div class="inner">
-        ${curTab==='timetable'?renderTimetable():curTab==='test'?renderTests():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?renderPlanInspect():renderInfo()}
+        ${curTab==='timetable'?renderTimetable():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?renderPlanInspect():renderInfo()}
       </div>
     </div>
     ${renderTabbar()}`;
@@ -515,7 +515,7 @@ function renderHdr(){
 }
 
 function renderTabbar(){
-  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'test',icon:'📝',label:'테스트'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'},{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}];
+  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'},{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}];
   return`<div class="tabbar">${tabs.map(t=>`<button class="tb-item ${curTab===t.id?'act':''}" onclick="curTab='${t.id}';render()">
     <span class="tb-icon">${t.icon}</span><span>${t.label}</span>
   </button>`).join('')}</div>`;
