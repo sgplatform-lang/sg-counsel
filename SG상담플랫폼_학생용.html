@@ -1624,7 +1624,11 @@ async function chgArchiveRound(date, test, subjectsSnapshot){
     // 없어 못 찾는 문제가 있었다. 이제 admin의 아카이브 방식과 똑같이 subject/detail/score가
     // 살아있는 전체 데이터를 그대로 저장한다.
     subjects: fullCopy,
-    fullSubjects: fullCopy
+    fullSubjects: fullCopy,
+    // ★ 2026-09-16(430 12차, 관리자 연동) 추가: 이 회차가 "언제 저장됐는지"를 남겨서,
+    // 관리자 화면에서 역할별 마지막 확인시각과 비교해 "안 읽은 회차 개수"를 정확히 셀 수
+    // 있게 한다(학생이 시험을 여러 개 입력했을 때 빨간점 안에 숫자로 표기하는 기능용).
+    savedAt: Date.now()
   };
   if(!Array.isArray(cd.history)) cd.history=[];
   cd.history = cd.history.filter(function(h){ return !(h.student===rec.student && h.date===rec.date && h.test===rec.test); });
