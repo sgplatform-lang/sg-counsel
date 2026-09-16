@@ -1429,6 +1429,218 @@ function RM_deleteCF70Submission(id){
   if(FB_USE()) window._fb.delete('challengerFinal70Submissions', id).catch(function(e){ alert('⚠️ 삭제가 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다). 새로고침하면 다시 나타날 수 있습니다.\n\n'+(e&&e.message?e.message:'')); });
   render();
 }
+// ══════════════════════════════════════════════════════════════════
+// ★ 2026-09-16 추가: "설문조사 관리" — 사전조사서/챌린저FINAL70처럼 관리자가 매번 Claude에게
+// 새 html 폼을 부탁하지 않고, 기관별로 직접 질문을 구성해 만드는 커스텀 설문. 정의는
+// Firestore 'customSurveys'(설문 하나=문서 하나, 질문 목록 포함), 제출은 'customSurveySubmissions'에
+// 저장되고, 공용 웹폼(설문조사_웹폼.html)이 ?survey= 값으로 질문 목록을 읽어와 화면을 그린다.
+// 사전조사/CF70과 같은 패턴(기관별 스코프, 목록 통째로 로드 후 클라이언트에서 필터)을 그대로 따른다.
+// ══════════════════════════════════════════════════════════════════
+async function _ensureCustomSurveysLoaded(forceRefresh){
+  if(!forceRefresh && ST.customSurveys && ST.customSurveys.length) return ST.customSurveys;
+  if(!FB_USE()) return ST.customSurveys||[];
+  const _role=ST.currentUser?.role;
+  const _orgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  let list;
+  if(_role!=='admin' && _orgId){
+    list = await _sgFetchWithRetry(()=>window._fb.collection('customSurveys').where('orgId','==',String(_orgId)).get(), 'customSurveys(scoped)')
+      .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
+      .catch(e=>{ console.warn('FB load error(customSurveys scoped):', e.message); return null; });
+  } else {
+    list = await fbLoadAll('customSurveys');
+  }
+  if(list) ST.customSurveys=list;
+  return ST.customSurveys||[];
+}
+async function _ensureCustomSurveySubmissionsLoaded(forceRefresh){
+  if(!forceRefresh && ST.customSurveySubmissions && ST.customSurveySubmissions.length) return ST.customSurveySubmissions;
+  if(!FB_USE()) return ST.customSurveySubmissions||[];
+  const _role=ST.currentUser?.role;
+  const _orgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  let list;
+  if(_role!=='admin' && _orgId){
+    list = await _sgFetchWithRetry(()=>window._fb.collection('customSurveySubmissions').where('orgId','==',String(_orgId)).get(), 'customSurveySubmissions(scoped)')
+      .then(snap=>snap.docs.map(d=>{const data=d.data();return{...data,id:data.id??d.id};}))
+      .catch(e=>{ console.warn('FB load error(customSurveySubmissions scoped):', e.message); return null; });
+  } else {
+    list = await fbLoadAll('customSurveySubmissions');
+  }
+  if(list) ST.customSurveySubmissions=list;
+  return ST.customSurveySubmissions||[];
+}
+function RM_refreshCustomSurveys(){
+  Promise.all([_ensureCustomSurveysLoaded(true), _ensureCustomSurveySubmissionsLoaded(true)]).then(function(){ render(); });
+}
+function RM_markCustomSurveyReviewed(id){
+  const p=(ST.customSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  if(!p) return;
+  p.status = p.status==='reviewed' ? 'new' : 'reviewed';
+  if(FB_USE()) window._fb.set('customSurveySubmissions', p.id, p).catch(function(e){ alert('⚠️ 상태 저장에 실패했습니다(서버 연결 문제일 수 있습니다).\n\n'+(e&&e.message?e.message:'')); });
+  render();
+}
+function RM_deleteCustomSurveySubmission(id){
+  if(!confirm('이 제출 내용을 삭제하시겠습니까?')) return;
+  ST.customSurveySubmissions=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.id)!==String(id); });
+  if(FB_USE()) window._fb.delete('customSurveySubmissions', id).catch(function(e){ alert('⚠️ 삭제가 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다). 새로고침하면 다시 나타날 수 있습니다.\n\n'+(e&&e.message?e.message:'')); });
+  render();
+}
+function deleteCustomSurvey(id){
+  if(!confirm('이 설문을 삭제하시겠습니까?\n이미 제출된 응답은 삭제되지 않지만, 설문을 지우면 설문조사함에서 더 이상 확인할 수 없게 됩니다.')) return;
+  ST.customSurveys=(ST.customSurveys||[]).filter(function(x){ return String(x.id)!==String(id); });
+  if(FB_USE()) window._fb.delete('customSurveys', id).catch(function(e){ alert('⚠️ 삭제가 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다).\n\n'+(e&&e.message?e.message:'')); });
+  render();
+}
+function copyCustomSurveyLink(orgId, surveyId, title){
+  const path=location.pathname.replace(/[^/]*$/, '');
+  const url=location.origin + path + encodeURIComponent('설문조사_웹폼.html') + '?org=' + encodeURIComponent(orgId) + '&survey=' + encodeURIComponent(surveyId);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      alert('"'+title+'" 설문 링크를 복사했습니다:\n\n'+url+'\n\n이 링크를 공유해주세요.');
+    }).catch(function(){ prompt('아래 링크를 복사해서 사용해주세요:', url); });
+  } else {
+    prompt('아래 링크를 복사해서 사용해주세요:', url);
+  }
+}
+function downloadCustomSurveyRedirectPage(orgId, orgName, surveyId, surveyTitle){
+  const path=location.pathname.replace(/[^/]*$/, '');
+  const targetUrl=location.origin + path + encodeURIComponent('설문조사_웹폼.html') + '?org=' + encodeURIComponent(orgId) + '&survey=' + encodeURIComponent(surveyId);
+  const title=orgName+' '+surveyTitle;
+  const desc='아래를 눌러 '+orgName+'의 '+surveyTitle+'를 작성해주세요.';
+  const html='<!DOCTYPE html>\n<html lang="ko">\n<head>\n<meta charset="UTF-8">\n'
+    +'<title>'+esc(title)+'</title>\n'
+    +'<meta property="og:title" content="'+esc(title)+'">\n'
+    +'<meta property="og:description" content="'+esc(desc)+'">\n'
+    +'<meta property="og:type" content="website">\n'
+    +'<meta name="description" content="'+esc(desc)+'">\n'
+    +'<meta http-equiv="refresh" content="0; url='+esc(targetUrl)+'">\n'
+    +'<script>location.replace('+JSON.stringify(targetUrl)+');<\/script>\n'
+    +'</head>\n<body>\n<p>'+esc(desc)+' 자동으로 이동하지 않으면 <a href="'+esc(targetUrl)+'">여기를 눌러주세요</a>.</p>\n</body>\n</html>\n';
+  const safeName=(orgName+'_'+surveyTitle).replace(/[\\/:*?"<>|]/g,'_');
+  const blob=new Blob([html], {type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='설문_'+safeName+'.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  alert('"설문_'+safeName+'.html" 파일을 다운로드했습니다.\n\n1) 이 파일을 GitHub 저장소에 다른 파일들과 같은 방식(Add file → Upload files)으로 올려주세요.\n2) 그 다음 이 링크복사 대신, 지금 올린 이 파일의 주소를 공유해주세요.\n(카카오톡 등으로 공유하면 미리보기 제목에 "'+title+'"이 표시됩니다)');
+}
+// ★ 2026-09-16 추가: 커스텀 설문 만들기/수정 모달. 질문 목록은 모달이 열려있는 동안
+// 로컬 배열(questions)로만 들고 있다가 "저장" 눌렀을 때만 ST.customSurveys/Firestore에 반영한다.
+// 질문 행 버튼들은 innerHTML로 매번 새로 그려지는 구조라 onclick에서 전역 함수(window._csf*)를
+// 참조해야 하며, 이 함수들은 모달이 열릴 때마다 새로 덮어써진다(동시에 모달 2개가 열리지 않으므로 안전).
+function openCustomSurveyForm(orgId, existing){
+  let questions = existing ? JSON.parse(JSON.stringify(existing.questions||[])) : [];
+  function nextQId(){ return 'q_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
+  questions.forEach(function(q){ if(!q.id) q.id=nextQId(); });
+
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  function questionRowHtml(q, idx){
+    const isChoice = q.type==='radio' || q.type==='checkbox';
+    return `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;background:#fafbfc">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <input class="csf-q-label" data-idx="${idx}" value="${esc(q.label||'')}" placeholder="질문 내용" style="flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12.5px">
+        <select class="csf-q-type" data-idx="${idx}" style="border:1px solid #ddd;border-radius:6px;padding:6px 6px;font-size:12px">
+          <option value="text" ${(q.type==='text'||!q.type)?'selected':''}>단답형</option>
+          <option value="textarea" ${q.type==='textarea'?'selected':''}>장문형</option>
+          <option value="radio" ${q.type==='radio'?'selected':''}>객관식(단일)</option>
+          <option value="checkbox" ${q.type==='checkbox'?'selected':''}>체크박스(복수)</option>
+        </select>
+      </div>
+      <div class="csf-q-options-wrap" style="display:${isChoice?'block':'none'};margin-bottom:6px">
+        <textarea class="csf-q-options" data-idx="${idx}" rows="2" placeholder="선택지를 한 줄에 하나씩 입력(예: 오전 / 오후 / 저녁)" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12px">${esc((q.options||[]).join('\n'))}</textarea>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#555;cursor:pointer"><input type="checkbox" class="csf-q-required" data-idx="${idx}" ${q.required?'checked':''}>필수 응답</label>
+        <div style="display:flex;gap:4px">
+          <button type="button" onclick="_csfMoveQuestion(${idx},-1)" style="border:1px solid #ddd;background:#fff;border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer">↑</button>
+          <button type="button" onclick="_csfMoveQuestion(${idx},1)" style="border:1px solid #ddd;background:#fff;border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer">↓</button>
+          <button type="button" onclick="_csfRemoveQuestion(${idx})" style="border:1px solid #fecaca;background:#fff5f5;color:#dc2626;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">삭제</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  function syncQuestionsFromDom(){
+    ov.querySelectorAll('.csf-q-label').forEach(function(el){ const i=+el.dataset.idx; if(questions[i]) questions[i].label=el.value; });
+    ov.querySelectorAll('.csf-q-type').forEach(function(el){ const i=+el.dataset.idx; if(questions[i]) questions[i].type=el.value; });
+    ov.querySelectorAll('.csf-q-options').forEach(function(el){ const i=+el.dataset.idx; if(questions[i]) questions[i].options=el.value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean); });
+    ov.querySelectorAll('.csf-q-required').forEach(function(el){ const i=+el.dataset.idx; if(questions[i]) questions[i].required=el.checked; });
+  }
+  function renderQuestionsBox(){
+    const box=ov.querySelector('#csf_questions');
+    if(!box) return;
+    box.innerHTML = questions.length ? questions.map(questionRowHtml).join('') : '<div style="font-size:11.5px;color:#aaa;padding:10px 0">아직 추가된 문항이 없습니다. "+ 문항 추가"를 눌러주세요.</div>';
+    box.querySelectorAll('.csf-q-type').forEach(function(el){
+      el.addEventListener('change', function(){ syncQuestionsFromDom(); renderQuestionsBox(); });
+    });
+  }
+  window._csfAddQuestion=function(){
+    syncQuestionsFromDom();
+    questions.push({ id: nextQId(), label:'', type:'text', required:false, options:[] });
+    renderQuestionsBox();
+  };
+  window._csfRemoveQuestion=function(idx){
+    syncQuestionsFromDom();
+    questions.splice(idx,1);
+    renderQuestionsBox();
+  };
+  window._csfMoveQuestion=function(idx, dir){
+    syncQuestionsFromDom();
+    const t=idx+dir;
+    if(t<0||t>=questions.length) return;
+    const tmp=questions[idx]; questions[idx]=questions[t]; questions[t]=tmp;
+    renderQuestionsBox();
+  };
+
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:24px">
+    <div style="font-size:16px;font-weight:900;margin-bottom:14px">${existing?'✏ 설문 수정':'+ 새 설문 만들기'}</div>
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11.5px;color:#777;margin-bottom:4px">설문 제목 *</label>
+      <input id="csf_title" value="${esc(existing?existing.title:'')}" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:11.5px;color:#777;margin-bottom:4px">안내문구 (선택 — 응답자에게 보여줄 설명)</label>
+      <input id="csf_desc" value="${esc(existing?existing.description:'')}" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px">
+    </div>
+    <div style="font-size:12.5px;font-weight:700;color:#333;margin-bottom:8px">질문 목록</div>
+    <div id="csf_questions"></div>
+    <button type="button" onclick="_csfAddQuestion()" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:16px">+ 문항 추가</button>
+    <div style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #eee;padding-top:14px">
+      <button type="button" id="csf_cancel" style="background:#f4f6fb;color:#555;border:1px solid #ddd;border-radius:8px;padding:8px 16px;font-size:12.5px;cursor:pointer">취소</button>
+      <button type="button" id="csf_save" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12.5px;font-weight:700;cursor:pointer">💾 저장</button>
+    </div>
+  </div>`;
+  renderQuestionsBox();
+  ov.querySelector('#csf_cancel').addEventListener('click', function(){ ov.remove(); });
+  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+  ov.querySelector('#csf_save').addEventListener('click', function(){
+    syncQuestionsFromDom();
+    const title=(ov.querySelector('#csf_title').value||'').trim();
+    if(!title){ alert('설문 제목을 입력해주세요.'); return; }
+    if(!questions.length){ alert('문항을 1개 이상 추가해주세요.'); return; }
+    for(let i=0;i<questions.length;i++){
+      if(!String(questions[i].label||'').trim()){ alert((i+1)+'번째 문항의 질문 내용을 입력해주세요.'); return; }
+      if((questions[i].type==='radio'||questions[i].type==='checkbox') && !(questions[i].options||[]).length){ alert((i+1)+'번째 문항("'+questions[i].label+'")은 객관식/체크박스라서 선택지를 1개 이상 입력해야 합니다.'); return; }
+    }
+    const survey={
+      id: existing?existing.id:('survey_'+Date.now()),
+      orgId: orgId,
+      title: title,
+      description: (ov.querySelector('#csf_desc').value||'').trim(),
+      questions: questions.map(function(q){ return { id:q.id, label:q.label.trim(), type:q.type, required:!!q.required, options:(q.type==='radio'||q.type==='checkbox')?(q.options||[]):[] }; }),
+      createdAt: existing?existing.createdAt:Date.now(),
+      updatedAt: Date.now(),
+    };
+    if(!ST.customSurveys) ST.customSurveys=[];
+    const idx=ST.customSurveys.findIndex(function(s){ return s.id===survey.id; });
+    if(idx>=0) ST.customSurveys[idx]=survey; else ST.customSurveys.push(survey);
+    if(FB_USE()) window._fb.set('customSurveys', survey.id, survey).catch(function(e){ alert('⚠️ 저장이 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다).\n\n'+(e&&e.message?e.message:'')); });
+    ov.remove();
+    render();
+  });
+  document.body.appendChild(ov);
+}
 // 상담원이 개인 리포트 화면에서 작성한 전달사항을 저장한다.
 function RM_saveCF70Note(id){
   const p=(ST.challengerF70Submissions||[]).find(function(x){ return String(x.id)===String(id); });
@@ -16936,8 +17148,10 @@ function renderRoadmap(s){
   const body = sub==='consult' ? renderRoadmapConsult(s)
     : sub==='catalog' ? renderProgramCatalog()
     : sub==='school' ? renderRoadmapSchool(s)
-    : sub==='inbox' ? renderRoadmapInbox()
-    : sub==='cf70' ? renderRoadmapCF70()
+    : sub==='survey' ? renderRoadmapSurveyHub()
+    : sub==='surveyMgmt' ? renderRoadmapSurveyMgmt()
+    : sub==='inbox' ? renderRoadmapInbox() // ★ 이전 버전 호환용(더 이상 탭에서 직접 진입하지 않음)
+    : sub==='cf70' ? renderRoadmapCF70()   // ★ 이전 버전 호환용(더 이상 탭에서 직접 진입하지 않음)
     : renderRoadmapReport(s); // 'basic'(기본상담) 및 그 외 값은 모두 원래 입시상담 입력화면
   return renderRoadmapSubNav(sub)+body;
 }
@@ -16949,16 +17163,241 @@ function renderRoadmap(s){
 // "프로그램 카탈로그"(기존 최상단 메뉴 화면을 그대로 재사용, 최상단 메뉴는 그대로 두고
 // 여기서도 접근 가능) / "고등학교 정보"(신규) / "사전조사 받은함"(신규 — 별도의 학생·학부모용
 // 웹폼에서 제출된 사전조사 내용을 확인) 총 5개 탭.
+// ★ 2026-09-16 추가: "설문조사 관리" 탭 — 사전조사서/CF70과 달리 관리자가 직접 질문을
+// 구성해 새 설문을 만드는 화면(링크 생성도 여기서 같이 함). 제출된 결과 확인은 여기가 아니라
+// "설문조사함" 허브에서 한다(사용자가 명시적으로 "생성/링크는 관리, 결과확인은 설문조사함"으로
+// 구분해달라고 요청함). 관리(생성·수정·삭제)는 admin/orgAdmin만 가능, teacher는 목록+링크만 본다.
+function RM_surveyMgmtOrgFilterOptionsHtml(){
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const cur=ST._surveyMgmtOrgFilter||'';
+  let opts='<option value=""'+(cur===''?' selected':'')+'>기관을 선택하세요</option>';
+  opts+=orgs.map(function(o){ return '<option value="'+esc(o.id)+'"'+(String(o.id)===String(cur)?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('');
+  return opts;
+}
+function RM_onSurveyMgmtOrgFilterChange(){
+  const el=document.getElementById('rmSurveyMgmtOrgFilter');
+  ST._surveyMgmtOrgFilter = el ? el.value : '';
+  render();
+}
+function _rmSurveyMgmtMyOrgId(){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  if(isAdminRole) return ST._surveyMgmtOrgFilter||'';
+  return ST.currentOrg?.id || ST.currentUser?.orgId || '';
+}
+function renderRoadmapSurveyMgmt(){
+  if(!ST._customSurveysMgmtLoaded){
+    ST._customSurveysMgmtLoaded=true;
+    _ensureCustomSurveysLoaded().then(function(){ render(); });
+    return '<div style="padding:48px;text-align:center;color:#888">설문 목록을 불러오는 중...</div>';
+  }
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const role=ST.currentUser?.role;
+  const canManage = role==='admin' || role==='orgAdmin';
+  const orgId=_rmSurveyMgmtMyOrgId();
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const orgName=(orgs.find(function(o){ return String(o.id)===String(orgId); })||{}).name||'';
+  const surveys=(ST.customSurveys||[]).filter(function(s){ return String(s.orgId)===String(orgId); }).sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+
+  const cardsHtml = surveys.length ? surveys.map(function(s){
+    return `<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:16px 18px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#1a1a2e">${esc(s.title)}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">문항 ${(s.questions||[]).length}개 · ${s.createdAt?new Date(s.createdAt).toLocaleDateString('ko-KR'):''} 생성</div>
+        </div>
+        ${canManage?`<div style="display:flex;gap:5px;flex-shrink:0">
+          <button onclick='openCustomSurveyForm(${JSON.stringify(orgId)}, (ST.customSurveys||[]).find(function(x){return x.id===${JSON.stringify(s.id)};}))' style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">✏ 수정</button>
+          <button onclick="deleteCustomSurvey('${esc(s.id)}')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑</button>
+        </div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button type="button" onclick="copyCustomSurveyLink('${esc(orgId)}','${esc(s.id)}','${esc(s.title).replace(/'/g,"\\'")}')" style="flex:1;background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer">🔗 링크복사</button>
+        <button type="button" onclick="downloadCustomSurveyRedirectPage('${esc(orgId)}','${esc(orgName).replace(/'/g,"\\'")}','${esc(s.id)}','${esc(s.title).replace(/'/g,"\\'")}')" style="flex:1;background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer">📇 카톡파일</button>
+      </div>
+    </div>`;
+  }).join('') : '<div style="text-align:center;padding:40px;color:#888"><div style="font-size:36px;margin-bottom:10px">📋</div><div style="font-size:13.5px">아직 만든 설문이 없습니다.</div></div>';
+
+  return `<div style="max-width:720px;margin:0 auto;padding-bottom:40px">
+    <div style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:900;color:#1a1a2e">⚙️ 설문조사 관리</div>
+      <div style="font-size:11px;color:#777;margin-top:2px">직접 질문을 구성해 새 설문을 만들고, 만든 설문의 링크를 공유하세요. 제출된 결과는 "📥 설문조사함"에서 확인합니다.</div>
+    </div>
+    ${isAdminRole?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택:</span><select id="rmSurveyMgmtOrgFilter" onchange="RM_onSurveyMgmtOrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:160px">${RM_surveyMgmtOrgFilterOptionsHtml()}</select></div>`:''}
+    ${!orgId?`<div style="text-align:center;padding:40px;color:#888">${isAdminRole?'↑ 기관을 먼저 선택해주세요':'기관 정보를 확인할 수 없습니다'}</div>`:`
+      ${canManage?`<button onclick="openCustomSurveyForm('${esc(orgId)}', null)" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:14px">+ 새 설문 만들기</button>`:''}
+      ${cardsHtml}
+    `}
+  </div>`;
+}
+// ★ 2026-09-16 추가: "설문조사함" 허브 화면. 사전조사서/챌린저FINAL70 각각의 결과 확인 로직은
+// 전혀 건드리지 않고(renderRoadmapInbox/renderRoadmapCF70 그대로 재사용), 진입 메뉴만 새로 만든다.
+// 카드에 🔗 링크복사/📇 카톡파일 버튼을 두어, 이전엔 "기관 관리"(최종관리자 전용) 탭에서만
+// 보이던 사전조사 링크를 기관관리자·선생님도 자기 기관 한정으로 볼 수 있게 한다.
+function _rmSurveyHubMyOrgId(){
+  const isAdminRole=ST.currentUser?.role==='admin';
+  if(isAdminRole) return ST._surveyHubOrgFilter||'';
+  return ST.currentOrg?.id || ST.currentUser?.orgId || '';
+}
+function RM_surveyHubOrgFilterOptionsHtml(){
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const cur=ST._surveyHubOrgFilter||'';
+  let opts='<option value=""'+(cur===''?' selected':'')+'>기관을 선택하세요</option>';
+  opts+=orgs.map(function(o){ return '<option value="'+esc(o.id)+'"'+(String(o.id)===String(cur)?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('');
+  return opts;
+}
+function RM_onSurveyHubOrgFilterChange(){
+  const el=document.getElementById('rmSurveyHubOrgFilter');
+  ST._surveyHubOrgFilter = el ? el.value : '';
+  render();
+}
+function RM_surveyHubOpen(which){
+  ST._surveyHubView = which; // 'presurvey' | 'cf70'
+  render();
+}
+function RM_surveyHubBack(){
+  ST._surveyHubView = null;
+  render();
+}
+function _rmSurveyHubLinkButtonsHtml(kind, orgId, isAdminRole){
+  if(!orgId){
+    return '<div style="font-size:11px;color:#aaa;margin-top:8px">'+(isAdminRole?'↑ 기관을 먼저 선택해주세요':'기관 정보를 확인할 수 없습니다')+'</div>';
+  }
+  const copyFn = kind==='survey' ? 'copyOrgSurveyLink' : 'copyOrgCf70Link';
+  const dlFn   = kind==='survey' ? 'downloadOrgSurveyRedirectPage' : 'downloadOrgCf70RedirectPage';
+  const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const orgName=(orgs.find(function(o){ return String(o.id)===String(orgId); })||{}).name||'';
+  return '<div style="display:flex;gap:6px;margin-top:8px">'
+    +'<button type="button" onclick="event.stopPropagation();'+copyFn+'(\''+esc(orgId).replace(/'/g,"\\'")+'\')" style="flex:1;background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer">🔗 링크복사</button>'
+    +'<button type="button" onclick="event.stopPropagation();'+dlFn+'(\''+esc(orgId).replace(/'/g,"\\'")+'\', \''+esc(orgName).replace(/'/g,"\\'")+'\')" style="flex:1;background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer">📇 카톡파일</button>'
+    +'</div>';
+}
+// ★ 2026-09-16 추가: 커스텀 설문(설문조사 관리에서 만든 것) 제출 결과 목록/상세. 사전조사
+// 받은함(RM_surveyDetailHtml 등)과 같은 카드+펼치기 패턴이되, 고정 필드가 아니라
+// submission.answers 배열(질문 라벨을 그때그때 스냅샷해둔 것)을 그대로 순회해서 보여준다.
+function RM_toggleCustomSurveyExpand(id){
+  ST._customSurveyExpanded=ST._customSurveyExpanded||{};
+  ST._customSurveyExpanded[id]=!ST._customSurveyExpanded[id];
+  render();
+}
+function RM_customSurveyDetailHtml(p){
+  function row(label,val){ return '<div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #f1f5f9;font-size:12px"><div style="width:160px;flex-shrink:0;color:#888;font-weight:700">'+esc(label)+'</div><div style="color:#333;white-space:pre-wrap">'+(val?esc(val):'—')+'</div></div>'; }
+  return '<div style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:6px">'
+    +row('연락처', p.phone)
+    +(p.answers||[]).map(function(a){ return row(a.label, a.value); }).join('')
+    +'</div>';
+}
+function RM_customSurveySubmissionsHtml(surveyId){
+  const survey=(ST.customSurveys||[]).find(function(s){ return String(s.id)===String(surveyId); });
+  const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); }).sort(function(a,b){ return (b.submittedAt||'').localeCompare(a.submittedAt||''); });
+  const unreadCount=list.filter(function(x){ return x.status!=='reviewed'; }).length;
+  const rows=list.map(function(p){
+    const isNew=p.status!=='reviewed';
+    const expanded=!!(ST._customSurveyExpanded||{})[p.id];
+    return `<div style="background:#fff;border:1px solid ${isNew?'#c7d2fe':'#e8eaf6'};border-left:4px solid ${isNew?'#3b5bdb':'#cbd5e1'};border-radius:10px;padding:14px 16px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="RM_toggleCustomSurveyExpand('${p.id}')">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${isNew?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">NEW</span>':''}
+          <span style="font-size:13.5px;font-weight:800;color:#1a1a2e">${esc(p.name||'이름 미입력')}</span>
+        </div>
+        <div style="font-size:11px;color:#aaa">${esc((p.submittedAt||'').slice(0,16).replace('T',' '))}</div>
+      </div>
+      ${expanded?RM_customSurveyDetailHtml(p):''}
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:${expanded?'12px':'8px'}">
+        <button onclick="event.stopPropagation();RM_markCustomSurveyReviewed('${p.id}')" style="background:${isNew?'#eef1ff':'#f4f6fb'};color:${isNew?'#3b5bdb':'#888'};border:1px solid ${isNew?'#c5cae9':'#ddd'};border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">${isNew?'✓ 확인함으로 표시':'○ 다시 새 항목으로'}</button>
+        <button onclick="event.stopPropagation();RM_deleteCustomSurveySubmission('${p.id}')" style="background:#fff;color:#dc2626;border:1px solid #fecaca;border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+    <div style="margin-bottom:12px">
+      <div style="font-size:15px;font-weight:900;color:#1a1a2e">📝 ${esc(survey?survey.title:'설문')}</div>
+      <div style="font-size:11px;color:#777;margin-top:2px">총 ${list.length}건 (미확인 ${unreadCount}건)</div>
+    </div>
+    ${list.length ? rows : `<div style="text-align:center;padding:48px;color:#888"><div style="font-size:40px;margin-bottom:12px">📥</div><div style="font-size:14px">아직 제출된 응답이 없습니다</div></div>`}
+  </div>`;
+}
+function renderRoadmapSurveyHub(){
+  // ★ 관리 탭과 별개로, 허브에서도 기관별 커스텀 설문 카드를 보여주려면 목록·제출건수가
+  // 필요하다. 화면을 막지 않고 백그라운드로 한 번만 불러온 뒤 다시 그린다(첫 렌더에는
+  // 아직 없을 수 있고, 로드가 끝나면 자동으로 카드가 나타남).
+  if(!ST._customSurveysHubLoaded){
+    ST._customSurveysHubLoaded=true;
+    Promise.all([_ensureCustomSurveysLoaded(), _ensureCustomSurveySubmissionsLoaded()]).then(function(){ render(); });
+  }
+  const view=ST._surveyHubView||null;
+  if(view==='presurvey'){
+    return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+renderRoadmapInbox();
+  }
+  if(view==='cf70'){
+    return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+renderRoadmapCF70();
+  }
+  if(view && view.indexOf('custom:')===0){
+    const surveyId=view.slice('custom:'.length);
+    return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+RM_customSurveySubmissionsHtml(surveyId);
+  }
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const orgId=_rmSurveyHubMyOrgId();
+  const newSurveyCount=(ST.preSurveySubmissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
+  const newCf70Count=(ST.challengerF70Submissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
+  const surveyTotal=(ST.preSurveySubmissions||[]).length;
+  const cf70Total=(ST.challengerF70Submissions||[]).length;
+  const customList=orgId ? (ST.customSurveys||[]).filter(function(s){ return String(s.orgId)===String(orgId); }) : [];
+  const customCardsHtml=customList.map(function(s){
+    const subs=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(s.id); });
+    const unread=subs.filter(function(x){ return x.status!=='reviewed'; }).length;
+    return `<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('custom:${esc(s.id)}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:14px;font-weight:800;color:#1a1a2e">📝 ${esc(s.title)}</div>
+        ${unread?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+unread+'</span>':''}
+      </div>
+      <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${subs.length}건 제출됨</div>
+      <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#7c3aed;font-weight:700">결과 확인 →</span></div>
+    </div>`;
+  }).join('');
+  return `<div style="max-width:960px;margin:0 auto;padding-bottom:40px">
+    <div style="margin-bottom:14px">
+      <div style="font-size:15px;font-weight:900;color:#1a1a2e">📥 설문조사함</div>
+      <div style="font-size:11px;color:#777;margin-top:2px">학생·학부모용 웹폼에서 제출된 설문을 종류별로 확인합니다. 카드를 누르면 결과 확인 화면으로 들어가고, "🔗 링크복사"로 이 기관의 설문 링크를 바로 공유할 수 있습니다. 새 설문은 "⚙️ 설문조사 관리"에서 만들 수 있습니다.</div>
+    </div>
+    ${isAdminRole?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택 (링크 생성용):</span><select id="rmSurveyHubOrgFilter" onchange="RM_onSurveyHubOrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:160px">${RM_surveyHubOrgFilterOptionsHtml()}</select></div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+      <div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('presurvey')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-size:14px;font-weight:800;color:#1a1a2e">📋 사전조사서</div>
+          ${newSurveyCount?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newSurveyCount+'</span>':''}
+        </div>
+        <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${surveyTotal}건 제출됨 · 기본상담·상담리포트와 연동</div>
+        <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#3b5bdb;font-weight:700">결과 확인 →</span></div>
+        ${_rmSurveyHubLinkButtonsHtml('survey', orgId, isAdminRole)}
+      </div>
+      <div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('cf70')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-size:14px;font-weight:800;color:#1a1a2e">🏆 챌린저 FINAL70</div>
+          ${newCf70Count?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newCf70Count+'</span>':''}
+        </div>
+        <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${cf70Total}건 제출됨 · 자체 대시보드·개인 리포트</div>
+        <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#0f766e;font-weight:700">결과 확인 →</span></div>
+        ${_rmSurveyHubLinkButtonsHtml('cf70', orgId, isAdminRole)}
+      </div>
+      ${customCardsHtml}
+    </div>
+  </div>`;
+}
 function renderRoadmapSubNav(active){
   const newSurveyCount=(ST.preSurveySubmissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
   const newCf70Count=(ST.challengerF70Submissions||[]).filter(function(x){ return x.status!=='reviewed'; }).length;
+  // ★ 2026-09-16 추가: "사전조사 받은함"과 "챌린저 FINAL70"이 각각 독립 탭으로 나뉘어 있던 것을
+  // "설문조사함" 하나로 통합(사용자 요청 — 앞으로 늘어날 설문 종류를 전부 여기 한 곳에서 확인하고,
+  // 링크 생성도 여기서 기관관리자·선생님까지 볼 수 있게 하기 위함). 두 기능의 내부 로직
+  // (renderRoadmapInbox/renderRoadmapCF70)은 전혀 건드리지 않고, 진입 화면(허브)만 새로 감싼다.
+  const newSurveyHubCount=newSurveyCount+newCf70Count;
   const tabs=[
     {key:'basic',   icon:'📝', label:'기본상담'},
     {key:'consult', icon:'📁', label:'상담리포트'},
     {key:'catalog', icon:'🗂', label:'프로그램 카탈로그'},
     {key:'school',  icon:'🏫', label:'고등학교 정보'},
-    {key:'inbox',   icon:'📥', label:'사전조사 받은함'+(newSurveyCount?' ('+newSurveyCount+')':'')},
-    {key:'cf70',    icon:'🏆', label:'챌린저 FINAL70'+(newCf70Count?' ('+newCf70Count+')':'')},
+    {key:'survey',  icon:'📥', label:'설문조사함'+(newSurveyHubCount?' ('+newSurveyHubCount+')':'')},
+    {key:'surveyMgmt', icon:'⚙️', label:'설문조사 관리'},
   ];
   return `<div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
     <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">🧭 UNIVERSITY COUNSELING · 입시상담 통합관리</div>
@@ -34380,12 +34819,51 @@ function _examcatRenderSavedImageList(){
         const nos = Object.keys(rootMap[gk]).sort(function(a,b){ return (+a)-(+b); });
         return '<div style="margin:4px 0"><span style="font-size:11px;font-weight:700;color:#0369a1">'+esc(groupLabel)+'</span> '+
           nos.map(function(no){
-            return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;margin:3px 4px 0 0;font-size:11.5px">'+esc(no)+'번'+
+            const url = (rootMap[gk][no] && rootMap[gk][no].url) || '';
+            const noLabel = url
+              ? '<span onclick="_examcatPreviewImage(this)" data-url="'+esc(url)+'" style="cursor:zoom-in;color:#0369a1;text-decoration:underline;text-underline-offset:2px" title="클릭하면 이미지 미리보기">'+esc(no)+'번</span>'
+              : esc(no)+'번';
+            return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;margin:3px 4px 0 0;font-size:11.5px">'+noLabel+
               '<button type="button" onclick="_examcatDeleteImage(\''+mode+'\',\''+esc(gk).replace(/'/g,"\\'")+'\',\''+esc(no)+'\')" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:11px;padding:0 2px">✕</button></span>';
           }).join('')+'</div>';
       }).join('')+'</div>';
   }
   el.innerHTML = listFor(_examcatMigrateImageMap(EXAMCAT_editing.qImages),'📄 등록된 문항 이미지','q') + listFor(_examcatMigrateImageMap(EXAMCAT_editing.eImages),'📄 등록된 해설 이미지','e');
+}
+
+// ★ 2026-09-16 추가: "등록된 문항 이미지" 목록에서 번호만 봐서는 실제로 잘 잘렸는지 알 수 없다는
+// 문제(특히 AI 자동 자르기 결과 확인용)로, 번호 클릭 시 실제 이미지를 크게 보여주는 미리보기 오버레이 추가.
+// innerHTML 문자열 조합 대신 DOM API로 <img src=...>를 넣어 URL 값 자체가 마크업을 깨뜨릴 위험이 없게 함.
+function _examcatPreviewImage(el){
+  const url = el && el.getAttribute('data-url');
+  if(!url) return;
+  let ov = document.getElementById('examcat-img-preview-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'examcat-img-preview-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:99999;align-items:center;justify-content:center;padding:20px;cursor:zoom-out';
+    ov.onclick = function(e){ if(e.target===ov) _examcatCloseImagePreview(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;max-width:94vw;max-height:94vh';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = _examcatCloseImagePreview;
+  closeBtn.style.cssText = 'position:absolute;top:-14px;right:-14px;width:30px;height:30px;border-radius:50%;background:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+  const img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:94vw;max-height:94vh;display:block;border-radius:6px;background:#fff';
+  wrap.appendChild(closeBtn);
+  wrap.appendChild(img);
+  ov.appendChild(wrap);
+  ov.style.display = 'flex';
+}
+function _examcatCloseImagePreview(){
+  const ov = document.getElementById('examcat-img-preview-overlay');
+  if(ov) ov.style.display = 'none';
 }
 
 // ★ 2026-09-02(3차) 추가: "국어 언어와매체 붙여쓰기 → 학생 쪽 채점 누락" 사고가 카탈로그를
