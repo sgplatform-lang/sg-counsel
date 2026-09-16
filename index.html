@@ -1524,6 +1524,177 @@ function downloadCustomSurveyRedirectPage(orgId, orgName, surveyId, surveyTitle)
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
   alert('"설문_'+safeName+'.html" 파일을 다운로드했습니다.\n\n1) 이 파일을 GitHub 저장소에 다른 파일들과 같은 방식(Add file → Upload files)으로 올려주세요.\n2) 그 다음 이 링크복사 대신, 지금 올린 이 파일의 주소를 공유해주세요.\n(카카오톡 등으로 공유하면 미리보기 제목에 "'+title+'"이 표시됩니다)');
 }
+// ★ 2026-09-16(430 10차) 추가: 설문 파일(.docx/.txt) 또는 붙여넣은 텍스트에서 문항을 자동
+// 인식해 "새 설문 만들기" 폼에 채워주는 가져오기 기능. 매번 관리자가 질문을 하나씩 입력하는
+// 대신, 기존에 쓰던 설문 문서(질문은 굵게+"N. 질문", 선택지는 글머리기호, 응답유형은
+// [단답형]/[복수 선택 가능]/[선택 서술형] 같은 대괄호 표기, 구간 안내는 "A. ..." 굵은 소제목)
+// 형식을 그대로 붙여넣거나 올리면 자동으로 질문목록을 구성한다. 완전한 자동화는 아니라서
+// (서식이 다른 문서는 제대로 인식 못 할 수 있음) 가져온 뒤에는 항상 기존 편집화면에서
+// 검수·수정 후 저장하게 한다(AI PDF 자동자르기 때와 동일한 "가져오기→검수→저장" 패턴).
+function _csfEnsureJSZip(){
+  return new Promise(function(resolve, reject){
+    if(window.JSZip){ resolve(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=function(){ resolve(); };
+    s.onerror=function(){ reject(new Error('.docx를 읽기 위한 라이브러리 로드에 실패했습니다(네트워크를 확인해주세요).')); };
+    document.head.appendChild(s);
+  });
+}
+// .docx(워드) 파일의 word/document.xml을 직접 파싱해서, 굵게 표시된 문단은 **텍스트**로,
+// 글머리기호/번호매기기(w:numPr)가 적용된 문단은 "- 텍스트"로, 그 외는 그냥 텍스트로 바꾼
+// 한 줄씩의 텍스트로 재구성한다(_csfParseSurveyText가 읽을 수 있는 공통 포맷).
+async function _csfExtractDocxText(file){
+  await _csfEnsureJSZip();
+  const buf = await file.arrayBuffer();
+  const zip = await window.JSZip.loadAsync(buf);
+  const docXmlFile = zip.file('word/document.xml');
+  if(!docXmlFile) throw new Error('올바른 .docx 파일이 아닌 것 같습니다(word/document.xml을 찾을 수 없습니다).');
+  const xmlStr = await docXmlFile.async('string');
+  const xml = new DOMParser().parseFromString(xmlStr, 'application/xml');
+  const paras = xml.getElementsByTagName('w:p');
+  const lines = [];
+  for(let i=0;i<paras.length;i++){
+    const p = paras[i];
+    const pPrArr = p.getElementsByTagName('w:pPr');
+    const pPr = pPrArr.length ? pPrArr[0] : null;
+    const isList = !!(pPr && pPr.getElementsByTagName('w:numPr').length);
+    const runs = p.getElementsByTagName('w:r');
+    let text='', boldCount=0, totalCount=0;
+    for(let j=0;j<runs.length;j++){
+      const r = runs[j];
+      const ts = r.getElementsByTagName('w:t');
+      let rt=''; for(let k=0;k<ts.length;k++) rt+=ts[k].textContent;
+      if(!rt) continue;
+      text += rt; totalCount++;
+      const rPrArr = r.getElementsByTagName('w:rPr');
+      let bold=false;
+      if(rPrArr.length){
+        const bArr = rPrArr[0].getElementsByTagName('w:b');
+        if(bArr.length){
+          const v = bArr[0].getAttribute('w:val');
+          bold = (v==null || v==='true' || v==='1');
+        }
+      }
+      if(bold) boldCount++;
+    }
+    text = text.trim();
+    if(!text) continue;
+    const boldPara = totalCount>0 && boldCount===totalCount;
+    if(isList) lines.push('- '+text);
+    else if(boldPara) lines.push('**'+text+'**');
+    else lines.push(text);
+  }
+  return lines.join('\n');
+}
+// 공통 포맷 텍스트(굵은 줄="**...**", 목록 줄="- ...", 대괄호 힌트="[...]") →
+// {title, description, questions[]}. 질문 인식 실패 시(형식이 다른 문서)에도 최소한 title은
+// 추정해서 반환하고, questions가 비어있으면 호출부에서 안내 후 수동 입력을 유도한다.
+function _csfParseSurveyText(text){
+  const rawLines = String(text||'').split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length; });
+  let title='', description=[];
+  const questions=[];
+  let cur=null, sawFirstQuestion=false;
+
+  function isBold(l){ return /^\*\*[\s\S]+\*\*$/.test(l); }
+  function stripBold(l){ return l.replace(/^\*\*/,'').replace(/\*\*$/,'').trim(); }
+  function isOption(l){ return /^[-•·]\s*/.test(l); }
+  function optionText(l){ return l.replace(/^[-•·]\s*/,'').trim(); }
+  function questionMatch(l){ const m=l.match(/^(\d+)\s*\\?\.\s*(.+)$/); return m?m[2].trim():null; }
+  function sectionMatch(l){ return /^[A-Za-z]\s*\.\s*.+$/.test(l); }
+  function bracketHint(l){ const m=l.match(/^\\?\[(.+?)\\?\]$/); return m?m[1]:null; }
+
+  function pushCurrent(){
+    if(cur && cur.label){
+      let label = cur.label;
+      if(cur.extra) label += ' ('+cur.extra+')';
+      questions.push({
+        id: 'q_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6),
+        label: label,
+        type: cur.type || (cur.options.length ? 'radio' : 'text'),
+        required: cur.required!==false,
+        options: cur.options.slice()
+      });
+    }
+    cur=null;
+  }
+
+  rawLines.forEach(function(raw){
+    const bold = isBold(raw);
+    const plain = bold ? stripBold(raw) : raw;
+
+    if(isOption(raw)){
+      if(cur){
+        if(cur.type==='textarea' || cur.type==='text'){
+          const et = optionText(raw);
+          cur.extra = cur.extra ? (cur.extra+', '+et) : ('예: '+et);
+        } else {
+          cur.options.push(optionText(raw));
+        }
+      }
+      return;
+    }
+    const hint = bracketHint(plain);
+    if(hint){
+      if(cur){
+        if(/^선택\s*(서술형|단답형)/.test(hint)){
+          cur.required=false;
+          cur.type = /서술형/.test(hint) ? 'textarea' : 'text';
+        } else if(/단답형/.test(hint)){
+          cur.type='text';
+        } else if(/서술형/.test(hint)){
+          cur.type='textarea';
+        } else if(/복수\s*선택/.test(hint)){
+          cur.type='checkbox';
+        }
+      }
+      return;
+    }
+    if(bold){
+      const qText = questionMatch(plain);
+      if(qText){
+        pushCurrent();
+        cur={label:qText, type:null, required:true, options:[], extra:null};
+        sawFirstQuestion=true;
+        return;
+      }
+      if(sectionMatch(plain)){
+        pushCurrent();
+        return;
+      }
+      if(cur && /선택/.test(plain)){
+        cur.type='checkbox';
+        cur.extra = plain;
+        return;
+      }
+      if(!sawFirstQuestion){
+        if(!title) title=plain; else description.push(plain);
+        return;
+      }
+      return;
+    }
+    if(!sawFirstQuestion){
+      description.push(plain);
+      return;
+    }
+    if(cur && /^예[):]/.test(plain)){
+      const exVal = plain.replace(/^예[):]\s*/, '').trim();
+      if(exVal){
+        cur.extra = cur.extra ? (cur.extra+'; 예: '+exVal) : ('예: '+exVal);
+      }
+      // exVal이 비어있으면("예)"만 있고 실제 예시는 뒤이은 글머리줄들에 있는 경우) 아무것도
+      // 하지 않고, 이어지는 글머리 옵션 처리 로직이 "예: " 접두어를 새로 붙여서 채우게 둔다.
+    }
+    // 그 외(※ 안내문 등 인식 못하는 줄)는 조용히 건너뜀 — 필요하면 저장 전 검수화면에서 수동 추가
+  });
+  pushCurrent();
+
+  return {
+    title: title || '가져온 설문',
+    description: description.join(' ').trim(),
+    questions: questions
+  };
+}
 // ★ 2026-09-16 추가: 커스텀 설문 만들기/수정 모달. 질문 목록은 모달이 열려있는 동안
 // 로컬 배열(questions)로만 들고 있다가 "저장" 눌렀을 때만 ST.customSurveys/Firestore에 반영한다.
 // 질문 행 버튼들은 innerHTML로 매번 새로 그려지는 구조라 onclick에서 전역 함수(window._csf*)를
@@ -1595,6 +1766,17 @@ function openCustomSurveyForm(orgId, existing){
 
   ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:24px">
     <div style="font-size:16px;font-weight:900;margin-bottom:14px">${existing?'✏ 설문 수정':'+ 새 설문 만들기'}</div>
+    ${existing?'':`<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:6px">📄 기존 설문 파일(.docx/.txt)에서 가져오기</div>
+      <div style="font-size:10.5px;color:#64748b;margin-bottom:8px">질문은 굵게 "1. 질문내용", 선택지는 글머리기호, 응답유형은 [단답형]/[복수 선택 가능]/[선택 서술형] 같은 대괄호 표기로 쓴 문서를 올리면 문항을 자동으로 채워줍니다. 서식이 다르면 일부만 인식될 수 있으니, 가져온 뒤 꼭 검수해주세요.</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="csf_import_file" accept=".docx,.txt" style="font-size:11px">
+        <button type="button" id="csf_import_btn" style="background:#0369a1;color:#fff;border:none;border-radius:7px;padding:6px 13px;font-size:11.5px;font-weight:700;cursor:pointer">가져오기</button>
+      </div>
+      <div style="margin-top:8px">
+        <textarea id="csf_import_text" rows="2" placeholder="또는 여기에 설문 텍스트를 직접 붙여넣고 위 '가져오기' 버튼을 눌러도 됩니다" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:11.5px"></textarea>
+      </div>
+    </div>`}
     <div style="margin-bottom:12px">
       <label style="display:block;font-size:11.5px;color:#777;margin-bottom:4px">설문 제목 *</label>
       <input id="csf_title" value="${esc(existing?existing.title:'')}" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px">
@@ -1612,6 +1794,50 @@ function openCustomSurveyForm(orgId, existing){
     </div>
   </div>`;
   renderQuestionsBox();
+  const importBtn = ov.querySelector('#csf_import_btn');
+  if(importBtn){
+    importBtn.addEventListener('click', async function(){
+      const fileEl = ov.querySelector('#csf_import_file');
+      const textEl = ov.querySelector('#csf_import_text');
+      const file = fileEl && fileEl.files && fileEl.files[0];
+      importBtn.disabled = true;
+      const origLabel = importBtn.textContent;
+      importBtn.textContent = '분석 중...';
+      try{
+        let text = '';
+        if(file){
+          if(/\.docx$/i.test(file.name)){
+            text = await _csfExtractDocxText(file);
+          } else {
+            text = await file.text();
+          }
+        } else {
+          text = (textEl && textEl.value) || '';
+        }
+        if(!text.trim()){ alert('가져올 파일을 선택하거나 텍스트를 붙여넣어주세요.'); return; }
+        const parsed = _csfParseSurveyText(text);
+        if(!parsed.questions.length){
+          alert('문항을 자동으로 인식하지 못했습니다. 문서 서식이 예상과 다를 수 있습니다.\n제목("'+parsed.title+'")만 채워드렸으니, 문항은 "+ 문항 추가"로 직접 입력해주세요.');
+        } else {
+          const ok = confirm('문항 '+parsed.questions.length+'개를 인식했습니다. 지금 채워넣을까요?\n(기존에 입력해둔 제목·문항이 있으면 덮어씁니다)\n\n가져온 뒤에는 꼭 내용을 확인·수정하고 저장해주세요.');
+          if(!ok) return;
+        }
+        const titleEl = ov.querySelector('#csf_title');
+        const descEl = ov.querySelector('#csf_desc');
+        if(titleEl) titleEl.value = parsed.title;
+        if(descEl) descEl.value = parsed.description;
+        if(parsed.questions.length){
+          questions = parsed.questions;
+          renderQuestionsBox();
+        }
+      } catch(e){
+        alert('가져오기에 실패했습니다: '+(e&&e.message?e.message:e));
+      } finally {
+        importBtn.disabled = false;
+        importBtn.textContent = origLabel;
+      }
+    });
+  }
   ov.querySelector('#csf_cancel').addEventListener('click', function(){ ov.remove(); });
   ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
   ov.querySelector('#csf_save').addEventListener('click', function(){
