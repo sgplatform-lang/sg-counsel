@@ -3245,6 +3245,12 @@ function _chgHasUnread(s){
   }
   return false;
 }
+// ★ 2026-09-16(430) 신규: 빨간점(챌린저 미확인)이 있는 학생을 좌측 학생명단 맨 위로
+// 올려서 매니저가 놓치지 않게 한다. Array.prototype.sort는 최신 JS 엔진에서 안정 정렬이
+// 보장되므로, 미확인 여부만 비교하면 같은 그룹 내에서는 기존 순서(이름순 등)가 그대로 유지된다.
+function _sortStudentsUnreadFirst(list){
+  return list.slice().sort((a,b)=>(_chgHasUnread(b)?1:0)-(_chgHasUnread(a)?1:0));
+}
 async function _gg_markChallengerRead(s){
   if(!s || !s.id) return;
   const lastSubmit = _chgLastSubmitAt(s);
@@ -3342,7 +3348,7 @@ function renderMain(){
         if(teacher2 && sc.includes(teacher2.name)) return true;
         return false;
       });
-  const filt=viewStudents.filter(s=>s.id&&s.name).filter(s=>((s.name||'').includes(ST.search)||(s.school||'').includes(ST.search))&&(ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC))));
+  const filt=_sortStudentsUnreadFirst(viewStudents.filter(s=>s.id&&s.name).filter(s=>((s.name||'').includes(ST.search)||(s.school||'').includes(ST.search))&&(ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC)))));
   return`<div class="hdr">
     <div class="logo-area">
       <div onclick="ST.page='main';render()" style="cursor:pointer;display:flex;align-items:center;gap:8px">
@@ -3476,7 +3482,6 @@ function renderDetail(s){
     {id:'overview',  label:'개요',       icon:'📋', sub:false,  perm:null},
     {id:'grade',     label:'성적',       icon:'📊', sub:false,  perm:'grade'},
     {id:'weekly',    label:'주간플랜',   icon:'📅', sub:true,   perm:'weekly'},
-    {id:'test',      label:'테스트',     icon:'📝', sub:false,  perm:'test'},
     {id:'consult',   label:'학습상담',   icon:'📈', sub:false,  perm:'consult'},
     {id:'susi',      label:'수시',       icon:'🏫', sub:true,   perm:'susi'},
     {id:'jeongsi',   label:'정시',       icon:'🎯', sub:false,  perm:'jeongsi'},
@@ -3587,7 +3592,7 @@ function renderDetail(s){
     <!-- ③ 성적·상담·개요: 인쇄 버튼만 우측에 -->
     ${!isSusiGroup&&!isWeekGroup&&curPrintBtn?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:6px">${curPrintBtn}</div>`:''}
 
-    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='test'?renderStudentTest(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
+    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
   </div>`;
 }
 
@@ -14676,7 +14681,7 @@ function renderAdmin(){
       ${(()=>{
         const isAdmin_=ST.currentUser?.role==='admin';
         const isOrgAdmin_=ST.currentUser?.role==='orgAdmin';
-        const tabs=[['report','📋 리포트'],['grade_stat','📊 성적 현황'],['learning_style','📈 학습상담'],['test','📝 테스트'],['subj_config','⚙ 과목설정']];
+        const tabs=[['report','📋 리포트'],['grade_stat','📊 성적 현황'],['learning_style','📈 학습상담'],['subj_config','⚙ 과목설정']];
         if(isAdmin_||isOrgAdmin_) tabs.push(['teacher','👨‍🏫 선생님']);
         if(isAdmin_||isOrgAdmin_) tabs.push(['student_mgmt','🎓 학생관리']);
         if(isAdmin_||isOrgAdmin_) tabs.push(['program_catalog','🗂 프로그램 카탈로그']);
@@ -14690,7 +14695,7 @@ function renderAdmin(){
       })()}
     </div>
   </div>
-  ${ST.adminTab==='report'?renderAdminReport():ST.adminTab==='grade_stat'?renderAdminGradeStat():ST.adminTab==='learning_style'?renderAdminLearningStyle():ST.adminTab==='test'?renderTestMain():ST.adminTab==='subj_config'?renderSubjConfig():ST.adminTab==='student_mgmt'?renderStudentMgmt():ST.adminTab==='orgs'?renderOrgMgmt():ST.adminTab==='program_catalog'?renderProgramCatalog():ST.adminTab==='teacher'?renderAdminTeacher():renderAdminTeacher()}`;
+  ${ST.adminTab==='report'?renderAdminReport():ST.adminTab==='grade_stat'?renderAdminGradeStat():ST.adminTab==='learning_style'?renderAdminLearningStyle():ST.adminTab==='subj_config'?renderSubjConfig():ST.adminTab==='student_mgmt'?renderStudentMgmt():ST.adminTab==='orgs'?renderOrgMgmt():ST.adminTab==='program_catalog'?renderProgramCatalog():ST.adminTab==='teacher'?renderAdminTeacher():renderAdminTeacher()}`;
 }
 
 // ── 관리자 리포트 탭 ──
@@ -17777,7 +17782,7 @@ function renderOrgMgmt(){
           <div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:4px">🔑 허용 기능 권한</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px">
             ${(()=>{
-              const ALL=[{key:'grade',label:'📊성적'},{key:'weekly',label:'📅주간플랜'},{key:'test',label:'📝테스트'},{key:'consult',label:'💬상담'},{key:'susi',label:'🏫수시'},{key:'gyogwa',label:'📋교과분석'},{key:'jonghap',label:'📚종합분석'},{key:'jeongsi',label:'🎯정시'},{key:'apex',label:'🏆APEX'},{key:'addStudent',label:'➕학생추가'},{key:'nulsul',label:'✏논술분석'},{key:'challenger',label:'🎯챌린저'},{key:'roadmap',label:'🧭입시상담'}];
+              const ALL=[{key:'grade',label:'📊성적'},{key:'weekly',label:'📅주간플랜'},{key:'consult',label:'💬상담'},{key:'susi',label:'🏫수시'},{key:'gyogwa',label:'📋교과분석'},{key:'jonghap',label:'📚종합분석'},{key:'jeongsi',label:'🎯정시'},{key:'apex',label:'🏆APEX'},{key:'addStudent',label:'➕학생추가'},{key:'nulsul',label:'✏논술분석'},{key:'challenger',label:'🎯챌린저'},{key:'roadmap',label:'🧭입시상담'}];
               const perms=org.permissions||ALL.map(p=>p.key);
               return ALL.map(p=>`<span style="font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600;background:${perms.includes(p.key)?'#eef1ff':'#f8fafc'};color:${perms.includes(p.key)?'#3b5bdb':'#cbd5e1'};border:1px solid ${perms.includes(p.key)?'#c7d2fe':'#e2e8f0'}">${p.label}</span>`).join('');
             })()}
@@ -17917,7 +17922,6 @@ function openOrgForm(orgData){
         ${[
           {key:'grade',     label:'📊 성적 조회/입력'},
           {key:'weekly',    label:'📅 주간플랜 관리'},
-          {key:'test',      label:'📝 테스트 관리'},
           {key:'consult',   label:'💬 상담 입력'},
           {key:'susi',      label:'🏫 수시 분석'},
           {key:'gyogwa',    label:'📋 교과분석'},
@@ -17929,7 +17933,7 @@ function openOrgForm(orgData){
           {key:'challenger',label:'🎯 챌린저(모의고사 분석)'},
           {key:'roadmap',   label:'🧭 입시상담(로드맵 리포트)'},
         ].map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:8px;border:1.5px solid #e8eaf6;cursor:pointer">
-          <input type="checkbox" id="org_perm_${p.key}" ${(org?.permissions||['grade','weekly','test','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent']).includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:#3b5bdb">
+          <input type="checkbox" id="org_perm_${p.key}" ${(org?.permissions||['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent']).includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:#3b5bdb">
           <span style="font-size:12px;font-weight:600;color:#333">${p.label}</span>
         </label>`).join('')}
       </div>
@@ -17964,7 +17968,7 @@ function openOrgForm(orgData){
       mobile: ov.querySelector('#of_mobile').value.trim(),
       email:  ov.querySelector('#of_email').value.trim(),
       createdAt: org?.createdAt||Date.now(),
-      permissions: ['grade','weekly','test','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked)
+      permissions: ['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked)
     };
 
     const idx=orgs.findIndex(o=>o.id===org?.id);
@@ -18274,7 +18278,6 @@ function openTForm(t){
   const PERMS=[
     {key:'grade',    label:'📊 성적 조회/입력'},
     {key:'weekly',   label:'📅 주간플랜 관리'},
-    {key:'test',     label:'📝 테스트 관리'},
     {key:'consult',  label:'💬 상담 입력'},
     {key:'susi',     label:'🏫 수시 분석'},
     {key:'gyogwa',   label:'📋 교과분석'},
@@ -19079,10 +19082,10 @@ function bindEvents(){
       const viewStudents2 = ST.currentUser?.role==='orgAdmin'
         ? ST.students.filter(s=>String(s.orgId||'')===String(ST.currentOrg?.id||''))
         : ST.students;
-      const filt2 = viewStudents2.filter(s=>s.id&&s.name).filter(s=>
+      const filt2 = _sortStudentsUnreadFirst(viewStudents2.filter(s=>s.id&&s.name).filter(s=>
         ((s.name||'').includes(ST.search)||(s.school||'').includes(ST.search)) &&
         (ST.filterC==='전체'||s.counselor===ST.filterC||([...(s.counselors||[])].includes(ST.filterC)))
-      );
+      ));
       // 리스트 HTML만 교체
       listEl.innerHTML = filt2.map(s=>{
         const a=gAvg(s.subjects);
@@ -28977,7 +28980,7 @@ R1,S001,국어,1,현대시,선지판단,저오답률,두선지판단지연,오�
 
 <section id="input" class="panel active">
 <div class="card">
-<div class="row"><h2>기본 정보</h2><button class="ghost right" onclick="loadStudent();markClicked(event)">학생정보 불러오기</button></div>
+<div class="row"><h2>기본 정보</h2><span id="sgSelfBadge" style="display:none;background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 9px;font-size:10.5px;font-weight:700;margin-right:6px">🧑‍🎓 셀프</span><button class="ghost right" onclick="loadStudent();markClicked(event)">학생정보 불러오기</button></div>
 <div class="grid g4">
 <div><label>학생명</label><input id="studentName" value="홍길동" onchange="populateHistoryDropdown()"></div><div><label>학교/학년</label><input id="studentSchool" value="합격고등학교 3학년"></div><div><label>응시일</label><input id="testDate" type="date"></div><div><label>시험명/회차</label><input id="testName" value="실전 모의고사 1회"></div>
 <div><label>담당 매니저</label><input id="managerName" value="에이스"></div><div><label>목표 대학/전공</label><input id="target" value="서울대학교 자유전공학부"></div><div><label>전체 이행률(%)</label><input id="compliance" type="number" value="" placeholder="문항 배점/1차원인 입력 전엔 100" readonly title="문항별 찍음·미응답 체크를 기준으로 실질완주율과 동일하게 자동 계산됩니다"></div><div><label>이번 회차 필수 집중 과목 수</label><select id="focusLimit"><option value="">선택 안 함</option><option value="1">1개</option><option value="2">2개</option><option value="3">3개</option><option value="4">4개</option><option value="5">5개</option></select></div>
@@ -32645,6 +32648,10 @@ function __SG_initFromHost(data){
   if($('nextCheck')) $('nextCheck').value = (data.meta&&data.meta.nextCheck) || '';
   if($('compliance')) $('compliance').value = (data.meta&&data.meta.compliance) || '';
   if($('focusLimit')) $('focusLimit').value = (data.meta&&data.meta.focusLimit) || '';
+  // ★ 2026-09-16(430) 추가: 학생이 학생용 페이지에서 "셀프 챌린저"(카탈로그 없이 직접
+  // 시험명·과목을 만든 기록)로 입력했으면, 기본정보의 학생정보 불러오기 버튼 옆에
+  // 작게 "셀프" 표시를 해서 매니저가 기관 카탈로그 기반 정식 회차와 구분할 수 있게 한다.
+  if($('sgSelfBadge')) $('sgSelfBadge').style.display = data.selfRegistered ? 'inline-block' : 'none';
 
   // 누적 기록(history) 복원
   // ★ 과거에 중복 저장되어 있던 회차 기록이 있으면 정리(학생+날짜+회차명 기준, 나중 것 유지)
@@ -33066,7 +33073,10 @@ function _gg_challengerInitPayload(stu){
     lastTestName: (stu.challengerData?.lastTestName)||'',
     history: (stu.challengerData?.history)||[],
     lastSubjects: (stu.challengerData?.lastSubjects)||[],
-    meta: (stu.challengerData?.meta)||{}
+    meta: (stu.challengerData?.meta)||{},
+    // ★ 2026-09-16(430) 추가: 이번 회차 과목 중 하나라도 학생이 카탈로그 없이 직접 만든
+    // "셀프 챌린저" 기록(_selfRegistered)이면 true — 기본정보 화면에 "셀프" 배지로 표시.
+    selfRegistered: Array.isArray(stu.challengerData?.lastSubjects) && stu.challengerData.lastSubjects.some(sp=>sp&&sp._selfRegistered)
   };
 }
 function _gg_sendChallengerInit(ifr, stu){
