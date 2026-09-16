@@ -345,6 +345,9 @@ try{
     // 것이 원인 — 문항수 많은 PDF는 분석에 70초 이상 걸릴 수 있어 실사용에서 충분히 재현됨.
     // 클라이언트 타임아웃을 서버와 동일하게 5분으로 맞춰서 해결.
     analyzeExamPdf: (payload)=>firebase.functions().httpsCallable('analyzeExamPdf', {timeout: 300000})(payload).then(r=>r.data),
+    // ★ 2026-09-15 추가: 문제지 PDF에서 문항별 위치(페이지+사각형 좌표%)를 AI가 추정해
+    // 알려주는 서버 함수. 위 analyzeExamPdf와 같은 5분 타임아웃(문항 많은 PDF 대비).
+    analyzeExamPdfRegions: (payload)=>firebase.functions().httpsCallable('analyzeExamPdfRegions', {timeout: 300000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -504,7 +507,12 @@ function toast(msg,d){
 </script>
 <!-- 정적 로그인 화면 (모바일 키보드 문제 해결) -->
 <div id="login-screen" style="display: flex; min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, rgb(30, 58, 138), rgb(59, 91, 219), rgb(99, 102, 241)); padding: 20px;">
-  <div style="background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <!-- ★ 2026-09-15(430) 추가: min-height로 카드 높이를 미리 확보해, 429에서 추가한 외부
+       Pretendard 폰트가 뒤늦게 로드되며 대체 폰트→Pretendard로 글자가 바뀔 때(폰트 스왑)
+       카드 높이가 살짝 달라지면서 화면 정중앙 재배치로 로그인 입력창이 움직여 보이던 현상
+       완화용(순수 시각 보정, 로그인 로직 무관). 내용이 더 길어지면(예: 에러 메시지) 자동으로
+       늘어나도록 height가 아닌 min-height 사용. -->
+  <div style="background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:380px;min-height:480px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="text-align:center;margin-bottom:24px">
       <div style="font-size:44px;margin-bottom:8px">🎓</div>
       <div id="login-platform-name" style="font-size:20px;font-weight:900;color:#1a1a2e">SG상담플랫폼</div>
@@ -2611,8 +2619,11 @@ function forceRender(){
 
 // ══ 로그인 화면 ══
 function renderLogin(){
+  // ★ 2026-09-15(430) 추가: 정적 로그인 화면과 동일하게 min-height로 카드 높이를 미리
+  // 확보해, 429에서 추가한 외부 Pretendard 폰트 스왑으로 카드가 재배치되며 입력창이
+  // 움직여 보이던 현상 완화(순수 시각 보정).
   return`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e3a8a,#3b5bdb,#6366f1);padding:20px">
-    <div style="background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="background:#fff;border-radius:20px;padding:32px 28px;width:100%;max-width:380px;min-height:480px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
       <div style="text-align:center;margin-bottom:24px">
         <div style="font-size:44px;margin-bottom:8px">🎓</div>
         <div style="font-size:20px;font-weight:900;color:#1a1a2e">${getPlatformName(true)}</div>
@@ -33846,6 +33857,19 @@ function _examcatPdfSectionHtml(){
       <label style="display:inline-block;background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155"><span id="examcat-file-label">📁 문제지 PDF 파일 선택</span><input type="file" id="examcat-file-input" accept="application/pdf" style="display:none" onchange="_examcatLoadPdf(this.files[0], EXAMCAT_pdfActiveMode||'q')"></label>
     </div>
     <div id="examcat-pdf-viewer" style="display:none">
+      <!-- ★ 2026-09-15 추가: "한 문항씩 마우스로 자르는 게 너무 오래 걸린다"는 요청으로,
+           AI가 PDF 전체를 한 번에 분석해서 문항별 위치를 추정한 뒤, 여기서 바로 전부
+           잘라 저장하는 기능. 좌표 추정이 완벽하지 않을 수 있어서(특히 지문이 길거나
+           그림이 문항 경계에 걸치는 경우), 실행 전 몇 개를 찾았는지 먼저 보여주고
+           확인을 받으며, 저장 후에도 아래 "등록된 문항 이미지" 목록에서 결과를 보고
+           잘못된 것만 기존 방식대로 다시 잘라 덮어쓸 수 있다(자동 100%를 보장하진 않음). -->
+      <div id="examcat-ai-region-panel" style="margin-bottom:10px;border:1.5px dashed #7c3aed;border-radius:10px;padding:10px;background:#faf5ff">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button type="button" id="examcat-ai-region-btn" onclick="_examcatAiDetectRegions()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🧠 AI로 이 문제지 전체 문항 자동 자르기</button>
+          <span id="examcat-ai-region-status" style="font-size:11.5px;color:#7c3aed"></span>
+        </div>
+        <p style="font-size:10.5px;color:#7c3aed;margin:6px 0 0">상단 "🧠 AI로 문제지·정답지 PDF 자동분석"에서 고른 과목/세부과목 기준으로 인식합니다. 문항 수에 따라 1~2분 걸릴 수 있고, 완료되면 몇 개를 찾았는지 확인 후 진행 여부를 물어봅니다. 자동으로 잘못 잘린 문항만 아래에서 기존 방식대로(마우스 드래그) 다시 잘라 덮어쓸 수 있습니다.</p>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
         <button type="button" onclick="_examcatPdfPage(-1)" style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">◀ 이전</button>
         <span id="examcat-pdf-pagelabel" style="font-size:12px;color:#334155"></span>
@@ -34131,6 +34155,29 @@ function _examcatMigrateImageMap(rootMap){
   return rootMap;
 }
 
+// ★ 2026-09-15 추가: 이미지 blob을 Storage에 올리고 examCatalog 항목(qImages/eImages)에
+// 등록하는 부분만 따로 뺀 공용 함수. 기존 수동 드래그 저장(_examcatSaveCrop)과 아래 AI
+// 일괄 자동 저장(_examcatBulkSaveRegions)이 이 함수 하나를 함께 쓴다 — 저장 형식이
+// 두 경로에서 절대 어긋나지 않도록(나중에 한쪽만 고치고 한쪽은 안 고치는 실수 방지).
+// examcatSaveEntry(Firestore 반영)는 호출부에서 각자 필요할 때 부르도록 여기선 안 함
+// (일괄 저장은 문항마다 매번 반영하면 느려서 전부 끝난 뒤 한 번만 반영하기 위함).
+async function _examcatUploadSaveImageBlob(mode, blob, subj, detail, nums){
+  if(!blob) throw new Error('이미지 변환에 실패했습니다.');
+  if(!FB_USE() || !window._fb || !window._fb.uploadBlob) throw new Error('서버 연결이 되어있지 않아 저장할 수 없습니다.');
+  const examId = EXAMCAT_editing.id;
+  const rangeKey = nums[0]+(nums.length>1?('-'+nums[nums.length-1]):'');
+  const path = 'examCatalog/'+examId+'/'+(mode==='q'?'q':'e')+'/'+(subj?subj+'_':'')+(detail?detail+'_':'')+rangeKey+'_'+Date.now()+'.jpg';
+  const url = await window._fb.uploadBlob(path, blob);
+  if(!EXAMCAT_editing.qImages) EXAMCAT_editing.qImages={};
+  if(!EXAMCAT_editing.eImages) EXAMCAT_editing.eImages={};
+  const rootMap = mode==='q' ? _examcatMigrateImageMap(EXAMCAT_editing.qImages) : _examcatMigrateImageMap(EXAMCAT_editing.eImages);
+  const groupKey = subj+'|'+detail;
+  if(!rootMap[groupKey]) rootMap[groupKey]={};
+  const targetMap = rootMap[groupKey];
+  nums.forEach(function(no){ targetMap[no] = {url:url, path:path, start:nums[0], end:nums[nums.length-1], pages:[{url:url,path:path}], groupId:rangeKey+'_'+Date.now()}; });
+  return {url:url, rangeKey:rangeKey};
+}
+
 async function _examcatSaveCrop(){
   const cur=_examcatCurPdf();
   const mode=EXAMCAT_pdfActiveMode;
@@ -34158,27 +34205,136 @@ async function _examcatSaveCrop(){
   cropCanvas.getContext('2d').drawImage(canvas, x1, y1, w, h, 0, 0, w, h);
   _examcatDrawOverlay(); // 화면에는 다시 빨간 박스 표시(사용자가 계속 선택 영역을 볼 수 있게)
   const blob = await new Promise(function(res){ cropCanvas.toBlob(res, 'image/jpeg', 0.85); });
-  if(!blob){ alert('이미지 변환에 실패했습니다.'); return; }
-  if(!FB_USE() || !window._fb || !window._fb.uploadBlob){ alert('서버 연결이 되어있지 않아 저장할 수 없습니다.'); return; }
-  const examId = EXAMCAT_editing.id;
-  const rangeKey = nums[0]+(nums.length>1?('-'+nums[nums.length-1]):'');
-  const path = 'examCatalog/'+examId+'/'+(mode==='q'?'q':'e')+'/'+(subj?subj+'_':'')+(detail?detail+'_':'')+rangeKey+'_'+Date.now()+'.jpg';
   try{
-    const url = await window._fb.uploadBlob(path, blob);
-    if(!EXAMCAT_editing.qImages) EXAMCAT_editing.qImages={};
-    if(!EXAMCAT_editing.eImages) EXAMCAT_editing.eImages={};
-    const rootMap = mode==='q' ? _examcatMigrateImageMap(EXAMCAT_editing.qImages) : _examcatMigrateImageMap(EXAMCAT_editing.eImages);
-    const groupKey = subj+'|'+detail;
-    if(!rootMap[groupKey]) rootMap[groupKey]={};
-    const targetMap = rootMap[groupKey];
-    nums.forEach(function(no){ targetMap[no] = {url:url, path:path, start:nums[0], end:nums[nums.length-1], pages:[{url:url,path:path}], groupId:rangeKey+'_'+Date.now()}; });
+    const saved = await _examcatUploadSaveImageBlob(mode, blob, subj, detail, nums);
     await examcatSaveEntry(EXAMCAT_editing);
     _examcatCancelCrop();
     _examcatRenderSavedImageList();
-    toast('✅ '+(subj?subj+(detail?'('+detail+') ':' '):'')+rangeKey+'번 이미지가 저장됐습니다.');
+    toast('✅ '+(subj?subj+(detail?'('+detail+') ':' '):'')+saved.rangeKey+'번 이미지가 저장됐습니다.');
   }catch(e){
     alert('업로드 중 오류가 발생했습니다: '+e.message+'\n\n인터넷 연결을 확인하고 다시 시도해주세요.');
   }
+}
+
+// ★ 2026-09-15 추가: "PDF를 올리면 AI가 문항을 알아서 잘라준다" 기능.
+// 1) 지금 화면에 열려있는 PDF(EXAMCAT_pdfStore[mode])의 원본 바이트를 pdf.js의
+//    doc.getData()로 다시 꺼내(파일을 다시 올릴 필요 없이) base64로 바꿔 서버로 보낸다.
+// 2) 서버(analyzeExamPdfRegions)가 문항별 페이지+사각형(%) 좌표를 추정해 돌려준다.
+// 3) 몇 개를 찾았는지 먼저 보여주고 확인을 받은 뒤, 그 좌표대로 페이지를 넘겨가며
+//    기존 수동 자르기와 완전히 동일한 방식(캔버스에서 잘라 Storage 업로드)으로 한 번에
+//    전부 저장한다. 좌표가 100% 정확하다고 보장하지 않으므로, 저장 후 "등록된 문항
+//    이미지" 목록에서 결과를 확인하고 잘못된 것만 기존 수동 드래그로 다시 잘라 덮어쓸
+//    수 있게 한다(자동 저장이 실패/부정확해도 기존 워크플로로 항상 복구 가능).
+let EXAMCAT_regionState = { busy:false };
+
+function _u8ToBase64(u8){
+  let binary='';
+  const chunk=0x8000;
+  for(let i=0;i<u8.length;i+=chunk){
+    binary += String.fromCharCode.apply(null, u8.subarray(i, i+chunk));
+  }
+  return btoa(binary);
+}
+
+// text: 서버가 돌려준 "문항범위\t페이지\tX1\tY1\tX2\tY2" 표. 형식이 안 맞거나 범위를
+// 벗어난 줄은 조용히 건너뛴다(한두 줄이 이상해도 나머지는 정상 진행되도록).
+function _examcatParseRegionRows(text, numPages){
+  const lines = String(text||'').split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  const out=[];
+  lines.forEach(function(line){
+    const cells = line.split('\t').map(function(c){return c.trim();});
+    if(cells.length<6) return;
+    if(cells[0]==='문항범위') return; // 헤더 줄 스킵
+    const range = cells[0];
+    const page = parseInt(cells[1],10);
+    const x1=parseFloat(cells[2]), y1=parseFloat(cells[3]), x2=parseFloat(cells[4]), y2=parseFloat(cells[5]);
+    if(!range || !isFinite(page) || page<1 || (numPages && page>numPages)) return;
+    if(![x1,y1,x2,y2].every(function(v){return isFinite(v);})) return;
+    const nx1=Math.max(0,Math.min(100,Math.min(x1,x2))), ny1=Math.max(0,Math.min(100,Math.min(y1,y2)));
+    const nx2=Math.max(0,Math.min(100,Math.max(x1,x2))), ny2=Math.max(0,Math.min(100,Math.max(y1,y2)));
+    if(nx2-nx1<1 || ny2-ny1<1) return; // 너무 작아서 비정상으로 보이는 영역은 제외
+    out.push({range:range, page:page, x1:nx1, y1:ny1, x2:nx2, y2:ny2});
+  });
+  return out;
+}
+
+function _examcatRegionStatus(msg){
+  const el=document.getElementById('examcat-ai-region-status');
+  if(el) el.textContent = msg||'';
+  const btn=document.getElementById('examcat-ai-region-btn');
+  if(btn) btn.disabled = !!EXAMCAT_regionState.busy;
+}
+
+async function _examcatAiDetectRegions(){
+  if(EXAMCAT_regionState.busy) return;
+  const mode = EXAMCAT_pdfActiveMode || 'q';
+  const cur = EXAMCAT_pdfStore[mode];
+  if(!cur){ alert('먼저 PDF를 불러와주세요.'); return; }
+  if(!FB_USE() || !window._fb || !window._fb.analyzeExamPdfRegions){ alert('서버 연결이 안 되어 있어 AI 자동 자르기를 쓸 수 없습니다.'); return; }
+  EXAMCAT_regionState.busy = true;
+  _examcatRegionStatus('📖 PDF 읽는 중...');
+  try{
+    if(!cur.doc || typeof cur.doc.getData !== 'function') throw new Error('PDF 원본 데이터를 다시 가져오지 못했습니다. PDF를 다시 선택해서 올려주세요.');
+    const bytes = await cur.doc.getData();
+    const base64 = _u8ToBase64(bytes);
+    const st = EXAMCAT_aiState; // 상단 "AI로 문제지·정답지 PDF 자동분석"과 같은 과목/세부과목 선택을 재사용
+    const subjNameMap={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+    _examcatRegionStatus('🧠 SG가 문항 위치를 분석 중입니다(1~2분 정도 걸릴 수 있습니다)...');
+    const result = await window._fb.analyzeExamPdfRegions({
+      subjCode: st.subj, subjName: subjNameMap[st.subj]||st.subj, elective: st.elective||'',
+      questionPdfBase64: base64,
+    });
+    const regions = _examcatParseRegionRows(result.regionText||'', cur.numPages);
+    EXAMCAT_regionState.busy = false;
+    _examcatRegionStatus('');
+    if(!regions.length){
+      alert('AI가 문항 영역을 하나도 찾지 못했습니다. PDF 내용을 확인하고 다시 시도해주세요.');
+      return;
+    }
+    if(!confirm('AI가 '+regions.length+'개 문항(구간)의 위치를 찾았습니다.\n\n"확인"을 누르면 지금 바로 전부 잘라서 저장합니다(같은 번호로 이미 저장된 이미지가 있으면 덮어씁니다).\n\n좌표가 완벽하지 않을 수 있어, 저장 후 아래 "등록된 문항 이미지" 목록에서 결과를 확인하고 잘못된 항목만 기존 방식대로(마우스 드래그) 다시 잘라 바꿀 수 있습니다.')) return;
+    await _examcatBulkSaveRegions(regions, mode, st.subj, st.elective);
+  }catch(e){
+    EXAMCAT_regionState.busy = false;
+    _examcatRegionStatus('');
+    alert('AI 자동 자르기 중 오류가 발생했습니다: '+(e&&e.message?e.message:e));
+  }
+}
+
+async function _examcatBulkSaveRegions(regions, mode, subj, elective){
+  const cur = EXAMCAT_pdfStore[mode];
+  if(!cur) return;
+  const detail = elective ? _cbrNormDetail(elective) : '';
+  let saved=0, skipped=0;
+  const total = regions.length;
+  for(let i=0;i<regions.length;i++){
+    const r = regions[i];
+    toast('⏳ AI 자동 자르기: '+(i+1)+'/'+total+'번째('+r.range+'번) 저장 중...', 20000);
+    try{
+      if(cur.pageNum !== r.page){
+        cur.pageNum = r.page;
+        await _examcatRenderPdfPage();
+      }
+      const canvas = document.getElementById('examcat-pdf-canvas');
+      if(!canvas) throw new Error('캔버스를 찾을 수 없습니다.');
+      const x1 = (r.x1/100)*canvas.width, y1=(r.y1/100)*canvas.height;
+      const w = ((r.x2-r.x1)/100)*canvas.width, h=((r.y2-r.y1)/100)*canvas.height;
+      const nums = _examcatExpandRange(r.range);
+      if(!nums.length || w<10 || h<10){ skipped++; continue; }
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = Math.max(1,Math.round(w)); cropCanvas.height = Math.max(1,Math.round(h));
+      cropCanvas.getContext('2d').drawImage(canvas, x1, y1, w, h, 0, 0, cropCanvas.width, cropCanvas.height);
+      const blob = await new Promise(function(res){ cropCanvas.toBlob(res, 'image/jpeg', 0.85); });
+      await _examcatUploadSaveImageBlob(mode, blob, subj, detail, nums);
+      saved++;
+    }catch(e){
+      console.warn('[examcat] AI 영역 저장 실패', r, e);
+      skipped++;
+    }
+  }
+  try{ await examcatSaveEntry(EXAMCAT_editing); }catch(e){ /* 개별 이미지는 이미 저장됐으므로 여기서 실패해도 계속 진행 */ }
+  const t=document.getElementById('admin-toast'); if(t) t.style.display='none';
+  _examcatRenderSavedImageList();
+  alert('AI 자동 자르기 완료: '+saved+'개 저장'+(skipped?', '+skipped+'개는 건너뜀(직접 확인 후 수동으로 잘라주세요)':'')+'.\n\n아래 "등록된 문항 이미지" 목록에서 결과를 확인해주세요.');
 }
 
 async function _examcatDeleteImage(mode, groupKey, no){
