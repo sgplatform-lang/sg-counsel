@@ -1651,6 +1651,26 @@ function _sgNotifOpenStudent(studentId){
   _gg_markChallengerRead(s).then(render);
   render();
 }
+// ★ 2026-09-16(430 21차) 신규: 설문조사(사전조사서/CF70/커스텀설문) 알림도 챌린저처럼
+// 클릭하면 해당 화면(입시상담 › 설문조사함)으로 바로 이동 + 읽음처리 되도록 한다.
+// 설문조사함은 좌측에서 학생을 먼저 선택해야 보이는 "학생상세" 탭 구조 안에 속해 있어서,
+// 현재 선택된 학생이 없으면 화면 자체가 "학생을 선택하세요" 빈 화면으로 남는다 — 알림
+// 자체는 특정 학생과 무관한 항목(설문 제출 목록)이라도 화면 진입은 가능해야 하므로,
+// 선택된 학생이 없을 때만 이 역할이 볼 수 있는 목록의 첫 학생을 임시로 선택해준다.
+function _sgNotifOpenSurvey(type, surveyId){
+  if(!ST.sel){
+    const list=_sgNotifVisibleStudents();
+    if(list && list.length) ST.sel=list[0];
+  }
+  ST.tab='roadmap';
+  ST.roadmapSubTab='survey';
+  if(type==='presurvey') ST._surveyHubView='presurvey';
+  else if(type==='cf70') ST._surveyHubView='cf70';
+  else if(type==='customSurvey') ST._surveyHubView='custom:'+surveyId;
+  ST._notifOpen=false;
+  _sgNotifMarkTypeReviewedInner(type, surveyId).then(render);
+  render();
+}
 // 상단 헤더 알림벨 버튼+드롭다운 HTML. renderMain()에서 호출됨(호출될 때마다 알림 데이터
 // 최초 1회 백그라운드 로딩도 함께 트리거).
 function _sgNotifBellHtml(){
@@ -1660,7 +1680,10 @@ function _sgNotifBellHtml(){
   const rowsHtml = notifs.length ? notifs.map(function(n){
     const markId = n.type==='customSurvey' ? n.surveyId : (n.studentId||'');
     const suffix = n.type==='challenger' ? ' 챌린저' : '';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;${n.type==='challenger'?'cursor:pointer':''}" ${n.type==='challenger'?`onclick="_sgNotifOpenStudent('${n.studentId}')"`:''}>
+    const rowOnclick = n.type==='challenger'
+      ? `_sgNotifOpenStudent('${n.studentId}')`
+      : `_sgNotifOpenSurvey('${n.type}','${esc(String(markId))}')`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;cursor:pointer" onclick="${rowOnclick}">
       <span style="min-width:20px;height:20px;border-radius:50%;background:#e53935;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${n.count>99?'99+':n.count}</span>
       <span style="flex:1;font-size:12px;color:#333;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.label)}${suffix}</span>
       <button onclick="event.stopPropagation();_sgNotifMarkOne('${n.type}','${esc(String(markId))}')" style="background:#f4f6fb;border:1px solid #e0e3ef;color:#666;font-size:10px;font-weight:700;border-radius:6px;padding:3px 7px;cursor:pointer;flex-shrink:0">확인</button>
