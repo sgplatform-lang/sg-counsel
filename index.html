@@ -1429,6 +1429,43 @@ function RM_deleteCF70Submission(id){
   if(FB_USE()) window._fb.delete('challengerFinal70Submissions', id).catch(function(e){ alert('⚠️ 삭제가 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다). 새로고침하면 다시 나타날 수 있습니다.\n\n'+(e&&e.message?e.message:'')); });
   render();
 }
+// ★ 2026-09-17 추가: "기관 미상"/"기관 미지정"으로 들어온 사전조사·CF70 제출건을 최종관리자가
+// 올바른 기관으로 재지정. 이 두 웹폼은 링크의 "?org=" 값을 그대로 orgId로 저장하는데,
+// 학생이 아직 그 기관에 등록 전이라도 orgId 자체는 정상 저장된다 — 그런데도 "기관 미상"이
+// 뜬다면 그 orgId가 지금 존재하는 어떤 기관과도 일치하지 않는다는 뜻으로, 가장 흔한 원인은
+// 그 기관을 한 번 삭제 후 재생성해 기관 ID가 바뀌었는데(기관 정보를 "수정"만 하면 ID는
+// 그대로 유지되므로 삭제→재생성 케이스만 해당), 예전 ID가 찍힌 배포된 링크/카톡파일이
+// 여전히 쓰이고 있는 경우다. 이미 들어와버린 제출은 옳은 기관을 자동으로 되찾을 방법이
+// 없으므로(예전 orgId 자체가 사라졌음), 최종관리자가 수동으로 지정할 수 있게 한다.
+function RM_reassignSubmissionOrg(collectionName, listKey, id, newOrgId){
+  if(!newOrgId) return; // 안내용 첫 옵션("🏫 기관 재지정...")이 선택된 경우 무시
+  const list = ST[listKey]||[];
+  const p = list.find(function(x){ return String(x.id)===String(id); });
+  if(!p) return;
+  const orgs = JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const org = orgs.find(function(o){ return String(o.id)===String(newOrgId); });
+  const orgName = org ? org.name : newOrgId;
+  if(!confirm('이 제출 건을 "'+orgName+'" 기관으로 재지정할까요?\n\n재지정하면 그 기관의 받은함에도 나타나게 됩니다.')) return;
+  p.orgId = newOrgId;
+  if(FB_USE()){
+    window._fb.set(collectionName, p.id, p).catch(function(e){
+      alert('⚠️ 기관 재지정이 서버에 반영되지 못했습니다(서버 연결 문제일 수 있습니다). 새로고침 후 다시 시도해주세요.\n\n'+(e&&e.message?e.message:''));
+    });
+  }
+  render();
+}
+// select onchange가 곧바로 재지정을 시도하는데, 사용자가 confirm에서 "취소"를 누르면
+// select 자신은 이미 새 값으로 바뀐 채 남아있어(실제 데이터는 안 바뀌었는데 화면 드롭다운만
+// 바뀐 값을 보여주는 불일치) 다음 렌더 때 현재 orgId 기준으로 다시 그려지며 자동 복구되므로,
+// 여기서는 별도 롤백 처리 없이 render()만 호출해도 충분하다(위 함수가 이미 그렇게 함).
+function RM_orgReassignSelectHtml(collectionName, listKey, p){
+  const orgs = JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+  const cur = String(p.orgId||'');
+  const opts = '<option value="">🏫 기관 재지정...</option>' + orgs.map(function(o){
+    return '<option value="'+esc(o.id)+'"'+(String(o.id)===cur?' selected':'')+'>'+esc(o.name)+'</option>';
+  }).join('');
+  return '<select onclick="event.stopPropagation()" onchange="event.stopPropagation();RM_reassignSubmissionOrg(\''+collectionName+'\',\''+listKey+'\',\''+esc(String(p.id))+'\',this.value)" style="font-size:10px;padding:1px 3px;border:1px solid #ddd;border-radius:6px;margin-left:4px;max-width:120px;color:#666;vertical-align:middle">'+opts+'</select>';
+}
 // ══════════════════════════════════════════════════════════════════
 // ★ 2026-09-16 추가: "설문조사 관리" — 사전조사서/챌린저FINAL70처럼 관리자가 매번 Claude에게
 // 새 html 폼을 부탁하지 않고, 기관별로 직접 질문을 구성해 만드는 커스텀 설문. 정의는
@@ -2151,13 +2188,22 @@ async function fbLoadAll_all(){
         return v;
       });
     }
-    const [students, teachers, tests, config, orgs] = await Promise.all([
+    // ★ 2026-09-17 추가: 삭제된 학생 ID 목록(휴지통 표식, 'deletedStudentIds' 컬렉션) —
+    // 아래 "로컬→Firebase 자동동기화"가 어떤 기기의 오래된 localStorage 캐시를 보고
+    // "삭제된 게 아니라 이 기기에서만 새로 추가된 학생"이라고 착각해 되살려버리는 것을
+    // 막기 위해, 삭제 시점에 기록해둔 이 목록을 로그인 로딩 때마다 함께 가져온다(전 기기
+    // 공용 — Firestore에 저장돼 있어 다른 기기의 삭제도 인식할 수 있음).
+    const [students, teachers, tests, config, orgs, deletedIds] = await Promise.all([
       _timed('학생(students)', _studentsPromise),
       _timed('선생님(teachers)', _teachersPromise),
       _timed('tests', fbLoadAll('tests')),
       _timed('config', fbLoadAll('config')),
       _timed('orgs', fbLoadAll('orgs')),
+      _timed('deletedStudentIds', fbLoadAll('deletedStudentIds')),
     ]);
+    // 이번 로딩분+이전 세션에서 이미 알고 있던 삭제기록을 합쳐서 유지(합집합, 절대 축소되지 않음)
+    ST._deletedStudentIds = ST._deletedStudentIds || new Set();
+    (deletedIds||[]).forEach(function(d){ if(d && d.id) ST._deletedStudentIds.add(String(d.id)); });
     console.log('[SG][로그인 로딩] 전체 완료: '+((performance.now()-_loginLoadStart)/1000).toFixed(2)+'초');
     if(students===null){
       // ★ 2026-08-29 추가: 15초 안에 응답이 없어 시간 초과로 실패한 경우, 화면단에서
@@ -3008,6 +3054,17 @@ async function deleteStudent(sid){
     // 본 뒤에 로그아웃/새로고침해도 안전하다는 뜻(안내가 뜨기 전에 창을 닫으면 아직 서버
     // 확인 전일 수 있다는 것도 알 수 있음).
     alert('[' + s.name + '] 학생이 삭제되었습니다.');
+  }
+  // ★ 2026-09-17 추가: 삭제가 서버에서 확정됐다면, 이 학생 ID를 "삭제 기록"(Firestore
+  // 'deletedStudentIds' 컬렉션)에도 남겨둔다. 이게 없으면 다른 기기·세션에 남아있는 오래된
+  // localStorage 캐시가 "Firebase엔 없지만 로컬엔 있으니 아직 못 올린 신규 학생이다"라고
+  // 착각해서(로그인 시 "로컬→Firebase 자동동기화" 로직) 삭제된 학생을 그대로 되살려버리는
+  // 문제가 있었다 — 이 기록이 있으면 그 로직이 되살리기 전에 걸러낸다.
+  if(_fbDeleteOk && FB_USE()){
+    if(!ST._deletedStudentIds) ST._deletedStudentIds=new Set();
+    ST._deletedStudentIds.add(String(sid));
+    window._fb.set('deletedStudentIds', String(sid), {id:String(sid), deletedAt:Date.now()})
+      .catch(function(e){ console.warn('삭제기록 저장 실패(다른 기기에서 이 학생이 되살아날 수 있음):', e); });
   }
   // localStorage 최종 저장(성공 시엔 삭제된 상태, 실패 시엔 복원된 상태)
   try{ localStorage.setItem(SK, JSON.stringify(ST.students)); }catch(e){}
@@ -17062,7 +17119,7 @@ function renderRoadmapInbox(){
   const rows=list.map(function(p){
     const isNew=_svIsUnread(p);
     const expanded=!!(ST._surveyExpanded||{})[p.id];
-    const orgLabel=isAdminRole ? ` <span style="color:#888;font-size:10.5px;font-weight:400">· ${esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))}</span>` : '';
+    const orgLabel=isAdminRole ? ` <span style="color:#888;font-size:10.5px;font-weight:400">· ${esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))}${RM_orgReassignSelectHtml('preSurveySubmissions','preSurveySubmissions',p)}</span>` : '';
     return `<div style="background:#fff;border:1px solid ${isNew?'#c7d2fe':'#e8eaf6'};border-left:4px solid ${isNew?'#3b5bdb':'#cbd5e1'};border-radius:10px;padding:14px 16px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="RM_toggleSurveyExpand('${p.id}')">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -17341,7 +17398,7 @@ function RM_cf70ListHtml(){
   const rows=list.map(function(p){
     const isNew=_svIsUnread(p);
     const expanded=!!(ST._cf70Expanded||{})[p.id];
-    const orgLabel=isAdminRole ? ` <span style="color:#888;font-size:10.5px;font-weight:400">· ${esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))}</span>` : '';
+    const orgLabel=isAdminRole ? ` <span style="color:#888;font-size:10.5px;font-weight:400">· ${esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))}${RM_orgReassignSelectHtml('challengerFinal70Submissions','challengerF70Submissions',p)}</span>` : '';
     const exam=p.examSubjects||{};
     const summary=[exam.kor,exam.math,exam.tamgu1,exam.tamgu2].filter(Boolean).join(' · ');
     return `<div style="background:#fff;border:1px solid ${isNew?'#fde68a':'#e8eaf6'};border-left:4px solid ${isNew?'#d97706':'#cbd5e1'};border-radius:10px;padding:14px 16px;margin-bottom:10px">
@@ -19234,10 +19291,15 @@ function openTForm(t){
 
       if(nameChanged || orgChanged){
         // 변경 대상 학생 수집 (전체 localStorage에서도 조회)
+        // ★ 2026-09-17 추가: 삭제된 학생의 묵은 localStorage 캐시가 여기 섞여 들어오면,
+        // 담당 선생님 이름이 그 학생의 예전 담당자와 우연히 같다는 이유만으로 되살아나
+        // Firebase에 재업로드될 수 있어(아래 fbSave) 삭제된 ID는 애초에 제외한다.
+        const _deletedIds2 = ST._deletedStudentIds || new Set();
         let allStudents = ST.students.slice();
         try{
           const fromStorage = JSON.parse(localStorage.getItem(SK)||'[]');
           fromStorage.forEach(fs=>{
+            if(fs && _deletedIds2.has(String(fs.id))) return;
             if(!allStudents.find(x=>String(x.id)===String(fs.id))) allStudents.push(fs);
           });
         }catch(e){}
@@ -20196,39 +20258,62 @@ function init(){
       ST._authLoading = false;
       if(loaded){
         console.log("✅ Firebase 데이터 로드 완료, teachers:", ST.teachers.length);
-        // ★ 로컬 데이터가 Firebase보다 최신인 학생 자동 업로드
-        // (로컬 파일에서 작업한 데이터를 GitHub 접속 시에도 보이게)
-        const _localStudents = [];
-        try{ const _ls=JSON.parse(localStorage.getItem(SK)||'[]'); if(Array.isArray(_ls)) _ls.forEach(function(ls){ _localStudents.push(ls); }); }catch(e){}
-        if(_localStudents.length){
-          const _toUpload = [];
-          _localStudents.forEach(function(ls){
-            const fbStu = ST.students.find(x=>String(x.id)===String(ls.id));
-            const lUp = ls._updatedAt||0;
-            const fUp = fbStu ? (fbStu._updatedAt||0) : 0;
-            // ★ 로컬이 최신이거나, weeklySubjOrder가 Firebase에 없는 경우 업로드
-            const fbMissingOrder = fbStu && !fbStu.weeklySubjOrder && ls.weeklySubjOrder;
-            if(lUp > fUp || fbMissingOrder){
-              _toUpload.push(_gg_migrateInspectKeys(ls));
-            }
-          });
-          if(_toUpload.length){
-            console.log('[SG] 로컬→Firebase 자동 동기화:', _toUpload.length+'명');
-            for(const s of _toUpload){
-              await fbSave('students', s.id, s);
-              const idx = ST.students.findIndex(x=>String(x.id)===String(s.id));
-              if(idx>=0) ST.students[idx]=s; else ST.students.push(s);
-            }
-            if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel.id))||ST.sel;
-            if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel.id))||ST.adminSel;
-            console.log('[SG] 자동 동기화 완료');
-          }
-        }
+        await _sgAutoSyncLocalStudentsToFirebase();
         render();
       }
       startRealtimeSync();
     }
   }, 500);
+}
+
+// ★ 로컬 데이터가 Firebase보다 최신인 학생 자동 업로드(로컬 파일에서 작업한 데이터를
+// GitHub 접속 시에도 보이게) — init()의 "2단계: 전체 데이터 로드" 직후에만 호출된다.
+// ★ 2026-09-17 수정: 이 로직은 원래 "오프라인에서 이 기기로만 새로 추가/수정한 학생을
+// 나중에 온라인 접속 시 Firebase에 반영"하려는 목적이었는데, Firebase에 없는 학생을 전부
+// "아직 못 올린 로컬 신규/수정본"으로만 취급해서, 실제로는(다른 기기·세션에서) 의도적으로
+// 삭제된 학생의 오래된 로컬 캐시까지 그대로 되살려 다시 업로드해버리는 버그가 있었다
+// (삭제 후에도 이 기기 localStorage에 남아있던 옛 스냅샷이 원인) — 삭제 시점에 기록해두는
+// `ST._deletedStudentIds`(Firestore 'deletedStudentIds' 컬렉션 기반, fbLoadAll_all에서
+// 로드됨)에 있는 ID는 여기서 애초에 후보에서 제외하고, 로컬 캐시에서도 함께 지워서 같은
+// 착각이 반복되지 않게 한다. 테스트하기 쉽도록(및 재사용을 위해) init()에서 분리해뒀다.
+async function _sgAutoSyncLocalStudentsToFirebase(){
+  const _deletedIds = ST._deletedStudentIds || new Set();
+  const _localStudents = [];
+  let _localHadDeletedLeftover = false;
+  try{
+    const _ls=JSON.parse(localStorage.getItem(SK)||'[]');
+    if(Array.isArray(_ls)){
+      _ls.forEach(function(ls){
+        if(ls && _deletedIds.has(String(ls.id))){ _localHadDeletedLeftover=true; return; }
+        _localStudents.push(ls);
+      });
+      // 삭제된 학생의 묵은 캐시가 섞여있었다면, 다음 로딩 때 또 이 판단을 반복하지
+      // 않도록 로컬 캐시 자체도 지금 정리해둔다.
+      if(_localHadDeletedLeftover) localStorage.setItem(SK, JSON.stringify(_localStudents));
+    }
+  }catch(e){}
+  if(!_localStudents.length) return;
+  const _toUpload = [];
+  _localStudents.forEach(function(ls){
+    const fbStu = ST.students.find(x=>String(x.id)===String(ls.id));
+    const lUp = ls._updatedAt||0;
+    const fUp = fbStu ? (fbStu._updatedAt||0) : 0;
+    // ★ 로컬이 최신이거나, weeklySubjOrder가 Firebase에 없는 경우 업로드
+    const fbMissingOrder = fbStu && !fbStu.weeklySubjOrder && ls.weeklySubjOrder;
+    if(lUp > fUp || fbMissingOrder){
+      _toUpload.push(_gg_migrateInspectKeys(ls));
+    }
+  });
+  if(!_toUpload.length) return;
+  console.log('[SG] 로컬→Firebase 자동 동기화:', _toUpload.length+'명');
+  for(const s of _toUpload){
+    await fbSave('students', s.id, s);
+    const idx = ST.students.findIndex(x=>String(x.id)===String(s.id));
+    if(idx>=0) ST.students[idx]=s; else ST.students.push(s);
+  }
+  if(ST.sel) ST.sel = ST.students.find(x=>String(x.id)===String(ST.sel.id))||ST.sel;
+  if(ST.adminSel) ST.adminSel = ST.students.find(x=>String(x.id)===String(ST.adminSel.id))||ST.adminSel;
+  console.log('[SG] 자동 동기화 완료');
 }
 
 // 수동 새로고침
