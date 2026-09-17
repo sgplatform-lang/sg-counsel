@@ -166,7 +166,12 @@ td{padding:8px 6px;border:1px solid #e8eaf6;font-size:12px;text-align:center}
 .grd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px}
 .grd-item{border-radius:10px;padding:10px 6px;text-align:center;border:1.5px solid}
 /* 토스트 */
-#toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:rgba(26,26,46,.9);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap}
+/* ★ 2026-09-17 수정: white-space:nowrap+최대너비 없음 탓에 긴 문구가 화면 폭을 넘어가며
+   좌우가 잘려 보이고, bottom:76px 고정값이 기기별 안전영역(하단 탭바 padding-bottom:
+   env(safe-area-inset-bottom))을 반영하지 않아 홈 인디케이터가 있는 기기에서 하단
+   탭바와 겹쳐 보이던 문제 — 줄바꿈을 허용하는 최대너비를 주고, 탭바 높이(안전영역 포함)
+   보다 확실히 위로 띄운다. */
+#toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:min(88vw,360px);width:max-content;background:rgba(26,26,46,.94);color:#fff;padding:11px 18px;border-radius:16px;font-size:13px;font-weight:600;line-height:1.5;text-align:center;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s;white-space:normal;box-shadow:0 6px 18px rgba(0,0,0,.22)}
 #toast.show{opacity:1}
 /* 아코디언 */
 details summary{cursor:pointer;list-style:none;padding:8px 0;border-top:1px solid #f0f0f8;font-size:12px;font-weight:700;color:#3b5bdb;user-select:none}
@@ -1548,6 +1553,9 @@ window.openMockEdit=function(){
 // ══════════════════════════════════════════════════
 let _chgViewMode='aar'; // 'wrong'=챌린저 오답 입력, 'aar'=챌린저 AAR 입력 — 기본값을 AAR로 변경(2026-08-26)
 function chgSetViewMode(m){ _chgViewMode=m; render(); }
+// ★ 2026-09-17 추가: AAR "입력완료" 직후 오답 뷰로 자동 전환할 때, 방금 입력한 과목
+// 카드를 잠깐 강조하기 위한 인덱스(해당 안 되면 null). chgGenerateAarMemo에서 세팅.
+let _chgAarJustHighlightIdx=null;
 // ★ 2026-09-14 추가: "챌린저"(🎯) 탭 한 화면에 (1)선생님이 등록한 시험의 AAR·오답원인을
 // 입력하는 것과 (2)선생님이 등록하지 않은 시험을 학생이 직접 만들어 기록하는 것이 아무
 // 구분 없이 섞여 있어, 어디에 입력해야 하는지 헷갈린다는 신고 → 화면 최상단에 "기관
@@ -2116,17 +2124,32 @@ function chgGenerateAarMemo(sIdx){
   // ★ 2026-09-13: AAR 요약 생성("입력완료")은 학생이 직접 AAR을 작성했다는 가장 확실한
   // 신호이므로 여기서도 플래그를 세운다(위 chgSetItemField 참고).
   sub._studentSelfInput = true;
-  render();
   chgScheduleSave();
-  // ★ 2026-09-17 추가: AAR만 입력하고 오답원인(📝 챌린저 오답 탭)은 입력하지 않은 채
-  // 넘어가는 학생이 많다는 신고 — AAR "입력완료" 시점에, 아직 오답원인이 하나도 선택되지
-  // 않은 상태면(문항이 아예 없거나, 있어도 전부 1차/2차 원인 미선택) 이어서 오답 탭으로
-  // 가라고 안내한다. 이미 오답까지 다 입력해둔 상태(AAR을 나중에 수정만 하는 경우)라면
-  // 평소처럼 짧은 완료 메시지만 보여준다.
+  // ★ 2026-09-13: AAR 요약 생성("입력완료")은 학생이 직접 AAR을 작성했다는 가장 확실한
+  // 신호이므로 여기서도 플래그를 세운다(위 chgSetItemField 참고).
+  // ★ 2026-09-17 추가: AAR만 입력하고 오답원인(📝 챌린저 오답)은 입력하지 않은 채 넘어가는
+  // 학생이 많다는 신고 → 처음엔 하단 토스트로만 안내했으나(4500ms, 긴 문구), 모바일에서
+  // 문구가 하단 탭바에 가려지거나 화면 밖으로 잘려 잘 안 보인다는 재신고. 안내만 하고 마는
+  // 대신, 아직 오답원인이 하나도 선택되지 않은 상태면(문항이 아예 없거나, 있어도 전부
+  // 1차/2차 원인 미선택) ① 화면 자체를 "📝 챌린저 오답" 뷰로 자동 전환하고 ② 방금
+  // AAR을 완료한 과목 카드로 스크롤 이동시키며 그 카드만 잠깐 테두리를 강조해, 어디에
+  // 이어서 입력해야 하는지 눈으로 바로 보이게 한다(토스트 문구도 훨씬 짧게 줄임).
+  // 이미 오답까지 다 입력해둔 상태(AAR을 나중에 수정만 하는 경우)라면 화면 전환 없이
+  // 평소처럼 짧은 완료 메시지만 보여준다(불필요한 화면 전환으로 방해하지 않기 위함).
   const hasAnyWrongReason = (sub.items||[]).some(function(it){ return it && ((it.reasons&&it.reasons.length) || it.causePrimary); });
   if(!hasAnyWrongReason){
-    toast('✅ AAR 입력이 완료됐습니다! 이어서 "📝 챌린저 오답" 탭에서 오답원인도 꼭 입력해주세요.', 4500);
+    _chgViewMode='wrong';
+    _chgAarJustHighlightIdx=sIdx;
+    toast('✅ AAR 완료! 이어서 오답원인을 입력해주세요 👇', 3000);
+    render();
+    setTimeout(function(){
+      const card=document.getElementById('chgSubjCard'+sIdx);
+      if(card) card.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 60);
+    // 강조 표시는 몇 초 후 자동으로 사라진다(계속 남아있으면 오히려 시선을 분산시킴).
+    setTimeout(function(){ if(_chgAarJustHighlightIdx===sIdx){ _chgAarJustHighlightIdx=null; render(); } }, 5000);
   } else {
+    render();
     toast('✅ 입력이 완료됐습니다!');
   }
 }
@@ -2864,7 +2887,11 @@ async function chgAnsGradeAndSave(){
 // (기관/셀프 모드별로 필터링된 목록에 재사용하기 위함). 카드 내용 자체는 전혀 바뀌지
 // 않았고, 기존 렌더 로직을 그대로 옮긴 것뿐이다.
 function _chgSubjectCardHtml(sub, sIdx, mode){
-  return `<div class="card" style="margin-bottom:12px"><div class="card-body">
+  // ★ 2026-09-17 추가: AAR 완료 직후 오답 뷰로 자동 전환됐을 때, 방금 완료한 과목 카드만
+  // 잠깐 강조 테두리+안내 배지로 눈에 띄게 한다(스크롤 이동은 chgGenerateAarMemo에서 처리).
+  const justCompleted = mode==='wrong' && _chgAarJustHighlightIdx===sIdx;
+  return `<div class="card" id="chgSubjCard${sIdx}" style="margin-bottom:12px${justCompleted?';border:2px solid #3b5bdb;box-shadow:0 0 0 4px rgba(59,91,219,.15)':''}"><div class="card-body">
+    ${justCompleted?'<div style="background:#eef1ff;color:#3b5bdb;font-size:12px;font-weight:800;border-radius:8px;padding:7px 10px;margin-bottom:10px">👇 방금 AAR을 완료한 과목이에요. 오답원인을 이어서 입력해주세요.</div>':''}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-size:13px;font-weight:700">과목 ${sIdx+1}</div>
       <button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveSubject(${sIdx})">삭제</button>
