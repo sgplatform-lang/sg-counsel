@@ -2177,6 +2177,19 @@ async function chgAnsLoadCatalog(){
   return _chgAnsCatalog;
 }
 let _chgAnsLoadFailed=false;
+// ★ 2026-09-17 추가: 시험카탈로그에 미래 응시일로 등록된 시험을 학생이 실수로 골라
+// 답안을 입력해버리는 사고 방지 — 오늘 날짜(로컬 기준, YYYY-MM-DD)를 반환한다. 관리자가
+// 등록하는 응시일(defaultDate)도 <input type="date"> 등에서 나오는 동일한 로컬 달력
+// 날짜 문자열이라 타임존 보정 없이 문자열 비교(> / <=)만으로 안전하게 비교 가능하다.
+function _chgAnsTodayStr(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// 응시일이 오늘보다 미래(내일 이후)인 시험인지 — 응시일 당일(오늘)부터는 밤 12시가
+// 지나 날짜가 바뀐 시점이므로 이미 입력 가능해야 해서 "미래"에 포함하지 않는다(>=이 아닌 >).
+function _chgAnsIsFutureExam(entry){
+  return !!(entry && entry.defaultDate && String(entry.defaultDate) > _chgAnsTodayStr());
+}
 // ★ 2026-08-30 추가: 응시일/시험명을 학생이 직접 타이핑하면 관리자 카탈로그의 표기와
 // 한 글자라도 다를 때 자동채점이 조용히 실패했다(정답을 못 찾음). 이제 학생은 관리자가
 // 등록해 둔 시험 목록에서 "선택"만 하고, 응시일·시험명 값은 카탈로그에서 그대로 가져와
@@ -2382,9 +2395,14 @@ function renderChallengerAnswerInput(){
   }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
   const examEntry=_chgAnsCurrentExamEntry();
   const examMeta=_chgAnsExamMeta(examEntry);
+  // ★ 2026-09-17 추가: 응시일이 아직 안 된(미래) 시험을 골랐으면 과목선택·답안입력 자체를
+  // 막는다(관리자가 미래 시험을 미리 등록해두는 경우가 많아, 학생이 실수로 아직 안 치른
+  // 시험을 골라 답안을 입력해버리는 사고를 방지). 오늘 이전(과거)·오늘 당일 시험은 기존처럼
+  // 전부 입력 가능 — "응시일 자정이 지나야 입력 가능"이므로 당일부터는 이미 미래가 아니다.
+  const isFutureExam = st.catId && _chgAnsIsFutureExam(examEntry);
   // ★ 380 추가: 시험을 선택했으면 그 시험에 실제로 등록된 과목만 보여주고, 아직 시험을
   // 선택하지 않았으면 과목 선택 자체를 숨긴다(어떤 과목이 있는지 알 수 없으므로).
-  const availableSlots = st.catId ? CHG_ANS_SLOTS.filter(x=>!!examMeta[x.code]) : [];
+  const availableSlots = (st.catId && !isFutureExam) ? CHG_ANS_SLOTS.filter(x=>!!examMeta[x.code]) : [];
   const enabledSlots=availableSlots.filter(x=>st.enabled[x.slot]);
   return `<div>
     <div class="stitle">🖊️ 챌린저 답안 입력</div>
@@ -2397,9 +2415,13 @@ function renderChallengerAnswerInput(){
         ${catalogList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.defaultDate||'날짜 미지정')} · ${esc(e.examName||'(이름 없음)')}</option>`).join('')}
       </select>
       ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}
-      ${st.date&&st.test?`<div style="margin-top:10px;padding:9px 12px;background:#f0fdfa;border-radius:8px;font-size:12.5px;color:#0f766e"><b>${esc(st.date)}</b> · ${esc(st.test)}</div>`:''}
+      ${st.date&&st.test?`<div style="margin-top:10px;padding:9px 12px;background:${isFutureExam?'#fff7ed':'#f0fdfa'};border-radius:8px;font-size:12.5px;color:${isFutureExam?'#9a3412':'#0f766e'}"><b>${esc(st.date)}</b> · ${esc(st.test)}</div>`:''}
       <p style="font-size:10.5px;color:#aaa;margin:8px 0 0">※ 응시일·시험명은 선생님이 등록한 정보 그대로 자동으로 채워지며, 직접 수정할 수 없습니다.</p>
-      ${st.catId ? `<div style="font-size:12.5px;font-weight:700;margin:14px 0 6px">응시 과목 선택</div>
+      ${isFutureExam?`<div style="margin-top:12px;padding:12px 14px;background:#fff7ed;border:1.5px solid #fb923c;border-radius:8px">
+        <p style="font-size:12.5px;font-weight:700;color:#9a3412;margin:0">⏳ 아직 응시일이 아닙니다. 응시일을 확인해주세요.</p>
+        <p style="font-size:11.5px;color:#9a3412;margin:5px 0 0">이 시험은 <b>${esc(st.date)}</b>부터(자정 이후) 답안 입력이 가능합니다. 날짜를 착각해 다른 시험을 고르진 않았는지 다시 한번 확인해주세요.</p>
+      </div>`:''}
+      ${(st.catId && !isFutureExam) ? `<div style="font-size:12.5px;font-weight:700;margin:14px 0 6px">응시 과목 선택</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${availableSlots.length ? availableSlots.map(x=>chgAnsSlotToggleHtml(x, examMeta)).join('') : '<p style="font-size:12px;color:#e53935">⚠️ 이 시험에는 채점 가능한 과목이 등록되어 있지 않습니다. 선생님께 문의해주세요.</p>'}
       </div>` : ''}
@@ -2695,6 +2717,10 @@ function _chgAutoDiffForItem(code, detail, no, peers){
 async function chgAnsGradeAndSave(){
   const st=chgAnsInit();
   if(!st.date||!st.test){ toast('시험을 먼저 선택해주세요'); return; }
+  // ★ 2026-09-17 추가: 화면에서는 미래 응시일 시험이면 이 버튼 자체가 안 그려지지만,
+  // 방어적으로 한 번 더 막는다(예: 자정을 걸쳐 탭을 오래 열어둔 채 이전 렌더의 버튼을
+  // 그대로 눌렀거나, 다른 경로로 호출된 경우 등).
+  if(_chgAnsIsFutureExam(_chgAnsCurrentExamEntry())){ toast('⏳ 아직 응시일이 아닙니다. 응시일을 확인해주세요.'); return; }
   const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
   const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot] && !!examMeta[x.code]);
   if(!enabledSlots.length){ toast('과목을 최소 1개 선택해주세요'); return; }
