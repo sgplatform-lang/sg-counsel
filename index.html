@@ -1789,6 +1789,16 @@ function downloadCustomSurveyRedirectPage(orgId, orgName, surveyId, surveyTitle)
 // 동일한 패턴을 재사용한다(이 페이지는 PDF 대신 링크로 결과리포트를 학부모께 전달하는 1단계
 // 기능 — 발행 시점 스냅샷을 보여주며, 콘텐츠 재설계는 2단계에서 다룰 예정).
 function _sgShowReportShareModal(url, studentName){
+  // ★ 2026-09-18(18차) 수정: "복사"/"카톡 미리보기 파일 다운로드" 버튼이 클릭해도 아무
+  // 반응이 없던 버그 — onclick 속성을 큰따옴표(")로 감쌌는데, 그 안에 JSON.stringify(url)로
+  // 값을 넣다 보니 JSON.stringify 결과물도 큰따옴표로 감싸져서 onclick 속성값이 URL의 첫
+  // 따옴표에서 잘려버렸다(실제로 onclick 속성이 `_sgCopyReportShareUrl(` 까지만 남고 뒤가
+  // 통째로 날아가 있었음 — 그래서 버튼을 눌러도 함수가 아예 호출되지 않았던 것). 바로 위
+  // "🔗 링크복사"/"📇 카톡파일" 버튼(copyCustomSurveyLink/downloadCustomSurveyRedirectPage)이
+  // 쓰는 것과 동일한 방식으로, onclick 안에서는 작은따옴표(')로 값을 감싸고 esc()+작은따옴표
+  // 이스케이프를 사용하도록 수정.
+  const urlAttr = esc(url).replace(/'/g,"\\'");
+  const nameAttr = esc(studentName||'학생').replace(/'/g,"\\'");
   const ov=document.createElement('div');
   ov.className='overlay';
   ov.innerHTML=`<div class="modal" style="max-width:520px">
@@ -1802,9 +1812,9 @@ function _sgShowReportShareModal(url, studentName){
       </div>
       <div style="display:flex;gap:6px;margin-bottom:12px">
         <input readonly value="${esc(url)}" onclick="this.select()" style="flex:1;font-size:12px;border:1px solid #e0e3ef;border-radius:8px;padding:8px 10px;color:#333">
-        <button onclick="_sgCopyReportShareUrl(${JSON.stringify(url)})" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">복사</button>
+        <button onclick="_sgCopyReportShareUrl('${urlAttr}')" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">복사</button>
       </div>
-      <button onclick="downloadReportShareRedirectPage(${JSON.stringify(url)},${JSON.stringify(studentName||'학생')})" style="width:100%;background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">📇 카톡 미리보기 파일 다운로드</button>
+      <button onclick="downloadReportShareRedirectPage('${urlAttr}','${nameAttr}')" style="width:100%;background:#f4f6fb;color:#555;border:1px solid #e0e3ef;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">📇 카톡 미리보기 파일 다운로드</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
