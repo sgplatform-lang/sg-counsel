@@ -29909,6 +29909,15 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 @media(max-width:520px){.sg-result-summary-wrap{grid-template-columns:1fr}}
 
 /* -- ★ 2026-09-17 추가: "오답 문항 분석"(구 객관적 위치 비교) 우선순위표 -- */
+/* ★ 2026-09-18(19차) 추가: 모바일(특히 학부모 공유 링크를 휴대폰으로 볼 때)처럼 화면 폭이
+   좁으면, width:100% 표가 폭에 맞춰 억지로 눌리면서 "단원/유형" 칸의 긴 한글 텍스트가 한
+   글자씩 세로로 줄바꿈되어 알아볼 수 없게 되는 문제가 있었다 — 표를 감싸는 래퍼에
+   가로 스크롤(overflow-x:auto)을 주고, 좁은 화면에서는 표에 최소 너비를 둬서 칸이
+   찌그러지는 대신 옆으로 살짝 스크롤해서 볼 수 있게 한다(내용을 줄이는 대신 원래 폭을
+   유지하는 방식 — 다른 넓은 표들(.batch-table-wrap)에 이미 쓰던 것과 동일한 패턴). */
+.aar-wrongitem-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:640px){.aar-wrongitem-table{min-width:600px}}
+@media print{.aar-wrongitem-table-wrap{overflow-x:visible}.aar-wrongitem-table{min-width:0!important}}
 .aar-wrongitem-table{width:100%;border-collapse:collapse;margin:8px 0 2px;font-size:12.5px}
 .aar-wrongitem-table th,.aar-wrongitem-table td{border:1px solid var(--line);padding:6px 8px;text-align:center}
 .aar-wrongitem-table th{background:#f8fafc;color:var(--muted);font-weight:700}
@@ -34782,7 +34791,7 @@ function __SG_initFromHost(data){
       return '<tr><td>'+esc(x.no)+'번</td><td>'+esc(x.unit||'단원정보 미입력')+'</td><td>'+_sgPbarHtml(x.rate)+'</td><td><span class="pill '+pillClass+'">'+esc(diff)+'</span></td><td class="v48-guide-text">'+esc(guide)+'</td></tr>';
     }).join('');
     if(!rows)return '';
-    return '<h4 class="aar-section-title">📋 확인 학습이 필요한 단원/유형 우선순위<span class="aar-wrongnos">오답문항 '+wrongNosText+'</span></h4><div class="aar-objective-box"><table class="aar-wrongitem-table v48-wrongitem-table"><thead><tr><th>오답문항</th><th>단원/유형</th><th>전체 오답률</th><th>실제 난이도</th><th>학습지침</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    return '<h4 class="aar-section-title">📋 확인 학습이 필요한 단원/유형 우선순위<span class="aar-wrongnos">오답문항 '+wrongNosText+'</span></h4><div class="aar-objective-box"><div class="aar-wrongitem-table-wrap"><table class="aar-wrongitem-table v48-wrongitem-table"><thead><tr><th>오답문항</th><th>단원/유형</th><th>전체 오답률</th><th>실제 난이도</th><th>학습지침</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   }
   // ★ 2026-09-17(2차) 추가: "이번 시험 고난도 문항 분석" — 내가 틀린 문항뿐 아니라 이번
   // 시험(같은 회차·같은 과목 응시생 기준)에서 오답률이 높았던 문항 전체를 문항번호 순으로
@@ -34833,7 +34842,7 @@ function __SG_initFromHost(data){
       var tip=_sgUnitStudyTip(groupKey,x.unit);
       return '<tr><td>'+esc(x.no)+'번</td><td>'+esc(x.unit)+'</td><td>'+_sgPbarHtml(x.rate)+'</td><td><span class="pill '+(x.correct?'green':'red')+'">'+(x.correct?'○ 정답':'✕ 오답')+'</span></td><td class="v48-guide-text">'+esc(tip)+'</td></tr>';
     }).join('');
-    return '<h4 class="aar-section-title">🔥 이번 시험 고난도 문항 분석 (응시생 실제 난이도 기준)</h4><div class="aar-objective-box"><table class="aar-wrongitem-table v48-wrongitem-table"><thead><tr><th>오답문항</th><th>단원/유형</th><th>전체 오답률</th><th>내 결과</th><th>학습지침</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>';
+    return '<h4 class="aar-section-title">🔥 이번 시험 고난도 문항 분석 (응시생 실제 난이도 기준)</h4><div class="aar-objective-box"><div class="aar-wrongitem-table-wrap"><table class="aar-wrongitem-table v48-wrongitem-table"><thead><tr><th>오답문항</th><th>단원/유형</th><th>전체 오답률</th><th>내 결과</th><th>학습지침</th></tr></thead><tbody>'+tableRows+'</tbody></table></div></div>';
   }
   window.aarSubjectReport=function(s){
     var f=window.aarParseMemo(s.memo), inf=aarInfer(s,f), record=window.aarRecordHtml(f,s);
