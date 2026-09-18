@@ -29935,6 +29935,20 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 .v48-wrongitem-table td:nth-child(2){font-size:13px;font-weight:700;color:var(--ink)}
 .v48-guide-text{font-size:13px;font-weight:700;color:#0f766e;line-height:1.4}
 @media print{.aar-wrongitem-table td:nth-child(1){font-size:12px}.v48-wrongitem-table td:nth-child(2){font-size:11px}.v48-guide-text{font-size:10.5px}}
+/* ★ 2026-09-18(20차) 추가: 학부모가 공유 링크를 휴대폰으로 볼 때, 19차 수정(가로 스크롤)도
+   여전히 옆으로 스크롤해야만 나머지 칸을 볼 수 있어 불편하다는 요청 — 화면이 좁을 때는 표를
+   가로 스크롤 대신 문항 1개당 카드 1장(세로 나열, 값 위에 라벨 표시)으로 완전히 바꿔서
+   스크롤 없이 위→아래로 쭉 읽을 수 있게 한다. 헤더 행은 각 카드 안 라벨로 대체되므로 숨김. */
+@media screen and (max-width:640px){
+  .aar-wrongitem-table-wrap{overflow-x:visible}
+  .aar-wrongitem-table{min-width:0}
+  .aar-wrongitem-table thead{display:none}
+  .aar-wrongitem-table,.aar-wrongitem-table tbody,.aar-wrongitem-table tr,.aar-wrongitem-table td{display:block;width:100%}
+  .aar-wrongitem-table tr{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#fff}
+  .aar-wrongitem-table td{border:none!important;padding:5px 2px;text-align:left}
+  .aar-wrongitem-table td:not(:last-child){border-bottom:1px dashed var(--line)!important}
+  .aar-wrongitem-table td:before{content:attr(data-label);display:block;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px}
+}
 
 /* ★ 2026-09-17(2차) 추가: 박스 밖으로 뺀 섹션 제목(오답 문항 분석/오답문항 정밀분석표/
    이번 시험 고난도 문항 분석 공통) + 오답문항 정밀분석표 + 이번 시험 고난도 문항 분석표 */
@@ -32713,7 +32727,7 @@ function aarObjectiveSummary(s){
   const sorted=[...d].sort((a,b)=>a.rate-b.rate);
   const rowsHtml=sorted.map(x=>{
     const tag = x.rate<=30?'<span class="pill red">우선 교정 필요</span>' : x.rate>=60?'<span class="pill amber">고난도 유형</span>' : '<span class="pill">중간 변별</span>';
-    return \`<tr><td>\${esc(x.no)}번</td><td>\${_sgPbarHtml(x.rate)}</td><td>\${tag}</td></tr>\`;
+    return \`<tr><td data-label="오답문항">\${esc(x.no)}번</td><td data-label="전체 오답률">\${_sgPbarHtml(x.rate)}</td><td data-label="구분">\${tag}</td></tr>\`;
   }).join('');
   // ★ 2026-09-17(2차) 수정: 제목("📊 오답 문항 분석")을 박스 밖으로 빼서 별도 섹션 제목으로
   // 표시, 태그 명칭 변경(우선 교정→우선 교정 필요, 고난도 영향→고난도 유형).
@@ -32726,7 +32740,7 @@ function aarObjectiveSummary(s){
   // 표 헤더 "문항"→"오답문항"으로 변경.
   // ★ 2026-09-18(14차) 수정: 4개 칸(내 오답 문항수 등)이 숫자만 있어 단위를 알기 어렵다는
   // 요청 — 숫자 옆에 "문항" 단위를 숫자보다 작게 덧붙인다(.v49-unit).
-  return \`<h4 class="aar-section-title">📊 오답 문항 분석<span class="aar-wrongnos">오답문항 \${wrongNosText}</span></h4><div class="aar-objective-box"><div class="aar-mini-stats"><div class="aar-mini-stat"><b>\${d.length}<small class="v49-unit">문항</small></b><span>내 오답 문항수</span></div><div class="aar-mini-stat"><b>\${low.length}<small class="v49-unit">문항</small></b><span>내 저오답률 오답</span></div><div class="aar-mini-stat"><b>\${mid.length}<small class="v49-unit">문항</small></b><span>내 중간 변별 오답</span></div><div class="aar-mini-stat \${high.length?'stat-warn':''}"><b>\${high.length}<small class="v49-unit">문항</small></b><span>내 고오답률 오답</span></div></div><table class="aar-wrongitem-table"><thead><tr><th>오답문항</th><th>전체 오답률</th><th>구분</th></tr></thead><tbody>\${rowsHtml}</tbody></table></div>\`
+  return \`<h4 class="aar-section-title">📊 오답 문항 분석<span class="aar-wrongnos">오답문항 \${wrongNosText}</span></h4><div class="aar-objective-box"><div class="aar-mini-stats"><div class="aar-mini-stat"><b>\${d.length}<small class="v49-unit">문항</small></b><span>내 오답 문항수</span></div><div class="aar-mini-stat"><b>\${low.length}<small class="v49-unit">문항</small></b><span>내 저오답률 오답</span></div><div class="aar-mini-stat"><b>\${mid.length}<small class="v49-unit">문항</small></b><span>내 중간 변별 오답</span></div><div class="aar-mini-stat \${high.length?'stat-warn':''}"><b>\${high.length}<small class="v49-unit">문항</small></b><span>내 고오답률 오답</span></div></div><div class="aar-wrongitem-table-wrap"><table class="aar-wrongitem-table"><thead><tr><th>오답문항</th><th>전체 오답률</th><th>구분</th></tr></thead><tbody>\${rowsHtml}</tbody></table></div></div>\`
 }
 function aarInfer(s,f){
   const subj=s.subject, cause=f['핵심 원인']||s.primaryFactor||'', risk=f['위험 행동']||'', time=f['시간 상태']||s.time||'', weak=f['확인된 부족 영역']||s.weakUnits||'', learn=f['학습 상태']||f['준비도']||s.preparationLevel||'', order=f['풀이 순서']||s.orderMemo||s.order||'';
@@ -34788,7 +34802,7 @@ function __SG_initFromHost(data){
       var diff=_sgDiffFromRate(x.rate);
       var guide=DIFF_GUIDE[diff]||diff;
       var pillClass=x.rate<=30?'red':(x.rate>=60?'amber':'');
-      return '<tr><td>'+esc(x.no)+'번</td><td>'+esc(x.unit||'단원정보 미입력')+'</td><td>'+_sgPbarHtml(x.rate)+'</td><td><span class="pill '+pillClass+'">'+esc(diff)+'</span></td><td class="v48-guide-text">'+esc(guide)+'</td></tr>';
+      return '<tr><td data-label="오답문항">'+esc(x.no)+'번</td><td data-label="단원/유형">'+esc(x.unit||'단원정보 미입력')+'</td><td data-label="전체 오답률">'+_sgPbarHtml(x.rate)+'</td><td data-label="실제 난이도"><span class="pill '+pillClass+'">'+esc(diff)+'</span></td><td class="v48-guide-text" data-label="학습지침">'+esc(guide)+'</td></tr>';
     }).join('');
     if(!rows)return '';
     return '<h4 class="aar-section-title">📋 확인 학습이 필요한 단원/유형 우선순위<span class="aar-wrongnos">오답문항 '+wrongNosText+'</span></h4><div class="aar-objective-box"><div class="aar-wrongitem-table-wrap"><table class="aar-wrongitem-table v48-wrongitem-table"><thead><tr><th>오답문항</th><th>단원/유형</th><th>전체 오답률</th><th>실제 난이도</th><th>학습지침</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
@@ -34840,7 +34854,7 @@ function __SG_initFromHost(data){
     // (문구)으로 분리하고, 헤더 "문항"→"오답문항"으로 변경(위 확인 학습 우선순위 표와 통일).
     var tableRows=rows.map(function(x){
       var tip=_sgUnitStudyTip(groupKey,x.unit);
-      return '<tr><td>'+esc(x.no)+'번</td><td>'+esc(x.unit)+'</td><td>'+_sgPbarHtml(x.rate)+'</td><td><span class="pill '+(x.correct?'green':'red')+'">'+(x.correct?'○ 정답':'✕ 오답')+'</span></td><td class="v48-guide-text">'+esc(tip)+'</td></tr>';
+      return '<tr><td data-label="오답문항">'+esc(x.no)+'번</td><td data-label="단원/유형">'+esc(x.unit)+'</td><td data-label="전체 오답률">'+_sgPbarHtml(x.rate)+'</td><td data-label="내 결과"><span class="pill '+(x.correct?'green':'red')+'">'+(x.correct?'○ 정답':'✕ 오답')+'</span></td><td class="v48-guide-text" data-label="학습지침">'+esc(tip)+'</td></tr>';
     }).join('');
     return '<h4 class="aar-section-title">🔥 이번 시험 고난도 문항 분석 (응시생 실제 난이도 기준)</h4><div class="aar-objective-box"><div class="aar-wrongitem-table-wrap"><table class="aar-wrongitem-table v48-wrongitem-table"><thead><tr><th>오답문항</th><th>단원/유형</th><th>전체 오답률</th><th>내 결과</th><th>학습지침</th></tr></thead><tbody>'+tableRows+'</tbody></table></div></div>';
   }
