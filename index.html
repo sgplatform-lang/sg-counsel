@@ -4171,7 +4171,7 @@ function renderDetail(s){
     weekly:     `<button onclick="printTab(${s.id},'weekly')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습플랜 인쇄/PDF</button>`,
     achieve:    `<button onclick="printAchieve(${s.id})" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 점검표 인쇄/PDF</button>
                  <button onclick="exportAchieveXls(${s.id})" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀</button>`,
-    consult:    `<button onclick="printTab(${s.id},'consult')" style="background:#8b5cf618;color:#8b5cf6;border:1.5px solid #8b5cf640;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 학습상담 인쇄/PDF</button>`,
+    consult:    '',
     jeongsi:    `<button onclick="saveJeongsiSnapshot('${s.id}')" style="background:#3b5bdb18;color:#3b5bdb;border:1.5px solid #3b5bdb40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">💾 분석결과 저장</button>
                  <button onclick="printJeongsi('${s.id}')" style="background:#ef444418;color:#ef4444;border:1.5px solid #ef444440;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">🖨️ 정시 인쇄/PDF</button>
                  <button onclick="exportJeongsiXls('${s.id}')" style="background:#10b98118;color:#10b981;border:1.5px solid #10b98140;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">📊 엑셀</button>`,
@@ -11675,16 +11675,19 @@ function LS_bannerHtml(active){
     {key:'report', icon:'📁', label:'상담리포트'},
     {key:'stats', icon:'📊', label:'상담통계'}
   ];
-  return `<div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
-    <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">📈 LEARNING STYLE · 학습상담 관리</div>
-    <div style="font-size:19px;font-weight:900;margin-bottom:4px">학습상담 통합 관리</div>
-    <div style="font-size:12px;color:#cbd5e1;margin-bottom:16px">과목별 학습 태도·성향을 기록하고, 누적 추이를 상담에 활용하세요.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${tabs.map(function(t){
-        const isAct=active===t.key;
-        return `<button onclick="ST.lsSubTab='${t.key}';render()" style="background:${isAct?'#fff':'rgba(255,255,255,.12)'};color:${isAct?'#0f2540':'#fff'};border:1px solid ${isAct?'#fff':'rgba(255,255,255,.35)'};border-radius:20px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">${t.icon} ${t.label}</button>`;
-      }).join('')}
+  return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #8b5cf6;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
+    <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(139,92,246,.05)"></div>
+    <div style="position:relative;z-index:2">
+      <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(139,92,246,.30);color:#7c3aed;background:rgba(139,92,246,.08);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;letter-spacing:1.2px;margin-bottom:12px">📈 LEARNING STYLE · 학습상담 관리</div>
+      <h1 style="margin:0;font-size:24px;color:#1a2340;letter-spacing:-.8px;line-height:1.2">학습상담 통합 관리</h1>
+      <p style="margin:8px 0 0;color:#5b6478;font-size:13px;max-width:760px">과목별 학습 태도·성향을 기록하고, 누적 추이를 상담에 활용하세요.</p>
     </div>
+  </div>
+  <div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
+    ${tabs.map(function(t){
+      const isAct=active===t.key;
+      return `<button onclick="ST.lsSubTab='${t.key}';render()" style="border:none;border-bottom:4px solid ${isAct?'#8b5cf6':'transparent'};background:transparent;color:${isAct?'#8b5cf6':'#64748b'};border-radius:0;padding:18px 18px;font-weight:${isAct?'800':'700'};font-size:14.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${t.icon} ${t.label}</button>`;
+    }).join('')}
   </div>`;
 }
 function LS_studentInfoBoxHtml(s){
@@ -29739,6 +29742,13 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
    먼저 오므로 wp-1은 실제로는 :first-child가 아니다 — 클래스로 직접 지정해야 적용된다. */
 .weekly-part{margin-top:44px!important}
 .weekly-part.wp-1{margin-top:0!important}
+/* ★ 2026-09-19 추가: 학부모 공유 링크를 휴대폰으로 볼 때는(인쇄가 아니라 계속 스크롤되는
+   화면이라) 표지 하단 기관명과 바로 아래 "PART 1." 제목이 거의 붙어서 나와 답답해 보인다는
+   요청 — 인쇄는 어차피 표지에서 페이지가 넘어가므로(위 print 규칙) 그대로 두고, 화면(스크롤)
+   에서만 wp-1 위쪽에 여유 있는 여백을 추가한다. */
+@media screen{
+  .weekly-part.wp-1{margin-top:38px!important}
+}
 .v46-part-head{margin:0 0 22px}
 /* ★ 2026-09-13 추가: "2.과목별 시험 직후 기록", "부록.문항별 전체 오답률 비교",
    "PART2.학생 실천 처방전", "PART2.5.실전 수행손실 분석" 4곳 모두 과목이 바뀌는 지점이
