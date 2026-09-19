@@ -173,6 +173,12 @@ td{padding:8px 6px;border:1px solid #e8eaf6;font-size:12px;text-align:center}
    보다 확실히 위로 띄운다. */
 #toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:min(88vw,360px);width:max-content;background:rgba(26,26,46,.94);color:#fff;padding:11px 18px;border-radius:16px;font-size:13px;font-weight:600;line-height:1.5;text-align:center;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s;white-space:normal;box-shadow:0 6px 18px rgba(0,0,0,.22)}
 #toast.show{opacity:1}
+/* ★ 2026-09-19 추가: 관리자가 챌린저 결과를 일괄반영해서 challengerData가 실시간으로
+   바뀌었을 때 뜨는 알림 — 기존 회색 토스트보다 훨씬 눈에 띄도록 챌린저 브랜드색(#0f766e)
+   배경에 더 크고 굵은 글자, 살짝 흔들리는 강조 애니메이션(toastPop)을 준다. 탭하면 바로
+   챌린저 탭으로 이동(js에서 onclick 연결). */
+#toast.toast-challenger{background:#0f766e;font-size:15.5px;font-weight:800;padding:16px 24px;border-radius:18px;box-shadow:0 10px 30px rgba(15,118,110,.5);animation:toastPop .4s ease;max-width:min(92vw,380px)}
+@keyframes toastPop{0%{transform:translateX(-50%) scale(.85)}60%{transform:translateX(-50%) scale(1.05)}100%{transform:translateX(-50%) scale(1)}}
 /* 아코디언 */
 details summary{cursor:pointer;list-style:none;padding:8px 0;border-top:1px solid #f0f0f8;font-size:12px;font-weight:700;color:#3b5bdb;user-select:none}
 details summary::-webkit-details-marker{display:none}
@@ -3443,6 +3449,15 @@ function startStudentRealtimeSync(studentId){
         const planFields = ['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
           'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData',
           'weeklyInspect','weeklyStrategyPeriod'];
+        // ★ 2026-09-19 추가: 무조건 "📅 플랜이 업데이트됨"만 띄우던 것을, 실제로 어떤
+        // 필드가 바뀌었는지 미리(덮어쓰기 전) 비교해서 챌린저 결과가 새로 들어온 경우에는
+        // 훨씬 눈에 띄는 전용 알림("새 시험 결과가 도착했어요")을 보여주도록 분리한다.
+        const challengerChanged = incoming.challengerData !== undefined
+          && JSON.stringify(incoming.challengerData) !== JSON.stringify(CU.challengerData);
+        const otherPlanChanged = planFields.some(function(field){
+          if(field==='challengerData') return false;
+          return incoming[field] !== undefined && JSON.stringify(incoming[field]) !== JSON.stringify(CU[field]);
+        });
         planFields.forEach(function(field){
           if(incoming[field] !== undefined) CU[field] = incoming[field];
         });
@@ -3450,9 +3465,36 @@ function startStudentRealtimeSync(studentId){
         // 항상 화면 갱신 (어떤 탭이든 최신 데이터 표시)
         render();
         // 토스트 알림
-        if(curTab !== 'timetable'){
-          const toastEl=document.getElementById('toast');
-          if(toastEl){toastEl.textContent='📅 플랜이 업데이트됨';toastEl.classList.add('show');setTimeout(function(){toastEl.classList.remove('show');},2000);}
+        const toastEl=document.getElementById('toast');
+        if(toastEl){
+          clearTimeout(window.__toastHideTimer);
+          if(challengerChanged && curTab!=='challenger' && curTab!=='challengeranswer'){
+            // 챌린저 새 결과 — 크고 눈에 띄는 전용 스타일, 탭하면 바로 챌린저 탭으로 이동
+            toastEl.innerHTML='🎯 새 시험 결과가 도착했어요!<br>챌린저에서 확인해주세요';
+            toastEl.classList.remove('toast-challenger'); void toastEl.offsetWidth; // 애니메이션 재생을 위해 클래스 재적용
+            toastEl.classList.add('toast-challenger');
+            toastEl.style.pointerEvents='auto';
+            toastEl.style.cursor='pointer';
+            toastEl.onclick=function(){
+              curTab='challenger'; render();
+              toastEl.classList.remove('show');
+            };
+            toastEl.classList.add('show');
+            window.__toastHideTimer=setTimeout(function(){
+              toastEl.classList.remove('show');
+              toastEl.classList.remove('toast-challenger');
+              toastEl.style.pointerEvents='none';
+              toastEl.style.cursor='';
+              toastEl.onclick=null;
+            },5000);
+          } else if(otherPlanChanged && curTab !== 'timetable'){
+            toastEl.classList.remove('toast-challenger');
+            toastEl.style.pointerEvents='none';
+            toastEl.onclick=null;
+            toastEl.textContent='📅 플랜이 업데이트됨';
+            toastEl.classList.add('show');
+            window.__toastHideTimer=setTimeout(function(){toastEl.classList.remove('show');},2000);
+          }
         }
       }, function(err){ console.warn('Student onSnapshot error:', err.message); });
     // 테스트 실시간 동기화
