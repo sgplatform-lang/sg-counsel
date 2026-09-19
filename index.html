@@ -29298,9 +29298,13 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   .cover-title{margin-top:30px}
   .cover-title h1{font-size:26px;line-height:1.35}
   .cover-eng{font-size:10.5px;margin-top:12px}
-  .cover-meta{margin:28px auto 30px;max-width:100%}
-  .cover-meta-row{font-size:12.5px;padding:6px 0}
-  .cover-footer{font-size:15px;padding-top:30px}
+  /* ★ 2026-09-19 추가: 학생정보 표(학생명/학교/학년/시험명/응시일)가 12.5px로도 여전히
+     휴대폰 화면에서 크게 느껴진다는 재요청 — 폰트를 한 번 더 줄이고(12.5px→11px), 줄
+     간격(padding)도 좁혀 표 전체 세로 길이를 함께 줄인다. 라벨 칸(88px→64px)도 좁혀 값
+     칸이 더 넓게 쓰이도록 조정. */
+  .cover-meta{margin:20px auto 24px;max-width:100%;padding:16px 4px}
+  .cover-meta-row{font-size:11px;padding:4px 0;grid-template-columns:64px 1fr}
+  .cover-footer{font-size:15px;padding-top:24px}
 }
 .cover-meta{
   /* ★ 2026-09-18(12차) 수정: 고정 px 값(96px→132px)으로는 여전히 학생정보 표 아래
@@ -29770,6 +29774,18 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
   .v46-part-head-row{padding-bottom:8px;border-bottom-width:2.5px}
   .v46-part-head-row h2{font-size:18px!important}
   .v46-part-head-side{font-size:13px}
+  .v46-part-head-meta{font-size:11px}
+}
+/* ★ 2026-09-19 추가: 학부모 공유 링크를 휴대폰 화면(인쇄 전, 웹페이지 상태)으로 볼 때
+   PART 1~4 제목(예: "PART 3. 이번 시험 분석과 다음 시험 처방")이 고정 23px라 폭을 넘어서면서
+   "처방"처럼 단어 중간이 끊겨 두 줄로 보이던 문제 — 좁은 화면에서는 제목 옆 배지(학생명/
+   응시일)를 제목 아래 줄로 내려 제목이 가로 폭을 온전히 쓰게 하고, 글자 크기도 화면 폭에
+   비례해 자동으로 줄여(clamp) 네 PART 제목이 항상 한 줄에 들어가면서도 서로 통일된
+   크기로 보이게 한다. */
+@media screen and (max-width:480px){
+  .v46-part-head-row{flex-direction:column;align-items:flex-start;gap:4px}
+  .v46-part-head-row h2{font-size:clamp(14px,4.4vw,17px)!important;white-space:nowrap}
+  .v46-part-head-side{font-size:12px}
   .v46-part-head-meta{font-size:11px}
 }
 
