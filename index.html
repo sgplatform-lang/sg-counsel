@@ -8681,9 +8681,9 @@ function renderWeekly(s){
   ];
   const tabBtns2=weekTabs.map(function(tb){
     const act=curWT===tb.id;
-    return '<button onclick="ST._eraseMode=false;ST.weekTab=\''+tb.id+'\';render()" style="background:'+(act?'#3b5bdb':'#f4f6fb')+';color:'+(act?'#fff':'#555')+';border:1.5px solid '+(act?'#3b5bdb':'#e0e3ef')+';border-radius:20px;padding:5px 13px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'+tb.label+'</button>';
+    return '<button onclick="ST._eraseMode=false;ST.weekTab=\''+tb.id+'\';render()" style="border:none;border-bottom:4px solid '+(act?'#d97706':'transparent')+';background:transparent;color:'+(act?'#d97706':'#64748b')+';border-radius:0;padding:12px 16px;font-weight:'+(act?'800':'700')+';font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">'+tb.label+'</button>';
   }).join('');
-  const tabBar2='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+tabBtns2+'</div>';
+  const tabBar2='<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px">'+tabBtns2+'</div>';
 
   let tabContent2='';
   if(curWT==='tt') tabContent2=ttHtml;
@@ -8692,6 +8692,8 @@ function renderWeekly(s){
   // 주간이력(hist) 탭 제거됨
   else if(curWT==='check') tabContent2=renderAchieve(s);
 
+  const navOpen = !!ST.weekNavOpen;
+  const navToggleBtn = '<button onclick="ST.weekNavOpen=!ST.weekNavOpen;render()" style="background:#fff7ed;color:#b45309;border:1px solid #fde3c1;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'+(navOpen?'▲ 월 선택 접기':'▾ 월 선택 펼치기')+'</button>';
   const navHtml=
     '<div style="background:#fff;border-radius:12px;padding:12px;margin-bottom:10px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">'
@@ -8701,15 +8703,30 @@ function renderWeekly(s){
     +'<button onclick="ST.weekYear=(ST.weekYear||new Date().getFullYear())+1;ST.weekMonth=1;ST.weekWeek=1;render()" style="background:#f4f6fb;border:1px solid #dde1f0;border-radius:7px;padding:4px 9px;font-size:12px;font-weight:700;cursor:pointer;color:#555">▶</button>'
     +(isCurrentWeek?'':'<button onclick="ST.weekYear=null;ST.weekMonth=null;ST.weekWeek=null;render()" style="background:#3b5bdb;color:#fff;border:none;border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;cursor:pointer">오늘</button>')
     +'</div>'
-    +'<div style="font-size:13px;font-weight:900;color:#1a1a2e">'+wm+'월</div>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="font-size:13px;font-weight:900;color:#1a1a2e">'+wm+'월 '+ww+'주</div>'
+    +navToggleBtn
     +'</div>'
-    +'<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+monthBtns
-    +'<button onclick="copyPrevWeekPlan(\''+s.id+'\','+wy+','+wm+','+ww+')" style="background:#f0fdf4;color:#059669;border:1.5px solid #6ee7b7;border-radius:6px;padding:2px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-left:6px">📋 지난주 가져오기</button>'
     +'</div>'
-    +(curWT==='tt'?'<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:6px">'+weekBtns+'</div>':'')
+    +(navOpen?(
+      '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+monthBtns
+      +'<button onclick="copyPrevWeekPlan(\''+s.id+'\','+wy+','+wm+','+ww+')" style="background:#f0fdf4;color:#059669;border:1.5px solid #6ee7b7;border-radius:6px;padding:2px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-left:6px">📋 지난주 가져오기</button>'
+      +'</div>'
+      +(curWT==='tt'?'<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:6px">'+weekBtns+'</div>':'')
+    ):'')
     +'</div>';
 
-  return '<div>'+navHtml+tabBar2+tabContent2+'</div>';
+  const heroHtml=
+    '<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #d97706;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">'
+    +'<div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(217,119,6,.05)"></div>'
+    +'<div style="position:relative;z-index:2">'
+    +'<div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(217,119,6,.30);color:#b45309;background:rgba(217,119,6,.08);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;letter-spacing:1.2px;margin-bottom:12px">🗓 WEEKLY PLAN · 주간 학습플랜 관리</div>'
+    +'<h1 style="margin:0;font-size:24px;color:#1a2340;letter-spacing:-.8px;line-height:1.2">주간플랜 관리</h1>'
+    +'<p style="margin:8px 0 0;color:#5b6478;font-size:13px;max-width:760px">과목별 시간표 배정부터 학습전략 · AI 추천 플랜 · 플랜점검까지 한 곳에서 확인하세요.</p>'
+    +'</div>'
+    +'</div>';
+
+  return '<div>'+heroHtml+navHtml+tabBar2+tabContent2+'</div>';
 }
 
 function renderAiPlanTab(s){
@@ -18467,16 +18484,19 @@ function renderRoadmapSubNav(active){
     {key:'survey',  icon:'📥', label:'설문조사함'+(newSurveyHubCount?' ('+newSurveyHubCount+')':'')},
     {key:'surveyMgmt', icon:'⚙️', label:'설문조사 관리'},
   ];
-  return `<div style="background:linear-gradient(135deg,#0f2540,#123a3a);border-radius:16px;padding:20px 22px;margin-bottom:14px;color:#fff">
-    <div style="display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.5px;color:#ffd479;margin-bottom:10px">🧭 UNIVERSITY COUNSELING · 입시상담 통합관리</div>
-    <div style="font-size:19px;font-weight:900;margin-bottom:4px">입시상담 통합 관리</div>
-    <div style="font-size:12px;color:#cbd5e1;margin-bottom:16px">로드맵 리포트 생성부터 상담이력 · 학원 프로그램 · 고등학교 정보까지 한 곳에서 확인하세요.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${tabs.map(function(t){
-        const isAct=active===t.key;
-        return `<button onclick="ST.roadmapSubTab='${t.key}';render()" style="background:${isAct?'#fff':'rgba(255,255,255,.12)'};color:${isAct?'#0f2540':'#fff'};border:1px solid ${isAct?'#fff':'rgba(255,255,255,.35)'};border-radius:20px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">${t.icon} ${t.label}</button>`;
-      }).join('')}
+  return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #3b5bdb;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
+    <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(59,91,219,.05)"></div>
+    <div style="position:relative;z-index:2">
+      <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(59,91,219,.30);color:#3b5bdb;background:rgba(59,91,219,.06);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;letter-spacing:1.2px;margin-bottom:12px">🧭 UNIVERSITY COUNSELING · 입시상담 통합관리</div>
+      <h1 style="margin:0;font-size:24px;color:#1a2340;letter-spacing:-.8px;line-height:1.2">입시상담 통합 관리</h1>
+      <p style="margin:8px 0 0;color:#5b6478;font-size:13px;max-width:760px">로드맵 리포트 생성부터 상담이력 · 학원 프로그램 · 고등학교 정보까지 한 곳에서 확인하세요.</p>
     </div>
+  </div>
+  <div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px">
+    ${tabs.map(function(t){
+      const isAct=active===t.key;
+      return `<button onclick="ST.roadmapSubTab='${t.key}';render()" style="border:none;border-bottom:4px solid ${isAct?'#3b5bdb':'transparent'};background:transparent;color:${isAct?'#3b5bdb':'#64748b'};border-radius:0;padding:12px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${t.icon} ${t.label}</button>`;
+    }).join('')}
   </div>`;
 }
 function renderRoadmapReport(s){
@@ -29784,7 +29804,7 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
    크기로 보이게 한다. */
 @media screen and (max-width:480px){
   .v46-part-head-row{flex-direction:column;align-items:flex-start;gap:4px}
-  .v46-part-head-row h2{font-size:clamp(14px,4.4vw,17px)!important;white-space:nowrap}
+  .v46-part-head-row h2{font-size:clamp(15px,var(--pv,4.4vw),26px)!important;white-space:nowrap}
   .v46-part-head-side{font-size:12px}
   .v46-part-head-meta{font-size:11px}
 }
@@ -31560,6 +31580,23 @@ function stripCovers(markup){
 // ══════════════════════════════════════════════════
 // 실전 수행손실·교정가능점수 (CHALLENGER 4대 실전지표, V1)
 // ══════════════════════════════════════════════════
+// ★ 2026-09-19 추가: PART 1~4 제목이 휴대폰 화면에서 전부 같은 글자 크기(clamp 고정값)를
+// 쓰다 보니, 짧은 제목("PART 4. 누적 변화 리포트")은 화면 폭 대비 훨씬 작게 보이고 긴 제목만
+// 겨우 꽉 차던 문제 — 제목 문자열의 실제 길이(한글/영문/공백/문장부호 가중치 계산)를 바탕으로
+// PART마다 화면을 거의 꽉 채우는 자기만의 글자 크기(vw)를 계산한다. 짧은 제목일수록 더 큰
+// 글자 크기가 나오며, 지나치게 커지지 않도록 CSS clamp()의 최대값(26px)으로 상한을 둔다.
+function _sgPartTitleFitVw(text){
+  var w=0;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];
+    if(c>='\uac00'&&c<='\ud7a3') w+=1.0; // 한글 완성형: 전각 취급
+    else if(/[0-9a-zA-Z]/.test(c)) w+=0.55; // 영문/숫자: 좁음
+    else if(c===' ') w+=0.32; // 공백
+    else w+=0.45; // 마침표·쉼표·가운뎃점 등 문장부호
+  }
+  if(w<=0) w=1;
+  return (100.7/w).toFixed(2);
+}
 function _sgPartHeadHtml(label, title, colorVar, opts){
   // ★ 2026-09-17 추가: PART 1(결과 분석리포트)만 우측 상단에 학생명 대신 응시일을
   // 보여주고, 하단의 "응시일|시험명" 메타 라인은 생략해달라는 요청 — 다른 PART(2/2.5/3)의
@@ -31577,9 +31614,10 @@ function _sgPartHeadHtml(label, title, colorVar, opts){
     if(testName) metaBits.push(testName);
   }
   const metaHtml = metaBits.map(esc).join(' <span class="sep">|</span> ');
+  const fitVw = _sgPartTitleFitVw(label+' '+title);
   return \`<div class="v46-part-head">
     <div class="v46-part-head-row">
-      <h2><span class="v46-part-num" style="color:\${colorVar}">\${esc(label)}</span> \${esc(title)}</h2>
+      <h2 style="--pv:\${fitVw}vw"><span class="v46-part-num" style="color:\${colorVar}">\${esc(label)}</span> \${esc(title)}</h2>
       \${sideText?\`<span class="v46-part-head-side">\${esc(sideText)}</span>\`:''}
     </div>
     \${metaHtml?\`<div class="v46-part-head-meta">\${metaHtml}</div>\`:''}
