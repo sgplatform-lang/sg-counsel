@@ -271,7 +271,7 @@ input,select,textarea{font-size:16px!important}
   input,select,textarea{font-size:inherit!important}
 }
 
-</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script><script>
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script><script>
 // ★ 2026-09-09(374) 추가: Firebase App Check — 보안 규칙이 "누구나 읽기/쓰기 가능"으로
 // 열려있어(로그인 화면이 Firebase 정식 인증이 아니라 자체 아이디/비번 대조 방식이라 규칙에서
 // "로그인한 사람만" 구분이 안 됨) 데이터가 그대로 노출된 문제의 1차 방어선. 이 앱(우리
@@ -355,6 +355,74 @@ try{
   window._fbReady = false;
   console.warn("Firebase 실패:", e.message);
 }
+</script>
+<script>
+// ★ 2026-09-20 추가: 관리자/기관관리자/선생님 로그인을 Firebase Authentication 기반으로
+// 전환(1단계 — 학생 로그인은 별도 2단계에서 다룸). firebase-auth-migration.js로 미리
+// 만들어둔 계정들과 짝을 맞추기 위해, 로그인ID를 이 계정들과 동일한 규칙으로 가짜 이메일로
+// 바꿔서 signInWithEmailAndPassword에 사용한다. role/orgId/teacherId는 그 계정에 심어둔
+// 커스텀 클레임(서버가 서명해서 내려주는 값)에서 읽으므로, 브라우저 콘솔에서 값을 조작해도
+// 실제 Firestore 접근 권한에는 영향이 없다(보안 규칙이 이 클레임을 직접 검사 — firestore-rules-phase1.txt 참고).
+const SG_AUTH_EMAIL_DOMAIN = 'sgplatform.local';
+function _sgToAuthEmail(loginId){
+  return String(loginId).trim().toLowerCase().replace(/[^a-z0-9._-]/g,'') + '@' + SG_AUTH_EMAIL_DOMAIN;
+}
+
+firebase.auth().onAuthStateChanged(async function(user){
+  const _ls = document.getElementById('login-screen');
+  const _app = document.getElementById('app');
+  if(!user){
+    // 로그아웃 상태 — 로그인 화면 표시
+    if(ST.currentUser){ ST.currentUser=null; ST.currentOrg=null; }
+    try{
+      if(_ls){ _ls.style.display='flex'; _ls.style.alignItems='center'; _ls.style.justifyContent='center'; }
+      if(_app){ _app.style.display='none'; }
+    }catch(e){}
+    if(typeof render==='function') render();
+    return;
+  }
+  // 로그인된 사용자 — 커스텀 클레임(role/orgId/teacherId)을 읽어온다.
+  // true를 넘겨서 캐시된 토큰이 아니라 최신 토큰을 강제로 받아온다(관리자가 방금
+  // 권한을 바꿔줬을 수도 있으므로).
+  let claims={};
+  try{
+    const tokenResult = await user.getIdTokenResult(true);
+    claims = tokenResult.claims || {};
+  }catch(e){ console.warn('토큰 확인 실패:', e.message); }
+  const role = claims.role;
+  if(role==='admin'){
+    ST.currentUser = {id:'admin', name:user.displayName||'최종관리자', role:'admin', teacherId:null};
+    ST.currentOrg = null;
+  } else if(role==='orgAdmin'){
+    let orgList=[]; try{ orgList=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); }catch(e){}
+    ST.currentUser = {id:'org_'+claims.orgId, name:user.displayName||'(기관관리자)', role:'orgAdmin', teacherId:null, orgId:claims.orgId};
+    ST.currentOrg = orgList.find(o=>String(o.id)===String(claims.orgId)) || null;
+  } else if(role==='teacher'){
+    let orgList=[]; try{ orgList=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); }catch(e){}
+    ST.currentUser = {id:claims.teacherId, name:user.displayName||'', role:'teacher', teacherId:claims.teacherId, orgId:claims.orgId||null};
+    ST.currentOrg = claims.orgId ? (orgList.find(o=>String(o.id)===String(claims.orgId)) || null) : null;
+  } else {
+    // 커스텀 클레임이 없는 계정 — 마이그레이션 스크립트를 거치지 않은 계정
+    console.warn('알 수 없는 role — firebase-auth-migration.js를 이 계정에 대해 실행했는지 확인하세요:', user.email);
+    firebase.auth().signOut();
+    return;
+  }
+  ST.page='admin';
+  ST._authLoading=true;
+  try{
+    if(_ls) _ls.style.display='none';
+    if(_app) _app.style.display='';
+  }catch(e){}
+  if(typeof render==='function') render();
+  if(typeof FB_USE==='function' && FB_USE()){
+    if(typeof fbLoadAll_all==='function') await fbLoadAll_all();
+    ST._authLoading=false;
+    if(typeof render==='function') render();
+    if(typeof startRealtimeSync==='function') startRealtimeSync();
+  } else {
+    ST._authLoading=false;
+  }
+});
 </script>
 <style id="v41-no-title-compact">
 .v41-flow.v41-flow-no-title{margin:3px 0 5px!important;padding:0!important;border:0!important;background:transparent!important;}
@@ -540,7 +608,7 @@ function toast(msg,d){
     <div style="text-align:center;margin-top:8px;font-size:10px;color:#ccc">파일버전: 2026-05-04 08:19</div>
     <div id="emergency_reset_box" style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:10px;border:1px solid #fde68a;display:none">
       <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:600">⚠ 로그인이 안 되시나요?</div>
-      <button onclick="localStorage.clear();sessionStorage.clear();alert(&#39;초기화 완료. 다시 로그인하세요.&#39;);location.reload();" style="width:100%;background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
+      <button onclick="try{firebase.auth().signOut();}catch(e){}localStorage.clear();sessionStorage.clear();alert(&#39;초기화 완료. 다시 로그인하세요.&#39;);location.reload();" style="width:100%;background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
         🔄 브라우저 데이터 초기화 후 재시작
       </button>
       <div style="font-size:10px;color:#b45309;margin-top:6px">※ 데이터는 Firebase에 백업되어 있어 복구됩니다</div>
@@ -3441,7 +3509,7 @@ function renderLogin(){
       <div id="login_err" style="text-align:center;color:#e53935;font-size:12px;margin-top:10px;min-height:18px"></div>
     <div id="emergency_reset_box" style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:10px;border:1px solid #fde68a;display:none">
       <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:600">⚠️ 로그인이 안 되시나요?</div>
-      <button onclick="localStorage.clear();sessionStorage.clear();alert('초기화 완료. 다시 로그인하세요.');location.reload();"
+      <button onclick="try{firebase.auth().signOut();}catch(e){}localStorage.clear();sessionStorage.clear();alert('초기화 완료. 다시 로그인하세요.');location.reload();"
         style="width:100%;background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
         🔄 브라우저 데이터 초기화 후 재시작
       </button>
@@ -3457,164 +3525,26 @@ function doLogin(){
   var err = document.getElementById('login_err');
 
   if(!id||!pw){ if(err)err.textContent='아이디와 비밀번호를 입력하세요.'; return; }
-  if(err) err.textContent='';
+  if(err) err.textContent='⏳ 로그인 중...';
 
-  // 최종관리자
-  if(id==='admin' && pw==='admin1234'){
-    ST.currentUser={id:'admin',name:'최종관리자',role:'admin',teacherId:null};
-    ST.currentOrg=null;
-    sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:null}));
-    ST.page='admin';
-    // ★ 2026-09-18(16차) 수정: 로그인 직후 이 시점의 ST.students는 "페이지 부팅 시" 미리 읽어둔
-    // localStorage 캐시(과거 세션에서 남은, 지금과 학생수·명단이 다를 수 있는 오래된 값)
-    // 그대로였다 — 그걸 바로 render()로 화면에 띄운 뒤 0.5초 뒤 Firebase 최신 데이터로 덮어쓰다
-    // 보니, "154명·홍길동" 같은 옛 목록이 잠깐 보였다가 "378명·김지원" 같은 실제 목록으로
-    // 갑자기 바뀌는 것처럼 보였다. 바로 아래 기관관리자 로그인 분기에는 이미 있는
-    // ST._authLoading(로딩 중엔 목록 대신 "불러오는 중..." 표시) 패턴을 여기도 동일하게 적용해,
-    // 오래된 캐시 목록이 화면에 잠깐이라도 나타나지 않도록 한다.
-    ST._authLoading = true;
-    render();
-    // Firebase에서 최신 데이터 로드
-    if(FB_USE()){
-      setTimeout(async()=>{ await fbLoadAll_all(); ST._authLoading=false; render(); startRealtimeSync(); },500);
-    } else {
-      ST._authLoading=false; // Firebase 미사용(로컬 전용) 환경 — 로딩 표시가 계속 남지 않게 즉시 해제
-    }
-    return;
-  }
-
-  // 기관관리자 로그인
-  try{
-    const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
-    const org=orgs.find(o=>String(o.loginId||'').trim()===id&&String(o.password||'').trim()===pw);
-    if(org){
-      ST.currentUser={id:'org_'+org.id,name:org.name+'(기관관리자)',role:'orgAdmin',teacherId:null};
-      ST.currentOrg=org;
-      sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:ST.currentOrg}));
-      // ★ 2026-08-22: 예전엔 로그인 직후 localStorage 캐시(브라우저에 남아있던 이전
-      // 세션/다른 기관 데이터일 수 있음)로 먼저 화면을 그린 뒤 Firebase 최신 데이터로
-      // 바꿔치기해서, 로그인 순간 잠깐 엉뚱한 기관 데이터가 보이는 문제가 있었다.
-      // Firebase를 쓰는 경우엔 캐시를 아예 안 쓰고 실제 데이터가 올 때까지 빈 목록으로
-      // 대기한다(로딩 중으로 자연스럽게 보임, 잘못된 데이터가 보이는 것보다 안전).
-      if(FB_USE()){
-        // ★ 2026-09-18 추가: 기존엔 Firebase 응답이 올 때까지 화면을 완전히 비워둬서
-        // "로그인 로딩이 너무 길다"는 체감으로 이어졌다. localStorage 캐시를 정확히
-        // 이 기관(org.id) 것만 걸러서 먼저 화면에 띄워두면(다른 기관 데이터가 섞여
-        // 보일 위험은 없음 — 8/22에 고쳤던 문제는 "걸러지지 않은" 캐시를 그대로 쓴
-        // 탓이었다), 캐시가 남아있는 한 로딩 스피너 없이 바로 화면이 뜨고, Firebase의
-        // 최신 데이터가 도착하면 조용히 교체된다. 캐시가 아예 없는 기기라면 이전과
-        // 동일하게 로딩 표시로 자연스럽게 이어진다.
-        try{
-          const allStu=dbL(SK)||[];
-          ST.students=allStu.filter(s=>s.orgId===org.id);
-          const allTea=JSON.parse(localStorage.getItem(SKT)||'[]');
-          ST.teachers=allTea.filter(t=>t.orgId===org.id);
-        }catch(e){ ST.students=[]; ST.teachers=[]; }
-        ST._authLoading = ST.students.length===0;
-        ST.page='admin'; ST.adminTab='report'; render();
-        (async()=>{ await fbLoadAll_all(); ST._authLoading=false; render(); startRealtimeSync(); })();
+  // ★ 2026-09-20 수정: 하드코딩된 admin/admin1234 비교, localStorage/ST.teachers 안의
+  // 평문 비밀번호 비교를 전부 제거하고 Firebase Authentication이 서버에서 검증하도록
+  // 변경(1단계 — 학생 로그인은 미포함). 실제 role/orgId 반영과 화면 전환은
+  // firebase.auth().onAuthStateChanged() 리스너(위쪽 스크립트)가 로그인 성공 이벤트를
+  // 받아서 전담 처리한다 — 여기서는 로그인 시도만 하면 된다.
+  firebase.auth().signInWithEmailAndPassword(_sgToAuthEmail(id), pw)
+    .catch(function(e){
+      if(!err) return;
+      if(e.code==='auth/wrong-password' || e.code==='auth/user-not-found' || e.code==='auth/invalid-credential' || e.code==='auth/invalid-email'){
+        err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';
+      } else if(e.code==='auth/too-many-requests'){
+        err.textContent='시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
       } else {
-        try{
-          const allStu=dbL(SK)||[];
-          ST.students=allStu.filter(s=>s.orgId===org.id);
-          const allTea=JSON.parse(localStorage.getItem(SKT)||'[]');
-          ST.teachers=allTea.filter(t=>t.orgId===org.id);
-        }catch(e){}
-        ST.page='admin'; ST.adminTab='report'; render();
+        err.textContent='로그인 오류: '+e.message;
       }
-      return;
-    }
-  }catch(e){}
-
-  // 모든 키에서 검색
-  var keys = ['sg_accounts_v1','susi_t_v2','susi_t_v1'];
-  var found = null;
-  for(var i=0; i<keys.length; i++){
-    try{
-      var raw = localStorage.getItem(keys[i]);
-      if(!raw) continue;
-      var arr = JSON.parse(raw);
-      for(var j=0; j<arr.length; j++){
-        var a = arr[j];
-        if(String(a.loginId||'').trim()===id && String(a.password||'').trim()===pw){
-          found = a; break;
-        }
-      }
-      if(found) break;
-    }catch(e2){}
-  }
-
-  // ST.teachers에서도 검색
-  if(!found){
-    var ts = ST.teachers||[];
-    for(var k=0; k<ts.length; k++){
-      if(String(ts[k].loginId||'').trim()===id && String(ts[k].password||'').trim()===pw){
-        found = ts[k]; break;
-      }
-    }
-  }
-
-  if(found){
-    ST.currentUser={id:found.id, name:found.name, role:'teacher', teacherId:found.id, orgId:found.orgId||null};
-    if(found.orgId){
-      try{
-        const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
-        const foundOrg=orgs.find(o=>o.id===found.orgId)||null;
-        ST.currentOrg=foundOrg;
-      }catch(e){ console.warn('기관 정보 로드 오류:',e); }
-    } else {
-      ST.currentOrg=null;
-    }
-    sessionStorage.setItem('sg_session', JSON.stringify({user:ST.currentUser, org:ST.currentOrg}));
-    // ★ 2026-08-22: 위 기관관리자 로그인과 동일한 이유로, Firebase 사용 시에는
-    // localStorage 캐시(다른 계정/기관의 이전 데이터일 수 있음)로 먼저 그리지 않고
-    // 실제 데이터가 도착할 때까지 빈 목록으로 대기한다.
-    if(FB_USE()){
-      // ★ 2026-09-18 추가: 위 기관관리자와 동일한 이유로, 선생님 로그인도 화면을 비워둔
-      // 채 기다리지 않고 본인이 담당하는 학생만 정확히 걸러낸 캐시를 먼저 보여준다.
-      try{
-        if(found.orgId && ST.currentOrg){
-          const allStudents=JSON.parse(localStorage.getItem(SK)||'[]');
-          const allTeachers=JSON.parse(localStorage.getItem(SKT)||'[]');
-          ST.students=allStudents.filter(s=>{
-            if(s.orgId!==ST.currentOrg.id) return false;
-            const sc=[...(s.counselors||[])];
-            if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
-            return sc.includes(found.name);
-          });
-          ST.teachers=allTeachers.filter(t=>t.orgId===ST.currentOrg.id);
-        } else { ST.students=[]; ST.teachers=[]; }
-      }catch(e){ ST.students=[]; ST.teachers=[]; }
-      ST._authLoading = ST.students.length===0;
-      ST.page='main'; render();
-      (async()=>{
-        const loaded = await fbLoadAll_all();
-        ST._authLoading=false;
-        if(loaded) render(); else render();
-      })();
-    } else {
-      try{
-        if(found.orgId && ST.currentOrg){
-          const allStudents=JSON.parse(localStorage.getItem(SK)||'[]');
-          const allTeachers=JSON.parse(localStorage.getItem(SKT)||'[]');
-          ST.students=allStudents.filter(s=>{
-            if(s.orgId!==ST.currentOrg.id) return false;
-            const sc=[...(s.counselors||[])];
-            if(s.counselor&&!sc.includes(s.counselor)) sc.unshift(s.counselor);
-            return sc.includes(found.name);
-          });
-          ST.teachers=allTeachers.filter(t=>t.orgId===ST.currentOrg.id);
-        }
-      }catch(e){ console.warn('기관 데이터 로드 오류:',e); }
-      ST.page='main'; render();
-    }
-    return;
-  }
-
-  if(err) err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';
-  // 로그인 실패 시 초기화 박스 표시
-  const _erb = document.getElementById('emergency_reset_box');
-  if(_erb) _erb.style.display = 'block';
+      const _erb = document.getElementById('emergency_reset_box');
+      if(_erb) _erb.style.display = 'block';
+    });
 }
 
 function restoreSession(){
@@ -3643,6 +3573,7 @@ function clearSession(){
   render();
 }
 function doLogout(){
+  try{ firebase.auth().signOut(); }catch(e){}
   sessionStorage.removeItem('sg_session');
   ST.currentUser=null;ST.currentOrg=null;ST.sel=null;ST.adminSel=null;ST.page='main';
   // ★ 2026-07-25 수정: 챌린저 iframe은 성능 최적화를 위해 스크롤/리사이즈/body 크기
