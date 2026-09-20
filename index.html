@@ -34622,12 +34622,10 @@ function __SG_initFromHost(data){
   function v41PeerSubjects(s){
     try{
       var ex=v41CurrentExam(), key=v41SubjectKey(s);
-      // ★ 2026-09-15(430) 수정: 등수·응시생 수 계산의 "모집단"을, 가능하면 항상 이번 시험
-      // 전체 응시자 기준으로 통일한다. window.__SG_EXTRA_PEERS는 부모창(SG)이 비동기로
-      // Firestore 전체 조회해 채워주는 "이번 시험 전체 응시자" 목록(관리자 role일 때는
-      // 이미 ST.students 자체가 전체라 조회를 안 하므로 비어있음) — 있으면 이것을 쓰고,
-      // 아직 도착 전(최초 렌더 순간)이면 예전처럼 부모창의 ST.students(역할별로 좁혀져
-      // 있을 수 있음)로 우선 표시한 뒤, 전체 목록이 도착하면 sg_update_exam_peers로 갱신된다.
+      // ★ 2026-09-20 수정: "동일 시험" 판정 기준을 응시일+시험명 → 시험명만으로 변경.
+      // 학생마다 실제로 시험을 치른 날짜가 다를 수 있어(사정상 다른 날 응시 등), 응시일까지
+      // 똑같이 요구하면 같은 시험을 본 학생인데도 통계(전체 오답률 등) 모집단에서 빠지는
+      // 문제가 있었다 — 이제 시험명만 같으면 같은 시험으로 간주해 모두 모집단에 포함한다.
       var pool = (Array.isArray(window.__SG_EXTRA_PEERS) && window.__SG_EXTRA_PEERS.length) ? window.__SG_EXTRA_PEERS : null;
       if(!pool){
         var p=window.parent, st=p&&p.ST;
@@ -34637,9 +34635,9 @@ function __SG_initFromHost(data){
       var arr=[];
       pool.forEach(function(stu){
         var cd=stu.challengerData||{}, subs=[];
-        if((!ex.date||cd.lastTestDate===ex.date)&&(!ex.name||cd.lastTestName===ex.name))subs=cd.lastSubjects||[];
+        if(!ex.name||cd.lastTestName===ex.name)subs=cd.lastSubjects||[];
         if(!subs.length&&Array.isArray(cd.history)){
-          var h=cd.history.slice().reverse().find(function(x){return (!ex.date||x.testDate===ex.date||x.date===ex.date)&&(!ex.name||x.testName===ex.name||x.name===ex.name||x.test===ex.name);});
+          var h=cd.history.slice().reverse().find(function(x){return (!ex.name||x.testName===ex.name||x.name===ex.name||x.test===ex.name);});
           if(h)subs=h.subjects||h.lastSubjects||[];
         }
         var found=(subs||[]).find(function(x){return v41SubjectKey(x)===key;});
@@ -46796,25 +46794,26 @@ function generateReport() {
   // 가장 최근 기록 탐색)으로 매칭해, "지난 회차 조회" 케이스도 우리 기관과 동일하게
   // 빠짐없이 찾도록 한다.
   async function _gg_fetchOtherOrgExamStudents(examDate, examName){
-    if(!FB_USE() || !examDate) return [];
+    if(!FB_USE() || !examName) return [];
     try{
       var snap = await _sgFetchWithRetry(function(){
         return window._fb.collection('students').get();
       }, 'students(전체기관 회차조회)');
-      var _dateN=_examDateNorm(examDate), _nameN=_examNameNorm(examName);
+      // ★ 2026-09-20 수정: 응시일이 아니라 시험명만으로 "동일 시험" 판정(v41PeerSubjects와
+      // 동일한 기준으로 통일 — 학생마다 실제 응시일이 다를 수 있어서).
+      var _nameN=_examNameNorm(examName);
       var out=[];
       snap.docs.forEach(function(d){
         var data=d.data(); var s=Object.assign({}, data, {id:data.id!=null?data.id:d.id});
         var cd=s.challengerData||{};
-        if((!_dateN||_examDateNorm(cd.lastTestDate)===_dateN)&&(!_nameN||_examNameNorm(cd.lastTestName)===_nameN)){
+        if(!_nameN||_examNameNorm(cd.lastTestName)===_nameN){
           out.push(s); return;
         }
         if(Array.isArray(cd.history)){
           for(var i=cd.history.length-1;i>=0;i--){
             var h=cd.history[i];
-            var hDate=_examDateNorm(h.date!=null?h.date:h.testDate);
             var hName=_examNameNorm(h.test!=null?h.test:(h.testName!=null?h.testName:h.name));
-            if((!_dateN||hDate===_dateN)&&(!_nameN||hName===_nameN)){
+            if(!_nameN||hName===_nameN){
               var hSubs=h.subjects||h.lastSubjects||h.fullSubjects||[];
               if(hSubs.length){
                 out.push(Object.assign({}, s, {challengerData:Object.assign({}, cd, {
