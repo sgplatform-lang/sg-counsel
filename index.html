@@ -348,6 +348,11 @@ try{
     // ★ 2026-09-15 추가: 문제지 PDF에서 문항별 위치(페이지+사각형 좌표%)를 AI가 추정해
     // 알려주는 서버 함수. 위 analyzeExamPdf와 같은 5분 타임아웃(문항 많은 PDF 대비).
     analyzeExamPdfRegions: (payload)=>firebase.functions().httpsCallable('analyzeExamPdfRegions', {timeout: 300000})(payload).then(r=>r.data),
+    // ★ 2026-09-20 추가(2단계 방법 B): 학생 등록/아이디·비번 수정 시 Firebase Auth
+    // 계정을 서버(Cloud Function)에서 자동으로 만들거나 갱신. 브라우저는 절대로
+    // Firebase 계정을 직접 만들 권한이 없으므로(보안상 당연히 막혀있음) 반드시
+    // 서버 함수를 거쳐야 한다 — cloud-function-upsertStudentAuth.js 배포 필요.
+    upsertStudentAuth: (payload)=>firebase.functions().httpsCallable('upsertStudentAuth')(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -12820,7 +12825,24 @@ window._saveSForm = function(sid){
       if(!ST._savingIds) ST._savingIds=new Set();
       ST._savingIds.add(String(targetStudent.id));
       fbSave('students', targetStudent.id, targetStudent)
-        .then(()=>{ setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(targetStudent.id)); }, 5000); })
+        .then(()=>{
+          setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(targetStudent.id)); }, 5000);
+          // ★ 2026-09-20 추가(2단계 방법 B): 아이디가 설정된 학생이면 Firebase Auth
+          // 계정도 함께 만들거나 갱신 — 이걸 해야 로그인 코드 전환 이후에도 신규/수정
+          // 학생이 실제로 로그인할 수 있다. 실패해도 Firestore 저장 자체는 이미 끝난
+          // 뒤라 화면을 막지 않고 콘솔 경고만 남긴다(관리자가 재시도할 수 있게).
+          if(targetStudent.studentLoginId && window._fb && window._fb.upsertStudentAuth){
+            window._fb.upsertStudentAuth({
+              studentId: targetStudent.id,
+              loginId: targetStudent.studentLoginId,
+              password: targetStudent.studentPassword,
+              orgId: targetStudent.orgId,
+              name: targetStudent.name
+            }).catch(function(e){
+              console.warn('⚠️ 학생 로그인 계정 동기화 실패(Firestore 저장은 완료됨):', e.message);
+            });
+          }
+        })
         .catch(()=>{ setTimeout(()=>{ if(ST._savingIds) ST._savingIds.delete(String(targetStudent.id)); }, 5000); });
     }
   }
