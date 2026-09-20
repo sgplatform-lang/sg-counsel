@@ -362,6 +362,9 @@ try{
     // Firebase 계정을 직접 만들 권한이 없으므로(보안상 당연히 막혀있음) 반드시
     // 서버 함수를 거쳐야 한다 — cloud-function-upsertStudentAuth.js 배포 필요.
     upsertStudentAuth: (payload)=>firebase.functions().httpsCallable('upsertStudentAuth')(payload).then(r=>r.data),
+    // ★ 2026-09-20(3차) 추가: 관리자페이지에서도 "다른 기관 학생 회차 조회"(_gg_fetchOtherOrgExamStudents)가
+    // 이 함수를 재사용한다 — 학생용 파일과 동일한 서버 함수.
+    getExamPeerSubjects: (payload)=>firebase.functions().httpsCallable('getExamPeerSubjects')(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -46797,38 +46800,21 @@ function generateReport() {
   async function _gg_fetchOtherOrgExamStudents(examDate, examName){
     if(!FB_USE() || !examName) return [];
     try{
-      var snap = await _sgFetchWithRetry(function(){
-        return window._fb.collection('students').get();
-      }, 'students(전체기관 회차조회)');
-      // ★ 2026-09-20 수정: 응시일이 아니라 시험명만으로 "동일 시험" 판정(v41PeerSubjects와
-      // 동일한 기준으로 통일 — 학생마다 실제 응시일이 다를 수 있어서).
-      var _nameN=_examNameNorm(examName);
-      var out=[];
-      snap.docs.forEach(function(d){
-        var data=d.data(); var s=Object.assign({}, data, {id:data.id!=null?data.id:d.id});
-        var cd=s.challengerData||{};
-        if(!_nameN||_examNameNorm(cd.lastTestName)===_nameN){
-          out.push(s); return;
-        }
-        if(Array.isArray(cd.history)){
-          for(var i=cd.history.length-1;i>=0;i--){
-            var h=cd.history[i];
-            var hName=_examNameNorm(h.test!=null?h.test:(h.testName!=null?h.testName:h.name));
-            if(!_nameN||hName===_nameN){
-              var hSubs=h.subjects||h.lastSubjects||h.fullSubjects||[];
-              if(hSubs.length){
-                out.push(Object.assign({}, s, {challengerData:Object.assign({}, cd, {
-                  lastSubjects: hSubs,
-                  lastTestDate: h.date!=null?h.date:h.testDate,
-                  lastTestName: h.test!=null?h.test:(h.testName!=null?h.testName:h.name)
-                })}));
-              }
-              break;
-            }
-          }
-        }
+      // ★ 2026-09-20(3차) 수정: 2단계 보안 규칙(firestore-rules-phase2.txt) 게시 이후,
+      // 기관관리자/선생님 role은 students 전체 컬렉션을 직접 조회할 권한이 없어(자기 기관만
+      // 허용) 이 함수가 "Missing or insufficient permissions" 오류로 실패하고 있었다
+      // (최종관리자만 전체 조회 권한이 있어 admin role에서는 문제가 안 드러났었음).
+      // 학생용 파일에서 이미 쓰고 있는 서버 함수(getExamPeerSubjects, Admin SDK로 보안
+      // 규칙의 영향을 받지 않음)를 그대로 재사용해 다른 기관 학생들의 과목별 데이터를
+      // 서버에서 대신 받아온다.
+      if(!window._fb || !window._fb.getExamPeerSubjects) return [];
+      var result = await window._fb.getExamPeerSubjects({testName: examName});
+      var subjects = (result && result.subjects) || [];
+      // v41PeerSubjects는 "학생 객체 배열"을 받아 각 학생의 challengerData.lastSubjects를
+      // 뒤져서 과목을 찾는 구조라, 서버가 돌려준 과목 하나당 가짜 학생 객체로 감싸준다.
+      return subjects.map(function(sub){
+        return { challengerData: { lastTestName: examName, lastSubjects: [sub] } };
       });
-      return out;
     }catch(e){
       console.warn('[SG] 전체 기관 회차 조회 실패:', e.message);
       return null;
