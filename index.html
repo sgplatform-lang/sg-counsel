@@ -46807,14 +46807,17 @@ function generateReport() {
       // 학생용 파일에서 이미 쓰고 있는 서버 함수(getExamPeerSubjects, Admin SDK로 보안
       // 규칙의 영향을 받지 않음)를 그대로 재사용해 다른 기관 학생들의 과목별 데이터를
       // 서버에서 대신 받아온다.
+      // ★ 2026-09-21 수정: 위 방식(subjects만 받아 가짜 학생 객체로 감싸기)은 이름·학교·
+      // 학년·반·기관ID가 전부 빈 값이라, 회차 통계표가 그 정보를 필요로 하는 부분(학교명
+      // 표시, 우리 기관/다른 기관 구분 등)에서 다른 기관 학생들이 통째로 누락되거나 빈 값으로
+      // 표시되는 원인이었다(최종관리자는 ST.students에 이미 실제 학생 객체가 전체 실려있어
+      // 이 문제가 드러나지 않았음). 서버(getExamPeerSubjects)가 이제 호출자 role이
+      // admin/orgAdmin/teacher(=스태프)면 익명화된 과목 배열 대신 실제 학생 단위 객체
+      // (id/name/school/grade/className/orgId/challengerData)를 그대로 돌려주도록 바뀌었으므로,
+      // 더 이상 가짜 학생으로 감싸는 변환이 필요 없다. (서버 index.js도 함께 배포해야 함 — 아래 안내 참고)
       if(!window._fb || !window._fb.getExamPeerSubjects) return [];
       var result = await window._fb.getExamPeerSubjects({testName: examName});
-      var subjects = (result && result.subjects) || [];
-      // v41PeerSubjects는 "학생 객체 배열"을 받아 각 학생의 challengerData.lastSubjects를
-      // 뒤져서 과목을 찾는 구조라, 서버가 돌려준 과목 하나당 가짜 학생 객체로 감싸준다.
-      return subjects.map(function(sub){
-        return { challengerData: { lastTestName: examName, lastSubjects: [sub] } };
-      });
+      return (result && result.students) || [];
     }catch(e){
       console.warn('[SG] 전체 기관 회차 조회 실패:', e.message);
       return null;
