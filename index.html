@@ -29587,6 +29587,10 @@ table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;ove
 .aar-objective-box{background:#eff6ff;border:1px solid #bfdbfe;border-left:6px solid var(--blue);border-radius:14px;padding:13px;margin:10px 0}
 .aar-mini-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0;page-break-inside:avoid;break-inside:avoid}
 .aar-mini-stat{background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 8px;min-height:92px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}.aar-mini-stat b{font-size:19px;color:#061d38;font-weight:900}.aar-mini-stat span{font-size:11.5px;color:var(--muted);font-weight:700;word-break:keep-all;text-align:center}
+/* ★ 2026-09-20 추가: 통계 칸(예: "시험에서 아쉽게 놓친 점수")만 봐서는 정확한 의미를
+   처음 보는 학부모가 알기 어렵다는 요청 — 해당 통계 칸 바로 아래에 짧은 설명을 붙인다. */
+.aar-explain-note{background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #64748b;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12.5px;line-height:1.75;color:#475569}
+.aar-explain-note b{color:#1e293b}
 .aar-assignment-table td{height:38px}
 .aar-appendix{page-break-before:always;break-before:page}
 @media(max-width:800px){.aar-record-list{grid-template-columns:1fr}.aar-mini-stats{grid-template-columns:1fr 1fr}}
@@ -33284,7 +33288,8 @@ function perfLossCardHtml(s){
       <div class="aar-mini-stat"><b>\${midHighRateItems.length}<small class="v49-unit">문항</small></b><span>중상 오답률 문항수(오답률50%이상)</span></div>
       <div class="aar-mini-stat stat-good"><b>\${lowRateItems.length}<small class="v49-unit">문항</small></b><span>저오답률 문항수(오답률50%미만)</span></div>
       <div class="aar-mini-stat stat-warn"><b>\${lowRatePointSum}점</b><span>실력보다 아깝게 놓친 점수</span></div>
-    </div>\` : '';
+    </div>
+    <div class="aar-explain-note">💡 <b>실력보다 아깝게 놓친 점수</b>란, 오답률이 낮은(=같은 시험을 본 다른 학생들 대부분은 맞힌) 문항에서 이 학생이 틀려서 잃은 점수입니다. 개념 자체를 몰라서라기보다 실수·시간 압박 등으로 놓쳤을 가능성이 높은 점수입니다.</div>\` : '';
   const lossCardsHtml = \`<div class="v48-loss-cards">
       <div class="v48-loss-card \${r.primary?'sev-high':''}"><b>\${r.primary?esc(r.primaryLabel):'해당 없음'}</b><span>점수를 가장 많이 깎은 이유</span></div>
       <div class="v48-loss-card"><b>\${r.timeLoss}점</b><span>시간 부족 문제</span></div>
@@ -33302,6 +33307,7 @@ function perfLossCardHtml(s){
       <div class="aar-mini-stat stat-warn"><b>\${r.totalLoss}점</b><span>시험에서 아쉽게 놓친 점수</span></div>
       <div class="aar-mini-stat \${recoverClass}"><b><small class="v49-unit">약</small> +\${r.recoverable}<small class="v49-unit">점</small></b><span>단기간 내 만회 가능한 점수</span></div>
     </div>
+    <div class="aar-explain-note">💡 <b>시험에서 아쉽게 놓친 점수</b>는 시간 부족·실수·집중력 저하 등 실전 상황에서의 이유로 잃은 점수입니다. 즉 몰라서 틀린 게 아니라 "충분히 맞힐 수 있었는데 놓친" 점수입니다.<br>💡 <b>단기간 내 만회 가능한 점수</b>는 이런 원인들을 교정하면 다음 시험에서 되찾을 가능성이 높다고 추정되는 점수입니다.</div>
     \${extraStatsHtml}
     <h2>3. 이번 시험 점수가 깎인 이유 분석</h2>
     \${lossCardsHtml}
