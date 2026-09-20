@@ -12663,7 +12663,8 @@ function _renderSForm(s){
           </div>
           <div>
             <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:4px">학생 비밀번호</div>
-            <input id="sf_lpw" type="password" class="inp" placeholder="${s?'변경 시에만 입력':'비밀번호 설정'}" value="">
+            <input id="sf_lpw" type="password" class="inp" placeholder="${s?'변경 시에만 입력(6자 이상)':'비밀번호 설정(6자 이상)'}" value="">
+            <div style="font-size:10px;color:#e67e22;margin-top:2px">⚠️ 6자 이상 입력해주세요 — 6자 미만이면 학생용 로그인 계정에 반영되지 않습니다.</div>
             ${s?`<div style="font-size:10px;color:#aaa;margin-top:2px">비워두면 기존 비밀번호 유지</div>`:''}
           </div>
         </div>
