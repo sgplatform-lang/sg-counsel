@@ -35,6 +35,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script>
 // ★ 2026-09-09(374) 추가: Firebase App Check — 관리자 파일과 동일한 이유로 추가.
 // 아래 사이트 키를 Firebase 콘솔에서 발급받은 값으로 교체해야 동작한다.
@@ -96,7 +97,11 @@ try{
         window._db.collection(col).where(field,op,value).get(),
         new Promise((_,rej)=>setTimeout(()=>rej(new Error('TIMEOUT: '+col+' 로딩이 15초 안에 끝나지 않았습니다')), 15000))
       ]).then(s=>s.docs.map(d=>({...d.data(),id:d.id}))),
-    set: (col,id,data)=>window._db.collection(col).doc(String(id)).set({...data,_t:Date.now()},{merge:true})
+    set: (col,id,data)=>window._db.collection(col).doc(String(id)).set({...data,_t:Date.now()},{merge:true}),
+    // ★ 2026-09-20 추가(2단계 대비): firestore-rules-phase2.txt 게시 후에는 학생 role이
+    // 본인 문서만 읽을 수 있어, 다른 학생들의 오답률을 직접 조회(_chgFetchExamPeerSubjects가
+    // 예전에 하던 방식)할 수 없다. 같은 결과를 서버(Cloud Function)를 통해 받아온다.
+    getExamPeerSubjects: (payload)=>firebase.functions().httpsCallable('getExamPeerSubjects')(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료");
@@ -2297,6 +2302,15 @@ function chgAnsSelectCatalog(catId){
   st.enabled={}; st.detail={}; st.answers={};
   render();
 }
+// ★ 2026-09-20 추가: 개인 사정으로 학원이 등록한 응시일과 실제로 시험을 치른 날짜가
+// 다른 학생을 위해, 응시일만 직접 수정할 수 있게 한다(시험명은 여전히 카탈로그 선택
+// 그대로 — 정답 조회는 catId 기준이라 응시일을 바꿔도 채점에는 전혀 영향 없음. 응시일은
+// 결과리포트 표시 및 "언제 이 시험을 봤는지" 기록용으로만 쓰인다).
+function chgAnsSetDate(val){
+  const st=chgAnsInit();
+  st.date=val;
+  render();
+}
 function chgAnsToggleSlot(slot){
   const st=chgAnsInit();
   st.enabled[slot]=!st.enabled[slot];
@@ -2491,7 +2505,10 @@ function renderChallengerAnswerInput(){
   // 막는다(관리자가 미래 시험을 미리 등록해두는 경우가 많아, 학생이 실수로 아직 안 치른
   // 시험을 골라 답안을 입력해버리는 사고를 방지). 오늘 이전(과거)·오늘 당일 시험은 기존처럼
   // 전부 입력 가능 — "응시일 자정이 지나야 입력 가능"이므로 당일부터는 이미 미래가 아니다.
-  const isFutureExam = st.catId && _chgAnsIsFutureExam(examEntry);
+  // ★ 2026-09-20 수정: 응시일을 학생이 직접 수정할 수 있게 되면서, "아직 응시일이 아님"
+  // 잠금도 카탈로그에 등록된 날짜(entry.defaultDate)가 아니라 학생이 지금 화면에 입력한
+  // 응시일(st.date) 기준으로 판단해야 실제 상황(연기된 응시일 등)과 맞게 동작한다.
+  const isFutureExam = st.catId && !!(st.date && String(st.date) > _chgAnsTodayStr());
   // ★ 380 추가: 시험을 선택했으면 그 시험에 실제로 등록된 과목만 보여주고, 아직 시험을
   // 선택하지 않았으면 과목 선택 자체를 숨긴다(어떤 과목이 있는지 알 수 없으므로).
   const availableSlots = (st.catId && !isFutureExam) ? CHG_ANS_SLOTS.filter(x=>!!examMeta[x.code]) : [];
@@ -2504,11 +2521,15 @@ function renderChallengerAnswerInput(){
       <label style="font-size:11px;color:#666">시험 선택</label>
       <select onchange="chgAnsSelectCatalog(this.value)" style="width:100%;padding:9px 8px;border:1px solid #ddd;border-radius:8px;font-size:13.5px;margin-top:4px">
         <option value="">-- 시험을 선택해주세요 --</option>
-        ${catalogList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.defaultDate||'날짜 미지정')} · ${esc(e.examName||'(이름 없음)')}</option>`).join('')}
+        ${catalogList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.examName||'(이름 없음)')}</option>`).join('')}
       </select>
       ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}
+      ${st.catId?`<div style="margin-top:10px">
+        <label style="font-size:11px;color:#666">응시일</label>
+        <input type="date" value="${esc(st.date)}" oninput="chgAnsSetDate(this.value)" style="width:100%;padding:9px 8px;border:1px solid #ddd;border-radius:8px;font-size:13.5px;margin-top:4px">
+        <p style="font-size:10.5px;color:#e67e22;margin:6px 0 0">※ 시험 응시일이 다르면 응시일을 직접 입력바랍니다.</p>
+      </div>`:''}
       ${st.date&&st.test?`<div style="margin-top:10px;padding:9px 12px;background:${isFutureExam?'#fff7ed':'#f0fdfa'};border-radius:8px;font-size:12.5px;color:${isFutureExam?'#9a3412':'#0f766e'}"><b>${esc(st.date)}</b> · ${esc(st.test)}</div>`:''}
-      <p style="font-size:10.5px;color:#aaa;margin:8px 0 0">※ 응시일·시험명은 선생님이 등록한 정보 그대로 자동으로 채워지며, 직접 수정할 수 없습니다.</p>
       ${isFutureExam?`<div style="margin-top:12px;padding:12px 14px;background:#fff7ed;border:1.5px solid #fb923c;border-radius:8px">
         <p style="font-size:12.5px;font-weight:700;color:#9a3412;margin:0">⏳ 아직 응시일이 아닙니다. 응시일을 확인해주세요.</p>
         <p style="font-size:11.5px;color:#9a3412;margin:5px 0 0">이 시험은 <b>${esc(st.date)}</b>부터(자정 이후) 답안 입력이 가능합니다. 날짜를 착각해 다른 시험을 고르진 않았는지 다시 한번 확인해주세요.</p>
@@ -2773,15 +2794,13 @@ function chgAnsSlotGridHtml(x, examMeta){
 // 서버 필터링한 뒤, 시험명은 클라이언트에서 한 번 더 좁힌다(복합 인덱스 불필요).
 async function _chgFetchExamPeerSubjects(date, testName){
   try{
-    if(!FB() || !date) return [];
-    const rows = await _fb.getWhere('students','challengerData.lastTestDate','==',date);
-    const out=[];
-    rows.forEach(function(stu){
-      const cd=stu.challengerData||{};
-      if(String(cd.lastTestName||'').trim()!==String(testName||'').trim()) return;
-      (cd.lastSubjects||[]).forEach(function(sub){ if(sub&&sub.subject) out.push(sub); });
-    });
-    return out;
+    if(!FB() || !testName) return [];
+    // ★ 2026-09-20 수정: 직접 Firestore 컬렉션을 조회하던 방식(다른 학생 문서를 통째로
+    // 읽어야 해서 2단계 보안 규칙 게시 후엔 권한 오류가 남)을 서버 함수 호출로 교체.
+    // 서버(Admin SDK, 보안 규칙의 영향을 받지 않음)가 대신 조회해서 필요한 값만 돌려준다
+    // — 결과 형태(subject/detail/items[].no)는 예전과 동일해서 아래 로직은 안 바뀐다.
+    const result = await window._fb.getExamPeerSubjects({ testName });
+    return (result && result.subjects) || [];
   }catch(e){
     console.warn('동일 회차 응시생 오답률 조회 실패(난이도는 "중"으로 대체하고 진행):', e.message);
     return [];
@@ -2812,7 +2831,9 @@ async function chgAnsGradeAndSave(){
   // ★ 2026-09-17 추가: 화면에서는 미래 응시일 시험이면 이 버튼 자체가 안 그려지지만,
   // 방어적으로 한 번 더 막는다(예: 자정을 걸쳐 탭을 오래 열어둔 채 이전 렌더의 버튼을
   // 그대로 눌렀거나, 다른 경로로 호출된 경우 등).
-  if(_chgAnsIsFutureExam(_chgAnsCurrentExamEntry())){ toast('⏳ 아직 응시일이 아닙니다. 응시일을 확인해주세요.'); return; }
+  // ★ 2026-09-20 수정: 위 렌더 쪽과 동일하게, 학생이 직접 입력한 응시일(st.date) 기준으로
+  // 재확인한다(카탈로그 등록일이 아니라).
+  if(st.date && String(st.date) > _chgAnsTodayStr()){ toast('⏳ 아직 응시일이 아닙니다. 응시일을 확인해주세요.'); return; }
   const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
   const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot] && !!examMeta[x.code]);
   if(!enabledSlots.length){ toast('과목을 최소 1개 선택해주세요'); return; }
