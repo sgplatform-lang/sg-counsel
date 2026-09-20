@@ -178,6 +178,9 @@ td{padding:8px 6px;border:1px solid #e8eaf6;font-size:12px;text-align:center}
    배경에 더 크고 굵은 글자, 살짝 흔들리는 강조 애니메이션(toastPop)을 준다. 탭하면 바로
    챌린저 탭으로 이동(js에서 onclick 연결). */
 #toast.toast-challenger{background:#0f766e;font-size:15.5px;font-weight:800;padding:16px 24px;border-radius:18px;box-shadow:0 10px 30px rgba(15,118,110,.5);animation:toastPop .4s ease;max-width:min(92vw,380px)}
+/* ★ 2026-09-20 추가: 오답원인 입력 후 "오답입력 최종완료"를 눌렀을 때 저장 여부가
+   헷갈린다는 요청 — 초록색 큰 성공 알림으로 확실히 보여준다. */
+#toast.toast-success{background:#16a34a;font-size:15.5px;font-weight:800;padding:16px 24px;border-radius:18px;box-shadow:0 10px 30px rgba(22,163,74,.5);animation:toastPop .4s ease;max-width:min(92vw,380px);white-space:pre-line}
 @keyframes toastPop{0%{transform:translateX(-50%) scale(.85)}60%{transform:translateX(-50%) scale(1.05)}100%{transform:translateX(-50%) scale(1)}}
 /* 아코디언 */
 details summary{cursor:pointer;list-style:none;padding:8px 0;border-top:1px solid #f0f0f8;font-size:12px;font-weight:700;color:#3b5bdb;user-select:none}
@@ -195,7 +198,7 @@ details summary::-webkit-details-marker{display:none}
 let CU=null, DATA={student:null,tests:[],students:[]}, curTab='timetable';
 // 초기 history state 등록 (페이지 로드 즉시)
 history.replaceState({tab:'timetable', loggedIn:false, ts:Date.now()}, '');
-function toast(msg,d=2000){const e=document.getElementById('toast');if(!e)return;e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),d);}
+function toast(msg,d=2000,cls=''){const e=document.getElementById('toast');if(!e)return;e.textContent=msg;if(cls){e.classList.remove('toast-success','toast-challenger');e.classList.add(cls);}e.classList.add('show');setTimeout(()=>{e.classList.remove('show');if(cls)e.classList.remove(cls);},d);}
 const FB=()=>window._fbReady&&window._fb;
 function fmtMock(val){
   if(!val) return '–';
@@ -1691,8 +1694,12 @@ async function chgSaveRound(){
   if(!confirm(cd.lastTestDate+' · '+cd.lastTestName+' 회차를 저장할까요?\n(같은 응시일+시험명으로 이미 저장된 회차가 있으면 그 내용을 덮어씁니다)\n저장 후에는 응시일/시험명을 바꿔서 다음 회차를 이어서 입력하시면 됩니다.')) return;
   const ok=await chgArchiveRound(cd.lastTestDate, cd.lastTestName, cd.lastSubjects);
   if(!ok){ toast('회차 저장 중 오류가 발생했습니다'); return; }
-  toast('✅ 입력이 완료됐습니다!');
+  // ★ 2026-09-20 추가: 저장 후에도 화면이 그대로라 실제로 저장됐는지 헷갈린다는 요청 —
+  // 화면을 맨 위로 스크롤해 눈에 띄게 "화면이 바뀌게" 하고, 크고 확실한 초록색 성공
+  // 알림을 평소 토스트(2초)보다 길게(4초) 보여준다.
   render();
+  window.scrollTo({top:0, behavior:'smooth'});
+  toast('✅ 저장 완료!\n'+cd.lastTestDate+' · '+cd.lastTestName+' 회차가 정상적으로 저장되었습니다.', 4000, 'toast-success');
 }
 function chgAddSubject(){
   const cd=chgInit();
@@ -2938,8 +2945,12 @@ function _chgSubjectCardHtml(sub, sIdx, mode){
           <div><label style="font-size:10px;color:#999;display:block;margin-bottom:2px">배점</label><input type="number" placeholder="배점" value="${esc(it.points)}" oninput="chgSetItemField(${sIdx},${iIdx},'points',this.value)"></div>
           <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 1차선택</label>${chgSelect(0,[['','1차원인'],['K','K 지식부족'],['T','T 시간손실'],['M','M 실수'],['J','J 판단·집착'],['C','C 집중붕괴'],['U','U 판정보류']].map(o=>o[1]),(({K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'})[it.causePrimary]||'1차원인'),`chgSetItemField(${sIdx},${iIdx},'causePrimary',{'1차원인':'','K 지식부족':'K','T 시간손실':'T','M 실수':'M','J 판단·집착':'J','C 집중붕괴':'C','U 판정보류':'U'}[this.value])`,'border-color:#8fd19e;background:#f4fbf5')}</div>
           <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 찍음/미응답 체크</label><div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#2e7d32;background:#f4fbf5;border:1.5px solid #8fd19e;border-radius:10px;padding:10px 12px"><input type="checkbox" style="width:18px;height:18px;flex:none;padding:0;margin:0;border-radius:4px;-webkit-appearance:checkbox;appearance:checkbox" ${it.guessedTime?'checked':''} onchange="chgSetItemField(${sIdx},${iIdx},'guessedTime',this.checked)">찍음/미응답</div></div>
-          <div><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 2차선택</label><button class="btn-sm" style="width:100%;background:#e8f5e9;color:#2e7d32;border:1.5px solid #8fd19e" onclick="chgOpenReasonModal(${sIdx},${iIdx})">오답원인 선택</button><div style="font-size:11px;margin-top:4px;color:${(it.reasons&&it.reasons.length)?'#333':'#aaa'}">${(it.reasons&&it.reasons.length)?esc(it.reasons.join(', ')):'선택 전'}</div></div>
-          <div><label style="font-size:10px;color:transparent;display:block;margin-bottom:2px">삭제</label><button class="btn-sm" style="background:#fee2e2;color:#dc2626" onclick="chgRemoveItem(${sIdx},${iIdx})">이 문항 삭제</button></div>
+          <div style="grid-column:1 / -1"><label style="font-size:10px;color:#2e7d32;font-weight:700;display:block;margin-bottom:2px">✅ 오답원인 2차선택</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button class="btn-sm" style="flex:0 0 auto;background:#e8f5e9;color:#2e7d32;border:1.5px solid #8fd19e" onclick="chgOpenReasonModal(${sIdx},${iIdx})">오답원인 선택</button>
+              <span style="font-size:13px;font-weight:700;padding:6px 12px;border-radius:8px;${(it.reasons&&it.reasons.length)?'color:#2e7d32;background:#f4fbf5;border:1.5px solid #8fd19e':'color:#aaa;background:#f5f5f5;border:1.5px solid #eee'}">${(it.reasons&&it.reasons.length)?esc(it.reasons.join(', ')):'선택 전'}</span>
+            </div>
+          </div>
         </div>
       </div>`).join('')}
       <button class="btn-sm" style="margin-top:8px;width:100%" onclick="chgAddItem(${sIdx})">+ 문항 추가</button>
