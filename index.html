@@ -31274,10 +31274,17 @@ function applyAllSuggestedCauses(sid){
 function addItem(sid){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);s.items.push({no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false});renderSubjects()}function removeItem(sid,i){syncSubject(sid);let s=state.subjects.find(x=>x.sid===sid);s.items.splice(i,1);if(!s.items.length)s.items.push({no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false});renderSubjects()}function removeSubject(sid){state.subjects=state.subjects.filter(s=>s.sid!==sid);renderSubjects();generate()}
 function difficultyEligible(s,i){
   let d=i.diff;
-  if(s.processRange==='중하 난이도 정답률 집중') return ['하','중'].includes(d);
-  if(s.difficultySelect==='하~중 난이도 우선') return ['하','중'].includes(d);
-  if(s.difficultySelect==='4점 중간 난도까지') return ['하','중','상'].includes(d);
-  if(s.processRange.includes('킬러 제외') || s.difficultySelect==='고난도/킬러 제외') return !['최상','킬러'].includes(d);
+  // ★ 2026-09-22 수정: 이 필드(processRange/difficultySelect)가 생기기 전에 저장된 과거
+  // 회차를 "선택 회차 불러오기"로 불러오면 과목 객체에 이 값이 아예 없어(undefined)
+  // ".includes(...)" 호출에서 예외가 터졌다 — 그 예외가 renderTrend/renderWeekly까지
+  // 전파되어 결과리포트 전체가 "이전 화면에 멈춘 것처럼" 보이던 버그의 실제 원인.
+  // 값이 없으면 "제한 없음"으로 안전하게 처리(빈 문자열)해서 예외 없이 항상 true를 반환.
+  let processRange=s.processRange||'';
+  let difficultySelect=s.difficultySelect||'';
+  if(processRange==='중하 난이도 정답률 집중') return ['하','중'].includes(d);
+  if(difficultySelect==='하~중 난이도 우선') return ['하','중'].includes(d);
+  if(difficultySelect==='4점 중간 난도까지') return ['하','중','상'].includes(d);
+  if(processRange.includes('킬러 제외') || difficultySelect==='고난도/킬러 제외') return !['최상','킬러'].includes(d);
   return true;
 }
 function exclusionReason(s,i){
@@ -31385,7 +31392,44 @@ function _sgAutoScoreBasis(s){
 }
 function progressInterpretation(s){let parts=[];if(s.unlearnedUnits)parts.push(\`미학습 범위: \${s.unlearnedUnits}\`);if(s.inProgressUnits)parts.push(\`학습 중: \${s.inProgressUnits}\`);if(s.weakUnits)parts.push(\`시험 후 부족 단원: \${s.weakUnits}\`);let base=_sgAutoScoreBasis(s);let detail=parts.join(' · ')||'세부 단원 미입력';return \`\${base}. \${detail}\`}
 function progressReport(s){return \`<div class="progress-report"><h4>\${name(s)} · 진도 보정 해석</h4><table><tr><th>준비도</th><td>\${esc(s.preparationLevel||'-')}</td><th>미학습 문항</th><td>\${esc(s.unlearnedCount||'0')}</td><th>학습범위 오답</th><td>\${esc(s.learnedErrorCount||'0')}</td></tr><tr><th>학습 완료</th><td colspan="2">\${esc(s.completedUnits||'-')}</td><th>학습 중</th><td colspan="2">\${esc(s.inProgressUnits||'-')}</td></tr><tr><th>미학습</th><td colspan="2">\${esc(s.unlearnedUnits||'-')}</td><th>부족 단원</th><td colspan="2">\${esc(s.weakUnits||'-')}</td></tr><tr><th>집중 붕괴</th><td>\${esc(s.concentrationBreak||'-')}</td><th>회복</th><td>\${esc(s.recoveryResult||'-')}</td><th>해석 기준</th><td>\${esc(_sgAutoScoreBasis(s))}</td></tr></table><p><b>해석:</b> \${esc(progressInterpretation(s))}</p></div>\`}
-function generate(){syncAll();state.subjects.forEach(ensureSituation);renderSubjects();updateOverallCompliance();renderLong();renderShort();renderTrend();renderWeekly();toast('분석이 생성되었습니다.')}
+// ★ 2026-09-21 추가: 매니저가 "과거 저장 회차"를 불러왔는데 결과리포트가 안 바뀌고 이전
+// 화면(다른 회차·다른 학생)이 그대로 남아있다는 신고가 반복됨 — 응시일/시험명 입력값은
+// 정상으로 바뀌는데 리포트 내용만 안 바뀌는 것으로 보아, 특정 회차의 데이터 형태에서
+// renderLong/renderShort/renderTrend/renderWeekly 중 하나가 중간에 자바스크립트 예외를
+// 던지면 그 뒤 $('weeklyReport').innerHTML 갱신 자체가 실행되지 않아 "화면이 이전 내용에서
+// 멈춘 것처럼" 보일 수 있다(콘솔에만 빨간 에러가 남고 화면엔 아무 표시가 없어 원인 파악이
+// 어려웠음). try/catch로 감싸서 실패해도 조용히 멈추지 않고, 무슨 오류인지 리포트 영역에
+// 직접 빨간 박스로 보여준다 — 이 오류 문구를 그대로 캡처해서 알려주면 정확한 원인을 바로
+// 특정할 수 있다.
+function _sgShowGenerateError(e){
+  console.error('[SG] 결과리포트 생성 오류:', e);
+  function _esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  var msg=_esc(e && e.message ? e.message : String(e));
+  var stack=e && e.stack ? _esc(e.stack) : '';
+  var box='<div style="padding:22px;border:2px solid #dc2626;background:#fef2f2;border-radius:10px;color:#991b1b;font-size:13px;line-height:1.7;text-align:left">'
+    +'<b>⚠️ 결과리포트를 생성하는 중 오류가 발생했습니다.</b><br>'
+    +'아래 내용을 그대로 캡처하거나 복사해서 개발자에게 전달해주세요.<br><br>'
+    +'<code style="display:block;white-space:pre-wrap;background:#fff;border:1px solid #fecaca;border-radius:6px;padding:10px;font-size:12px">'
+    +msg+(stack?('\\n\\n'+stack):'')
+    +'</code></div>';
+  var _rw=$('weeklyReport'); if(_rw) _rw.innerHTML=box;
+  try{ toast('⚠️ 결과리포트 생성 중 오류가 발생했습니다. 화면의 빨간 오류 메시지를 확인해주세요.'); }catch(e2){}
+}
+function generate(){
+  try{
+    syncAll();
+    state.subjects.forEach(ensureSituation);
+    renderSubjects();
+    updateOverallCompliance();
+    renderLong();
+    renderShort();
+    renderTrend();
+    renderWeekly();
+    toast('분석이 생성되었습니다.');
+  }catch(e){
+    _sgShowGenerateError(e);
+  }
+}
 function buildAnalysis(){let tags=allTags().map(x=>\`\${x.tag}(\${x.count})\`).join(' · ')||'문항/단원/오답원인을 입력하면 표시됩니다.';let fs=focusedSubjects();return \`<div class="bar"><b>전체 반복 확인 근거</b><span>\${tags}</span></div><div class="bar"><b>이번 회차 집중 과목</b><span>\${state.subjects.filter(s=>fs.includes(s.sid)).map(name).join(', ')}</span></div>\`+state.subjects.map(s=>\`<div class="report-card"><h3>\${name(s)} \${fs.includes(s.sid)?'<span class="pill green">집중</span>':'<span class="pill">비집중</span>'}</h3><p><b>범위:</b> \${s.processRange} · <b>난이도:</b> \${s.difficultySelect} · <b>목표:</b> \${s.accuracyTarget} · <b>오답개수:</b> \${wrongCount(s)}</p>\${progressReport(s)}\${situationReport(s)}\${excludedItems(s).length?\`<div class="bar"><b>이번 미션 제외</b><span>\${excludedItems(s).map(i=>\`\${i.no||'-'}번(\${i.diff||'-'}): \${exclusionReason(s,i)}\`).join(' · ')}</span></div>\`:''}\${issues(s).map(iss=>\`<div class="issue selected"><h4>\${iss.tag}</h4><table><tr><th>문항</th><td>\${iss.items.join(', ')}</td><th>단원/유형</th><td>\${[...new Set(iss.units)].join(', ')}</td></tr><tr><th>행동강령</th><td colspan="3">\${actionFor(s,iss.tag)}</td></tr></table></div>\`).join('')||'<p class="muted">미션으로 올릴 문항은 문항번호·단원/유형·오답원인을 모두 입력해야 합니다.</p>'}</div>\`).join('')}
 function allTags(){let m={};state.subjects.forEach(s=>issues(s).forEach(i=>m[i.tag]=(m[i.tag]||0)+i.count));return Object.entries(m).map(([tag,count])=>({tag,count})).sort((a,b)=>b.count-a.count)}
 function cover(title){let d=($('testDate').value||'').slice(0,7).replace('-','.');
@@ -31655,6 +31699,13 @@ function _sgPbarHtml(rate){
   return \`<div class="v46-pbar-wrap"><div class="v46-pbar-track"><div class="v46-pbar-fill \${sev}" style="width:\${r}%"></div></div><span class="v46-pbar-num \${sev}">\${rate.toFixed(1)}%</span></div>\`;
 }
 function renderWeekly(){
+  try{
+    _sgRenderWeeklyImpl();
+  }catch(e){
+    _sgShowGenerateError(e);
+  }
+}
+function _sgRenderWeeklyImpl(){
   renderLong();
   renderShort();
   renderTrend();
@@ -31755,6 +31806,13 @@ function loadHistoryRound(){
     });
   }
   renderSubjects();generate();showTab('input');
+  // ★ 2026-09-21 추가: 지금부터 "과거 저장 회차"를 보고 있는 중임을 표시 — 이 표시가
+  // 켜져 있는 동안엔, 부모창(관리자)에서 이 학생 데이터를 다시 보내와도(다른 학생
+  // 결과 일괄반영에 이 학생이 포함됐거나 실시간 동기화가 다시 일어난 경우 등)
+  // 화면(응시일/시험명/과목 데이터)이 최신 회차로 되돌아가지 않고 그대로 유지된다
+  // (__SG_initFromHost의 _skipRoundOverwrite 분기 참고). "🔄 학생 입력 새로고침"을
+  // 누르면 이 표시가 해제되고 최신 회차로 명시적으로 되돌아간다.
+  window.__SG_sgViewingHistory = true;
   toast(rec.date+' \\u00b7 '+rec.test+' \\ud68c\\ucc28\\ub97c \\ubd88\\ub7ec\\uc654\\uc2b5\\ub2c8\\ub2e4.'+(hasFullData?'':' (\\uc694\\uc57d\\uc815\\ubcf4\\ub9cc)')  );
 }
 
@@ -33332,6 +33390,13 @@ function perfLossCardHtml(s){
       <div class="v48-loss-card"><b>\${r.judgeLoss}점</b><span>한 문제에 집착</span></div>
       <div class="v48-loss-card"><b>\${r.concLoss}점</b><span>집중력 저하</span></div>
     </div>\`;
+  // ★ 신규: "3. 이번 시험 점수가 깎인 이유 분석" 5개 카드가 어떤 기준으로 계산되는지,
+  // 그리고 왜 해당없음/0점으로 비어 보일 수 있는지 학부모가 이해할 수 있도록 짧은 설명 추가.
+  const lossExplainHtml = r.primary
+    ? \`<div class="aar-explain-note">💡 위 5개 항목은 학생이 틀린 문항마다 표시한 <b>1차 오답원인</b>과 <b>문항 배점</b>을 근거로 계산됩니다.<br>
+      · <b>점수를 가장 많이 깎은 이유</b>: 시간 부족·실수·집착·집중저하 4가지 중 배점 합이 가장 큰 원인<br>
+      · <b>시간 부족 문제 / 아는데 실수 / 한 문제에 집착 / 집중력 저하</b>: 각각 그 원인으로 틀렸다고 표시된 문항들의 배점 합입니다.</div>\`
+    : \`<div class="aar-explain-note">💡 지금처럼 <b>해당없음·0점</b>으로 보이는 것은 아직 틀린 문항에 <b>1차 오답원인</b>(시간부족·실수·집착·집중저하 등)이 입력되지 않았기 때문입니다. 오답원인을 입력하면 이 5개 항목이 자동으로 계산되어 채워집니다.</div>\`;
   // ★ 2026-09-18(17차) 수정: "현재 점수"의 "점"과 "단기간 내 만회 가능한 점수"의 "약"/"점"도
   // 숫자 옆 단위 글자이므로 "문항"과 동일하게 .v49-unit으로 작게 표시(숫자만 크게 강조).
   return \`<div class="report-card aar-flow-card">
@@ -33346,6 +33411,7 @@ function perfLossCardHtml(s){
     \${extraStatsHtml}
     <h2>3. 이번 시험 점수가 깎인 이유 분석</h2>
     \${lossCardsHtml}
+    \${lossExplainHtml}
     \${perfLossTrendTableHtml(s)}
   </div>\`;
 }
@@ -34477,6 +34543,16 @@ function __SG_confirmSampleLoad(e){
 
 
 function __SG_initFromHost(data){
+  // ★ 2026-09-21 추가: 매니저가 "과거 저장 회차"를 불러와 결과리포트를 보고 있는 도중,
+  // 부모창(관리자)이 같은 학생 데이터를 다시 전송하면(예: 다른 학생 결과 일괄반영 중
+  // 이 학생도 포함돼 있었던 경우, 실시간 동기화 재초기화 등) 무조건 최신 회차로
+  // 덮어써버려서 "과거 회차를 불러왔는데 결과리포트엔 최신 시험만 나온다"는 문제가
+  // 있었다. → 같은 학생이고, 지금 과거 회차를 보고 있는 중이며, 명시적 새로고침
+  // 요청(data.forceRefresh)이 아니면 응시일/시험명/과목 데이터는 건드리지 않고
+  // 누적기록(history)만 최신으로 갱신해서 "과거 저장 회차" 목록에는 새 회차가 보이게
+  // 하되, 지금 보고 있는 화면(과거 회차)은 그대로 유지한다.
+  const _isSameStudent = !!__SG_STUDENT_ID && String(data.studentId||'')===String(__SG_STUDENT_ID);
+  const _skipRoundOverwrite = _isSameStudent && !!window.__SG_sgViewingHistory && !data.forceRefresh;
   __SG_STUDENT_ID = data.studentId;
   // ★ 일괄채점 반영 시 학생 불일치를 감지하기 위해, SG가 최초 전달한 학생명을 별도로 보관
   window.__SG_ORIGINAL_STUDENT_NAME = data.studentName || '';
@@ -34487,21 +34563,27 @@ function __SG_initFromHost(data){
   if($('studentSchool')) $('studentSchool').value = data.studentSchool || '';
   if($('target')) $('target').value = data.target || '';
   if($('managerName')) $('managerName').value = data.managerName || '';
-  if($('testDate')) $('testDate').value = data.lastTestDate || today();
-  if($('testName')) $('testName').value = data.lastTestName || '';
+  if(!_skipRoundOverwrite){
+    if($('testDate')) $('testDate').value = data.lastTestDate || today();
+    if($('testName')) $('testName').value = data.lastTestName || '';
+  }
   // ★ 학생을 바꿔서 열거나(또는 결과일괄반영 재실행 시) data.meta에 값이 없으면
   // 반드시 빈 값으로 채워서, 이전에 열었던 다른 학생/회차의 값이 화면에 남아있지 않게 한다.
-  if($('changes')) $('changes').value = (data.meta&&data.meta.changes) || '';
-  if($('special')) $('special').value = (data.meta&&data.meta.special) || '';
-  if($('nextCheck')) $('nextCheck').value = (data.meta&&data.meta.nextCheck) || '';
-  if($('compliance')) $('compliance').value = (data.meta&&data.meta.compliance) || '';
-  if($('focusLimit')) $('focusLimit').value = (data.meta&&data.meta.focusLimit) || '';
+  // (단, 과거 회차를 보고 있는 중에 스킵하는 경우는 이 메타값들도 건드리지 않는다)
+  if(!_skipRoundOverwrite){
+    if($('changes')) $('changes').value = (data.meta&&data.meta.changes) || '';
+    if($('special')) $('special').value = (data.meta&&data.meta.special) || '';
+    if($('nextCheck')) $('nextCheck').value = (data.meta&&data.meta.nextCheck) || '';
+    if($('compliance')) $('compliance').value = (data.meta&&data.meta.compliance) || '';
+    if($('focusLimit')) $('focusLimit').value = (data.meta&&data.meta.focusLimit) || '';
+  }
   // ★ 2026-09-16(430) 추가: 학생이 학생용 페이지에서 "셀프 챌린저"(카탈로그 없이 직접
   // 시험명·과목을 만든 기록)로 입력했으면, 기본정보의 학생정보 불러오기 버튼 옆에
   // 작게 "셀프" 표시를 해서 매니저가 기관 카탈로그 기반 정식 회차와 구분할 수 있게 한다.
   if($('sgSelfBadge')) $('sgSelfBadge').style.display = data.selfRegistered ? 'inline-block' : 'none';
 
-  // 누적 기록(history) 복원
+  // 누적 기록(history) 복원 — 과거 회차를 보는 중이어도 목록 자체는 최신으로 갱신해서
+  // "과거 저장 회차" 드롭다운에 방금 반영된 새 회차가 바로 보이게 한다(화면 표시만 유지).
   // ★ 과거에 중복 저장되어 있던 회차 기록이 있으면 정리(학생+날짜+회차명 기준, 나중 것 유지)
   // (이전에 같은 회차가 두 번 전송/저장되어 누적 리포트에 같은 줄이 중복 표시되던 문제 보정)
   (function(){
@@ -34510,6 +34592,23 @@ function __SG_initFromHost(data){
     raw.forEach(h=>{ seen.set((h.student||'')+'|'+(h.date||'')+'|'+(h.test||''), h); });
     state.history = Array.from(seen.values());
   })();
+
+  window.__SG_sgLatestRoundKey = String(data.lastTestDate||'')+'|'+String(data.lastTestName||'');
+  if(!_skipRoundOverwrite){
+    window.__SG_sgViewingHistory = false;
+  }
+
+  if(_skipRoundOverwrite){
+    renderSubjects();
+    populateHistoryDropdown();
+    try{ toast('새 시험 데이터가 도착했습니다(과거 회차를 보고 있어 화면은 유지됩니다). 최신 회차를 보려면 "🔄 학생 입력 새로고침"을 눌러주세요.'); }catch(e){}
+    const st2 = $('sgSyncStatus');
+    if(st2){
+      st2.textContent = (data.studentName||'학생')+' 님 새 데이터 수신됨 · 현재 과거 회차 보기 중(화면 유지)';
+      st2.style.color = '#b45309';
+    }
+    return;
+  }
 
   // ★ 핵심 수정: 가장 최근에 저장했던 과목 카드 전체(상세 입력)를 그대로 복원
   // 저장된 상세 데이터가 있으면 그것을 쓰고, 없으면(최초 진입) 빈 카드 3개로 시작
@@ -35189,6 +35288,11 @@ function _gg_challengerInitPayload(stu){
 function _gg_sendChallengerInit(ifr, stu){
   if(!ifr || !ifr.contentWindow || !stu) return;
   const payload = _gg_challengerInitPayload(stu);
+  // ★ 2026-09-21 추가: "🔄 학생 입력 새로고침" 버튼을 눌렀을 때만 true로 세팅되는
+  // 명시적 새로고침 신호. iframe 쪽(__SG_initFromHost)이 이 값이 true일 때만 매니저가
+  // "과거 저장 회차"를 보고 있는 중이어도 최신 회차로 강제 갱신하도록 판단 기준으로 쓴다.
+  payload.forceRefresh = !!window.__SG_forceChallengerRefresh;
+  window.__SG_forceChallengerRefresh = false;
   ifr.contentWindow.postMessage(payload, '*');
   const examDate = payload.lastTestDate, examName = payload.lastTestName;
   if((examDate || examName) && typeof window._gg_ensureFullExamPeers === 'function'){
@@ -35439,7 +35543,7 @@ function renderChallenger(s){
   return `<div style="background:#fff;border-radius:14px;border:1.5px solid #e8eaf6;overflow:hidden">
     <div style="padding:12px 16px;background:#f0fdfa;border-bottom:1.5px solid #99f6e4;display:flex;align-items:center;gap:8px">
       <span style="font-size:15px;font-weight:800;color:#0f766e">🎯 챌린저 · 실전모의고사 정밀분석</span>
-      <button onclick="window.__challengerLoadedFor=null;render();" style="margin-left:auto;background:#fff;color:#0f766e;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🔄 학생 입력 새로고침</button>
+      <button onclick="window.__SG_forceChallengerRefresh=true;window.__challengerLoadedFor=null;render();" style="margin-left:auto;background:#fff;color:#0f766e;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🔄 학생 입력 새로고침</button>
       <button onclick="openChallengerBulkReflect()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📋 결과 일괄반영</button>
       <button onclick="openExamCatalog()" style="background:#fff;color:#0369a1;border:1.5px solid #0369a1;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📚 시험 카탈로그 관리</button>
       <button onclick="openChallengerDupCheck()" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🧹 중복 회차 검사</button>
@@ -46813,8 +46917,9 @@ function generateReport() {
       // 표시되는 원인이었다(최종관리자는 ST.students에 이미 실제 학생 객체가 전체 실려있어
       // 이 문제가 드러나지 않았음). 서버(getExamPeerSubjects)가 이제 호출자 role이
       // admin/orgAdmin/teacher(=스태프)면 익명화된 과목 배열 대신 실제 학생 단위 객체
-      // (id/name/school/grade/className/orgId/challengerData)를 그대로 돌려주도록 바뀌었으므로,
-      // 더 이상 가짜 학생으로 감싸는 변환이 필요 없다. (서버 index.js도 함께 배포해야 함 — 아래 안내 참고)
+      // (id/name/school/grade/className/orgId/challengerData, lastTestDate 포함)를 그대로
+      // 돌려주도록 바뀌었으므로, 더 이상 가짜 학생으로 감싸는 변환이 필요 없다.
+      // (서버 index.js도 함께 배포해야 함)
       if(!window._fb || !window._fb.getExamPeerSubjects) return [];
       var result = await window._fb.getExamPeerSubjects({testName: examName});
       return (result && result.students) || [];
