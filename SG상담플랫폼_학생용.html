@@ -2263,21 +2263,28 @@ function chgAnsInit(){
   return _chgAnsState;
 }
 // ★ 2026-09-23 추가: 관리자 시험 카탈로그(examCatalog) 문서가 Firestore 1MB 한도를 넘는
-// 대형 시험(전과목 등)은, 관리자 쪽에서 문항 단원/정답/해설 데이터를 별도 저장소(Storage)로
-// 분리해 저장하고 문서에는 그 위치(_payloadUrl)만 남긴다(관리자 파일 examcatSaveEntry 참고).
-// 이 학생용 화면은 examCatalog를 그대로 통째로 읽어오기 때문에, 분리 저장된 시험은
-// answerKey/itemMeta가 비어있는 것처럼 보여 "채점 가능한 과목이 없습니다"로 잘못 표시됐다.
-// 관리자 파일의 _examcatEnsurePayloadLoaded와 동일한 방식으로, 필요한 시점에 분리 저장분을
-// 다시 불러와 합쳐준다.
+// 대형 시험(전과목 등)은, 관리자 쪽에서 문항 단원/정답/해설 데이터를 별도 문서들로 분리해
+// 저장하고(examCatalogPayloads 컬렉션) 원본 문서에는 조각 개수(_payloadChunks)만 남긴다
+// (관리자 파일 examcatSaveEntry 참고). 이 학생용 화면은 examCatalog를 그대로 통째로
+// 읽어오기 때문에, 분리 저장된 시험은 answerKey/itemMeta가 비어있는 것처럼 보여
+// "채점 가능한 과목이 없습니다"로 잘못 표시됐다.
+// ※ 2026-09-23 최초 버전은 Firebase Storage에 올린 뒤 fetch()로 다시 읽어오는 방식이었으나,
+// Storage 다운로드 응답에 브라우저가 요구하는 CORS 헤더가 없어 fetch가 전부 차단되는
+// 문제가 있었다(실제 배포 후 콘솔에서 CORS 오류로 확인). Firestore 문서 읽기는 이런 제약이
+// 없으므로, 관리자 파일과 동일하게 Firestore 분리 문서(examCatalogPayloads)를 조회해서
+// 합치는 방식으로 다시 수정했다.
 async function _chgAnsEnsureExamPayloadLoaded(entry){
   if(!entry || !entry._payloadOffloaded || entry._payloadLoaded) return entry;
   if(entry._payloadLoading) return entry._payloadLoading;
-  if(!entry._payloadUrl){ entry._payloadLoaded=true; return entry; }
   entry._payloadLoading=(async function(){
     try{
-      const res=await fetch(entry._payloadUrl);
-      const payload=await res.json();
-      Object.assign(entry, payload);
+      const chunks=await window._fb.getWhere('examCatalogPayloads','examId','==',entry.id);
+      chunks.sort(function(a,b){ return (a.index||0)-(b.index||0); });
+      if(chunks.length){
+        const joined=chunks.map(function(c){ return c.chunk||''; }).join('');
+        const payload=JSON.parse(joined);
+        Object.assign(entry, payload);
+      }
     }catch(e){
       console.warn('시험 카탈로그 분리 저장분을 불러오지 못했습니다:', entry.id, e.message);
     }
