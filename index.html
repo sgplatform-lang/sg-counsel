@@ -35804,15 +35804,26 @@ function _examcatSubjLabel(entry){
 // 않고, 분리 저장된 필드가 실제로 필요한 시점(수정 화면 열기/결과 일괄반영에 불러오기/
 // 오답노트 인쇄 등)에는 _examcatEnsurePayloadLoaded()로 그때그때 다시 불러온다.
 const EXAMCAT_OFFLOAD_FIELDS=['itemMeta','answerKey','itemMetaRawText','answerKeyRawText','qImages','eImages'];
+// ★ 2026-09-23 수정: 기존에는 용량 초과 필드를 Firebase Storage에 JSON으로 업로드하고
+// URL만 Firestore 문서에 남기는 방식이었으나, Storage 다운로드 응답에는 브라우저가 요구하는
+// CORS 헤더(Access-Control-Allow-Origin)가 기본적으로 없어 학생용 페이지 등에서 fetch()로
+// 다시 읽어오는 시도가 전부 CORS 오류로 막히는 문제가 있었다(업로드 자체는 성공하지만 재조회가
+// 막힘). Firestore 문서 읽기는 이런 CORS 제약이 전혀 없으므로, 대신 "examCatalogPayloads"
+// 컬렉션에 문서 하나당 1MB 미만이 되도록 문자열을 여러 조각으로 나눠 저장하는 방식으로 변경.
+const EXAMCAT_CHUNK_SIZE=300000; // 한글 기준으로도 안전하게 1MB 미만이 되도록 여유있게 설정
 async function _examcatEnsurePayloadLoaded(entry){
   if(!entry || !entry._payloadOffloaded || entry._payloadLoaded) return entry;
   if(entry._payloadLoading) return entry._payloadLoading;
-  if(!entry._payloadUrl){ entry._payloadLoaded=true; return entry; }
   entry._payloadLoading=(async function(){
     try{
-      const res=await fetch(entry._payloadUrl);
-      const payload=await res.json();
-      Object.assign(entry, payload);
+      const snap=await window._fb.collection('examCatalogPayloads').where('examId','==',entry.id).get();
+      const chunks=snap.docs.map(d=>d.data());
+      chunks.sort(function(a,b){ return (a.index||0)-(b.index||0); });
+      if(chunks.length){
+        const joined=chunks.map(function(c){ return c.chunk||''; }).join('');
+        const payload=JSON.parse(joined);
+        Object.assign(entry, payload);
+      }
     }catch(e){
       console.warn('examCatalog 분리 저장분을 불러오지 못했습니다:', entry.id, e.message);
     }
@@ -35821,6 +35832,22 @@ async function _examcatEnsurePayloadLoaded(entry){
     return entry;
   })();
   return entry._payloadLoading;
+}
+async function _examcatDeletePayloadChunksRange(examId, fromIndex, toIndexExclusive){
+  const dels=[];
+  for(let i=fromIndex; i<toIndexExclusive; i++){
+    dels.push(window._fb.delete('examCatalogPayloads', examId+'__'+i).catch(function(){}));
+  }
+  await Promise.all(dels);
+}
+async function _examcatCleanupPayloadChunks(examId){
+  // 몇 개가 있는지 모를 때(시험 삭제 시) 실제로 존재하는 조각들을 조회해서 전부 지운다.
+  try{
+    const snap=await window._fb.collection('examCatalogPayloads').where('examId','==',examId).get();
+    await Promise.all(snap.docs.map(d=>window._fb.delete('examCatalogPayloads', d.id).catch(function(){})));
+  }catch(e){
+    console.warn('examCatalogPayloads 조회/정리 실패:', examId, e.message);
+  }
 }
 async function examcatSaveEntry(entry){
   entry.updatedAt = Date.now();
@@ -35831,22 +35858,35 @@ async function examcatSaveEntry(entry){
   const idx = ST.examCatalog.findIndex(x=>x.id===entry.id);
   if(idx>-1) ST.examCatalog[idx]=entry; else ST.examCatalog.push(entry);
   let toSave=entry;
+  const prevChunkTotal=entry._payloadChunks||0;
   try{
     const _size=new TextEncoder().encode(JSON.stringify(entry)).length;
     const _safeLimit=900000; // 1,048,576보다 여유 있게 낮춰서, 다른 필드가 조금 늘어도 안전하게
-    if(_size>_safeLimit && FB_USE() && window._fb && window._fb.uploadBlob){
+    if(_size>_safeLimit && FB_USE() && window._fb){
       const payload={};
       EXAMCAT_OFFLOAD_FIELDS.forEach(function(f){ if(entry[f]!==undefined) payload[f]=entry[f]; });
-      const path='examCatalog/'+entry.id+'/payload_'+Date.now()+'.json';
-      const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
-      const url=await window._fb.uploadBlob(path, blob);
+      const payloadStr=JSON.stringify(payload);
+      const chunkTexts=[];
+      for(let i=0;i<payloadStr.length;i+=EXAMCAT_CHUNK_SIZE){ chunkTexts.push(payloadStr.slice(i,i+EXAMCAT_CHUNK_SIZE)); }
+      for(let i=0;i<chunkTexts.length;i++){
+        await window._fb.set('examCatalogPayloads', entry.id+'__'+i, {examId:entry.id, index:i, total:chunkTexts.length, chunk:chunkTexts[i]});
+      }
+      if(prevChunkTotal>chunkTexts.length){ await _examcatDeletePayloadChunksRange(entry.id, chunkTexts.length, prevChunkTotal); }
       toSave=Object.assign({}, entry);
       EXAMCAT_OFFLOAD_FIELDS.forEach(function(f){ delete toSave[f]; });
-      toSave._payloadUrl=url; toSave._payloadPath=path; toSave._payloadOffloaded=true;
+      delete toSave._payloadUrl; delete toSave._payloadPath; // 예전 Storage 방식 흔적 제거
+      toSave._payloadOffloaded=true; toSave._payloadChunks=chunkTexts.length;
       // 지금 메모리 속 entry(=ST.examCatalog에 들어간 그 객체)는 큰 필드를 그대로 갖고
       // 있으니, 이 세션에서는 다시 받아올 필요 없이 바로 화면에 반영된다.
-      entry._payloadUrl=url; entry._payloadPath=path; entry._payloadOffloaded=true; entry._payloadLoaded=true;
-      console.warn('[examcat] 문서 크기('+_size+'bytes)가 한도를 넘어 일부 필드를 Storage로 분리 저장했습니다:', entry.id);
+      entry._payloadOffloaded=true; entry._payloadChunks=chunkTexts.length; entry._payloadLoaded=true;
+      delete entry._payloadUrl; delete entry._payloadPath;
+      console.warn('[examcat] 문서 크기('+_size+'bytes)가 한도를 넘어 일부 필드를 Firestore 분리 문서('+chunkTexts.length+'개)로 저장했습니다:', entry.id);
+    } else if(entry._payloadOffloaded && prevChunkTotal>0){
+      // 이전엔 용량 초과로 분리 저장했었는데, 이번 수정으로 안전한 크기로 줄어든 경우:
+      // 남아있는 분리 문서를 정리하고 평범한 단일 문서 저장으로 되돌린다.
+      await _examcatCleanupPayloadChunks(entry.id);
+      delete entry._payloadOffloaded; delete entry._payloadChunks; delete entry._payloadLoaded;
+      toSave=entry;
     }
   }catch(e){
     console.warn('examCatalog 크기 확인/분리 저장 실패(원본 그대로 저장 시도):', e.message);
@@ -35864,6 +35904,8 @@ async function examcatDeleteEntry(id){
   if(FB_USE()){
     try{ await window._fb.delete('examCatalog', id); }
     catch(e){ console.warn('examCatalog 삭제 실패:', e.message); }
+    try{ await _examcatCleanupPayloadChunks(id); }
+    catch(e){ console.warn('examCatalogPayloads 정리 실패:', e.message); }
   }
 }
 
