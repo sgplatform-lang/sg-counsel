@@ -2262,6 +2262,31 @@ function chgAnsInit(){
   _chgAnsState = { date:'', test:'', catId:'', enabled:{}, detail:{}, answers:{} }; // answers[slot] = {no:value}
   return _chgAnsState;
 }
+// ★ 2026-09-23 추가: 관리자 시험 카탈로그(examCatalog) 문서가 Firestore 1MB 한도를 넘는
+// 대형 시험(전과목 등)은, 관리자 쪽에서 문항 단원/정답/해설 데이터를 별도 저장소(Storage)로
+// 분리해 저장하고 문서에는 그 위치(_payloadUrl)만 남긴다(관리자 파일 examcatSaveEntry 참고).
+// 이 학생용 화면은 examCatalog를 그대로 통째로 읽어오기 때문에, 분리 저장된 시험은
+// answerKey/itemMeta가 비어있는 것처럼 보여 "채점 가능한 과목이 없습니다"로 잘못 표시됐다.
+// 관리자 파일의 _examcatEnsurePayloadLoaded와 동일한 방식으로, 필요한 시점에 분리 저장분을
+// 다시 불러와 합쳐준다.
+async function _chgAnsEnsureExamPayloadLoaded(entry){
+  if(!entry || !entry._payloadOffloaded || entry._payloadLoaded) return entry;
+  if(entry._payloadLoading) return entry._payloadLoading;
+  if(!entry._payloadUrl){ entry._payloadLoaded=true; return entry; }
+  entry._payloadLoading=(async function(){
+    try{
+      const res=await fetch(entry._payloadUrl);
+      const payload=await res.json();
+      Object.assign(entry, payload);
+    }catch(e){
+      console.warn('시험 카탈로그 분리 저장분을 불러오지 못했습니다:', entry.id, e.message);
+    }
+    entry._payloadLoaded=true;
+    delete entry._payloadLoading;
+    return entry;
+  })();
+  return entry._payloadLoading;
+}
 async function chgAnsLoadCatalog(){
   if(_chgAnsCatalog) return _chgAnsCatalog;
   if(!FB()) return [];
@@ -2500,6 +2525,16 @@ function renderChallengerAnswerInput(){
     return true;
   }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
   const examEntry=_chgAnsCurrentExamEntry();
+  // ★ 2026-09-23 추가: 분리 저장된(대형) 시험이면 문항 정보를 먼저 불러온 뒤에 과목
+  // 목록을 계산해야 한다 — 안 그러면 "채점 가능한 과목이 없습니다"로 잘못 보인다.
+  if(examEntry && examEntry._payloadOffloaded && !examEntry._payloadLoaded){
+    if(!examEntry._payloadLoading){
+      _chgAnsEnsureExamPayloadLoaded(examEntry).then(function(){ if(curTab==='challengeranswer') render(); });
+    }
+    return `<div><div class="stitle">🖊️ 챌린저 답안 입력</div>
+      <div class="card"><div class="card-body" style="text-align:center;padding:30px;color:#999;font-size:13px">문항 정보를 불러오는 중입니다...</div></div>
+    </div>`;
+  }
   const examMeta=_chgAnsExamMeta(examEntry);
   // ★ 2026-09-17 추가: 응시일이 아직 안 된(미래) 시험을 골랐으면 과목선택·답안입력 자체를
   // 막는다(관리자가 미래 시험을 미리 등록해두는 경우가 많아, 학생이 실수로 아직 안 치른
