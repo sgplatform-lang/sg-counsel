@@ -35815,19 +35815,41 @@ async function _examcatEnsurePayloadLoaded(entry){
   if(!entry || !entry._payloadOffloaded || entry._payloadLoaded) return entry;
   if(entry._payloadLoading) return entry._payloadLoading;
   entry._payloadLoading=(async function(){
-    try{
-      const snap=await window._fb.collection('examCatalogPayloads').where('examId','==',entry.id).get();
-      const chunks=snap.docs.map(d=>d.data());
-      chunks.sort(function(a,b){ return (a.index||0)-(b.index||0); });
-      if(chunks.length){
-        const joined=chunks.map(function(c){ return c.chunk||''; }).join('');
-        const payload=JSON.parse(joined);
-        Object.assign(entry, payload);
+    // ★ 2026-09-25 추가: 학생용 페이지에서 "한국사·탐구 답안 입력은 되는데 채점이 조용히
+    // 0점 처리된다"는 신고가 있었다 — 원인은 조각(chunk)이 여러 개인 대형 시험(전과목 등)에서,
+    // 조회 시점 네트워크 상황(또는 방금 저장 직후의 전파 지연)에 따라 뒤쪽 조각 일부가
+    // 누락된 채로 조회되는데도 예전 코드는 그걸 "정상 로드 완료"로 표시해버린 것. 조각 개수가
+    // 예상(_payloadChunks)과 다르면 불완전한 것으로 보고 최대 3회까지 재조회한다(관리자
+    // 화면에서도 동일한 방식으로 데이터를 읽으므로 여기도 동일하게 강화).
+    const expectedTotal = entry._payloadChunks || 0;
+    let lastErr = null;
+    for(let attempt=0; attempt<3; attempt++){
+      lastErr = null;
+      try{
+        const snap=await window._fb.collection('examCatalogPayloads').where('examId','==',entry.id).get();
+        const chunks=snap.docs.map(d=>d.data());
+        chunks.sort(function(a,b){ return (a.index||0)-(b.index||0); });
+        if(expectedTotal>0 && chunks.length!==expectedTotal){
+          throw new Error('분리 저장된 '+expectedTotal+'개 조각 중 '+chunks.length+'개만 조회됨');
+        }
+        if(chunks.length){
+          const joined=chunks.map(function(c){ return c.chunk||''; }).join('');
+          const payload=JSON.parse(joined);
+          Object.assign(entry, payload);
+        }
+        break;
+      }catch(e){
+        lastErr = e;
+        if(attempt<2) await new Promise(function(r){ setTimeout(r, 600*(attempt+1)); });
       }
-    }catch(e){
-      console.warn('examCatalog 분리 저장분을 불러오지 못했습니다:', entry.id, e.message);
     }
-    entry._payloadLoaded=true;
+    if(lastErr){
+      console.warn('examCatalog 분리 저장분을 불러오지 못했습니다(재시도 실패):', entry.id, lastErr.message);
+      entry._payloadLoadFailed = true;
+    } else {
+      entry._payloadLoaded = true;
+      delete entry._payloadLoadFailed;
+    }
     delete entry._payloadLoading;
     return entry;
   })();
@@ -35849,6 +35871,48 @@ async function _examcatCleanupPayloadChunks(examId){
     console.warn('examCatalogPayloads 조회/정리 실패:', examId, e.message);
   }
 }
+// ★ 2026-09-25 추가: "학생용에서 답안 입력 오류가 아예 안 나도록, 등록 시점에서 강화해달라"는
+// 요청 — 예전엔 조각 문서들을 한 개씩 순서대로 window._fb.set()으로 저장했는데, 이 저장
+// 도중에(문항 수가 많아 수십 번 왕복하는 동안) 인터넷이 잠깐 끊기거나 탭을 닫는 등의 이유로
+// 일부 조각만 저장되고 나머지는 예전 값 그대로 남는 "반쯤 저장된" 상태가 될 수 있었다 — 이게
+// 실제로 학생용 채점 오류의 근본 원인일 가능성이 있다. 이제는 Firestore의 배치 쓰기(batch)로
+// 모든 조각을 한 번에 묶어서 "전부 성공 아니면 전부 실패"가 보장되게 하고, 저장 직후 다시
+// 읽어와 실제로 정확히 저장됐는지(개수+내용 모두) 확인한다. 확인에 실패하면 카탈로그 문서
+// 자체를 저장하지 않고 분명한 오류를 띄워, 깨진 상태가 조용히 남아 나중에(학생 답안 입력
+// 시점에) 뒤늦게 문제가 되는 일을 원천 차단한다.
+async function _examcatWriteAndVerifyChunks(examId, chunkTexts, prevChunkTotal){
+  const total=chunkTexts.length;
+  for(let attempt=0; attempt<2; attempt++){
+    try{
+      const batch=window._fb.db.batch();
+      for(let i=0;i<total;i++){
+        const ref=window._fb.db.collection('examCatalogPayloads').doc(examId+'__'+i);
+        batch.set(ref, {examId:examId, index:i, total:total, chunk:chunkTexts[i], _t:Date.now()});
+      }
+      // 이번엔 더 적은 조각으로 줄어드는 경우, 남는 옛 조각도 같은 배치에서 함께 지워서
+      // "새 조각은 저장됐는데 옛 조각 정리는 실패" 같은 어중간한 상태가 생기지 않게 한다.
+      if(prevChunkTotal>total){
+        for(let i=total;i<prevChunkTotal;i++){
+          batch.delete(window._fb.db.collection('examCatalogPayloads').doc(examId+'__'+i));
+        }
+      }
+      await batch.commit();
+      // 저장 직후 다시 읽어와 개수와 내용이 정확히 일치하는지 확인(read-your-writes 확인).
+      const snap=await window._fb.collection('examCatalogPayloads').where('examId','==',examId).get();
+      const got=snap.docs.map(d=>d.data()).filter(function(c){ return (c.total||0)===total; });
+      if(got.length!==total) throw new Error('저장 확인 실패: '+total+'개 중 '+got.length+'개만 확인됨');
+      got.sort(function(a,b){ return (a.index||0)-(b.index||0); });
+      const joined=got.map(function(c){ return c.chunk||''; }).join('');
+      const expectedStr=chunkTexts.join('');
+      if(joined!==expectedStr) throw new Error('저장 확인 실패: 저장된 내용이 원본과 다릅니다');
+      return true; // 검증까지 성공
+    }catch(e){
+      console.warn('[examcat] 분리 저장 시도 '+(attempt+1)+'회 실패:', e.message);
+      if(attempt===1) throw e; // 2회 모두 실패하면 호출자에게 전파
+    }
+  }
+  return false;
+}
 async function examcatSaveEntry(entry){
   entry.updatedAt = Date.now();
   // ★ 2026-08-26 수정: Firestore는 undefined 필드가 하나라도 있으면 문서 저장을 통째로
@@ -35868,10 +35932,15 @@ async function examcatSaveEntry(entry){
       const payloadStr=JSON.stringify(payload);
       const chunkTexts=[];
       for(let i=0;i<payloadStr.length;i+=EXAMCAT_CHUNK_SIZE){ chunkTexts.push(payloadStr.slice(i,i+EXAMCAT_CHUNK_SIZE)); }
-      for(let i=0;i<chunkTexts.length;i++){
-        await window._fb.set('examCatalogPayloads', entry.id+'__'+i, {examId:entry.id, index:i, total:chunkTexts.length, chunk:chunkTexts[i]});
+      try{
+        await _examcatWriteAndVerifyChunks(entry.id, chunkTexts, prevChunkTotal);
+      }catch(e){
+        // ★ 배치 쓰기+검증이 최종적으로 실패하면, 절대 카탈로그 문서를 "분리 저장 완료"로
+        // 잘못 표시해 저장하지 않는다 — 여기서 완전히 중단해 학생용 페이지에 깨진 상태가
+        // 전달되는 일 자체를 막는다(관리자가 원인을 확인하고 다시 저장을 시도해야 함).
+        alert('⚠️ 대용량 시험 데이터(문항/정답) 저장에 실패했습니다.\n\n오류 내용: '+e.message+'\n\n인터넷 연결을 확인한 뒤 다시 "저장" 버튼을 눌러 재시도해주세요.\n\n(재시도해도 계속 실패하면 문의해주세요 — 이번 시도로는 기존 데이터가 바뀌지 않았습니다)');
+        return;
       }
-      if(prevChunkTotal>chunkTexts.length){ await _examcatDeletePayloadChunksRange(entry.id, chunkTexts.length, prevChunkTotal); }
       toSave=Object.assign({}, entry);
       EXAMCAT_OFFLOAD_FIELDS.forEach(function(f){ delete toSave[f]; });
       delete toSave._payloadUrl; delete toSave._payloadPath; // 예전 Storage 방식 흔적 제거
@@ -35880,7 +35949,7 @@ async function examcatSaveEntry(entry){
       // 있으니, 이 세션에서는 다시 받아올 필요 없이 바로 화면에 반영된다.
       entry._payloadOffloaded=true; entry._payloadChunks=chunkTexts.length; entry._payloadLoaded=true;
       delete entry._payloadUrl; delete entry._payloadPath;
-      console.warn('[examcat] 문서 크기('+_size+'bytes)가 한도를 넘어 일부 필드를 Firestore 분리 문서('+chunkTexts.length+'개)로 저장했습니다:', entry.id);
+      console.warn('[examcat] 문서 크기('+_size+'bytes)가 한도를 넘어 일부 필드를 Firestore 분리 문서('+chunkTexts.length+'개)로 저장(배치+검증 완료)했습니다:', entry.id);
     } else if(entry._payloadOffloaded && prevChunkTotal>0){
       // 이전엔 용량 초과로 분리 저장했었는데, 이번 수정으로 안전한 크기로 줄어든 경우:
       // 남아있는 분리 문서를 정리하고 평범한 단일 문서 저장으로 되돌린다.
@@ -48095,14 +48164,22 @@ function generateReport() {
     var akMapCommon=_lookupBucket2(examEntry.answerKey, codeAliases2, '|');
     var metaMapDetail=_lookupBucket2(examEntry.itemMeta, codeAliases2, '|'+normDetail);
     var metaMapCommon=_lookupBucket2(examEntry.itemMeta, codeAliases2, '|');
-    var items=[]; var gotPoints=0, totalPoints=0;
+    // ★ 2026-09-25 수정: "한국사·탐구는 문항 입력은 되는데 이유 없이 0점 처리된다"는 신고의
+    // 실제 원인 — 카탈로그에서 이 과목의 정답(answerKey)을 하나도 못 찾은 경우에도(예:
+    // 분리 저장된 조각이 아직 다 조회되지 않았거나, 세부과목 표기가 어긋난 경우), 예전 코드는
+    // totalPoints를 먼저(정답 유무와 무관하게) 항상 누적해버려서 gotPoints=0/totalPoints>0인
+    // "점수 0점"이 그대로 저장됐다(오답 문항 목록도 비어있어 원인을 알 수 없어 보였다).
+    // 이제는 정답을 찾은 문항만 배점을 합산하고, 하나도 못 찾았으면 채점 자체를 중단해
+    // 잘못된 0점이 조용히 저장되는 일을 막는다.
+    var items=[]; var gotPoints=0, totalPoints=0, foundAnswerCount2=0;
     for(var no2=1;no2<=total;no2++){
       var ak=akMapDetail[no2]||akMapCommon[no2]||{}; var meta=metaMapDetail[no2]||metaMapCommon[no2]||{};
       var points=(+ak.points)||(+meta.points)||(100/total);
-      totalPoints+=points;
       var correctRaw=ak.answer||meta.answer||'';
       var myRaw=newAnswers[no2];
       if(!correctRaw) continue;
+      foundAnswerCount2++;
+      totalPoints+=points;
       // 5지선다/단답형 구분 없이, 정답 표기(①~⑤ 등)까지 정규화해서 비교(학생용 채점 로직과 동일 규칙)
       var mcMap={'①':'1','②':'2','③':'3','④':'4','⑤':'5'};
       function normMc(v){ var t=String(v==null?'':v).trim(); if(mcMap[t])return mcMap[t]; var mm=t.match(/^[①-⑤]/); if(mm)return mcMap[mm[0]]; var n=t.replace(/[^\d]/g,''); return n||t; }
@@ -48118,6 +48195,10 @@ function generateReport() {
           guessedTime:!(String(myRaw||'').trim()), points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'',
           explanation:ak.explain||meta.explain||'', question:ak.question||''});
       }
+    }
+    if(foundAnswerCount2===0){
+      alert('⚠️ 이 과목('+(s.subject==='INQ'?'탐구('+ (s.detail||'') +')':s.subject)+')의 정답 데이터를 카탈로그에서 찾지 못해 재채점을 중단했습니다.\n\n시험 카탈로그에 이 과목의 정답이 정확한 세부과목명으로 등록되어 있는지 확인한 뒤 다시 시도해주세요.\n\n(예전 점수는 그대로 유지되며, 잘못된 0점으로 덮어쓰지 않았습니다)');
+      return;
     }
     s.score = totalPoints? +(gotPoints).toFixed(1) : '';
     s.wrongCount = items.length;
