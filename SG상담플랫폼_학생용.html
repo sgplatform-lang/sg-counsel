@@ -2277,22 +2277,53 @@ async function _chgAnsEnsureExamPayloadLoaded(entry){
   if(!entry || !entry._payloadOffloaded || entry._payloadLoaded) return entry;
   if(entry._payloadLoading) return entry._payloadLoading;
   entry._payloadLoading=(async function(){
-    try{
-      const chunks=await window._fb.getWhere('examCatalogPayloads','examId','==',entry.id);
-      chunks.sort(function(a,b){ return (a.index||0)-(b.index||0); });
-      if(chunks.length){
-        const joined=chunks.map(function(c){ return c.chunk||''; }).join('');
-        const payload=JSON.parse(joined);
-        Object.assign(entry, payload);
+    // ★ 2026-09-25 추가: 전과목처럼 조각(chunk)이 여러 개인 대형 시험에서, 한국사·탐구처럼
+    // 뒤쪽에 저장된 조각이 네트워크 상황(또는 방금 저장 직후의 전파 지연)에 따라 간헐적으로
+    // 누락된 채로 조회되는 사고가 있었다 — 정답 자체는 정상 등록돼 있었는데도, 조각 일부가
+    // 비어 그 과목의 answerKey/itemMeta가 통째로 빠져 "문항 입력은 되지만 채점은 0점"으로
+    // 처리됐다(카탈로그에 정답이 없는 문항은 채점 대상에서 제외되는 게 아니라, 그 과목 전체가
+    // 빈 정답표를 참조해 전부 오답 처리됨). 조각 개수가 예상(_payloadChunks)과 다르면
+    // 불완전한 것으로 보고 최대 3회까지 짧은 간격을 두고 재조회한다.
+    const expectedTotal = entry._payloadChunks || 0;
+    let lastErr = null;
+    for(let attempt=0; attempt<3; attempt++){
+      lastErr = null;
+      try{
+        const chunks=await window._fb.getWhere('examCatalogPayloads','examId','==',entry.id);
+        chunks.sort(function(a,b){ return (a.index||0)-(b.index||0); });
+        if(expectedTotal>0 && chunks.length!==expectedTotal){
+          throw new Error('분리 저장된 '+expectedTotal+'개 조각 중 '+chunks.length+'개만 조회됨');
+        }
+        if(chunks.length){
+          const joined=chunks.map(function(c){ return c.chunk||''; }).join('');
+          const payload=JSON.parse(joined);
+          Object.assign(entry, payload);
+        }
+        break;
+      }catch(e){
+        lastErr = e;
+        if(attempt<2) await new Promise(function(r){ setTimeout(r, 600*(attempt+1)); });
       }
-    }catch(e){
-      console.warn('시험 카탈로그 분리 저장분을 불러오지 못했습니다:', entry.id, e.message);
     }
-    entry._payloadLoaded=true;
+    if(lastErr){
+      console.warn('시험 카탈로그 분리 저장분을 불러오지 못했습니다(재시도 실패):', entry.id, lastErr.message);
+      // ★ 실패 시 절대 _payloadLoaded를 true로 남기지 않는다 — 잘못 "로드 완료"로 표시되면
+      // 이후 examMeta/채점이 텅 빈(또는 불완전한) itemMeta/answerKey를 그대로 정상 데이터인
+      // 것처럼 써버려, 위에서 설명한 "조용한 0점 처리" 사고가 재발한다.
+      entry._payloadLoadFailed = true;
+    } else {
+      entry._payloadLoaded = true;
+      delete entry._payloadLoadFailed;
+    }
     delete entry._payloadLoading;
     return entry;
   })();
   return entry._payloadLoading;
+}
+function _chgAnsRetryPayloadLoad(){
+  const entry=_chgAnsCurrentExamEntry();
+  if(entry) delete entry._payloadLoadFailed;
+  render();
 }
 async function chgAnsLoadCatalog(){
   if(_chgAnsCatalog) return _chgAnsCatalog;
@@ -2534,6 +2565,15 @@ function renderChallengerAnswerInput(){
   const examEntry=_chgAnsCurrentExamEntry();
   // ★ 2026-09-23 추가: 분리 저장된(대형) 시험이면 문항 정보를 먼저 불러온 뒤에 과목
   // 목록을 계산해야 한다 — 안 그러면 "채점 가능한 과목이 없습니다"로 잘못 보인다.
+  if(examEntry && examEntry._payloadOffloaded && examEntry._payloadLoadFailed){
+    return `<div><div class="stitle">🖊️ 챌린저 답안 입력</div>
+      <div class="card"><div class="card-body" style="text-align:center;padding:30px;color:#b45309">
+        <div style="font-size:26px;margin-bottom:8px">⚠️</div>
+        <div style="font-size:13px;margin-bottom:12px">문항 정보를 불러오지 못했습니다.<br>인터넷 연결을 확인한 뒤 다시 시도해주세요.<br>(이 상태에서는 답안을 입력·제출할 수 없습니다)</div>
+        <button onclick="_chgAnsRetryPayloadLoad();" style="padding:9px 18px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🔄 다시 시도</button>
+      </div></div>
+    </div>`;
+  }
   if(examEntry && examEntry._payloadOffloaded && !examEntry._payloadLoaded){
     if(!examEntry._payloadLoading){
       _chgAnsEnsureExamPayloadLoaded(examEntry).then(function(){ if(curTab==='challengeranswer') render(); });
@@ -2876,6 +2916,20 @@ async function chgAnsGradeAndSave(){
   // ★ 2026-09-20 수정: 위 렌더 쪽과 동일하게, 학생이 직접 입력한 응시일(st.date) 기준으로
   // 재확인한다(카탈로그 등록일이 아니라).
   if(st.date && String(st.date) > _chgAnsTodayStr()){ toast('⏳ 아직 응시일이 아닙니다. 응시일을 확인해주세요.'); return; }
+  // ★ 2026-09-25 추가: 전과목처럼 문항 정보가 분리 저장된(_payloadOffloaded) 대형 시험은,
+  // 화면 진입 시 자동으로 불러오지만 채점 직전에 한 번 더 확실히 로드 완료 상태인지
+  // 확인한다(방어적 이중 확인 — 실제 신고된 "한국사·탐구만 조용히 0점 처리" 사고가 바로
+  // 이 로딩 타이밍/불완전 조회 문제였다). 로딩에 실패한 상태라면 절대 채점을 진행하지
+  // 않고 안내 후 중단한다.
+  const _curEntryForLoad=_chgAnsCurrentExamEntry();
+  if(_curEntryForLoad && _curEntryForLoad._payloadOffloaded && !_curEntryForLoad._payloadLoaded){
+    toast('문항 정보를 다시 확인하는 중입니다...', 3000);
+    await _chgAnsEnsureExamPayloadLoaded(_curEntryForLoad);
+  }
+  if(_curEntryForLoad && _curEntryForLoad._payloadLoadFailed){
+    alert('⚠️ 문항 정보를 서버에서 불러오지 못해 채점을 진행할 수 없습니다.\n\n인터넷 연결을 확인한 뒤 페이지를 새로고침해서 다시 시도해주세요.\n(이 상태로는 절대 제출되지 않으니 안심하고 다시 시도하시면 됩니다)');
+    return;
+  }
   const examMeta=_chgAnsExamMeta(_chgAnsCurrentExamEntry());
   const enabledSlots=CHG_ANS_SLOTS.filter(x=>st.enabled[x.slot] && !!examMeta[x.code]);
   if(!enabledSlots.length){ toast('과목을 최소 1개 선택해주세요'); return; }
@@ -2923,7 +2977,6 @@ async function chgAnsGradeAndSave(){
       const ak=akMapDetail[no]||akMapCommon[no]||{};
       const meta=metaMapDetail[no]||metaMapCommon[no]||{};
       const points=(+ak.points)||(+meta.points)||(100/resolvedCount);
-      totalPoints+=points;
       const correctRaw=ak.answer||meta.answer||'';
       const myRaw=ans[no];
       rawAnswers[no]=myRaw!=null?String(myRaw):'';
@@ -2934,6 +2987,13 @@ async function chgAnsGradeAndSave(){
         ? (correctRaw!=='' && _chgAnsIsMcCorrect(myRaw, correctRaw))
         : (correctRaw!=='' && _chgAnsIsShortCorrect(myRaw, correctRaw));
       if(!correctRaw){ continue; } // 카탈로그에 정답이 없는 문항은 채점 대상에서 제외
+      // ★ 2026-09-25 수정: 예전엔 totalPoints를 정답 유무와 무관하게 항상 먼저 누적해서,
+      // 이 과목 문항 중 일부만 카탈로그에 정답이 등록돼 있으면(예: 분리 저장된 조각이 일부만
+      // 조회됐거나, 세부과목 표기가 어긋나 일부 문항만 못 찾은 경우) 찾지 못한 문항들의
+      // 배점까지 분모(totalPoints)에 얹혀 점수가 실제보다 낮게(심하면 0에 가깝게) 계산되는
+      // "이유를 알 수 없는 저점/0점" 사고 원인이 됐다. 이제 실제로 정답을 찾은 문항의 배점만
+      // totalPoints에 더한다(정상 케이스는 모든 문항에 정답이 있으므로 계산 결과는 동일).
+      totalPoints+=points;
       foundAnswerCount++;
       if(isCorrect){ gotPoints+=points; }
       else{
