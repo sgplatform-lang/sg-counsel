@@ -112,6 +112,10 @@ try{
     // ★ 2026-09-28 추가: X-lab · 월별교과활동(교과별 예상세특용 교과활동 보고서) 전용 함수 2종.
     xlabGenerateSubjectSection: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectSection', {timeout: 120000})(payload).then(r=>r.data),
     xlabGenerateSubjectRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectRecord', {timeout: 120000})(payload).then(r=>r.data),
+    // ★ 2026-09-28 추가: X-lab · 최종예상세특 전용 함수 3종.
+    xlabGenerateFinalSection: (payload)=>firebase.functions().httpsCallable('xlabGenerateFinalSection', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateFinalLinkedActivity: (payload)=>firebase.functions().httpsCallable('xlabGenerateFinalLinkedActivity', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateFinalRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateFinalRecord', {timeout: 120000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료");
@@ -4346,30 +4350,38 @@ function xlabPrintRecord(){
   w.document.close();
 }
 
-// ★ 2026-09-28 추가: X-lab 최상단에 "월별주제활동 / 월별교과활동" 모드 전환 도입
-// (관리자 요청: 향후 "셀프주제활동"까지 3종으로 늘어날 예정). 편집 화면에서는 표시하지
-// 않고, 목록 화면 최상단에서만 전환한다.
-let _xlabTopModeMain = 'topic'; // 'topic' | 'subject'
+// ★ 2026-09-28 추가: X-lab 최상단에 "월별주제활동 / 월별교과활동 / 최종예상세특" 모드
+// 전환 도입(관리자 요청: 향후 "셀프주제활동"까지 4종으로 늘어날 예정). 편집 화면에서는
+// 표시하지 않고, 목록 화면 최상단에서만 전환한다.
+let _xlabTopModeMain = 'topic'; // 'topic' | 'subject' | 'final'
 function xlabSwitchTopMode(mode){
   _xlabTopModeMain = mode;
   if(mode==='subject'){
     _xsubView='list';
     if(_xsubLoadedForMonth!==_xsubMonth) _xsubLoadList();
+  }else if(mode==='final'){
+    _xfinView='list';
+    if(!_xfinLoaded) _xfinLoadList();
   }else{
     _xlabView='list';
   }
   render();
 }
 function _xlabTopModeBar(){
+  const modes = [['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특']];
   return `<div style="display:flex;gap:8px;margin-bottom:14px">
-    <button onclick="xlabSwitchTopMode('topic')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${_xlabTopModeMain==='topic'?'#3b5bdb':'#ddd'};background:${_xlabTopModeMain==='topic'?'#3b5bdb':'#fff'};color:${_xlabTopModeMain==='topic'?'#fff':'#333'};font-weight:800;font-size:12px">📘 월별주제활동</button>
-    <button onclick="xlabSwitchTopMode('subject')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${_xlabTopModeMain==='subject'?'#3b5bdb':'#ddd'};background:${_xlabTopModeMain==='subject'?'#3b5bdb':'#fff'};color:${_xlabTopModeMain==='subject'?'#fff':'#333'};font-weight:800;font-size:12px">📗 월별교과활동</button>
+    ${modes.map(function(pair){
+      const k=pair[0], label=pair[1];
+      const on = _xlabTopModeMain===k;
+      return `<button onclick="xlabSwitchTopMode('${k}')" style="flex:1;padding:10px 6px;border-radius:10px;border:1.5px solid ${on?'#3b5bdb':'#ddd'};background:${on?'#3b5bdb':'#fff'};color:${on?'#fff':'#333'};font-weight:800;font-size:11.5px">${label}</button>`;
+    }).join('')}
   </div>`;
 }
 
 function renderXlab(){
   if(!CU) return '';
   if(_xlabTopModeMain==='subject') return renderXsub();
+  if(_xlabTopModeMain==='final') return renderXfin();
   if(_xlabView==='edit' && _xlabCurrent) return renderXlabEdit();
   return renderXlabList();
 }
@@ -5103,6 +5115,509 @@ function renderXsubEdit(){
       <button onclick="xsubGenerateRecord()" ${_xsubRecordLoading?'disabled':''} style="width:100%;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:10px;font-weight:800">${_xsubRecordLoading?'⏳ 생성 중...':(t.expectedRecord?'🔄 예상세특 다시 생성':'🤖 교과 예상세특 생성')}</button>
     </div>` : ''}
     `}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 🏆 X-lab — 최종예상세특 (학생용, 2026-09-28 신규)
+// 관리자 요청 스펙: 교과목+희망학과 선택 → 기존 월별주제활동(xlabTopics) 또는
+// 월별교과활동(xlabSubjectReports)에서 같은 교과목으로 작성된 보고서를 불러와 선택(또는
+// 불러오지 않고 직접 입력) → 6개 항목(주제선정동기/개념·원리·이론/실사례/문제점·개선점/
+// 배운점·느낀점·알게된점/독서활동) 각각을 AI추천/직접입력/수정·추가/없음 중 선택 →
+// 연계활동(유형 선택 후 AI추천/직접입력) 추가 → "최종 예상세특 생성"(500자) → 저장/수정/
+// 인쇄·PDF. 저장 위치: 신규 컬렉션 xlabFinalRecords.
+// ⚠️ Firestore 보안규칙에 'xlabFinalRecords' 컬렉션이 xlabTopics와 같은 방식으로
+// (allow read, write: if true) 추가되어 있어야 정상 동작합니다.
+// ══════════════════════════════════════════════════════════════════════════
+const XFIN_SECTIONS = [
+  ['motivation','주제 선정동기'],
+  ['concept','개념·원리·이론'],
+  ['example','실사례'],
+  ['issue','문제점·개선점'],
+  ['learned','배운점·느낀점·알게된점'],
+  ['reading','독서활동'],
+];
+const XFIN_SECTION_COLORS = {motivation:'#e08a8a', concept:'#5fae7a', example:'#d99a4e', issue:'#d9738c', learned:'#6c8ee2', reading:'#8f7fe0'};
+const XFIN_LINKED_TYPES = ['동아리','진로','자율','봉사','교과','실험','탐구','토론','강연','독서','논문','직접입력'];
+
+let _xfinList = [];
+let _xfinLoading = false;
+let _xfinLoaded = false;
+let _xfinView = 'list';
+let _xfinCurrent = null;
+let _xfinCandidates = null; // null=아직 미조회, []=조회했지만 없음
+let _xfinCandidatesLoading = false;
+let _xfinSectionLoading = {};
+let _xfinLinkedLoading = false;
+let _xfinFinalLoading = false;
+
+async function _xfinLoadList(){
+  if(!FB() || !CU) return;
+  _xfinLoading = true; render();
+  try{
+    const all = await window._fb.getWhere('xlabFinalRecords','studentId','==',String(CU.id));
+    _xfinList = (all||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('X-lab 최종예상세특 목록 로딩 실패:', e.message);
+    _xfinList = [];
+  }
+  _xfinLoaded = true;
+  _xfinLoading = false; render();
+}
+
+function _xfinBlankSections(){
+  const o = {};
+  XFIN_SECTIONS.forEach(function(pair){ o[pair[0]] = {mode:'', text:''}; });
+  return o;
+}
+
+function xfinNewRecord(){
+  _xfinCurrent = {
+    id: 'xfin_'+CU.id+'_'+Date.now(),
+    studentId: String(CU.id),
+    studentName: CU.name||'', studentSchool: CU.school||'', studentGrade: CU.grade||'',
+    department: CU.xlabDepartment||'',
+    subjectArea:'', subjectAreaCustom:'',
+    topicTitle:'',
+    sourceType:'', sourceId:'',
+    sections: _xfinBlankSections(),
+    linkedActivity: {type:'', typeCustom:'', mode:'', text:''},
+    finalRecordText:'',
+    createdAt: Date.now(),
+  };
+  _xfinCandidates = null;
+  _xfinView = 'edit';
+  render();
+}
+
+function xfinOpenExisting(id){
+  const t = _xfinList.find(function(x){return x.id===id;});
+  if(!t) return;
+  _xfinCurrent = t;
+  if(!_xfinCurrent.sections) _xfinCurrent.sections = _xfinBlankSections();
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {type:'', typeCustom:'', mode:'', text:''};
+  _xfinCandidates = null;
+  _xfinView = 'edit';
+  render();
+}
+
+function xfinBackToList(){ _xfinView='list'; _xfinCurrent=null; render(); }
+
+function xfinCaptureFormFields(){
+  if(!_xfinCurrent) return;
+  const deptEl=document.getElementById('xfinDeptInput'); if(deptEl) _xfinCurrent.department=deptEl.value;
+  const customEl=document.getElementById('xfinSubjectAreaCustom'); if(customEl) _xfinCurrent.subjectAreaCustom=customEl.value;
+  const topicEl=document.getElementById('xfinTopicTitleInput'); if(topicEl) _xfinCurrent.topicTitle=topicEl.value;
+  if(!_xfinCurrent.sections) _xfinCurrent.sections=_xfinBlankSections();
+  XFIN_SECTIONS.forEach(function(pair){
+    const el=document.getElementById('xfinSection_'+pair[0]);
+    if(el){ if(!_xfinCurrent.sections[pair[0]]) _xfinCurrent.sections[pair[0]]={mode:'',text:''}; _xfinCurrent.sections[pair[0]].text=el.value; }
+  });
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity={type:'',typeCustom:'',mode:'',text:''};
+  const linkedCustomEl=document.getElementById('xfinLinkedTypeCustom'); if(linkedCustomEl) _xfinCurrent.linkedActivity.typeCustom=linkedCustomEl.value;
+  const linkedContentEl=document.getElementById('xfinLinkedContent'); if(linkedContentEl) _xfinCurrent.linkedActivity.text=linkedContentEl.value;
+  const finalEl=document.getElementById('xfinFinalRecordText'); if(finalEl) _xfinCurrent.finalRecordText=finalEl.value;
+}
+
+function _xfinResolvedSubjectArea(t){
+  if(!t) return '';
+  return (t.subjectArea==='직접입력') ? (t.subjectAreaCustom||'').trim() : (t.subjectArea||'');
+}
+function _xfinResolvedLinkedType(t){
+  const la = (t && t.linkedActivity) || {};
+  return la.type==='직접입력' ? (la.typeCustom||'').trim() : (la.type||'');
+}
+
+function xfinChooseSubjectArea(v){
+  if(_xfinCurrent.finalRecordText) return; // 최종 생성 후에는 일관성 보호를 위해 교과목 변경 불가
+  xfinCaptureFormFields();
+  _xfinCurrent.subjectArea = v;
+  if(v!=='직접입력') _xfinCurrent.subjectAreaCustom='';
+  _xfinCandidates = null;
+  render();
+}
+
+async function xfinLoadCandidates(){
+  xfinCaptureFormFields();
+  const subjArea = _xfinResolvedSubjectArea(_xfinCurrent);
+  if(!subjArea){ alert('교과목을 먼저 선택해주세요.'); return; }
+  _xfinCandidatesLoading = true; render();
+  try{
+    const [topics, subjects] = await Promise.all([
+      window._fb.getWhere('xlabTopics','studentId','==',String(CU.id)),
+      window._fb.getWhere('xlabSubjectReports','studentId','==',String(CU.id)),
+    ]);
+    const list = [];
+    (topics||[]).forEach(function(x){
+      if(!x.topicTitle) return;
+      if((x.subjectArea||'').trim()!==subjArea) return;
+      list.push({
+        kind:'topic', id:x.id, month:x.month, department:x.department,
+        topicTitle:x.topicTitle, topicDesc:x.topicDesc||'',
+        advancedTopicTitle:x.advancedTopicTitle||'',
+        expectedRecordText:(x.expectedRecord&&x.expectedRecord.recordText)||'',
+        base:{
+          motivation:(x.report&&x.report.reason)||'',
+          concept:(x.report&&x.report.concept)||'',
+          example:(x.report&&x.report.example)||'',
+          issue:(x.report&&x.report.issue)||'',
+          learned:'', reading:'',
+        },
+      });
+    });
+    (subjects||[]).forEach(function(x){
+      if(!x.topicTitle) return;
+      if(_xsubResolvedSubjectArea(x)!==subjArea) return;
+      list.push({
+        kind:'subject', id:x.id, month:x.month, department:x.department,
+        topicTitle:x.topicTitle, topicDesc:x.topicDesc||'',
+        advancedTopicTitle:(x.report&&x.report.advanced)||'',
+        expectedRecordText:(x.expectedRecord&&x.expectedRecord.recordText)||'',
+        base:{
+          motivation:_xsubReasonSummaryText(x.reason||{}),
+          concept:(x.report&&x.report.concept)||'',
+          example:(x.report&&x.report.example)||'',
+          issue:(x.report&&x.report.issue)||'',
+          learned:(x.report&&x.report.learned)||'',
+          reading:(x.report&&x.report.reading)||'',
+        },
+      });
+    });
+    list.sort(function(a,b){ return String(b.month).localeCompare(String(a.month)); });
+    _xfinCandidates = list;
+  }catch(e){
+    alert('불러오기 실패: '+e.message);
+    _xfinCandidates = [];
+  }
+  _xfinCandidatesLoading = false; render();
+}
+
+function xfinSelectCandidate(kind, id){
+  const c = (_xfinCandidates||[]).find(function(x){return x.kind===kind && x.id===id;});
+  if(!c) return;
+  xfinCaptureFormFields();
+  _xfinCurrent.sourceType = kind;
+  _xfinCurrent.sourceId = id;
+  _xfinCurrent.topicTitle = c.topicTitle || '';
+  if(!_xfinCurrent.department) _xfinCurrent.department = c.department||CU.xlabDepartment||'';
+  XFIN_SECTIONS.forEach(function(pair){
+    const k = pair[0];
+    const baseVal = (c.base && c.base[k]) || '';
+    _xfinCurrent.sections[k] = { mode: baseVal ? 'edit' : '', text: baseVal };
+  });
+  render();
+}
+
+function xfinStartManual(){
+  xfinCaptureFormFields();
+  _xfinCurrent.sourceType = 'manual';
+  _xfinCurrent.sourceId = '';
+  render();
+}
+
+function xfinChooseSectionMode(field, mode){
+  xfinCaptureFormFields();
+  if(!_xfinCurrent.sections[field]) _xfinCurrent.sections[field] = {mode:'', text:''};
+  _xfinCurrent.sections[field].mode = mode;
+  if(mode==='none') _xfinCurrent.sections[field].text = '';
+  render();
+}
+
+async function xfinGenerateSection(field){
+  xfinCaptureFormFields();
+  const subjArea = _xfinResolvedSubjectArea(_xfinCurrent);
+  if(!subjArea || !_xfinCurrent.topicTitle){ alert('교과목과 주제/활동명을 먼저 입력해주세요.'); return; }
+  const baseContext = (_xfinCurrent.sections[field] && _xfinCurrent.sections[field].text) || '';
+  _xfinSectionLoading[field] = true; render();
+  try{
+    const r = await window._fb.xlabGenerateFinalSection({department:_xfinCurrent.department||'', subjectArea:subjArea, topic:_xfinCurrent.topicTitle, section:field, baseContext:baseContext, grade:CU.grade||''});
+    if(!_xfinCurrent.sections[field]) _xfinCurrent.sections[field] = {mode:'ai', text:''};
+    _xfinCurrent.sections[field].text = r.text;
+  }catch(e){
+    alert('생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xfinSectionLoading[field] = false; render();
+}
+
+function renderXfinSectionBlock(t, key, label){
+  const sec = t.sections[key] || {mode:'', text:''};
+  const loading = !!_xfinSectionLoading[key];
+  const color = XFIN_SECTION_COLORS[key] || '#0f766e';
+  const modes = [['ai','🤖 AI추천'],['manual','✍️ 직접입력'],['edit','📝 수정/추가'],['none','🚫 없음']];
+  let control = '';
+  if(sec.mode==='none'){
+    control = '<div style="text-align:center;color:#aaa;font-size:11px;padding:10px">이 항목은 최종 예상세특에 포함하지 않습니다.</div>';
+  }else if(sec.mode==='ai'){
+    control = `<button onclick="xfinGenerateSection('${key}')" ${loading?'disabled':''} style="width:100%;padding:10px;background:${color};color:#fff;border:none;border-radius:8px;font-weight:800;margin-bottom:6px">${loading?'⏳ 생성 중...':(sec.text?'🔄 다시 생성':'AI로 생성')}</button>
+      <textarea id="xfinSection_${key}" rows="3" placeholder="AI로 생성된 내용이 여기에 표시됩니다" style="font-size:13px">${String(sec.text||'').replace(/</g,'&lt;')}</textarea>`;
+  }else if(sec.mode==='manual' || sec.mode==='edit'){
+    control = `<textarea id="xfinSection_${key}" rows="3" placeholder="${sec.mode==='edit'?'기존 내용을 수정·추가하세요':'내용을 직접 입력하세요'}" style="font-size:13px">${String(sec.text||'').replace(/</g,'&lt;')}</textarea>`;
+  }else{
+    control = '<div style="text-align:center;color:#aaa;font-size:11px;padding:10px">위에서 방법을 선택해주세요.</div>';
+  }
+  return `
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f1f1f1">
+    <div style="font-size:12px;font-weight:800;color:#333;margin-bottom:6px">${label}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+      ${modes.map(function(pair){
+        const mk=pair[0], mlabel=pair[1];
+        const on = sec.mode===mk;
+        return `<button onclick="xfinChooseSectionMode('${key}','${mk}')" style="padding:5px 10px;border-radius:14px;border:1.5px solid ${on?color:'#ddd'};background:${on?color:'#fff'};color:${on?'#fff':'#333'};font-weight:700;font-size:10.5px">${mlabel}</button>`;
+      }).join('')}
+    </div>
+    ${control}
+  </div>`;
+}
+
+function xfinChooseLinkedType(v){
+  xfinCaptureFormFields();
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {type:'', typeCustom:'', mode:'', text:''};
+  _xfinCurrent.linkedActivity.type = v;
+  if(v!=='직접입력') _xfinCurrent.linkedActivity.typeCustom = '';
+  render();
+}
+
+function xfinChooseLinkedMode(mode){
+  xfinCaptureFormFields();
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {type:'', typeCustom:'', mode:'', text:''};
+  _xfinCurrent.linkedActivity.mode = mode;
+  if(mode==='none') _xfinCurrent.linkedActivity.text = '';
+  render();
+}
+
+async function xfinGenerateLinkedActivity(){
+  xfinCaptureFormFields();
+  const activityType = _xfinResolvedLinkedType(_xfinCurrent);
+  const subjArea = _xfinResolvedSubjectArea(_xfinCurrent);
+  if(!activityType){ alert('연계활동 유형을 먼저 선택해주세요.'); return; }
+  if(!subjArea || !_xfinCurrent.topicTitle){ alert('교과목과 주제/활동명을 먼저 입력해주세요.'); return; }
+  _xfinLinkedLoading = true; render();
+  try{
+    const r = await window._fb.xlabGenerateFinalLinkedActivity({department:_xfinCurrent.department||'', subjectArea:subjArea, topic:_xfinCurrent.topicTitle, activityType:activityType, grade:CU.grade||''});
+    _xfinCurrent.linkedActivity.text = r.text;
+  }catch(e){
+    alert('생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xfinLinkedLoading = false; render();
+}
+
+async function xfinGenerateFinalRecord(){
+  xfinCaptureFormFields();
+  const subjArea = _xfinResolvedSubjectArea(_xfinCurrent);
+  if(!subjArea){ alert('교과목을 선택해주세요.'); return; }
+  if(!_xfinCurrent.topicTitle){ alert('주제/활동명을 입력해주세요.'); return; }
+  const sectionTexts = {};
+  XFIN_SECTIONS.forEach(function(pair){
+    const k = pair[0];
+    const sec = _xfinCurrent.sections[k];
+    if(sec && sec.mode!=='none' && sec.text) sectionTexts[k] = sec.text;
+  });
+  const la = _xfinCurrent.linkedActivity || {};
+  const linkedText = (la.mode!=='none') ? (la.text||'') : '';
+  _xfinFinalLoading = true; render();
+  try{
+    const r = await window._fb.xlabGenerateFinalRecord({department:_xfinCurrent.department||'', subjectArea:subjArea, topic:_xfinCurrent.topicTitle, sectionTexts:sectionTexts, linkedActivityText:linkedText, grade:CU.grade||''});
+    _xfinCurrent.finalRecordText = r.recordText;
+  }catch(e){
+    alert('생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xfinFinalLoading = false; render();
+}
+
+async function xfinSaveRecord(){
+  xfinCaptureFormFields();
+  const subjArea = _xfinResolvedSubjectArea(_xfinCurrent);
+  if(!subjArea){ alert('교과목을 선택해주세요.'); return; }
+  if(!_xfinCurrent.topicTitle){ alert('주제/활동명을 입력해주세요.'); return; }
+  if(!_xfinCurrent.finalRecordText){ alert('먼저 "최종 예상세특 생성"을 눌러주세요.'); return; }
+  _xfinCurrent.studentName = CU.name||'';
+  _xfinCurrent.studentSchool = CU.school||'';
+  _xfinCurrent.studentGrade = CU.grade||'';
+  _xfinCurrent.savedAt = Date.now();
+  try{
+    if(FB()) await window._fb.set('xlabFinalRecords', _xfinCurrent.id, _xfinCurrent);
+    toast('저장되었습니다 💾');
+    await _xfinLoadList();
+    _xfinView='list'; _xfinCurrent=null; render();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+
+function xfinDeleteRecord(id){
+  if(!confirm('이 최종예상세특을 삭제하시겠습니까?')) return;
+  (async function(){
+    try{
+      if(FB()) await window._db.collection('xlabFinalRecords').doc(id).delete();
+      toast('삭제되었습니다');
+      await _xfinLoadList();
+    }catch(e){ alert('삭제 실패: '+e.message); }
+  })();
+}
+
+function _xfinBuildFullReportHtml(t){
+  const savedDate = t.savedAt ? new Date(t.savedAt) : new Date();
+  const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  const schoolVal = t.studentSchool || (typeof CU!=='undefined' && CU ? CU.school : '') || '';
+  const gradeVal = t.studentGrade || (typeof CU!=='undefined' && CU ? CU.grade : '') || '';
+  const dateCompact = savedDate.getFullYear()+String(savedDate.getMonth()+1).padStart(2,'0')+String(savedDate.getDate()).padStart(2,'0');
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab 최종예상세특_'+dateCompact;
+  const subjArea = _xfinResolvedSubjectArea(t);
+  const sectionLabels = {motivation:'주제 선정동기',concept:'개념·원리·이론',example:'실사례',issue:'문제점·개선점',learned:'배운점·느낀점·알게된점',reading:'독서활동'};
+  let html = '<html><head><meta charset="utf-8"><title>'+pdfTitle+'</title>'
+    +'<style>body{font-family:"Malgun Gothic",sans-serif;padding:36px;color:#222;line-height:1.7}h1{font-size:22px;text-align:center;margin-bottom:14px}h2{font-size:15px;margin:20px 0 6px;color:#b8860b}hr{border:none;border-top:1px solid #ccc;margin:14px 0}.meta-row{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}.topic-box{background:#f7f8fb;border-radius:10px;padding:12px 14px;font-size:13px}.record-box{background:#fffbe6;border-radius:10px;padding:14px;font-size:14px;white-space:pre-wrap;border:1.5px solid #f0d060}p{font-size:13px;white-space:pre-wrap}</style></head><body>'
+    +'<h1>🏆 X-lab 최종예상세특</h1>'
+    +'<hr>'
+    +'<div class="meta-row">'
+      +'<span>년월일: <b>'+dateStr+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(schoolVal)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(gradeVal)+'</b></span>'
+      +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
+      +'<span>희망학과: <b>'+_xlabEsc(t.department)+'</b></span>'
+    +'</div>'
+    +'<hr>'
+    +'<div class="topic-box">'
+      +'<div><b>교과목:</b> '+_xlabEsc(subjArea||'-')+'</div>'
+      +'<div><b>주제/활동명:</b> '+_xlabEsc(t.topicTitle)+'</div>'
+    +'</div>'
+    +'<hr>'
+    +'<h2>📋 최종 예상세특</h2>'
+    +'<div class="record-box">'+_xlabEsc(t.finalRecordText)+'</div>';
+  Object.keys(sectionLabels).forEach(function(k){
+    const sec = t.sections && t.sections[k];
+    if(sec && sec.mode!=='none' && sec.text){
+      html += '<h2>'+sectionLabels[k]+'</h2><p>'+_xlabEsc(sec.text)+'</p>';
+    }
+  });
+  const laText = (t.linkedActivity && t.linkedActivity.mode!=='none') ? t.linkedActivity.text : '';
+  if(laText){
+    html += '<h2>연계 활동 ('+_xlabEsc(_xfinResolvedLinkedType(t))+')</h2><p>'+_xlabEsc(laText)+'</p>';
+  }
+  html += '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  return html;
+}
+
+function xfinPrintReport(){
+  const t = _xfinCurrent;
+  if(!t) return;
+  const w = window.open('','_blank');
+  w.document.write(_xfinBuildFullReportHtml(t));
+  w.document.close();
+}
+
+function renderXfin(){
+  if(!CU) return '';
+  if(_xfinView==='edit' && _xfinCurrent) return renderXfinEdit();
+  return renderXfinList();
+}
+
+function renderXfinList(){
+  if(!_xfinLoaded && !_xfinLoading) _xfinLoadList();
+  return `
+  <div style="padding:16px">
+    ${_xlabTopModeBar()}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:18px;font-weight:800">🏆 X-lab · 최종예상세특</span>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #eee">
+      <label style="font-size:12px;color:#666;font-weight:700">희망학과</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input id="xlabDeptInput" value="${(CU.xlabDepartment||'').replace(/"/g,'&quot;')}" placeholder="예: 컴퓨터공학과">
+        <button onclick="xlabSaveDepartment()" style="flex:none;padding:0 16px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:700">저장</button>
+      </div>
+    </div>
+    <button onclick="xfinNewRecord()" style="width:100%;padding:14px;background:#b8860b;color:#fff;border:none;border-radius:12px;font-weight:800;font-size:14px;margin-bottom:16px">➕ 새 최종예상세특 만들기</button>
+    ${_xfinLoading ? '<div style="text-align:center;color:#888;padding:30px">불러오는 중...</div>' :
+      !_xfinList.length ? '<div style="text-align:center;color:#aaa;padding:30px;font-size:13px">등록된 최종예상세특이 없습니다.</div>' :
+      _xfinList.map(function(t){return `
+      <div onclick="xfinOpenExisting('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div style="font-size:11px;color:#888">${_xfinResolvedSubjectArea(t)||'교과목 미선택'}</div>
+            <div style="font-weight:800;font-size:14px;margin-top:2px">${t.topicTitle||'(제목 없음)'}</div>
+            <div style="font-size:11px;color:${t.finalRecordText?'#0f766e':'#e8590c'};margin-top:4px;font-weight:700">${t.finalRecordText?'✅ 생성 완료':'⏳ 작성 중'}</div>
+          </div>
+          <button onclick="event.stopPropagation();xfinDeleteRecord('${t.id}')" style="background:none;border:none;color:#e03131;font-size:12px">삭제</button>
+        </div>
+      </div>`;}).join('')}
+  </div>`;
+}
+
+function renderXfinEdit(){
+  const t = _xfinCurrent;
+  const locked = !!t.finalRecordText;
+  return `
+  <div style="padding:16px">
+    <button onclick="xfinBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
+    <div style="font-size:16px;font-weight:800;margin-bottom:14px">🏆 ${t.topicTitle?t.topicTitle:'새 최종예상세특'}</div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <label style="font-size:12px;color:#666;font-weight:700">희망학과 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+      <input id="xfinDeptInput" value="${(t.department||CU.xlabDepartment||'').replace(/"/g,'&quot;')}" style="margin:6px 0 10px">
+      <label style="font-size:12px;color:#666;font-weight:700">교과목 선택 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px">
+        ${XLAB_SUBJECT_AREA_OPTS.map(function(o){return `<button onclick="xfinChooseSubjectArea('${o}')" ${locked?'disabled':''} style="padding:7px 12px;border-radius:16px;border:1.5px solid ${t.subjectArea===o?'#b8860b':'#ddd'};background:${t.subjectArea===o?'#b8860b':'#fff'};color:${t.subjectArea===o?'#fff':'#333'};font-weight:700;font-size:11px;opacity:${locked?'0.6':'1'}">${o}</button>`;}).join('')}
+      </div>
+      ${t.subjectArea==='직접입력' ? `<input id="xfinSubjectAreaCustom" placeholder="교과목명 직접 입력" ${locked?'disabled':''} value="${(t.subjectAreaCustom||'').replace(/"/g,'&quot;')}" style="margin-bottom:6px">` : ''}
+      <label style="font-size:12px;color:#666;font-weight:700;margin-top:6px;display:block">주제/활동명 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+      <input id="xfinTopicTitleInput" value="${(t.topicTitle||'').replace(/"/g,'&quot;')}" placeholder="최종예상세특에 담을 주제/활동명" style="margin:6px 0 4px">
+    </div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:13px">📥 기존 월별주제/교과활동에서 불러오기</span>
+        <button onclick="xfinLoadCandidates()" ${_xfinCandidatesLoading?'disabled':''} style="padding:6px 12px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:11px">${_xfinCandidatesLoading?'⏳ 불러오는 중...':'🔄 불러오기'}</button>
+      </div>
+      ${_xfinCandidates===null ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:12px">교과목을 선택하고 "불러오기"를 눌러주세요.</div>' :
+        !_xfinCandidates.length ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:12px">이 교과목으로 작성된 월별주제활동/교과활동이 없습니다. 아래에서 직접 입력해주세요.</div>' :
+        `<div style="max-height:340px;overflow-y:auto">${_xfinCandidates.map(function(c){return `
+          <div onclick="xfinSelectCandidate('${c.kind}','${c.id}')" style="border:1px solid ${(t.sourceType===c.kind&&t.sourceId===c.id)?'#b8860b':'#eee'};background:${(t.sourceType===c.kind&&t.sourceId===c.id)?'#fff8e1':'#fff'};border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer">
+            <div style="font-size:10px;color:#aaa">${c.kind==='topic'?'📘 월별주제활동':'📗 월별교과활동'} · ${_xlabMonthLabel(c.month)}</div>
+            <div style="font-weight:700;font-size:13px;margin-top:2px">${c.topicTitle}</div>
+            ${c.advancedTopicTitle?`<div style="font-size:11px;color:#7c3aed;margin-top:3px">🧭 심화·확장: ${c.advancedTopicTitle}</div>`:''}
+            ${c.expectedRecordText?`<div style="font-size:11px;color:#888;margin-top:3px">📝 예상세특 있음</div>`:''}
+          </div>`;}).join('')}</div>`}
+      <button onclick="xfinStartManual()" style="width:100%;padding:9px;background:none;border:1.5px dashed #ccc;border-radius:8px;font-weight:700;font-size:11px;color:#666;margin-top:6px">✍️ 불러오지 않고 직접 입력할래요</button>
+    </div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:6px">📄 항목별 내용 구성</div>
+      <div style="font-size:11px;color:#888;margin-bottom:6px">항목마다 AI추천 / 직접입력 / 수정·추가 / 없음 중 하나를 선택하세요.</div>
+      ${XFIN_SECTIONS.map(function(pair){ return renderXfinSectionBlock(t, pair[0], pair[1]); }).join('')}
+    </div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:10px">🔗 연계 활동</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${XFIN_LINKED_TYPES.map(function(o){
+          const on = (t.linkedActivity && t.linkedActivity.type)===o;
+          return `<button onclick="xfinChooseLinkedType('${o}')" style="padding:7px 12px;border-radius:16px;border:1.5px solid ${on?'#3b5bdb':'#ddd'};background:${on?'#3b5bdb':'#fff'};color:${on?'#fff':'#333'};font-weight:700;font-size:11px">${o}</button>`;
+        }).join('')}
+      </div>
+      ${(t.linkedActivity && t.linkedActivity.type==='직접입력') ? `<input id="xfinLinkedTypeCustom" placeholder="연계활동 유형 직접 입력" value="${((t.linkedActivity&&t.linkedActivity.typeCustom)||'').replace(/"/g,'&quot;')}" style="margin-bottom:10px">` : ''}
+      ${(t.linkedActivity && t.linkedActivity.type) ? `
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button onclick="xfinChooseLinkedMode('ai')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${(t.linkedActivity.mode==='ai')?'#3b5bdb':'#ddd'};background:${(t.linkedActivity.mode==='ai')?'#3b5bdb18':'#fff'};font-weight:700;font-size:11px">🤖 AI추천</button>
+        <button onclick="xfinChooseLinkedMode('manual')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${(t.linkedActivity.mode==='manual')?'#3b5bdb':'#ddd'};background:${(t.linkedActivity.mode==='manual')?'#3b5bdb18':'#fff'};font-weight:700;font-size:11px">✍️ 직접입력</button>
+        <button onclick="xfinChooseLinkedMode('none')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${(t.linkedActivity.mode==='none')?'#3b5bdb':'#ddd'};background:${(t.linkedActivity.mode==='none')?'#3b5bdb18':'#fff'};font-weight:700;font-size:11px">🚫 없음</button>
+      </div>
+      ${t.linkedActivity.mode==='ai' ? `<button onclick="xfinGenerateLinkedActivity()" ${_xfinLinkedLoading?'disabled':''} style="width:100%;padding:10px;background:#8f7fe0;color:#fff;border:none;border-radius:8px;font-weight:800;margin-bottom:6px">${_xfinLinkedLoading?'⏳ 생성 중...':(t.linkedActivity.text?'🔄 다시 생성':'AI로 생성')}</button>
+        <textarea id="xfinLinkedContent" rows="3" style="font-size:13px">${String(t.linkedActivity.text||'').replace(/</g,'&lt;')}</textarea>` :
+        t.linkedActivity.mode==='manual' ? `<textarea id="xfinLinkedContent" rows="3" placeholder="연계 활동 내용을 입력하세요" style="font-size:13px">${String(t.linkedActivity.text||'').replace(/</g,'&lt;')}</textarea>` :
+        t.linkedActivity.mode==='none' ? '<div style="text-align:center;color:#aaa;font-size:11px;padding:8px">연계활동을 포함하지 않습니다.</div>' :
+        '<div style="text-align:center;color:#aaa;font-size:11px;padding:8px">위에서 방법을 선택해주세요.</div>'}
+      ` : ''}
+    </div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:30px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:14px">🏆 최종 예상세특 (500자)</span>
+        ${t.finalRecordText ? `<button onclick="xfinPrintReport()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>` : ''}
+      </div>
+      ${t.finalRecordText ? `<textarea id="xfinFinalRecordText" rows="7" maxlength="500" oninput="document.getElementById('xfinFinalCount').textContent=this.value.length" style="font-size:13px;background:#fffbe6">${String(t.finalRecordText).replace(/</g,'&lt;')}</textarea>
+        <div style="text-align:right;font-size:11px;color:#999;margin:4px 0 10px"><span id="xfinFinalCount">${String(t.finalRecordText).length}</span>/500자</div>` :
+        '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">아직 생성되지 않았습니다.</div>'}
+      <button onclick="xfinGenerateFinalRecord()" ${_xfinFinalLoading?'disabled':''} style="width:100%;padding:12px;background:#b8860b;color:#fff;border:none;border-radius:10px;font-weight:800;margin-bottom:8px">${_xfinFinalLoading?'⏳ 생성 중...':(t.finalRecordText?'🔄 최종 예상세특 다시 생성':'🏆 최종 예상세특 생성')}</button>
+      <button onclick="xfinSaveRecord()" style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">💾 저장하기</button>
+    </div>
   </div>`;
 }
 </script>
