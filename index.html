@@ -26752,7 +26752,20 @@ let gg_currentStudentId = null;
 
 // ── 지역 분류 ──
 function gg_getUnivRegion(univ){
-  const seoulUnivs=['고려대','연세대','서강대','성균관대','한양대','이화여자대','서울시립대','건국대','동국대','홍익대','국민대','숙명여자대','세종대','광운대','명지대','덕성여자대','서울여자대','경희대','한국외국어대','중앙대','서울대','가톨릭대','한성대','동덕여자대','성신여자대','삼육대','서울과학기술대','서울신학대','KC대','육군사관학교','경기대','추계예술대','한국성서대','장로회신학대'];
+  // ★ 버그 수정(2026-09-28, 관리자 제보): "고려대학교(세종)", "홍익대학교(세종)",
+  // "건국대학교(글로컬)"처럼 서울 소재 대학과 이름이 겹치는 지방 분교/캠퍼스가, 아래
+  // seoulUnivs 목록과의 단순 문자열 포함(includes) 매칭 때문에 전부 "서울"로 분류되어
+  // "서울"만 체크한 대학 매칭 필터에도 함께 노출되던 문제. 괄호 안에 분교/캠퍼스를 나타
+  // 내는 태그가 있으면 그 지역을 먼저 확정하고, 서울 소재 대학 목록 매칭은 그 다음에만
+  // 적용한다. "명지대학교(자연)"(용인 자연캠퍼스)처럼 태그가 실제로는 캠퍼스를 구분하는
+  // 경우도 함께 처리한다.
+  const branchTagRegion = {'세종':'지방사립','글로컬':'지방사립','천안':'수도권','아산':'수도권','자연':'수도권'};
+  const branchTag = univ.match(/\(([^)]+)\)/);
+  if(branchTag && branchTagRegion[branchTag[1]]) return branchTagRegion[branchTag[1]];
+  // ★ 같은 제보로 "경기대학교"도 실제 본교(수원)는 서울이 아닌데 아래 목록에 잘못
+  // 포함되어 있었다(원래 있던 '경기대' 항목 삭제 — 바로 아래 수도권 목록의 '경기' 매칭
+  // 으로 정상 분류된다).
+  const seoulUnivs=['고려대','연세대','서강대','성균관대','한양대','이화여자대','서울시립대','건국대','동국대','홍익대','국민대','숙명여자대','세종대','광운대','명지대','덕성여자대','서울여자대','경희대','한국외국어대','중앙대','서울대','가톨릭대','한성대','동덕여자대','성신여자대','삼육대','서울과학기술대','서울신학대','KC대','육군사관학교','추계예술대','한국성서대','장로회신학대'];
   if(seoulUnivs.some(u=>univ.includes(u))) return '서울';
   if(univ.includes('인천')||univ.includes('경기')||univ.includes('아주')||univ.includes('가천')||univ.includes('단국')||univ.includes('을지')||univ.includes('차의과')||univ.includes('수원')||univ.includes('성결')||univ.includes('대진')||univ.includes('한신')||univ.includes('평택')||univ.includes('한경')||univ.includes('한국공학')||univ.includes('한국항공')) return '수도권';
   if(univ.includes('부산')||univ.includes('경북')||univ.includes('전남')||univ.includes('전북')||univ.includes('충남')||univ.includes('충북')||univ.includes('강원')||univ.includes('제주')||univ.includes('경상')||univ.includes('전주')||univ.includes('안동')||univ.includes('군산')||univ.includes('창원')||univ.includes('공주')||univ.includes('영남')||univ.includes('순천향')||univ.includes('한림')||univ.includes('건양')) return '지방사립';
@@ -48450,6 +48463,21 @@ function _xlabEsc(x){ return String(x==null?'':x); }
 function _xlabBuildFullReportHtml(t){
   const savedDate = (t.report && t.report.savedAt) ? new Date(t.report.savedAt) : new Date();
   const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  // ★ 2026-09-28 추가: 예전에 저장된 주제활동 문서에는 studentSchool/studentGrade
+  // 스냅샷이 없을 수 있다(이 필드를 나중에 추가했기 때문). 그런 경우 관리자 화면이 이미
+  // 들고 있는 최신 학생 명부(ST.students)에서 같은 학생을 찾아 학교/학년을 보충한다.
+  let schoolVal = t.studentSchool, gradeVal = t.studentGrade;
+  if((!schoolVal || !gradeVal) && typeof ST!=='undefined' && Array.isArray(ST.students)){
+    const liveStu = ST.students.find(function(x){return String(x.id)===String(t.studentId);});
+    if(liveStu){
+      if(!schoolVal) schoolVal = liveStu.school||'';
+      if(!gradeVal) gradeVal = liveStu.grade||'';
+    }
+  }
+  // ★ 2026-09-28 추가: 브라우저의 "PDF로 저장"은 <title>을 파일명으로 그대로 쓰므로,
+  // "학생명_X-lab 주제활동 보고서_YYYYMMDD" 형태가 되도록 제목을 동적으로 구성한다.
+  const dateCompact = savedDate.getFullYear()+String(savedDate.getMonth()+1).padStart(2,'0')+String(savedDate.getDate()).padStart(2,'0');
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab 주제활동 보고서_'+dateCompact;
   const sections = [
     ['주제 선정이유', t.report&&t.report.reason],
     ['개념·원리·이론', t.report&&t.report.concept],
@@ -48457,7 +48485,7 @@ function _xlabBuildFullReportHtml(t){
     ['문제점·개선점', t.report&&t.report.issue],
     ['교내활동 예시', t.report&&t.report.activity],
   ];
-  let html = '<html><head><meta charset="utf-8"><title>X-lab 주제활동 보고서</title>'
+  let html = '<html><head><meta charset="utf-8"><title>'+pdfTitle+'</title>'
     +'<style>'
     +'body{font-family:"Apple SD Gothic Neo",sans-serif;padding:40px;line-height:1.7;color:#1a1a2e}'
     +'h1{font-size:22px;text-align:center;margin:0 0 14px}'
@@ -48474,8 +48502,8 @@ function _xlabBuildFullReportHtml(t){
     +'<hr>'
     +'<div class="meta-row">'
       +'<span>년월일: <b>'+dateStr+'</b></span>'
-      +'<span>학교: <b>'+_xlabEsc(t.studentSchool)+'</b></span>'
-      +'<span>학년: <b>'+_xlabEsc(t.studentGrade)+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(schoolVal)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(gradeVal)+'</b></span>'
       +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
       +'<span>희망학과: <b>'+_xlabEsc(t.department)+'</b></span>'
     +'</div>'
@@ -48615,11 +48643,65 @@ function renderXlabAdminDetail(t){
   `;
 }
 
+// ★ 2026-09-28 추가: 세 표(주제통계표/주제확장표/예상세특표)도 인쇄·PDF 변환이 가능해야
+// 한다는 요청에 따라, 화면에 보이는 표를 그대로 새 창에 옮겨 인쇄하는 공용 헬퍼.
+function _xlabAdminPrintTable(title, icon, s, theadHtml, rowsHtml){
+  const w = window.open('','_blank');
+  const html = '<html><head><meta charset="utf-8"><title>'+title+'</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}.meta{color:#666;font-size:12px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}th{background:#f8f9fc}</style>'
+    +'</head><body>'
+    +'<h1>'+icon+' '+title+'</h1>'
+    +'<div class="meta">학생: '+_xlabEsc(s.name)+' · 학교: '+_xlabEsc(s.school)+' · 학년: '+_xlabEsc(s.grade)+' · 희망학과: '+_xlabEsc(s.xlabDepartment)+'</div>'
+    +'<table><thead><tr>'+theadHtml+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>'
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+
+// 인쇄 버튼은 표 헤더에서 onclick으로 인자 없이 호출되므로, 지금 보고 있는 학생(id)을
+// _xlabAdminStudentId로 추적해서 ST.students 명부에서 이름/학교/학년 등을 직접 찾는다.
+function _xlabAdminCurrentStudent(){
+  if(typeof ST==='undefined' || !Array.isArray(ST.students)) return {};
+  return ST.students.find(function(x){return String(x.id)===String(_xlabAdminStudentId);}) || {};
+}
+
+function xlabAdminPrintStatsTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xlabAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const rowsHtml = rows.map(function(t){
+    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+    const subjOk = !!(t.subjectArea && String(t.subjectArea).trim());
+    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td>'+(t.topicSource==='ai'?'AI추천':'직접입력')+'</td><td>'+(subjOk?_xlabEsc(t.subjectArea):'미선택')+'</td><td>'+((t.report&&t.report.savedAt)?'완료':'미작성')+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 주제통계표', '📊', s, '<th>월</th><th>주제명</th><th>주제 출처</th><th>과목선택 여부</th><th>보고서 상태</th>', rowsHtml);
+}
+
+function xlabAdminPrintExpandTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xlabAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const rowsHtml = rows.map(function(t){
+    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td>'+_xlabEsc(t.subjectArea||'-')+'</td><td>'+_xlabEsc(t.advancedTopicTitle||'(미선택)')+'</td><td>'+_xlabEsc(t.advancedTopicDesc)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 주제확장표', '🧭', s, '<th>월</th><th>처음 주제</th><th>과목</th><th>심화·확장 주제</th><th>비고</th>', rowsHtml);
+}
+
+function xlabAdminPrintRecordTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xlabAdminList.filter(function(t){return !!t.expectedRecord;}).slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const rowsHtml = rows.map(function(t){
+    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(t.expectedRecord.subject||'(과목 미지정)')+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td style="white-space:pre-wrap">'+_xlabEsc(t.expectedRecord.recordText)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 예상세특표', '🗂', s, '<th>월</th><th>과목구분</th><th>주제</th><th>예상세특</th>', rowsHtml);
+}
+
 // "주제통계표": 월별 주제명 + 과목선택 여부(교과목 선택했는지)를 한눈에 보는 표
 function renderXlabAdminStatsTable(s){
   const rows = _xlabAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
-  if(!rows.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>';
-  return `
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xlabAdminPrintStatsTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>';
+  return printBtn+`
   <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#f8f9fc;text-align:left">
@@ -48645,8 +48727,9 @@ function renderXlabAdminStatsTable(s){
 // "주제확장표": 처음 주제 + 과목 + 심화·확장 주제를 함께 보는 표
 function renderXlabAdminExpandTable(s){
   const rows = _xlabAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
-  if(!rows.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>';
-  return `
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xlabAdminPrintExpandTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>';
+  return printBtn+`
   <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#f8f9fc;text-align:left">
@@ -48671,8 +48754,9 @@ function renderXlabAdminExpandTable(s){
 // "예상세특표": 월별 과목구분 + 예상세특 내용을 한눈에 보는 표
 function renderXlabAdminRecordTable(s){
   const rows = _xlabAdminList.filter(function(t){return !!t.expectedRecord;}).slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
-  if(!rows.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">작성된 예상세특이 없습니다.</div>';
-  return `
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xlabAdminPrintRecordTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">작성된 예상세특이 없습니다.</div>';
+  return printBtn+`
   <div style="display:flex;flex-direction:column;gap:10px">
     ${rows.map(function(t){
       const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
