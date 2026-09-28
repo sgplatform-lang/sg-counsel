@@ -48418,6 +48418,9 @@ let _xlabAdminStudentId = null;
 let _xlabAdminList = [];
 let _xlabAdminLoading = false;
 let _xlabAdminDetail = null;
+// ★ 2026-09-28 추가: 관리자 X-lab 화면을 "기본입력 · 주제통계표 · 주제확장표 · 예상세특표"
+// 4개 탭으로 재구성(관리자 요청). 학생이 바뀌면 첫 탭(기본입력)으로 되돌린다.
+let _xlabAdminSubTab = '기본입력';
 
 async function _xlabAdminLoad(studentId){
   _xlabAdminLoading = true; render();
@@ -48437,56 +48440,138 @@ function xlabAdminOpenDetail(id){
   render();
 }
 function xlabAdminCloseDetail(){ _xlabAdminDetail=null; render(); }
+function xlabAdminSetSubTab(k){ _xlabAdminSubTab=k; _xlabAdminDetail=null; render(); }
+
+// ★ 2026-09-28 추가(관리자 요청): 학생용페이지와 동일한 "AI 주제활동 보고서" 양식으로
+// 통일 — xlabTopics 문서 하나를 학생/관리자 양쪽이 공유하므로, 학생이 저장한 내용을
+// 관리자 쪽에서도 같은 모양(년월일·학교·학년·이름·희망학과 → 선택 주제/교과목/교과개념
+// → ①~⑤ → 심화·확장 추천 → 예상세특)으로 인쇄·PDF 확인할 수 있다.
+function _xlabEsc(x){ return String(x==null?'':x); }
+function _xlabBuildFullReportHtml(t){
+  const savedDate = (t.report && t.report.savedAt) ? new Date(t.report.savedAt) : new Date();
+  const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  const sections = [
+    ['주제 선정이유', t.report&&t.report.reason],
+    ['개념·원리·이론', t.report&&t.report.concept],
+    ['실사례 예시', t.report&&t.report.example],
+    ['문제점·개선점', t.report&&t.report.issue],
+    ['교내활동 예시', t.report&&t.report.activity],
+  ];
+  let html = '<html><head><meta charset="utf-8"><title>X-lab 주제활동 보고서</title>'
+    +'<style>'
+    +'body{font-family:"Apple SD Gothic Neo",sans-serif;padding:40px;line-height:1.7;color:#1a1a2e}'
+    +'h1{font-size:22px;text-align:center;margin:0 0 14px}'
+    +'hr{border:none;border-top:2px solid #1a1a2e;margin:14px 0}'
+    +'.meta-row{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:#333}'
+    +'.meta-row b{color:#111}'
+    +'.topic-box{background:#f8f9fc;border-radius:10px;padding:14px 16px;margin:14px 0;font-size:13px}'
+    +'.topic-box div{margin-bottom:4px}'
+    +'h2{font-size:14px;margin:20px 0 6px;color:#3b5bdb;border-left:4px solid #3b5bdb;padding-left:8px}'
+    +'p{font-size:13px;white-space:pre-wrap;margin:0 0 4px}'
+    +'.record-box{border:1px solid #ddd;border-radius:8px;padding:14px;font-size:13px;white-space:pre-wrap}'
+    +'</style></head><body>'
+    +'<h1>📘 X-lab 주제활동 보고서</h1>'
+    +'<hr>'
+    +'<div class="meta-row">'
+      +'<span>년월일: <b>'+dateStr+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(t.studentSchool)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(t.studentGrade)+'</b></span>'
+      +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
+      +'<span>희망학과: <b>'+_xlabEsc(t.department)+'</b></span>'
+    +'</div>'
+    +'<hr>'
+    +'<div class="topic-box">'
+      +'<div><b>선택 주제:</b> '+_xlabEsc(t.topicTitle)+'</div>'
+      +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+      +'<div><b>교과목:</b> '+_xlabEsc(t.subjectArea||'-')+'</div>'
+      +'<div><b>교과개념:</b> '+_xlabEsc(t.subjectConcept||'-')+'</div>'
+    +'</div>'
+    +'<hr>';
+  sections.forEach(function(pair){
+    html += '<h2>'+pair[0]+'</h2><p>'+_xlabEsc(pair[1])+'</p>';
+  });
+  html += '<h2>주제 심화·확장 추천</h2><p>'+(t.advancedTopicTitle ? (_xlabEsc(t.advancedTopicTitle)+(t.advancedTopicDesc?(' — '+_xlabEsc(t.advancedTopicDesc)):'')) : '(미선택)')+'</p>';
+  if(t.expectedRecord){
+    html += '<hr><h2>📝 예상 세특 ('+_xlabEsc(t.expectedRecord.subject)+')</h2><div class="record-box">'+_xlabEsc(t.expectedRecord.recordText)+'</div>';
+  }
+  html += '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  return html;
+}
 
 function xlabAdminPrint(id){
   const t = _xlabAdminList.find(function(x){return x.id===id;});
   if(!t) return;
   const w = window.open('','_blank');
-  let html = '<html><head><meta charset="utf-8"><title>X-lab 주제활동</title>'
-    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:36px;line-height:1.7;color:#1a1a2e}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;margin:18px 0 6px;color:#3b5bdb}.meta{color:#666;font-size:12px;margin-bottom:20px}p{font-size:13px;white-space:pre-wrap}</style>'
-    +'</head><body>'
-    +'<h1>🔬 X-lab 주제활동</h1>'
-    +'<div class="meta">학생: '+(t.studentName||'')+' · 희망학과: '+(t.department||'')+' · 주제: '+(t.topicTitle||'')+'</div>';
-  if(t.report){
-    html += '<h2>① 주제 선정이유</h2><p>'+(t.report.reason||'')+'</p>'
-      +'<h2>② 개념·원리·이론</h2><p>'+(t.report.concept||'')+'</p>'
-      +'<h2>③ 실사례 예시</h2><p>'+(t.report.example||'')+'</p>'
-      +'<h2>④ 문제점·개선점</h2><p>'+(t.report.issue||'')+'</p>'
-      +'<h2>⑤ 교내활동 예시</h2><p>'+(t.report.activity||'')+'</p>';
-  }
-  if(t.expectedRecord){
-    html += '<h2>📝 예상 세특 ('+(t.expectedRecord.subject||'')+')</h2><p>'+(t.expectedRecord.recordText||'')+'</p>';
-  }
-  html += '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
-  w.document.write(html);
+  w.document.write(_xlabBuildFullReportHtml(t));
   w.document.close();
+}
+
+// ★ 2026-09-28 추가: renderRoadmapSubNav()와 동일한 "배지+제목+설명" 헤더 카드 패턴을
+// X-lab에도 적용(관리자 요청: "상단을 이미지처럼"). 그 아래 4개 하위탭을 함께 그린다.
+function renderXlabAdminHeader(){
+  const tabs=[['기본입력','📝'],['주제통계표','📊'],['주제확장표','🧭'],['예상세특표','🗂']];
+  return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #7c3aed;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
+    <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(124,58,237,.05)"></div>
+    <div style="position:relative;z-index:2">
+      <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(124,58,237,.30);color:#7c3aed;background:rgba(124,58,237,.06);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;letter-spacing:1.2px;margin-bottom:12px">🔬 X-LAB · 월별 주제활동</div>
+      <h1 style="margin:0;font-size:24px;color:#1a2340;letter-spacing:-.8px;line-height:1.2">X-lab 월별 주제활동 관리</h1>
+      <p style="margin:8px 0 0;color:#5b6478;font-size:13px;max-width:760px">희망 진로에서 출발해 주제 선정 → 개념·원리·이론 → 실사례 → 문제점·개선점 → 학교 연계 활동까지, 한 편의 탐구가 완성되는 과정을 한 곳에서 확인하세요.</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
+    ${tabs.map(function(pair){
+      const k=pair[0], icon=pair[1];
+      const isAct=_xlabAdminSubTab===k;
+      return `<button onclick="xlabAdminSetSubTab('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#7c3aed':'transparent'};background:transparent;color:${isAct?'#7c3aed':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${k}</button>`;
+    }).join('')}
+  </div>`;
 }
 
 function renderXlabAdmin(s){
   if(_xlabAdminStudentId!==String(s.id)){
     _xlabAdminStudentId=String(s.id);
-    _xlabAdminList=[]; _xlabAdminDetail=null;
+    _xlabAdminList=[]; _xlabAdminDetail=null; _xlabAdminSubTab='기본입력';
     _xlabAdminLoad(s.id);
   }
-  if(_xlabAdminDetail) return renderXlabAdminDetail(_xlabAdminDetail);
+  let body;
+  if(_xlabAdminLoading){
+    body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
+  } else if(_xlabAdminSubTab==='주제통계표'){
+    body = renderXlabAdminStatsTable(s);
+  } else if(_xlabAdminSubTab==='주제확장표'){
+    body = renderXlabAdminExpandTable(s);
+  } else if(_xlabAdminSubTab==='예상세특표'){
+    body = renderXlabAdminRecordTable(s);
+  } else {
+    body = _xlabAdminDetail ? renderXlabAdminDetail(_xlabAdminDetail) : renderXlabAdminBasicInput(s);
+  }
+  return `<div style="padding:20px">${renderXlabAdminHeader()}${body}</div>`;
+}
 
+// "기본입력" 탭: 학생 기본 인적사항 + 월별 주제보고서 목록(클릭하면 상세/인쇄)
+function renderXlabAdminBasicInput(s){
   const byMonth={};
   _xlabAdminList.forEach(function(t){ (byMonth[t.month]=byMonth[t.month]||[]).push(t); });
   const months=Object.keys(byMonth).sort().reverse();
 
   return `
-  <div style="padding:20px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <span style="font-size:17px;font-weight:800">🔬 X-lab · 월별주제활동</span>
-      <span style="font-size:12px;color:#888">희망학과: ${s.xlabDepartment||'(미입력)'}</span>
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:10px">👤 학생 기본 인적사항</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;font-size:12px">
+        <div><span style="color:#888">이름</span><div style="font-weight:700;margin-top:2px">${s.name||''}</div></div>
+        <div><span style="color:#888">학교</span><div style="font-weight:700;margin-top:2px">${s.school||''}</div></div>
+        <div><span style="color:#888">학년</span><div style="font-weight:700;margin-top:2px">${s.grade||''}</div></div>
+        <div><span style="color:#888">담당</span><div style="font-weight:700;margin-top:2px">${s.counselor||''}</div></div>
+        <div><span style="color:#888">희망학과(X-lab)</span><div style="font-weight:700;margin-top:2px">${s.xlabDepartment||'(미입력)'}</div></div>
+      </div>
     </div>
-    ${_xlabAdminLoading ? '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>' :
-      !months.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>' :
+    <div style="font-weight:800;font-size:14px;margin-bottom:10px">📘 월별 주제보고서</div>
+    ${!months.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>' :
       months.map(function(m){
         const p=m.split('-'); const label=p[0]+'년 '+parseInt(p[1],10)+'월';
         return `
         <div style="margin-bottom:18px">
-          <div style="font-weight:800;font-size:13px;color:#3b5bdb;margin-bottom:8px">${label}</div>
+          <div style="font-weight:800;font-size:13px;color:#7c3aed;margin-bottom:8px">${label}</div>
           ${byMonth[m].map(function(t){return `
           <div onclick="xlabAdminOpenDetail('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
             <div>
@@ -48497,13 +48582,11 @@ function renderXlabAdmin(s){
           </div>`;}).join('')}
         </div>`;
       }).join('')
-    }
-  </div>`;
+    }`;
 }
 
 function renderXlabAdminDetail(t){
   return `
-  <div style="padding:20px">
     <button onclick="xlabAdminCloseDetail()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:12px">← 목록으로</button>
     <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">
       <div>
@@ -48513,6 +48596,8 @@ function renderXlabAdminDetail(t){
       <button onclick="xlabAdminPrint('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>
     </div>
     ${t.topicDesc?`<div style="background:#f8f9fc;border-radius:10px;padding:12px;font-size:12px;color:#555;margin-bottom:16px">${t.topicDesc}</div>`:''}
+    ${(t.subjectArea||t.subjectConcept) ? `<div style="font-size:12px;color:#0f766e;margin-bottom:16px;background:#0f766e0f;border-radius:8px;padding:8px 10px">${t.subjectArea?('📘 교과목: '+t.subjectArea):''}${(t.subjectArea&&t.subjectConcept)?' · ':''}${t.subjectConcept?('교과개념: '+t.subjectConcept):''}</div>` : ''}
+    ${t.advancedTopicTitle ? `<div style="font-size:12px;color:#7c3aed;margin-bottom:16px;background:#7c3aed0f;border-radius:8px;padding:8px 10px">🧭 심화·확장 주제: ${t.advancedTopicTitle}${t.advancedTopicDesc?(' — '+t.advancedTopicDesc):''}</div>` : ''}
     ${t.report ? `
     <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:14px">
       <div style="font-weight:800;font-size:14px;margin-bottom:10px">📘 주제탐구 보고서</div>
@@ -48527,6 +48612,78 @@ function renderXlabAdminDetail(t){
       <div style="font-size:11px;color:#888;margin-bottom:8px">과목: ${t.expectedRecord.subject||''} · 동기: ${t.expectedRecord.motivation||''} · 관련활동: ${t.expectedRecord.relatedActivity||''}${t.expectedRecord.linkedActivity?(' · 연계활동: '+t.expectedRecord.linkedActivity):''}</div>
       <div style="font-size:13px;color:#333;white-space:pre-wrap;border:1px solid #eee;border-radius:8px;padding:12px">${t.expectedRecord.recordText||''}</div>
     </div>` : ''}
+  `;
+}
+
+// "주제통계표": 월별 주제명 + 과목선택 여부(교과목 선택했는지)를 한눈에 보는 표
+function renderXlabAdminStatsTable(s){
+  const rows = _xlabAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  if(!rows.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>';
+  return `
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">월</th><th style="padding:10px 12px">주제명</th><th style="padding:10px 12px">주제 출처</th><th style="padding:10px 12px">과목선택 여부</th><th style="padding:10px 12px">보고서 상태</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(function(t){
+          const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+          const subjOk = !!(t.subjectArea && String(t.subjectArea).trim());
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:10px 12px">${mLabel}</td>
+            <td style="padding:10px 12px;font-weight:700">${t.topicTitle||''}</td>
+            <td style="padding:10px 12px">${t.topicSource==='ai'?'🤖 AI추천':'✍️ 직접입력'}</td>
+            <td style="padding:10px 12px">${subjOk?('✅ '+t.subjectArea):'❌ 미선택'}</td>
+            <td style="padding:10px 12px">${(t.report&&t.report.savedAt)?'✅ 완료':'⏳ 미작성'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// "주제확장표": 처음 주제 + 과목 + 심화·확장 주제를 함께 보는 표
+function renderXlabAdminExpandTable(s){
+  const rows = _xlabAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  if(!rows.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>';
+  return `
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">월</th><th style="padding:10px 12px">처음 주제</th><th style="padding:10px 12px">과목</th><th style="padding:10px 12px">심화·확장 주제</th><th style="padding:10px 12px">비고</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(function(t){
+          const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:10px 12px">${mLabel}</td>
+            <td style="padding:10px 12px;font-weight:700">${t.topicTitle||''}</td>
+            <td style="padding:10px 12px">${t.subjectArea||'-'}</td>
+            <td style="padding:10px 12px;font-weight:700;color:#7c3aed">${t.advancedTopicTitle||'(미선택)'}</td>
+            <td style="padding:10px 12px;color:#888">${t.advancedTopicDesc||''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// "예상세특표": 월별 과목구분 + 예상세특 내용을 한눈에 보는 표
+function renderXlabAdminRecordTable(s){
+  const rows = _xlabAdminList.filter(function(t){return !!t.expectedRecord;}).slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  if(!rows.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">작성된 예상세특이 없습니다.</div>';
+  return `
+  <div style="display:flex;flex-direction:column;gap:10px">
+    ${rows.map(function(t){
+      const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+      return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:800;font-size:12px;color:#0f766e">${mLabel} · ${t.expectedRecord.subject||'(과목 미지정)'}</span>
+          <span style="font-size:11px;color:#888">주제: ${t.topicTitle||''}</span>
+        </div>
+        <div style="font-size:13px;color:#333;white-space:pre-wrap;border:1px solid #eee;border-radius:8px;padding:10px">${t.expectedRecord.recordText||''}</div>
+      </div>`;
+    }).join('')}
   </div>`;
 }
 </script>
