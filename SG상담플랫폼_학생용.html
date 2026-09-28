@@ -109,6 +109,9 @@ try{
     xlabGenerateTopicReport: (payload)=>firebase.functions().httpsCallable('xlabGenerateTopicReport', {timeout: 120000})(payload).then(r=>r.data),
     xlabGenerateExpectedRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateExpectedRecord', {timeout: 120000})(payload).then(r=>r.data),
     xlabRecommendAdvancedTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendAdvancedTopics', {timeout: 120000})(payload).then(r=>r.data),
+    // ★ 2026-09-28 추가: X-lab · 월별교과활동(교과별 예상세특용 교과활동 보고서) 전용 함수 2종.
+    xlabGenerateSubjectSection: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectSection', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateSubjectRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectRecord', {timeout: 120000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료");
@@ -4343,8 +4346,30 @@ function xlabPrintRecord(){
   w.document.close();
 }
 
+// ★ 2026-09-28 추가: X-lab 최상단에 "월별주제활동 / 월별교과활동" 모드 전환 도입
+// (관리자 요청: 향후 "셀프주제활동"까지 3종으로 늘어날 예정). 편집 화면에서는 표시하지
+// 않고, 목록 화면 최상단에서만 전환한다.
+let _xlabTopModeMain = 'topic'; // 'topic' | 'subject'
+function xlabSwitchTopMode(mode){
+  _xlabTopModeMain = mode;
+  if(mode==='subject'){
+    _xsubView='list';
+    if(_xsubLoadedForMonth!==_xsubMonth) _xsubLoadList();
+  }else{
+    _xlabView='list';
+  }
+  render();
+}
+function _xlabTopModeBar(){
+  return `<div style="display:flex;gap:8px;margin-bottom:14px">
+    <button onclick="xlabSwitchTopMode('topic')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${_xlabTopModeMain==='topic'?'#3b5bdb':'#ddd'};background:${_xlabTopModeMain==='topic'?'#3b5bdb':'#fff'};color:${_xlabTopModeMain==='topic'?'#fff':'#333'};font-weight:800;font-size:12px">📘 월별주제활동</button>
+    <button onclick="xlabSwitchTopMode('subject')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${_xlabTopModeMain==='subject'?'#3b5bdb':'#ddd'};background:${_xlabTopModeMain==='subject'?'#3b5bdb':'#fff'};color:${_xlabTopModeMain==='subject'?'#fff':'#333'};font-weight:800;font-size:12px">📗 월별교과활동</button>
+  </div>`;
+}
+
 function renderXlab(){
   if(!CU) return '';
+  if(_xlabTopModeMain==='subject') return renderXsub();
   if(_xlabView==='edit' && _xlabCurrent) return renderXlabEdit();
   return renderXlabList();
 }
@@ -4357,6 +4382,7 @@ function renderXlabList(){
   if(_xlabLoadedForMonth!==_xlabMonth && !_xlabLoading) _xlabLoadList();
   return `
   <div style="padding:16px">
+    ${_xlabTopModeBar()}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <span style="font-size:18px;font-weight:800">🔬 X-lab · 월별주제활동</span>
     </div>
@@ -4504,6 +4530,579 @@ function renderXlabRecordWizard(){
         <button onclick="${step===4?'xlabWizardFinishLinked()':'xlabWizardNext()'}" ${_xlabRecordLoading?'disabled':''} style="flex:2;padding:12px;background:#0f766e;color:#fff;border:none;border-radius:10px;font-weight:800">${_xlabRecordLoading?'⏳ 생성 중...':(step===4?'🤖 AI 예상세특 생성':'다음')}</button>
       </div>
     </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 📗 X-lab — 월별교과활동 (학생용, 2026-09-28 신규)
+// 관리자 요청 스펙: 교과목(국어/영어/수학/사회/과학/역사/직접입력) + 희망학과 입력 →
+// 탐구 주제를 "기존 월별주제활동 목록에서 선택" / "직접입력" / "AI 주제추천" 중 하나로
+// 선정 → 주제 선정이유/알게 된 계기를 4가지 유형(수업시간/독서활동/교내활동/직접입력)
+// 중 하나로 구조화해서 입력 → 6개 항목(개념·원리·이론/실사례/문제점·개선점/
+// 배운점·느낀점·알게된점/독서활동 기록/심화·확장주제)을 AI추천 또는 직접입력으로 작성 →
+// 저장/수정/인쇄·PDF → 교과 예상세특(500자) 버튼 생성.
+// 저장 위치: 신규 컬렉션 xlabSubjectReports(학생ID+월 단위 문서).
+// ⚠️ Firestore 보안규칙에 'xlabSubjectReports' 컬렉션이 xlabTopics와 같은 방식으로
+// (allow read, write: if true) 추가되어 있어야 정상 동작합니다.
+// ══════════════════════════════════════════════════════════════════════════
+const XSUB_SCHOOL_ACTIVITY_TYPES = ['동아리','진로','자율','봉사','실험','탐구','토론','강연','독서','직접입력'];
+const XSUB_REPORT_FIELDS = [
+  ['concept','① 개념·원리·이론'],
+  ['example','② 실사례 예시'],
+  ['issue','③ 문제점·개선점'],
+  ['learned','④ 배운점·느낀점·알게된점'],
+  ['reading','⑤ 독서활동 기록'],
+  ['advanced','⑥ 심화·확장주제'],
+];
+const XSUB_REPORT_FIELD_COLORS = {concept:'#5fae7a', example:'#d99a4e', issue:'#d9738c', learned:'#6c8ee2', reading:'#8f7fe0', advanced:'#3bb6c9'};
+
+let _xsubMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+let _xsubList = [];
+let _xsubLoading = false;
+let _xsubLoadedForMonth = null;
+let _xsubView = 'list'; // 'list' | 'edit'
+let _xsubCurrent = null;
+let _xsubTopicMode = 'existing'; // 'existing' | 'ai' | 'manual'
+let _xsubAiCandidates = null;
+let _xsubAiLoading = false;
+let _xsubExistingTopics = null; // 학생의 xlabTopics 캐시("기존 목록에서 선택"용)
+let _xsubReportLoading = {};
+let _xsubRecordLoading = false;
+
+async function _xsubLoadList(){
+  if(!FB() || !CU) return;
+  const loadedMonth = _xsubMonth;
+  _xsubLoading = true; render();
+  try{
+    const all = await window._fb.getWhere('xlabSubjectReports','studentId','==',String(CU.id));
+    _xsubList = (all||[]).filter(t=>t.month===loadedMonth).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }catch(e){
+    console.warn('X-lab 교과활동 목록 로딩 실패:', e.message);
+    _xsubList = [];
+  }
+  _xsubLoadedForMonth = loadedMonth;
+  _xsubLoading = false; render();
+}
+
+function xsubChangeMonth(m){
+  _xsubMonth = m; _xsubView='list'; _xsubCurrent=null;
+  _xsubLoadList();
+}
+
+async function _xsubEnsureExistingTopics(){
+  if(_xsubExistingTopics!==null) return;
+  if(!FB() || !CU) return;
+  try{
+    const all = await window._fb.getWhere('xlabTopics','studentId','==',String(CU.id));
+    _xsubExistingTopics = (all||[]).filter(t=>t.topicTitle).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }catch(e){ _xsubExistingTopics = []; }
+  render();
+}
+
+function xsubNewActivity(){
+  _xsubCurrent = {
+    id: 'xsub_'+CU.id+'_'+Date.now(),
+    studentId: String(CU.id),
+    studentName: CU.name||'',
+    studentSchool: CU.school||'',
+    studentGrade: CU.grade||'',
+    month: _xsubMonth,
+    department: CU.xlabDepartment||'',
+    subjectArea:'', subjectAreaCustom:'',
+    topicSource: 'existing',
+    topicTitle:'', topicDesc:'', linkedXlabTopicId:'',
+    reason: {type:''},
+    report: {concept:'',example:'',issue:'',learned:'',reading:'',advanced:''},
+    expectedRecord: null,
+    createdAt: Date.now(),
+  };
+  _xsubTopicMode = 'existing';
+  _xsubAiCandidates = null;
+  _xsubView = 'edit';
+  render();
+  _xsubEnsureExistingTopics();
+}
+
+function xsubOpenExisting(id){
+  const t = _xsubList.find(x=>x.id===id);
+  if(!t) return;
+  _xsubCurrent = t;
+  if(!_xsubCurrent.reason) _xsubCurrent.reason = {type:''};
+  if(!_xsubCurrent.report) _xsubCurrent.report = {concept:'',example:'',issue:'',learned:'',reading:'',advanced:''};
+  _xsubTopicMode = t.topicSource||'existing';
+  _xsubAiCandidates = null;
+  _xsubView = 'edit';
+  render();
+  if(_xsubTopicMode==='existing' && !t.topicTitle) _xsubEnsureExistingTopics();
+}
+
+function xsubBackToList(){ _xsubView='list'; _xsubCurrent=null; render(); }
+
+function xsubResetTopic(){
+  if(_xsubCurrent.report && _xsubCurrent.report.savedAt){
+    if(!confirm('이미 저장된 보고서입니다. 주제를 다시 선택해도 아래 작성된 항목 내용은 그대로 남아있습니다. 계속할까요?')) return;
+  }
+  _xsubCurrent.topicTitle=''; _xsubCurrent.topicDesc=''; _xsubCurrent.linkedXlabTopicId='';
+  _xsubAiCandidates = null;
+  render();
+}
+
+// 화면이 다시 그려지기 전에 현재 입력 중인 값들을 모두 _xsubCurrent에 반영 — X-lab
+// 월별주제활동의 _xlabCaptureFormFields()와 동일한 이유(칩 클릭 등으로 render()가
+// 다시 호출되면서 입력 중이던 텍스트 값이 사라지는 것을 방지)로 존재한다.
+function xsubCaptureFormFields(){
+  if(!_xsubCurrent) return;
+  const map = {
+    xsubDeptInput:'department',
+    xsubSubjectAreaCustom:'subjectAreaCustom',
+    xsubInterestInput:'_interestDraft',
+    xsubManualTitle:'_manualTitleDraft',
+    xsubManualDesc:'_manualDescDraft',
+  };
+  Object.keys(map).forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) _xsubCurrent[map[id]] = el.value;
+  });
+  if(!_xsubCurrent.reason) _xsubCurrent.reason = {type:''};
+  const reasonMap = {
+    xsubReasonClassSubject:'classSubject', xsubReasonClassConcept:'classConcept',
+    xsubReasonBookTitle:'bookTitle', xsubReasonBookAuthor:'bookAuthor', xsubReasonBookCuriosity:'bookCuriosity',
+    xsubReasonActivityTypeCustom:'activityTypeCustom', xsubReasonActivityName:'activityName', xsubReasonActivityCuriosity:'activityCuriosity',
+    xsubReasonManualText:'manualText',
+  };
+  Object.keys(reasonMap).forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) _xsubCurrent.reason[reasonMap[id]] = el.value;
+  });
+}
+
+function xsubChooseSubjectArea(v){
+  if(_xsubCurrent.topicTitle) return; // 주제 확정 후에는 교과목 변경 불가(보고서 내용과 어긋나지 않도록)
+  xsubCaptureFormFields();
+  _xsubCurrent.subjectArea = v;
+  if(v!=='직접입력') _xsubCurrent.subjectAreaCustom='';
+  render();
+}
+
+function _xsubResolvedSubjectArea(t){
+  if(!t) return '';
+  return (t.subjectArea==='직접입력') ? (t.subjectAreaCustom||'').trim() : (t.subjectArea||'');
+}
+
+function xsubChooseTopicMode(mode){
+  xsubCaptureFormFields();
+  _xsubTopicMode = mode;
+  if(mode==='existing') _xsubEnsureExistingTopics();
+  render();
+}
+
+function xsubSelectExistingTopic(id){
+  const t = (_xsubExistingTopics||[]).find(x=>x.id===id);
+  if(!t) return;
+  xsubCaptureFormFields();
+  _xsubCurrent.topicSource = 'existing';
+  _xsubCurrent.linkedXlabTopicId = t.id;
+  _xsubCurrent.topicTitle = t.topicTitle;
+  _xsubCurrent.topicDesc = t.topicDesc||'';
+  if(!_xsubCurrent.department) _xsubCurrent.department = t.department||CU.xlabDepartment||'';
+  render();
+}
+
+async function xsubFindAiTopics(){
+  xsubCaptureFormFields();
+  const dept = (_xsubCurrent.department||'').trim() || CU.xlabDepartment || '';
+  const interest = (_xsubCurrent._interestDraft||'').trim();
+  if(!dept){ alert('희망학과를 먼저 입력해주세요.'); return; }
+  _xsubCurrent.department = dept;
+  _xsubAiLoading = true; render();
+  try{
+    const r = await window._fb.xlabRecommendTopics({department:dept, interest:interest, keywords:'', difficultyLevel:_xlabDefaultDifficulty(), grade:CU.grade||''});
+    _xsubAiCandidates = r.topics||[];
+  }catch(e){
+    alert('주제 추천 중 오류가 발생했습니다: '+e.message);
+    _xsubAiCandidates = [];
+  }
+  _xsubAiLoading = false; render();
+}
+
+function xsubSelectAiTopic(idx){
+  const t = _xsubAiCandidates[idx];
+  if(!t) return;
+  xsubCaptureFormFields();
+  _xsubCurrent.topicSource = 'ai';
+  _xsubCurrent.linkedXlabTopicId = '';
+  _xsubCurrent.topicTitle = t.title;
+  _xsubCurrent.topicDesc = t.desc;
+  render();
+}
+
+function xsubSetManualTopic(){
+  const titleEl = document.getElementById('xsubManualTitle');
+  const descEl = document.getElementById('xsubManualDesc');
+  const title = titleEl ? titleEl.value.trim() : '';
+  const desc = descEl ? descEl.value.trim() : '';
+  if(!title){ alert('탐구 주제를 입력해주세요.'); return; }
+  xsubCaptureFormFields();
+  _xsubCurrent.topicSource = 'manual';
+  _xsubCurrent.linkedXlabTopicId = '';
+  _xsubCurrent.topicTitle = title;
+  _xsubCurrent.topicDesc = desc;
+  render();
+}
+
+function xsubChooseReasonType(type){
+  xsubCaptureFormFields();
+  if(!_xsubCurrent.reason) _xsubCurrent.reason = {};
+  _xsubCurrent.reason.type = type;
+  render();
+}
+
+function xsubChooseActivityType(v){
+  xsubCaptureFormFields();
+  _xsubCurrent.reason.activityType = v;
+  if(v!=='직접입력') _xsubCurrent.reason.activityTypeCustom='';
+  render();
+}
+
+function _xsubReasonSummaryText(r){
+  if(!r || !r.type) return '';
+  if(r.type==='class') return '📚 수업시간('+(r.classSubject||'')+') 중 궁금증: '+(r.classConcept||'');
+  if(r.type==='reading') return '📖 독서활동("'+(r.bookTitle||'')+'"'+(r.bookAuthor?(' · '+r.bookAuthor):'')+') 중 궁금증: '+(r.bookCuriosity||'');
+  if(r.type==='schoolActivity') return '🏫 교내활동('+(r.activityType==='직접입력'?(r.activityTypeCustom||''):(r.activityType||''))+(r.activityName?(' · '+r.activityName):'')+') 중 궁금증: '+(r.activityCuriosity||'');
+  if(r.type==='manual') return r.manualText||'';
+  return '';
+}
+
+function renderXsubReasonBlock(t){
+  const r = t.reason || {};
+  const opts = [
+    {key:'class', label:'📚 수업시간에 궁금증이 생김'},
+    {key:'reading', label:'📖 독서활동 중 궁금증이 생김'},
+    {key:'schoolActivity', label:'🏫 교내활동 중 궁금증이 생김'},
+    {key:'manual', label:'✍️ 직접입력'},
+  ];
+  let sub = '';
+  if(r.type==='class'){
+    sub = `
+      <label style="font-size:12px;color:#666;font-weight:700">관련 과목</label>
+      <input id="xsubReasonClassSubject" value="${(r.classSubject||'').replace(/"/g,'&quot;')}" placeholder="예: 물리학Ⅰ" style="margin:6px 0 10px">
+      <label style="font-size:12px;color:#666;font-weight:700">궁금해진 원리/이론/개념</label>
+      <textarea id="xsubReasonClassConcept" rows="2" style="margin:6px 0">${(r.classConcept||'').replace(/</g,'&lt;')}</textarea>`;
+  }else if(r.type==='reading'){
+    sub = `
+      <label style="font-size:12px;color:#666;font-weight:700">도서명</label>
+      <input id="xsubReasonBookTitle" value="${(r.bookTitle||'').replace(/"/g,'&quot;')}" style="margin:6px 0 10px">
+      <label style="font-size:12px;color:#666;font-weight:700">저자</label>
+      <input id="xsubReasonBookAuthor" value="${(r.bookAuthor||'').replace(/"/g,'&quot;')}" style="margin:6px 0 10px">
+      <label style="font-size:12px;color:#666;font-weight:700">궁금증이 생긴 내용</label>
+      <textarea id="xsubReasonBookCuriosity" rows="2" style="margin:6px 0">${(r.bookCuriosity||'').replace(/</g,'&lt;')}</textarea>`;
+  }else if(r.type==='schoolActivity'){
+    sub = `
+      <label style="font-size:12px;color:#666;font-weight:700">교내활동 유형</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">
+        ${XSUB_SCHOOL_ACTIVITY_TYPES.map(function(o){return `<button onclick="xsubChooseActivityType('${o}')" style="padding:7px 12px;border-radius:16px;border:1.5px solid ${r.activityType===o?'#3b5bdb':'#ddd'};background:${r.activityType===o?'#3b5bdb':'#fff'};color:${r.activityType===o?'#fff':'#333'};font-weight:700;font-size:11px">${o}</button>`;}).join('')}
+      </div>
+      ${r.activityType==='직접입력' ? `<input id="xsubReasonActivityTypeCustom" placeholder="활동 유형 직접 입력" value="${(r.activityTypeCustom||'').replace(/"/g,'&quot;')}" style="margin-bottom:10px">` : ''}
+      <label style="font-size:12px;color:#666;font-weight:700">활동명</label>
+      <input id="xsubReasonActivityName" value="${(r.activityName||'').replace(/"/g,'&quot;')}" style="margin:6px 0 10px">
+      <label style="font-size:12px;color:#666;font-weight:700">궁금증이 생긴 내용</label>
+      <textarea id="xsubReasonActivityCuriosity" rows="2" style="margin:6px 0">${(r.activityCuriosity||'').replace(/</g,'&lt;')}</textarea>`;
+  }else if(r.type==='manual'){
+    sub = `<textarea id="xsubReasonManualText" rows="3" placeholder="이 주제를 알게 된 계기를 자유롭게 적어주세요" style="margin-top:6px">${(r.manualText||'').replace(/</g,'&lt;')}</textarea>`;
+  }
+  return `
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+    <div style="font-weight:800;font-size:13px;margin-bottom:10px">🧭 주제 선정이유 / 알게 된 계기 <span style="color:#e03131;font-weight:400;font-size:11px">(필수)</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      ${opts.map(function(o){return `<button onclick="xsubChooseReasonType('${o.key}')" style="padding:8px 12px;border-radius:16px;border:1.5px solid ${r.type===o.key?'#3b5bdb':'#ddd'};background:${r.type===o.key?'#3b5bdb':'#fff'};color:${r.type===o.key?'#fff':'#333'};font-weight:700;font-size:11px">${o.label}</button>`;}).join('')}
+    </div>
+    ${sub}
+  </div>`;
+}
+
+async function xsubGenerateReportSection(field){
+  if(!_xsubCurrent.topicTitle){ alert('먼저 주제를 선택하거나 입력해주세요.'); return; }
+  if(!_xsubResolvedSubjectArea(_xsubCurrent)){ alert('교과목을 먼저 선택해주세요.'); return; }
+  if(!_xsubCurrent.reason || !_xsubCurrent.reason.type){ alert('먼저 "주제 선정이유 / 알게 된 계기"를 선택·입력해주세요.'); return; }
+  if(!_xsubCurrent.report) _xsubCurrent.report = {concept:'',example:'',issue:'',learned:'',reading:'',advanced:''};
+  XSUB_REPORT_FIELDS.forEach(function(pair){
+    const el = document.getElementById('xsubReport_'+pair[0]);
+    if(el) _xsubCurrent.report[pair[0]] = el.value;
+  });
+  xsubCaptureFormFields();
+  _xsubReportLoading[field] = true; render();
+  try{
+    const r = await window._fb.xlabGenerateSubjectSection({
+      department: _xsubCurrent.department||'',
+      subjectArea: _xsubResolvedSubjectArea(_xsubCurrent),
+      topic: _xsubCurrent.topicTitle,
+      topicDesc: _xsubCurrent.topicDesc||'',
+      section: field,
+      reason: _xsubCurrent.reason||{},
+      grade: CU.grade||'',
+    });
+    _xsubCurrent.report[field] = r.text;
+    _xsubCurrent.report.generatedAt = Date.now();
+  }catch(e){
+    alert('AI 생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xsubReportLoading[field] = false; render();
+}
+
+async function xsubSaveActivity(){
+  if(!_xsubCurrent.topicTitle){ alert('저장할 주제 내용이 없습니다.'); return; }
+  const subjArea = _xsubResolvedSubjectArea(_xsubCurrent);
+  if(!subjArea){ alert('교과목을 선택해주세요.'); return; }
+  if(!_xsubCurrent.reason || !_xsubCurrent.reason.type){ alert('"주제 선정이유 / 알게 된 계기"는 필수입니다.'); return; }
+  _xsubCurrent.studentName = CU.name||'';
+  _xsubCurrent.studentSchool = CU.school||'';
+  _xsubCurrent.studentGrade = CU.grade||'';
+  if(!_xsubCurrent.report) _xsubCurrent.report = {concept:'',example:'',issue:'',learned:'',reading:'',advanced:''};
+  XSUB_REPORT_FIELDS.forEach(function(pair){
+    const el = document.getElementById('xsubReport_'+pair[0]);
+    if(el) _xsubCurrent.report[pair[0]] = el.value;
+  });
+  for(const pair of XSUB_REPORT_FIELDS){
+    const f = pair[0], label = pair[1];
+    if(!String(_xsubCurrent.report[f]||'').trim()){
+      alert('"'+label+'" 항목은 필수 입력입니다. AI로 생성하거나 직접 입력해주세요.');
+      return;
+    }
+  }
+  _xsubCurrent.report.savedAt = Date.now();
+  try{
+    if(FB()) await window._fb.set('xlabSubjectReports', _xsubCurrent.id, _xsubCurrent);
+    toast('저장되었습니다 💾');
+    await _xsubLoadList();
+    _xsubView='list'; _xsubCurrent=null; render();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+
+function xsubDeleteActivity(id){
+  if(!confirm('이 교과활동 보고서를 삭제하시겠습니까?')) return;
+  (async function(){
+    try{
+      if(FB()) await window._db.collection('xlabSubjectReports').doc(id).delete();
+      toast('삭제되었습니다');
+      await _xsubLoadList();
+    }catch(e){ alert('삭제 실패: '+e.message); }
+  })();
+}
+
+async function xsubGenerateRecord(){
+  if(!_xsubCurrent || !_xsubCurrent.report || !_xsubCurrent.report.savedAt){ alert('먼저 보고서를 저장해주세요.'); return; }
+  const subjArea = _xsubResolvedSubjectArea(_xsubCurrent);
+  const summary = XSUB_REPORT_FIELDS.map(function(pair){ return _xsubCurrent.report[pair[0]]||''; }).join(' ');
+  _xsubRecordLoading = true; render();
+  try{
+    const r = await window._fb.xlabGenerateSubjectRecord({
+      department: _xsubCurrent.department||'',
+      subjectArea: subjArea,
+      topic: _xsubCurrent.topicTitle,
+      topicDesc: _xsubCurrent.topicDesc||'',
+      reportSummary: summary.slice(0,2000),
+      grade: CU.grade||'',
+    });
+    _xsubCurrent.expectedRecord = {recordText:r.recordText, subject:subjArea, generatedAt:Date.now()};
+    if(FB()) await window._fb.set('xlabSubjectReports', _xsubCurrent.id, _xsubCurrent);
+    toast('교과 예상세특이 생성·저장되었습니다 💾');
+  }catch(e){
+    alert('생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xsubRecordLoading = false; render();
+}
+
+function _xsubBuildFullReportHtml(t){
+  const savedDate = (t.report && t.report.savedAt) ? new Date(t.report.savedAt) : new Date();
+  const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  const schoolVal = t.studentSchool || (typeof CU!=='undefined' && CU ? CU.school : '') || '';
+  const gradeVal = t.studentGrade || (typeof CU!=='undefined' && CU ? CU.grade : '') || '';
+  const dateCompact = savedDate.getFullYear()+String(savedDate.getMonth()+1).padStart(2,'0')+String(savedDate.getDate()).padStart(2,'0');
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab 월별교과활동 보고서_'+dateCompact;
+  const subjArea = _xsubResolvedSubjectArea(t);
+  const reasonLine = _xsubReasonSummaryText(t.reason||{});
+  const sections = [
+    ['① 개념·원리·이론', t.report&&t.report.concept],
+    ['② 실사례 예시', t.report&&t.report.example],
+    ['③ 문제점·개선점', t.report&&t.report.issue],
+    ['④ 배운점·느낀점·알게된점', t.report&&t.report.learned],
+    ['⑤ 독서활동 기록', t.report&&t.report.reading],
+    ['⑥ 심화·확장주제', t.report&&t.report.advanced],
+  ];
+  let html = '<html><head><meta charset="utf-8"><title>'+pdfTitle+'</title>'
+    +'<style>body{font-family:"Malgun Gothic",sans-serif;padding:36px;color:#222;line-height:1.7}h1{font-size:22px;text-align:center;margin-bottom:14px}h2{font-size:15px;margin:20px 0 6px;color:#0f766e}hr{border:none;border-top:1px solid #ccc;margin:14px 0}.meta-row{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}.topic-box{background:#f7f8fb;border-radius:10px;padding:12px 14px;font-size:13px}.record-box{background:#fff7ed;border-radius:10px;padding:12px 14px;font-size:13px;white-space:pre-wrap}p{font-size:13px;white-space:pre-wrap}</style></head><body>'
+    +'<h1>📗 X-lab 월별교과활동 보고서</h1>'
+    +'<hr>'
+    +'<div class="meta-row">'
+      +'<span>년월일: <b>'+dateStr+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(schoolVal)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(gradeVal)+'</b></span>'
+      +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
+      +'<span>희망학과: <b>'+_xlabEsc(t.department)+'</b></span>'
+    +'</div>'
+    +'<hr>'
+    +'<div class="topic-box">'
+      +'<div><b>교과목:</b> '+_xlabEsc(subjArea||'-')+'</div>'
+      +'<div><b>탐구 주제:</b> '+_xlabEsc(t.topicTitle)+'</div>'
+      +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+      +'<div style="margin-top:6px"><b>주제 선정이유/계기:</b> '+_xlabEsc(reasonLine||'-')+'</div>'
+    +'</div>'
+    +'<hr>';
+  sections.forEach(function(pair){
+    html += '<h2>'+pair[0]+'</h2><p>'+_xlabEsc(pair[1])+'</p>';
+  });
+  if(t.expectedRecord && t.expectedRecord.recordText){
+    html += '<hr><h2>📝 교과 예상 세특 ('+_xlabEsc(subjArea)+')</h2><div class="record-box">'+_xlabEsc(t.expectedRecord.recordText)+'</div>';
+  }
+  html += '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  return html;
+}
+
+function xsubPrintReport(){
+  const t = _xsubCurrent;
+  if(!t) return;
+  const w = window.open('','_blank');
+  w.document.write(_xsubBuildFullReportHtml(t));
+  w.document.close();
+}
+
+function renderXsub(){
+  if(!CU) return '';
+  if(_xsubView==='edit' && _xsubCurrent) return renderXsubEdit();
+  return renderXsubList();
+}
+
+function renderXsubList(){
+  const months=[];
+  const now=new Date();
+  for(let i=0;i<12;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  months.reverse();
+  if(_xsubLoadedForMonth!==_xsubMonth && !_xsubLoading) _xsubLoadList();
+  return `
+  <div style="padding:16px">
+    ${_xlabTopModeBar()}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:18px;font-weight:800">📗 X-lab · 월별교과활동</span>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #eee">
+      <label style="font-size:12px;color:#666;font-weight:700">희망학과</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input id="xlabDeptInput" value="${(CU.xlabDepartment||'').replace(/"/g,'&quot;')}" placeholder="예: 컴퓨터공학과">
+        <button onclick="xlabSaveDepartment()" style="flex:none;padding:0 16px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:700">저장</button>
+      </div>
+    </div>
+    <div id="xsubMonthScroller" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:4px">
+      ${months.map(m=>`<button onclick="xsubChangeMonth('${m}')" style="flex:none;padding:8px 14px;border-radius:20px;border:1.5px solid ${m===_xsubMonth?'#3b5bdb':'#ddd'};background:${m===_xsubMonth?'#3b5bdb':'#fff'};color:${m===_xsubMonth?'#fff':'#333'};font-weight:700;font-size:12px">${_xlabMonthLabel(m)}</button>`).join('')}
+    </div>
+    <button onclick="xsubNewActivity()" style="width:100%;padding:14px;background:#3bb6c9;color:#fff;border:none;border-radius:12px;font-weight:800;font-size:14px;margin-bottom:16px">➕ 새 교과활동 만들기</button>
+    ${_xsubLoading ? '<div style="text-align:center;color:#888;padding:30px">불러오는 중...</div>' :
+      !_xsubList.length ? '<div style="text-align:center;color:#aaa;padding:30px;font-size:13px">이번 달 등록된 교과활동이 없습니다.</div>' :
+      _xsubList.map(function(t){return `
+      <div onclick="xsubOpenExisting('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div style="font-size:11px;color:#888">${_xsubResolvedSubjectArea(t)||'교과목 미선택'}</div>
+            <div style="font-weight:800;font-size:14px;margin-top:2px">${t.topicTitle||'(제목 없음)'}</div>
+            <div style="font-size:11px;color:${(t.report&&t.report.savedAt)?'#0f766e':'#e8590c'};margin-top:4px;font-weight:700">${(t.report&&t.report.savedAt)?'✅ 저장 완료':'⏳ 작성 중'}</div>
+          </div>
+          <button onclick="event.stopPropagation();xsubDeleteActivity('${t.id}')" style="background:none;border:none;color:#e03131;font-size:12px">삭제</button>
+        </div>
+      </div>`;}).join('')}
+  </div>`;
+}
+
+function renderXsubEdit(){
+  const t = _xsubCurrent;
+  return `
+  <div style="padding:16px">
+    <button onclick="xsubBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
+    <div style="font-size:16px;font-weight:800;margin-bottom:14px">📗 ${t.topicTitle?t.topicTitle:'새 교과활동'}</div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <label style="font-size:12px;color:#666;font-weight:700">희망학과 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+      <input id="xsubDeptInput" value="${(t.department||CU.xlabDepartment||'').replace(/"/g,'&quot;')}" style="margin:6px 0 10px">
+      <label style="font-size:12px;color:#666;font-weight:700">교과목 선택 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px">
+        ${XLAB_SUBJECT_AREA_OPTS.map(function(o){return `<button onclick="xsubChooseSubjectArea('${o}')" ${t.topicTitle?'disabled':''} style="padding:7px 12px;border-radius:16px;border:1.5px solid ${t.subjectArea===o?'#3b5bdb':'#ddd'};background:${t.subjectArea===o?'#3b5bdb':'#fff'};color:${t.subjectArea===o?'#fff':'#333'};font-weight:700;font-size:11px;opacity:${t.topicTitle?'0.6':'1'}">${o}</button>`;}).join('')}
+      </div>
+      ${t.subjectArea==='직접입력' ? `<input id="xsubSubjectAreaCustom" placeholder="교과목명 직접 입력" ${t.topicTitle?'disabled':''} value="${(t.subjectAreaCustom||'').replace(/"/g,'&quot;')}" style="margin-bottom:6px">` : ''}
+    </div>
+
+    ${!t.topicTitle ? `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:13px;margin-bottom:10px">탐구 주제 선정</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button onclick="xsubChooseTopicMode('existing')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid ${_xsubTopicMode==='existing'?'#3b5bdb':'#ddd'};background:${_xsubTopicMode==='existing'?'#3b5bdb18':'#fff'};font-weight:700;font-size:12px">📋 기존 목록</button>
+        <button onclick="xsubChooseTopicMode('ai')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid ${_xsubTopicMode==='ai'?'#3b5bdb':'#ddd'};background:${_xsubTopicMode==='ai'?'#3b5bdb18':'#fff'};font-weight:700;font-size:12px">🤖 AI 추천</button>
+        <button onclick="xsubChooseTopicMode('manual')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid ${_xsubTopicMode==='manual'?'#3b5bdb':'#ddd'};background:${_xsubTopicMode==='manual'?'#3b5bdb18':'#fff'};font-weight:700;font-size:12px">✍️ 직접입력</button>
+      </div>
+      ${_xsubTopicMode==='existing' ? `
+        ${_xsubExistingTopics===null ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">불러오는 중...</div>' :
+          !_xsubExistingTopics.length ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">월별주제활동에서 먼저 주제를 등록해주세요.</div>' :
+          `<div style="max-height:320px;overflow-y:auto">${_xsubExistingTopics.map(function(x){return `
+            <div onclick="xsubSelectExistingTopic('${x.id}')" style="border:1px solid #eee;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer">
+              <div style="font-size:10px;color:#aaa">${_xlabMonthLabel(x.month)}</div>
+              <div style="font-weight:700;font-size:13px">${x.topicTitle}</div>
+              <div style="font-size:11px;color:#888;margin-top:4px">${x.topicDesc||''}</div>
+            </div>`;}).join('')}</div>`}
+      ` : _xsubTopicMode==='ai' ? `
+        <label style="font-size:12px;color:#666;font-weight:700">관심 주제/키워드 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+        <input id="xsubInterestInput" value="${(t._interestDraft||'').replace(/"/g,'&quot;')}" placeholder="예: 인공지능, 신재생에너지" style="margin:6px 0 10px">
+        <button onclick="xsubFindAiTopics()" ${_xsubAiLoading?'disabled':''} style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">${_xsubAiLoading?'⏳ 주제 찾는 중...':'🔍 주제찾기'}</button>
+        ${_xsubAiCandidates ? `
+          <div style="margin-top:14px;max-height:320px;overflow-y:auto">
+            ${!_xsubAiCandidates.length ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">추천 결과가 없습니다. 다시 시도해주세요.</div>' :
+              _xsubAiCandidates.map(function(c,i){return `
+              <div onclick="xsubSelectAiTopic(${i})" style="border:1px solid #eee;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer">
+                <div style="font-weight:700;font-size:13px">${c.title}</div>
+                <div style="font-size:11px;color:#888;margin-top:4px">${c.desc}</div>
+              </div>`;}).join('')}
+          </div>` : ''}
+      ` : `
+        <label style="font-size:12px;color:#666;font-weight:700">탐구 주제 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+        <input id="xsubManualTitle" placeholder="탐구 주제를 입력하세요" style="margin:6px 0 10px">
+        <label style="font-size:12px;color:#666;font-weight:700">간단한 설명 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+        <textarea id="xsubManualDesc" rows="3" style="margin:6px 0 10px"></textarea>
+        <button onclick="xsubSetManualTopic()" style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">주제 확정</button>
+      `}
+    </div>` : `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;color:#888">${t.topicSource==='ai'?'🤖 AI추천':(t.topicSource==='existing'?'📋 기존 목록에서 선택':'✍️ 직접입력')} · 희망학과: ${t.department||''}</div>
+      <div style="font-weight:800;font-size:15px;margin-top:4px">${t.topicTitle}</div>
+      <div style="font-size:12px;color:#666;margin-top:6px">${t.topicDesc||''}</div>
+      ${!(t.report&&t.report.savedAt) ? `<button onclick="xsubResetTopic()" style="margin-top:10px;background:none;border:none;color:#3b5bdb;font-size:12px;font-weight:700">주제 다시 선택</button>` : ''}
+    </div>
+
+    ${renderXsubReasonBlock(t)}
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:14px">📄 교과활동 보고서</span>
+        ${(t.report&&t.report.savedAt) ? `<button onclick="xsubPrintReport()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>` : ''}
+      </div>
+      <div style="font-size:11px;color:#888;margin-bottom:10px">항목별로 "🤖 AI로 생성" 버튼을 눌러 내용을 만들고, 필요하면 직접 내용을 고치거나 덧붙이세요.</div>
+      ${XSUB_REPORT_FIELDS.map(function(pair){
+        const f=pair[0], label=pair[1];
+        const val = (t.report && t.report[f]) || '';
+        const loading = !!_xsubReportLoading[f];
+        const btnColor = XSUB_REPORT_FIELD_COLORS[f]||'#0f766e';
+        return `
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #f1f1f1">
+          <label style="font-size:12px;color:#333;font-weight:800">${label} <span style="color:#e03131;font-weight:400">(필수)</span></label>
+          <button onclick="xsubGenerateReportSection('${f}')" ${loading?'disabled':''} style="width:100%;padding:12px;background:${btnColor};color:#fff;border:none;border-radius:10px;font-weight:800;margin-top:8px">${loading?'⏳ 생성 중...':(val?('🔄 '+label+' 다시 생성'):('🤖 '+label+' (필수)'))}</button>
+          <textarea id="xsubReport_${f}" rows="3" placeholder="AI로 생성하거나 직접 입력하세요" style="margin-top:8px;font-size:13px">${String(val).replace(/</g,'&lt;')}</textarea>
+        </div>`;
+      }).join('')}
+      <button onclick="xsubSaveActivity()" style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800;margin-top:8px">💾 보고서 저장</button>
+    </div>
+
+    ${(t.report&&t.report.savedAt) ? `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:30px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:10px">📝 교과 예상세특 (500자)</div>
+      ${t.expectedRecord && t.expectedRecord.recordText ? `<div style="background:#fff7ed;border-radius:10px;padding:12px;font-size:12px;white-space:pre-wrap;margin-bottom:10px">${String(t.expectedRecord.recordText).replace(/</g,'&lt;')}</div>` : '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">아직 생성되지 않았습니다.</div>'}
+      <button onclick="xsubGenerateRecord()" ${_xsubRecordLoading?'disabled':''} style="width:100%;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:10px;font-weight:800">${_xsubRecordLoading?'⏳ 생성 중...':(t.expectedRecord?'🔄 예상세특 다시 생성':'🤖 교과 예상세특 생성')}</button>
+    </div>` : ''}
+    `}
   </div>`;
 }
 </script>
