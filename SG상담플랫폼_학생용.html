@@ -102,6 +102,13 @@ try{
     // 본인 문서만 읽을 수 있어, 다른 학생들의 오답률을 직접 조회(_chgFetchExamPeerSubjects가
     // 예전에 하던 방식)할 수 없다. 같은 결과를 서버(Cloud Function)를 통해 받아온다.
     getExamPeerSubjects: (payload)=>firebase.functions().httpsCallable('getExamPeerSubjects')(payload).then(r=>r.data),
+    // ★ 2026-09-27 추가: X-lab(월별 주제활동) AI 기능 3종 — analyzeExamPdf/
+    // getExamPeerSubjects와 동일하게, Anthropic API 키는 서버(Cloud Function)에만
+    // 있고 브라우저는 이 함수를 "호출"만 한다(키 자체는 절대 받지 않음).
+    xlabRecommendTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendTopics', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateTopicReport: (payload)=>firebase.functions().httpsCallable('xlabGenerateTopicReport', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateExpectedRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateExpectedRecord', {timeout: 120000})(payload).then(r=>r.data),
+    xlabRecommendAdvancedTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendAdvancedTopics', {timeout: 120000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료");
@@ -501,12 +508,16 @@ function render(){
     ${renderHdr()}
     <div class="content" id="content">
       <div class="inner">
-        ${curTab==='timetable'?renderTimetable():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?renderPlanInspect():renderInfo()}
+        ${curTab==='timetable'?renderTimetable():curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?renderPlanInspect():(curTab==='xlab'&&CU&&CU.xlabEnabled)?renderXlab():renderInfo()}
       </div>
     </div>
     ${renderTabbar()}`;
   const _newContent = document.getElementById('content');
   if(_newContent && _prevScrollTop) _newContent.scrollTop = _prevScrollTop;
+  // X-lab 월 선택 스크롤바: innerHTML 교체로 매번 새로 만들어지므로, 최신 월(오른쪽 끝)이
+  // 기본으로 보이도록 렌더될 때마다 스크롤을 맨 오른쪽으로 맞춰준다.
+  const _monthScroller = document.getElementById('xlabMonthScroller');
+  if(_monthScroller) _monthScroller.scrollLeft = _monthScroller.scrollWidth;
 }
 
 function renderLogin(){
@@ -588,7 +599,12 @@ function renderHdr(){
 }
 
 function renderTabbar(){
-  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'},{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}];
+  // ★ 2026-09-27 추가: X-lab은 관리자가 학생 등록/수정 시 개별로 켜준 학생에게만
+  // 보여야 하므로(전체 학생 기본 노출 금지 요청), CU.xlabEnabled가 true인 경우에만
+  // 탭 목록에 포함시킨다 — 관리자에서 이 값을 꺼두면 새로고침/재로그인 시 즉시 탭이 사라짐.
+  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'}]
+    .concat(CU && CU.xlabEnabled ? [{id:'xlab',icon:'🔬',label:'X-lab'}] : [])
+    .concat([{id:'inspect',icon:'✅',label:'플랜점검'},{id:'info',icon:'👤',label:'내 정보'}]);
   return`<div class="tabbar">${tabs.map(t=>`<button class="tb-item ${curTab===t.id?'act':''}" onclick="curTab='${t.id}';render()">
     <span class="tb-icon">${t.icon}</span><span>${t.label}</span>
   </button>`).join('')}</div>`;
@@ -3744,6 +3760,646 @@ async function refreshData(){
 // 로그인 안 된 상태의 첫 화면 표시만 아래 한 줄로 대체(로그인돼 있으면 곧이어
 // onAuthStateChanged가 앱 화면으로 전환한다).
 render();
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// 🔬 X-lab — 월별 주제활동 (학생용, 2026-09-27 신규)
+// 관리자 요청 스펙: 월 선택 → 희망학과 입력(지속표기·수정가능) → AI추천/직접입력으로
+// 주제 선택 → 주제탐구 보고서(5항목) AI 생성/저장/수정/인쇄·PDF → 그 보고서를 바탕으로
+// "예상세특 생성" 4단계(과목/동기/관련활동/연계활동) 선택 → AI가 500자 이내 예상세특
+// 생성 → 저장/수정/인쇄·PDF. 한 학생이 한 달에 여러 개의 주제활동을 만들 수 있음.
+//
+// 저장 위치: 신규 컬렉션 xlabTopics(학생ID+월 단위 문서, 문서 개수 제한 없음).
+// 희망학과는 학생별로 계속 유지돼야 하므로 xlabTopics가 아니라 students 문서 자체의
+// xlabDepartment 필드에 저장(챌린저의 challengerData처럼 기존 학생 문서에 필드만 추가).
+// ⚠️ Firestore 보안규칙에 'xlabTopics' 컬렉션이 examCatalogPayloads 등과 같은 방식으로
+// (allow read, write: if true) 추가되어 있어야 정상 동작합니다.
+// ══════════════════════════════════════════════════════════════════════════
+let _xlabMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+let _xlabList = [];
+let _xlabLoading = false;
+let _xlabView = 'list'; // 'list' | 'edit'
+let _xlabCurrent = null; // 현재 열람/편집 중인 xlabTopics 문서(신규면 아직 topicTitle이 빈 상태)
+// ★ 버그 수정(2026-09-27): "이번 달 등록된 활동이 0건"(정상)과 "아직 안 불러옴"을
+// _xlabList.length===0 하나로 구분하려 했더니, 신규 학생처럼 진짜로 0건인 달에서는
+// renderXlabList가 렌더될 때마다 "안 불러왔다"고 착각해 _xlabLoadList()를 또 호출 →
+// 그게 다시 render()를 불러 renderXlabList가 또 실행 → 또 호출...하는 무한 루프에
+// 빠져 화면이 "불러오는 중"에 멈춘 것처럼 보이고 버튼 클릭도 씹혔다. 이제부터는
+// "몇 월 데이터를 마지막으로 불러왔는지"를 별도로 기록해서, 그 달을 이미 불러왔으면
+// (결과가 0건이어도) 다시 부르지 않는다.
+let _xlabLoadedForMonth = null;
+let _xlabTopicMode = 'ai'; // 'ai' | 'manual'
+let _xlabAiCandidates = null;
+let _xlabAiLoading = false;
+let _xlabAdvancedMode = 'ai'; // 'ai' | 'manual' — ⑥ 주제 심화·확장 추천
+let _xlabAdvancedCandidates = null;
+let _xlabAdvancedLoading = false;
+let _xlabReportLoading = {}; // {reason:true/false, concept:..., ...} — 항목별 개별 로딩 상태
+let _xlabRecordWizardStep = 0; // 0=닫힘, 1~4=단계
+let _xlabRecordChoice = {};
+let _xlabRecordLoading = false;
+
+function _xlabMonthLabel(m){ const p=String(m).split('-'); return p[0]+'년 '+parseInt(p[1],10)+'월'; }
+
+async function _xlabLoadList(){
+  if(!FB() || !CU) return;
+  const loadedMonth = _xlabMonth;
+  _xlabLoading = true; render();
+  try{
+    const all = await window._fb.getWhere('xlabTopics','studentId','==',String(CU.id));
+    _xlabList = (all||[]).filter(t=>t.month===loadedMonth).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }catch(e){
+    console.warn('X-lab 목록 로딩 실패:', e.message);
+    _xlabList = [];
+  }
+  _xlabLoadedForMonth = loadedMonth;
+  _xlabLoading = false; render();
+}
+
+function xlabChangeMonth(m){
+  _xlabMonth = m; _xlabView='list'; _xlabCurrent=null;
+  _xlabLoadList();
+}
+
+async function xlabSaveDepartment(){
+  const el = document.getElementById('xlabDeptInput');
+  const v = el ? el.value.trim() : '';
+  if(!v){ alert('희망학과를 입력해주세요.'); return; }
+  try{
+    if(FB()) await window._fb.set('students',CU.id,{xlabDepartment:v});
+    CU.xlabDepartment = v;
+    toast('희망학과가 저장되었습니다 💾');
+    render();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+
+// ★ 2026-09-27(3차) 추가: 주제 선택 단계(AI추천/직접입력 공통)에 "교과목 선택"(선택,
+// 국어/수학/영어/사회/과학/역사/직접입력 중 택1)과 "교과개념입력"(선택, 자유 텍스트)을
+// 추가 — 보고서(5개 항목) 생성 시 AI가 이 교과 맥락을 반영하도록 하기 위함. 두 필드
+// 모두 선택사항이며, 칩을 고르는 순간 render()가 다시 호출되므로(화면 전체가 다시
+// 그려짐), 그 직전에 함께 입력 중이던 다른 입력창 값들을 놓치지 않도록 미리 값을
+// 저장해두는 헬퍼(_xlabCaptureFormFields)가 필요하다.
+const XLAB_SUBJECT_AREA_OPTS = ['국어','수학','영어','사회','과학','역사','직접입력'];
+let _xlabSubjectChoice = {area:'', areaCustom:'', concept:''};
+
+function _xlabCaptureFormFields(){
+  if(!_xlabCurrent) return;
+  const deptEl = document.getElementById('xlabDeptInput2');
+  if(deptEl) _xlabCurrent.department = deptEl.value;
+  const interestEl = document.getElementById('xlabInterestInput');
+  if(interestEl) _xlabCurrent.interest = interestEl.value;
+  const kwEl = document.getElementById('xlabKeywordsInput');
+  if(kwEl) _xlabCurrent.keywords = kwEl.value;
+  const titleEl = document.getElementById('xlabManualTitle');
+  if(titleEl) _xlabCurrent._manualTitleDraft = titleEl.value;
+  const descEl = document.getElementById('xlabManualDesc');
+  if(descEl) _xlabCurrent._manualDescDraft = descEl.value;
+  const customEl = document.getElementById('xlabSubjectAreaCustom');
+  if(customEl) _xlabSubjectChoice.areaCustom = customEl.value;
+  const conceptEl = document.getElementById('xlabSubjectConceptInput');
+  if(conceptEl) _xlabSubjectChoice.concept = conceptEl.value;
+}
+
+function xlabChooseSubjectArea(v){
+  _xlabCaptureFormFields();
+  _xlabSubjectChoice.area = v;
+  render();
+}
+
+function renderXlabSubjectFields(){
+  return `
+    <label style="font-size:12px;color:#666;font-weight:700">교과목 선택 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">
+      ${XLAB_SUBJECT_AREA_OPTS.map(function(o){return `<button onclick="xlabChooseSubjectArea('${o}')" style="padding:7px 12px;border-radius:16px;border:1.5px solid ${_xlabSubjectChoice.area===o?'#3b5bdb':'#ddd'};background:${_xlabSubjectChoice.area===o?'#3b5bdb':'#fff'};color:${_xlabSubjectChoice.area===o?'#fff':'#333'};font-weight:700;font-size:11px">${o}</button>`;}).join('')}
+    </div>
+    ${_xlabSubjectChoice.area==='직접입력' ? `<input id="xlabSubjectAreaCustom" placeholder="교과목명 직접 입력" value="${(_xlabSubjectChoice.areaCustom||'').replace(/"/g,'&quot;')}" style="margin-bottom:10px">` : ''}
+    <label style="font-size:12px;color:#666;font-weight:700">교과개념입력 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+    <textarea id="xlabSubjectConceptInput" rows="2" placeholder="이 주제와 연결하고 싶은 교과 개념을 적어주세요 (선택)" style="margin:6px 0 10px">${(_xlabSubjectChoice.concept||'').replace(/</g,'&lt;')}</textarea>
+  `;
+}
+
+function xlabNewTopic(){
+  _xlabCurrent = {
+    id: 'xlab_'+CU.id+'_'+Date.now(),
+    studentId: String(CU.id),
+    studentName: CU.name||'',
+    month: _xlabMonth,
+    department: CU.xlabDepartment||'',
+    topicSource: 'ai',
+    topicTitle: '', topicDesc: '',
+    interest:'', keywords:'',
+    subjectArea:'', subjectConcept:'',
+    advancedTopicTitle:'', advancedTopicDesc:'', advancedTopicSource:'',
+    report: null,
+    expectedRecord: null,
+    createdAt: Date.now(),
+  };
+  _xlabTopicMode = 'ai';
+  _xlabAiCandidates = null;
+  _xlabSubjectChoice = {area:'', areaCustom:'', concept:''};
+  _xlabAdvancedMode = 'ai';
+  _xlabAdvancedCandidates = null;
+  _xlabView = 'edit';
+  render();
+}
+
+function xlabOpenExisting(id){
+  const t = _xlabList.find(x=>x.id===id);
+  if(!t) return;
+  _xlabCurrent = t;
+  _xlabTopicMode = t.topicSource||'ai';
+  _xlabAiCandidates = null;
+  _xlabSubjectChoice = {area:'', areaCustom:'', concept:''};
+  _xlabAdvancedMode = t.advancedTopicSource||'ai';
+  _xlabAdvancedCandidates = null;
+  _xlabView = 'edit';
+  render();
+}
+
+function xlabBackToList(){ _xlabView='list'; _xlabCurrent=null; render(); }
+
+function xlabResetTopic(){
+  if(!_xlabCurrent) return;
+  _xlabCurrent.topicTitle=''; _xlabCurrent.topicDesc=''; _xlabAiCandidates=null;
+  _xlabSubjectChoice = {area:'', areaCustom:'', concept:''};
+  render();
+}
+
+// ★ 2026-09-27(3차) 추가: "⑥ 주제 심화·확장 추천" — 이미 확정한 주제를 더 깊이
+// 파고들거나 넓힐 수 있는 후속 탐구 주제를 AI로 추천받거나 직접 입력하는 기능.
+// 여기서 고른 주제는 ①~⑤ 보고서 항목을 AI로 생성할 때 추가 맥락으로 함께 전달된다.
+function xlabResetAdvancedTopic(){
+  if(!_xlabCurrent) return;
+  _xlabCurrent.advancedTopicTitle=''; _xlabCurrent.advancedTopicDesc=''; _xlabCurrent.advancedTopicSource='';
+  _xlabAdvancedCandidates=null; _xlabAdvancedMode='ai';
+  render();
+}
+
+async function xlabFindAdvancedTopics(){
+  if(!_xlabCurrent || !_xlabCurrent.topicTitle){ alert('먼저 주제를 확정해주세요.'); return; }
+  _xlabAdvancedLoading = true; render();
+  try{
+    const r = await window._fb.xlabRecommendAdvancedTopics({department:_xlabCurrent.department||'', topic:_xlabCurrent.topicTitle, topicDesc:_xlabCurrent.topicDesc||''});
+    _xlabAdvancedCandidates = r.topics||[];
+  }catch(e){
+    alert('심화·확장 주제 추천 중 오류가 발생했습니다: '+e.message);
+    _xlabAdvancedCandidates = [];
+  }
+  _xlabAdvancedLoading = false; render();
+}
+
+function xlabSelectAdvancedTopic(idx){
+  const t = _xlabAdvancedCandidates[idx];
+  if(!t) return;
+  _xlabCurrent.advancedTopicSource='ai';
+  _xlabCurrent.advancedTopicTitle=t.title;
+  _xlabCurrent.advancedTopicDesc=t.desc;
+  render();
+}
+
+function xlabSetAdvancedManualTopic(){
+  const titleEl = document.getElementById('xlabAdvancedManualTitle');
+  const descEl = document.getElementById('xlabAdvancedManualDesc');
+  const title = titleEl?titleEl.value.trim():'';
+  const desc = descEl?descEl.value.trim():'';
+  if(!title){ alert('심화·확장 주제를 입력해주세요.'); return; }
+  _xlabCurrent.advancedTopicSource='manual';
+  _xlabCurrent.advancedTopicTitle=title;
+  _xlabCurrent.advancedTopicDesc=desc;
+  render();
+}
+
+async function xlabFindTopics(){
+  const deptEl = document.getElementById('xlabDeptInput2');
+  const dept = (deptEl?deptEl.value:'') || _xlabCurrent.department || CU.xlabDepartment || '';
+  const interestEl = document.getElementById('xlabInterestInput');
+  const keywordsEl = document.getElementById('xlabKeywordsInput');
+  const interest = interestEl?interestEl.value.trim():'';
+  const keywords = keywordsEl?keywordsEl.value.trim():'';
+  if(!dept.trim()){ alert('희망학과를 먼저 입력해주세요.'); return; }
+  if(!interest.trim()){ alert('관심 주제를 먼저 입력해주세요.'); return; }
+  _xlabCurrent.department = dept.trim();
+  _xlabCurrent.interest = interest;
+  _xlabCurrent.keywords = keywords;
+  _xlabAiLoading = true; render();
+  try{
+    const r = await window._fb.xlabRecommendTopics({department:_xlabCurrent.department, interest:_xlabCurrent.interest, keywords:_xlabCurrent.keywords});
+    _xlabAiCandidates = r.topics||[];
+  }catch(e){
+    alert('주제 추천 중 오류가 발생했습니다: '+e.message);
+    _xlabAiCandidates = [];
+  }
+  _xlabAiLoading = false; render();
+}
+
+function xlabSelectAiTopic(idx){
+  const t = _xlabAiCandidates[idx];
+  if(!t) return;
+  _xlabCaptureFormFields();
+  _xlabCurrent.topicSource='ai';
+  _xlabCurrent.topicTitle = t.title;
+  _xlabCurrent.topicDesc = t.desc;
+  _xlabCurrent.subjectArea = _xlabSubjectChoice.area==='직접입력' ? (_xlabSubjectChoice.areaCustom||'').trim() : (_xlabSubjectChoice.area||'');
+  _xlabCurrent.subjectConcept = (_xlabSubjectChoice.concept||'').trim();
+  render();
+}
+
+function xlabSetManualTopic(){
+  const titleEl = document.getElementById('xlabManualTitle');
+  const descEl = document.getElementById('xlabManualDesc');
+  const title = titleEl?titleEl.value.trim():'';
+  const desc = descEl?descEl.value.trim():'';
+  if(!title){ alert('관심주제를 입력해주세요.'); return; }
+  const customEl = document.getElementById('xlabSubjectAreaCustom');
+  if(customEl) _xlabSubjectChoice.areaCustom = customEl.value;
+  const conceptEl = document.getElementById('xlabSubjectConceptInput');
+  if(conceptEl) _xlabSubjectChoice.concept = conceptEl.value;
+  _xlabCurrent.topicSource='manual';
+  _xlabCurrent.topicTitle = title;
+  _xlabCurrent.topicDesc = desc;
+  _xlabCurrent.subjectArea = _xlabSubjectChoice.area==='직접입력' ? (_xlabSubjectChoice.areaCustom||'').trim() : (_xlabSubjectChoice.area||'');
+  _xlabCurrent.subjectConcept = (_xlabSubjectChoice.concept||'').trim();
+  render();
+}
+
+// ★ 2026-09-27(2차) 수정: 5개 항목을 한 번에 생성하던 방식 → 학생이 항목별로 "AI로
+// 생성" 버튼을 눌러서 하나씩 확인해가며 채우는 방식으로 변경(관리자 요청: 생성 과정을
+// 학생에게 보여주고, 이후 내용을 직접 추가·수정도 가능하게). _xlabReportLoading을
+// boolean 하나가 아니라 {reason:true/false,...} 형태로 바꿔서 항목별로 로딩 표시.
+const XLAB_REPORT_FIELDS = [['reason','① 주제 선정이유'],['concept','② 개념·원리·이론'],['example','③ 실사례 예시'],['issue','④ 문제점·개선점'],['activity','⑤ 교내활동 예시']];
+// 항목별로 서로 다른 파스텔톤 버튼 색상(관리자 요청: "항목마다 파스텔톤으로 다르게")
+const XLAB_REPORT_FIELD_COLORS = { reason:'#6c8ee2', concept:'#5fae7a', example:'#d99a4e', issue:'#d9738c', activity:'#8f7fe0' };
+
+// ⑥ 주제 심화·확장 추천 — ①~⑤와 달리 자유 텍스트가 아니라, 확정된 주제를 바탕으로
+// AI가 후속(심화/확장) 탐구 주제 후보를 추천하거나 학생이 직접 입력해서 "고르는" UI.
+// 여기서 고른 주제는 renderXlabEdit()에서 로드하지 않고 xlabGenerateReportSection()이
+// 페이로드에 함께 실어보내 ①~⑤ 항목 생성 시 AI가 참고하도록 한다.
+function renderXlabAdvancedTopicBlock(t){
+  const hasAdvanced = !!t.advancedTopicTitle;
+  return `
+  <div style="margin-top:18px;padding-top:14px;border-top:1px solid #f1f1f1">
+    <label style="font-size:12px;color:#333;font-weight:800">⑥ 주제 심화·확장 추천 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+    <div style="font-size:11px;color:#888;margin-top:4px;margin-bottom:8px">현재 주제를 더 깊이 파고들거나 넓힐 수 있는 후속 주제를 골라주세요. ①~⑤ 항목을 생성·저장할 때 함께 반영됩니다.</div>
+    ${hasAdvanced ? `
+      <div style="background:#f7f5ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:#7c3aed">${t.advancedTopicSource==='ai'?'🤖 AI추천':'✍️ 직접입력'}</div>
+        <div style="font-weight:700;font-size:13px;margin-top:2px">${t.advancedTopicTitle}</div>
+        ${t.advancedTopicDesc?`<div style="font-size:11px;color:#666;margin-top:4px">${t.advancedTopicDesc}</div>`:''}
+        <button onclick="xlabResetAdvancedTopic()" style="margin-top:8px;background:none;border:none;color:#3b5bdb;font-size:11px;font-weight:700">다시 선택</button>
+      </div>
+    ` : `
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button onclick="_xlabAdvancedMode='ai';render()" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid ${_xlabAdvancedMode==='ai'?'#3b5bdb':'#ddd'};background:${_xlabAdvancedMode==='ai'?'#3b5bdb18':'#fff'};font-weight:700;font-size:12px">🤖 AI 추천</button>
+        <button onclick="_xlabAdvancedMode='manual';render()" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid ${_xlabAdvancedMode==='manual'?'#3b5bdb':'#ddd'};background:${_xlabAdvancedMode==='manual'?'#3b5bdb18':'#fff'};font-weight:700;font-size:12px">✍️ 직접입력</button>
+      </div>
+      ${_xlabAdvancedMode==='ai' ? `
+        <button onclick="xlabFindAdvancedTopics()" ${_xlabAdvancedLoading?'disabled':''} style="width:100%;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:10px;font-weight:800">${_xlabAdvancedLoading?'⏳ 추천 받는 중...':'🔍 심화·확장 주제 추천받기'}</button>
+        ${_xlabAdvancedCandidates ? `
+          <div style="margin-top:12px;max-height:300px;overflow-y:auto">
+            ${!_xlabAdvancedCandidates.length ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">추천 결과가 없습니다. 다시 시도해주세요.</div>' :
+              _xlabAdvancedCandidates.map(function(c,i){return `
+              <div onclick="xlabSelectAdvancedTopic(${i})" style="border:1px solid #eee;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer">
+                <div style="font-weight:700;font-size:13px">${c.title}</div>
+                <div style="font-size:11px;color:#888;margin-top:4px">${c.desc}</div>
+              </div>`;}).join('')}
+          </div>` : ''}
+      ` : `
+        <input id="xlabAdvancedManualTitle" placeholder="심화·확장 주제를 입력하세요" style="margin-bottom:10px">
+        <textarea id="xlabAdvancedManualDesc" rows="2" placeholder="간단한 설명 (선택)" style="margin-bottom:10px"></textarea>
+        <button onclick="xlabSetAdvancedManualTopic()" style="width:100%;padding:12px;background:#7c3aed;color:#fff;border:none;border-radius:10px;font-weight:800">주제 확정</button>
+      `}
+    `}
+  </div>`;
+}
+
+async function xlabGenerateReportSection(field){
+  if(!_xlabCurrent.topicTitle){ alert('먼저 주제를 선택하거나 입력해주세요.'); return; }
+  if(!_xlabCurrent.advancedTopicTitle){ alert('먼저 "⑥ 주제 심화·확장 추천"에서 후속 주제를 선택하거나 입력해주세요.'); return; }
+  // 편집 중이던 다른 항목의 내용이 날아가지 않게, 현재 textarea 값들을 먼저 반영
+  if(!_xlabCurrent.report) _xlabCurrent.report = {reason:'',concept:'',example:'',issue:'',activity:''};
+  XLAB_REPORT_FIELDS.forEach(function(pair){
+    const el = document.getElementById('xlabReport_'+pair[0]);
+    if(el) _xlabCurrent.report[pair[0]] = el.value;
+  });
+  _xlabReportLoading[field] = true; render();
+  try{
+    const r = await window._fb.xlabGenerateTopicReport({department:_xlabCurrent.department, topic:_xlabCurrent.topicTitle, topicDesc:_xlabCurrent.topicDesc, section:field, subjectArea:_xlabCurrent.subjectArea||'', subjectConcept:_xlabCurrent.subjectConcept||'', advancedTopic:_xlabCurrent.advancedTopicTitle||'', advancedTopicDesc:_xlabCurrent.advancedTopicDesc||''});
+    _xlabCurrent.report[field] = r.text;
+    _xlabCurrent.report.generatedAt = Date.now();
+  }catch(e){
+    alert('AI 생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xlabReportLoading[field] = false; render();
+}
+
+async function xlabSaveTopic(){
+  if(!_xlabCurrent.topicTitle){ alert('저장할 주제 내용이 없습니다.'); return; }
+  if(!_xlabCurrent.advancedTopicTitle){ alert('"⑥ 주제 심화·확장 추천" 항목은 필수입니다. 후속 주제를 선택하거나 입력해주세요.'); return; }
+  if(!_xlabCurrent.report) _xlabCurrent.report = {reason:'',concept:'',example:'',issue:'',activity:''};
+  ['reason','concept','example','issue','activity'].forEach(function(f){
+    const el = document.getElementById('xlabReport_'+f);
+    if(el) _xlabCurrent.report[f] = el.value;
+  });
+  for(const pair of XLAB_REPORT_FIELDS){
+    const f = pair[0], label = pair[1];
+    if(!String(_xlabCurrent.report[f]||'').trim()){
+      alert('"'+label+'" 항목은 필수 입력입니다. AI로 생성하거나 직접 입력해주세요.');
+      return;
+    }
+  }
+  _xlabCurrent.report.savedAt = Date.now();
+  try{
+    if(FB()) await window._fb.set('xlabTopics', _xlabCurrent.id, _xlabCurrent);
+    toast('저장되었습니다 💾');
+    await _xlabLoadList();
+    _xlabView='list'; _xlabCurrent=null; render();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+
+function xlabDeleteTopic(id){
+  if(!confirm('이 주제활동을 삭제하시겠습니까?')) return;
+  (async function(){
+    try{
+      if(FB()) await window._db.collection('xlabTopics').doc(id).delete();
+      toast('삭제되었습니다');
+      await _xlabLoadList();
+    }catch(e){ alert('삭제 실패: '+e.message); }
+  })();
+}
+
+function xlabPrintReport(){
+  const t = _xlabCurrent;
+  if(!t || !t.report) return;
+  const w = window.open('','_blank');
+  w.document.write(
+    '<html><head><meta charset="utf-8"><title>주제탐구 보고서</title>'+
+    '<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:36px;line-height:1.7;color:#1a1a2e}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;margin:18px 0 6px;color:#3b5bdb}.meta{color:#666;font-size:12px;margin-bottom:20px}p{font-size:13px;white-space:pre-wrap}</style>'+
+    '</head><body>'+
+    '<h1>📘 주제탐구 보고서</h1>'+
+    '<div class="meta">희망학과: '+(t.department||'')+' · 주제: '+(t.topicTitle||'')+' · '+_xlabMonthLabel(t.month)+'</div>'+
+    '<h2>① 주제 선정이유</h2><p>'+(t.report.reason||'')+'</p>'+
+    '<h2>② 주제 개념·원리·이론</h2><p>'+(t.report.concept||'')+'</p>'+
+    '<h2>③ 주제 실사례 예시</h2><p>'+(t.report.example||'')+'</p>'+
+    '<h2>④ 주제 문제점·개선점</h2><p>'+(t.report.issue||'')+'</p>'+
+    '<h2>⑤ 주제 교내활동 예시</h2><p>'+(t.report.activity||'')+'</p>'+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script>'+
+    '</body></html>'
+  );
+  w.document.close();
+}
+
+// ── 예상세특 생성 4단계 위저드 ──
+const XLAB_SUBJECT_CATS = ['국어','영어','수학','사회','과학','자율활동','진로활동','동아리활동','직접입력'];
+const XLAB_MOTIVATION_OPTS = ['독서활동','수업시간','직접입력'];
+const XLAB_ACTIVITY_OPTS = ['수업시간 발표','실험활동보고서 작성','탐구보고서 작성','독서 주제탐구 활동','직접입력'];
+
+function xlabOpenRecordWizard(){
+  if(!_xlabCurrent || !_xlabCurrent.report || !_xlabCurrent.report.savedAt){ alert('먼저 주제탐구 보고서를 생성·저장해주세요.'); return; }
+  _xlabRecordChoice = {subject:'',subjectCustom:'',motivation:'',motivationCustom:'',relatedActivity:'',relatedActivityCustom:'',linkedActivity:'',linkedActivityCustom:''};
+  _xlabRecordWizardStep = 1;
+  render();
+}
+function xlabCloseRecordWizard(){ _xlabRecordWizardStep=0; render(); }
+function xlabWizardChoose(field, val){ _xlabRecordChoice[field] = val; render(); }
+function xlabWizardCustomIdFor(step){
+  return {1:'xlabSubjectCustom',2:'xlabMotivationCustom',3:'xlabRelatedCustom',4:'xlabLinkedCustom'}[step];
+}
+function xlabWizardFieldFor(step){
+  return {1:'subject',2:'motivation',3:'relatedActivity',4:'linkedActivity'}[step];
+}
+function xlabWizardNext(){
+  const step = _xlabRecordWizardStep;
+  const field = xlabWizardFieldFor(step);
+  const customEl = document.getElementById(xlabWizardCustomIdFor(step));
+  if(customEl) _xlabRecordChoice[field+'Custom'] = customEl.value.trim();
+  if(step<4 && !_xlabRecordChoice[field]){ alert('선택지를 골라주세요.'); return; }
+  if(step<4 && _xlabRecordChoice[field]==='직접입력' && !_xlabRecordChoice[field+'Custom']){ alert('직접 입력 내용을 적어주세요.'); return; }
+  _xlabRecordWizardStep = step+1;
+  render();
+}
+function xlabWizardPrev(){ _xlabRecordWizardStep = Math.max(1,_xlabRecordWizardStep-1); render(); }
+function xlabWizardSkipLinked(){
+  _xlabRecordChoice.linkedActivity=''; _xlabRecordChoice.linkedActivityCustom='';
+  xlabGenerateRecord();
+}
+function xlabWizardFinishLinked(){
+  const customEl = document.getElementById('xlabLinkedCustom');
+  if(customEl) _xlabRecordChoice.linkedActivityCustom = customEl.value.trim();
+  if(_xlabRecordChoice.linkedActivity==='직접입력' && !_xlabRecordChoice.linkedActivityCustom){ alert('직접 입력 내용을 적어주세요.'); return; }
+  xlabGenerateRecord();
+}
+
+async function xlabGenerateRecord(){
+  const c = _xlabRecordChoice;
+  const subject = c.subject==='직접입력' ? c.subjectCustom : c.subject;
+  const motivation = c.motivation==='직접입력' ? c.motivationCustom : c.motivation;
+  const relatedActivity = c.relatedActivity==='직접입력' ? c.relatedActivityCustom : c.relatedActivity;
+  const linkedActivity = c.linkedActivity ? (c.linkedActivity==='직접입력' ? c.linkedActivityCustom : c.linkedActivity) : '';
+  if(!subject || !motivation || !relatedActivity){ alert('필수 항목이 비어있습니다. 처음부터 다시 진행해주세요.'); _xlabRecordWizardStep=1; render(); return; }
+  const t = _xlabCurrent;
+  const reportSummary = t.report ? [t.report.reason,t.report.concept].filter(Boolean).join(' ') : '';
+  _xlabRecordLoading = true; render();
+  try{
+    const r = await window._fb.xlabGenerateExpectedRecord({
+      department:t.department, topic:t.topicTitle, reportSummary,
+      subject, motivation, relatedActivity, linkedActivity,
+    });
+    t.expectedRecord = { subject, motivation, relatedActivity, linkedActivity, recordText:r.recordText, generatedAt:Date.now() };
+    _xlabRecordWizardStep = 0;
+  }catch(e){
+    alert('예상세특 생성 중 오류가 발생했습니다: '+e.message);
+  }
+  _xlabRecordLoading = false; render();
+}
+
+async function xlabSaveRecord(){
+  const el = document.getElementById('xlabRecordText');
+  if(el && _xlabCurrent.expectedRecord) _xlabCurrent.expectedRecord.recordText = el.value;
+  try{
+    if(FB()) await window._fb.set('xlabTopics', _xlabCurrent.id, _xlabCurrent);
+    toast('예상세특이 저장되었습니다 💾');
+    render();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+
+function xlabPrintRecord(){
+  const t = _xlabCurrent;
+  if(!t || !t.expectedRecord) return;
+  const w = window.open('','_blank');
+  w.document.write(
+    '<html><head><meta charset="utf-8"><title>예상 세특</title>'+
+    '<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:36px;line-height:1.8;color:#1a1a2e}h1{font-size:20px;margin-bottom:4px}.meta{color:#666;font-size:12px;margin-bottom:20px}p{font-size:14px;white-space:pre-wrap;border:1px solid #ddd;border-radius:8px;padding:16px}</style>'+
+    '</head><body>'+
+    '<h1>📝 예상 세부능력 및 특기사항</h1>'+
+    '<div class="meta">과목: '+(t.expectedRecord.subject||'')+' · 주제: '+(t.topicTitle||'')+'</div>'+
+    '<p>'+(t.expectedRecord.recordText||'')+'</p>'+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script>'+
+    '</body></html>'
+  );
+  w.document.close();
+}
+
+function renderXlab(){
+  if(!CU) return '';
+  if(_xlabView==='edit' && _xlabCurrent) return renderXlabEdit();
+  return renderXlabList();
+}
+
+function renderXlabList(){
+  const months=[];
+  const now=new Date();
+  for(let i=0;i<12;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  months.reverse();
+  if(_xlabLoadedForMonth!==_xlabMonth && !_xlabLoading) _xlabLoadList();
+  return `
+  <div style="padding:16px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:18px;font-weight:800">🔬 X-lab · 월별주제활동</span>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #eee">
+      <label style="font-size:12px;color:#666;font-weight:700">희망학과</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input id="xlabDeptInput" value="${(CU.xlabDepartment||'').replace(/"/g,'&quot;')}" placeholder="예: 컴퓨터공학과">
+        <button onclick="xlabSaveDepartment()" style="flex:none;padding:0 16px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:700">저장</button>
+      </div>
+    </div>
+    <div id="xlabMonthScroller" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:4px">
+      ${months.map(m=>`<button onclick="xlabChangeMonth('${m}')" style="flex:none;padding:8px 14px;border-radius:20px;border:1.5px solid ${m===_xlabMonth?'#3b5bdb':'#ddd'};background:${m===_xlabMonth?'#3b5bdb':'#fff'};color:${m===_xlabMonth?'#fff':'#333'};font-weight:700;font-size:12px">${_xlabMonthLabel(m)}</button>`).join('')}
+    </div>
+    <button onclick="xlabNewTopic()" style="width:100%;padding:14px;background:#0f766e;color:#fff;border:none;border-radius:12px;font-weight:800;font-size:14px;margin-bottom:16px">➕ 새 주제활동 만들기</button>
+    ${_xlabLoading ? '<div style="text-align:center;color:#888;padding:30px">불러오는 중...</div>' :
+      !_xlabList.length ? '<div style="text-align:center;color:#aaa;padding:30px;font-size:13px">이번 달 등록된 주제활동이 없습니다.</div>' :
+      _xlabList.map(function(t){return `
+      <div onclick="xlabOpenExisting('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div style="font-weight:800;font-size:14px">${t.topicTitle||'(제목 없음)'}</div>
+            <div style="font-size:11px;color:#888;margin-top:4px">${t.topicSource==='ai'?'🤖 AI추천':'✍️ 직접입력'}${(t.report&&t.report.savedAt)?' · 보고서 완료':' · 보고서 미작성'}${t.expectedRecord?' · 예상세특 완료':''}</div>
+          </div>
+          <button onclick="event.stopPropagation();xlabDeleteTopic('${t.id}')" style="background:none;border:none;color:#e53935;font-size:16px">🗑</button>
+        </div>
+      </div>`;}).join('')
+    }
+  </div>`;
+}
+
+function renderXlabEdit(){
+  const t = _xlabCurrent;
+  return `
+  <div style="padding:16px">
+    <button onclick="xlabBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
+    <div style="font-size:16px;font-weight:800;margin-bottom:14px">🔬 ${t.topicTitle?t.topicTitle:'새 주제활동'}</div>
+
+    ${!t.topicTitle ? `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button onclick="_xlabCaptureFormFields();_xlabTopicMode='ai';render()" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${_xlabTopicMode==='ai'?'#3b5bdb':'#ddd'};background:${_xlabTopicMode==='ai'?'#3b5bdb18':'#fff'};font-weight:700">🤖 AI 주제추천</button>
+        <button onclick="_xlabCaptureFormFields();_xlabTopicMode='manual';render()" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${_xlabTopicMode==='manual'?'#3b5bdb':'#ddd'};background:${_xlabTopicMode==='manual'?'#3b5bdb18':'#fff'};font-weight:700">✍️ 직접입력</button>
+      </div>
+      ${_xlabTopicMode==='ai' ? `
+        <label style="font-size:12px;color:#666;font-weight:700">희망학과 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+        <input id="xlabDeptInput2" value="${(t.department||CU.xlabDepartment||'').replace(/"/g,'&quot;')}" style="margin:6px 0 10px">
+        <label style="font-size:12px;color:#666;font-weight:700">관심 주제 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+        <input id="xlabInterestInput" value="${(t.interest||'').replace(/"/g,'&quot;')}" placeholder="예: 인공지능, 신재생에너지" style="margin:6px 0 10px">
+        ${renderXlabSubjectFields()}
+        <label style="font-size:12px;color:#666;font-weight:700">관심 키워드 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+        <input id="xlabKeywordsInput" value="${(t.keywords||'').replace(/"/g,'&quot;')}" placeholder="예: 딥러닝, 태양광" style="margin:6px 0 10px">
+        <button onclick="xlabFindTopics()" ${_xlabAiLoading?'disabled':''} style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">${_xlabAiLoading?'⏳ 주제 찾는 중...':'🔍 주제찾기'}</button>
+        ${_xlabAiCandidates ? `
+          <div style="margin-top:14px;max-height:340px;overflow-y:auto">
+            ${!_xlabAiCandidates.length ? '<div style="text-align:center;color:#aaa;font-size:12px;padding:16px">추천 결과가 없습니다. 다시 시도해주세요.</div>' :
+              _xlabAiCandidates.map(function(c,i){return `
+              <div onclick="xlabSelectAiTopic(${i})" style="border:1px solid #eee;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer">
+                <div style="font-weight:700;font-size:13px">${c.title}</div>
+                <div style="font-size:11px;color:#888;margin-top:4px">${c.desc}</div>
+              </div>`;}).join('')}
+          </div>` : ''}
+      ` : `
+        <label style="font-size:12px;color:#666;font-weight:700">관심주제 <span style="color:#e03131;font-weight:400">(필수)</span></label>
+        <input id="xlabManualTitle" placeholder="관심주제를 입력하세요" style="margin:6px 0 10px">
+        ${renderXlabSubjectFields()}
+        <label style="font-size:12px;color:#666;font-weight:700">간단한 설명 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+        <textarea id="xlabManualDesc" rows="3" style="margin:6px 0 10px"></textarea>
+        <button onclick="xlabSetManualTopic()" style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">주제 확정</button>
+      `}
+    </div>` : `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;color:#888">${t.topicSource==='ai'?'🤖 AI추천':'✍️ 직접입력'} · 희망학과: ${t.department||''}</div>
+      <div style="font-weight:800;font-size:15px;margin-top:4px">${t.topicTitle}</div>
+      <div style="font-size:12px;color:#666;margin-top:6px">${t.topicDesc||''}</div>
+      ${(t.subjectArea||t.subjectConcept) ? `<div style="font-size:11px;color:#0f766e;margin-top:6px;background:#0f766e0f;border-radius:8px;padding:6px 8px">${t.subjectArea?('📘 교과목: '+t.subjectArea):''}${(t.subjectArea&&t.subjectConcept)?' · ':''}${t.subjectConcept?('교과개념: '+t.subjectConcept):''}</div>` : ''}
+      ${!(t.report&&t.report.savedAt) ? `<button onclick="xlabResetTopic()" style="margin-top:10px;background:none;border:none;color:#3b5bdb;font-size:12px;font-weight:700">주제 다시 선택</button>` : ''}
+    </div>
+
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:14px">📘 주제탐구 보고서</span>
+        ${(t.report&&t.report.savedAt) ? `<button onclick="xlabPrintReport()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>` : ''}
+      </div>
+      <div style="font-size:11px;color:#888;margin-bottom:10px">항목별로 "🤖 AI로 생성" 버튼을 눌러 내용을 만들고, 필요하면 직접 내용을 고치거나 덧붙이세요.</div>
+      ${XLAB_REPORT_FIELDS.map(function(pair){
+        const f=pair[0], label=pair[1];
+        const val = (t.report && t.report[f]) || '';
+        const loading = !!_xlabReportLoading[f];
+        const btnColor = XLAB_REPORT_FIELD_COLORS[f] || '#0f766e';
+        return `
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #f1f1f1">
+          <label style="font-size:12px;color:#333;font-weight:800">${label} <span style="color:#e03131;font-weight:400">(필수)</span></label>
+          <button onclick="xlabGenerateReportSection('${f}')" ${loading?'disabled':''} style="width:100%;padding:12px;background:${btnColor};color:#fff;border:none;border-radius:10px;font-weight:800;margin-top:8px">${loading?'⏳ 생성 중...':(val?('🔄 '+label+' 다시 생성'):('🤖 '+label+' (필수)'))}</button>
+          <textarea id="xlabReport_${f}" rows="3" placeholder="AI로 생성하거나 직접 입력하세요" style="margin-top:8px;font-size:13px">${String(val).replace(/</g,'&lt;')}</textarea>
+        </div>
+      `;}).join('')}
+      ${renderXlabAdvancedTopicBlock(t)}
+      <button onclick="xlabSaveTopic()" style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800;margin-top:8px">💾 보고서 저장</button>
+    </div>
+
+    ${(t.report&&t.report.savedAt) ? `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:14px">📝 예상 세특</span>
+        ${!t.expectedRecord ? `<button onclick="xlabOpenRecordWizard()" style="padding:7px 14px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🤖 예상세특 생성</button>`
+        : `<div style="display:flex;gap:6px"><button onclick="xlabOpenRecordWizard()" style="padding:7px 12px;background:#3b5bdb18;color:#3b5bdb;border:none;border-radius:8px;font-weight:700;font-size:12px">🔄 다시생성</button><button onclick="xlabPrintRecord()" style="padding:7px 12px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`}
+      </div>
+      ${t.expectedRecord ? `
+        <div style="font-size:11px;color:#888;margin-bottom:6px">과목: ${t.expectedRecord.subject||''} · 동기: ${t.expectedRecord.motivation||''}</div>
+        <textarea id="xlabRecordText" rows="6" maxlength="500" oninput="document.getElementById('xlabRecordCount').textContent=this.value.length" style="font-size:13px">${String(t.expectedRecord.recordText||'').replace(/</g,'&lt;')}</textarea>
+        <div style="text-align:right;font-size:11px;color:#999;margin:4px 0 10px"><span id="xlabRecordCount">${String(t.expectedRecord.recordText||'').length}</span>/500자</div>
+        <button onclick="xlabSaveRecord()" style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">💾 예상세특 저장</button>
+      ` : '<div style="text-align:center;color:#aaa;font-size:12px;padding:20px">아직 예상세특이 생성되지 않았습니다.</div>'}
+    </div>` : ''}
+    `}
+  </div>
+  ${_xlabRecordWizardStep>0 ? renderXlabRecordWizard() : ''}`;
+}
+
+function renderXlabRecordWizard(){
+  const step = _xlabRecordWizardStep;
+  const c = _xlabRecordChoice;
+  const stepDef = {
+    1:{title:'과목 선택',field:'subject',opts:XLAB_SUBJECT_CATS,customId:'xlabSubjectCustom'},
+    2:{title:'동기 선택',field:'motivation',opts:XLAB_MOTIVATION_OPTS,customId:'xlabMotivationCustom'},
+    3:{title:'관련 활동 선택',field:'relatedActivity',opts:XLAB_ACTIVITY_OPTS,customId:'xlabRelatedCustom'},
+    4:{title:'연계 활동 선택 (선택사항)',field:'linkedActivity',opts:XLAB_ACTIVITY_OPTS,customId:'xlabLinkedCustom'},
+  }[step];
+  return `
+  <div style="position:fixed;inset:0;background:#0008;display:flex;align-items:flex-end;z-index:999" onclick="if(event.target===this)xlabCloseRecordWizard()">
+    <div style="background:#fff;width:100%;border-radius:18px 18px 0 0;padding:20px;max-height:80vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span style="font-weight:800;font-size:15px">${step}/4 · ${stepDef.title}</span>
+        <button onclick="xlabCloseRecordWizard()" style="background:none;border:none;font-size:18px">✕</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        ${stepDef.opts.map(function(o){return `<button onclick="xlabWizardChoose('${stepDef.field}','${o}')" style="padding:9px 14px;border-radius:20px;border:1.5px solid ${c[stepDef.field]===o?'#3b5bdb':'#ddd'};background:${c[stepDef.field]===o?'#3b5bdb':'#fff'};color:${c[stepDef.field]===o?'#fff':'#333'};font-weight:700;font-size:12px">${o}</button>`;}).join('')}
+      </div>
+      ${c[stepDef.field]==='직접입력' ? `<input id="${stepDef.customId}" placeholder="직접 입력" value="${(c[stepDef.field+'Custom']||'').replace(/"/g,'&quot;')}" style="margin-bottom:12px">` : ''}
+      <div style="display:flex;gap:8px;margin-top:16px">
+        ${step>1 ? `<button onclick="xlabWizardPrev()" style="flex:1;padding:12px;background:#f1f3f8;border:none;border-radius:10px;font-weight:700">이전</button>` : ''}
+        ${step===4 ? `<button onclick="xlabWizardSkipLinked()" style="flex:1;padding:12px;background:#f1f3f8;border:none;border-radius:10px;font-weight:700">건너뛰기</button>` : ''}
+        <button onclick="${step===4?'xlabWizardFinishLinked()':'xlabWizardNext()'}" ${_xlabRecordLoading?'disabled':''} style="flex:2;padding:12px;background:#0f766e;color:#fff;border:none;border-radius:10px;font-weight:800">${_xlabRecordLoading?'⏳ 생성 중...':(step===4?'🤖 AI 예상세특 생성':'다음')}</button>
+      </div>
+    </div>
+  </div>`;
+}
 </script>
 <script>
 if ('serviceWorker' in navigator) {
