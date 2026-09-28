@@ -48548,8 +48548,12 @@ function xlabAdminSwitchTopMode(mode){
   _xfinAdminDetail = null;
   render();
 }
+function xsubAdminSetSubTab(k){ _xsubAdminSubTab = k; render(); }
+function xfinAdminSetSubTab(k){ _xfinAdminSubTab = k; render(); }
 function renderXlabAdminHeader(){
   const tabs=[['기본입력','📝'],['주제통계표','📊'],['주제확장표','🧭'],['예상세특표','🗂']];
+  const xsubTabs=[['기본입력','📝'],['교과활동표','📊'],['예상세특표','🗂']];
+  const xfinTabs=[['기본입력','📝'],['과목별예상세특표','📊'],['최종예상세특표','🗂']];
   const topModes=[['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특']];
   return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #7c3aed;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
     <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(124,58,237,.05)"></div>
@@ -48572,6 +48576,20 @@ function renderXlabAdminHeader(){
       const isAct=_xlabAdminSubTab===k;
       return `<button onclick="xlabAdminSetSubTab('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#7c3aed':'transparent'};background:transparent;color:${isAct?'#7c3aed':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${k}</button>`;
     }).join('')}
+  </div>` : ''}
+  ${_xlabAdminTopMode==='subject' ? `<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
+    ${xsubTabs.map(function(pair){
+      const k=pair[0], icon=pair[1];
+      const isAct=_xsubAdminSubTab===k;
+      return `<button onclick="xsubAdminSetSubTab('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#0f766e':'transparent'};background:transparent;color:${isAct?'#0f766e':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${k}</button>`;
+    }).join('')}
+  </div>` : ''}
+  ${_xlabAdminTopMode==='final' ? `<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
+    ${xfinTabs.map(function(pair){
+      const k=pair[0], icon=pair[1];
+      const isAct=_xfinAdminSubTab===k;
+      return `<button onclick="xfinAdminSetSubTab('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#b8860b':'transparent'};background:transparent;color:${isAct?'#b8860b':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${k}</button>`;
+    }).join('')}
   </div>` : ''}`;
 }
 
@@ -48583,21 +48601,35 @@ function renderXlabAdmin(s){
   }
   if(_xsubAdminStudentId!==String(s.id)){
     _xsubAdminStudentId=String(s.id);
-    _xsubAdminList=[]; _xsubAdminDetail=null;
+    _xsubAdminList=[]; _xsubAdminDetail=null; _xsubAdminSubTab='기본입력';
     _xsubAdminLoad(s.id);
   }
   if(_xfinAdminStudentId!==String(s.id)){
     _xfinAdminStudentId=String(s.id);
-    _xfinAdminList=[]; _xfinAdminDetail=null;
+    _xfinAdminList=[]; _xfinAdminDetail=null; _xfinAdminSubTab='기본입력';
     _xfinAdminLoad(s.id);
   }
   let body;
   if(_xlabAdminTopMode==='subject'){
-    body = _xsubAdminLoading ? '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>'
-      : (_xsubAdminDetail ? renderXsubAdminDetail(_xsubAdminDetail) : renderXsubAdminList(s));
+    if(_xsubAdminLoading){
+      body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
+    } else if(_xsubAdminSubTab==='교과활동표'){
+      body = renderXsubAdminActivityTable(s);
+    } else if(_xsubAdminSubTab==='예상세특표'){
+      body = renderXsubAdminRecordTable(s);
+    } else {
+      body = _xsubAdminDetail ? renderXsubAdminDetail(_xsubAdminDetail) : renderXsubAdminList(s);
+    }
   } else if(_xlabAdminTopMode==='final'){
-    body = _xfinAdminLoading ? '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>'
-      : (_xfinAdminDetail ? renderXfinAdminDetail(_xfinAdminDetail) : renderXfinAdminList(s));
+    if(_xfinAdminLoading){
+      body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
+    } else if(_xfinAdminSubTab==='과목별예상세특표'){
+      body = renderXfinAdminSubjectTable(s);
+    } else if(_xfinAdminSubTab==='최종예상세특표'){
+      body = renderXfinAdminRecordTable(s);
+    } else {
+      body = _xfinAdminDetail ? renderXfinAdminDetail(_xfinAdminDetail) : renderXfinAdminList(s);
+    }
   } else if(_xlabAdminLoading){
     body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
   } else if(_xlabAdminSubTab==='주제통계표'){
@@ -48621,6 +48653,7 @@ let _xsubAdminStudentId = null;
 let _xsubAdminList = [];
 let _xsubAdminLoading = false;
 let _xsubAdminDetail = null;
+let _xsubAdminSubTab = '기본입력';
 
 async function _xsubAdminLoad(studentId){
   _xsubAdminLoading = true; render();
@@ -48783,6 +48816,8 @@ let _xfinAdminStudentId = null;
 let _xfinAdminList = [];
 let _xfinAdminLoading = false;
 let _xfinAdminDetail = null;
+let _xfinAdminSubTab = '기본입력';
+let _xfinAdminSortSubjectAsc = null; // null=정렬 안함, true/false=과목명 오름/내림차순
 
 async function _xfinAdminLoad(studentId){
   _xfinAdminLoading = true; render();
@@ -48923,6 +48958,188 @@ function renderXfinAdminDetail(t){
       <div style="font-size:13px;color:#333;white-space:pre-wrap">${t.linkedActivity.text}</div>
     </div>` : ''}
   `;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ★ 2026-09-28 추가: 월별교과활동/최종예상세특에도 표 형태 열람 + 인쇄/PDF 탭을
+// 추가해 달라는 요청에 따른 신규 함수들. 기존 _xlabAdminPrintTable /
+// _xlabAdminCurrentStudent 공용 헬퍼를 그대로 재사용한다.
+// ══════════════════════════════════════════════════════════════════════════
+
+// "교과활동표": 월별·교과목·주제·심화확장주제·도서활동을 모아 보는 표 (xlabSubjectReports)
+function renderXsubAdminActivityTable(s){
+  const rows = _xsubAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xsubAdminPrintActivityTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 교과활동이 없습니다.</div>';
+  return printBtn+`
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">월</th><th style="padding:10px 12px">교과목</th><th style="padding:10px 12px">주제</th><th style="padding:10px 12px">심화·확장주제</th><th style="padding:10px 12px">독서활동</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(function(t){
+          const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:10px 12px">${mLabel}</td>
+            <td style="padding:10px 12px">${_xsubResolvedSubjectArea(t)||'-'}</td>
+            <td style="padding:10px 12px;font-weight:700">${t.topicTitle||''}</td>
+            <td style="padding:10px 12px;color:#0f766e">${(t.report&&t.report.advanced)||'(미작성)'}</td>
+            <td style="padding:10px 12px;color:#888">${(t.report&&t.report.reading)||'(미작성)'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+function xsubAdminPrintActivityTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xsubAdminList.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const rowsHtml = rows.map(function(t){
+    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(_xsubResolvedSubjectArea(t)||'-')+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td style="white-space:pre-wrap">'+_xlabEsc((t.report&&t.report.advanced)||'')+'</td><td style="white-space:pre-wrap">'+_xlabEsc((t.report&&t.report.reading)||'')+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 교과활동표', '📊', s, '<th>월</th><th>교과목</th><th>주제</th><th>심화·확장주제</th><th>독서활동</th>', rowsHtml);
+}
+
+// "예상세특표"(월별교과활동용): 월별·과목별 교과 예상세특 내용을 한눈에 보는 표
+function renderXsubAdminRecordTable(s){
+  const rows = _xsubAdminList.filter(function(t){return !!(t.expectedRecord&&t.expectedRecord.recordText);}).slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xsubAdminPrintRecordTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">작성된 교과 예상세특이 없습니다.</div>';
+  return printBtn+`
+  <div style="display:flex;flex-direction:column;gap:10px">
+    ${rows.map(function(t){
+      const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+      return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:800;font-size:12px;color:#0f766e">${mLabel} · ${_xsubResolvedSubjectArea(t)||'(과목 미지정)'}</span>
+          <span style="font-size:11px;color:#888">주제: ${t.topicTitle||''}</span>
+        </div>
+        <div style="font-size:13px;color:#333;white-space:pre-wrap;border:1px solid #eee;border-radius:8px;padding:10px">${t.expectedRecord.recordText||''}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function xsubAdminPrintRecordTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xsubAdminList.filter(function(t){return !!(t.expectedRecord&&t.expectedRecord.recordText);}).slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+  const rowsHtml = rows.map(function(t){
+    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(_xsubResolvedSubjectArea(t)||'(과목 미지정)')+'</td><td style="white-space:pre-wrap">'+_xlabEsc(t.expectedRecord.recordText)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 교과 예상세특표', '🗂', s, '<th>월</th><th>과목</th><th>예상세특 내용</th>', rowsHtml);
+}
+
+// 최종예상세특의 심화·확장주제는 별도 필드로 저장되지 않으므로, 근거가 된 원본
+// (월별주제활동 xlabTopics 또는 월별교과활동 xlabSubjectReports)에서 찾아온다.
+function _xfinResolvedAdvancedTopic(t){
+  if(!t || !t.sourceId) return '';
+  if(t.sourceType==='topic'){
+    const src = _xlabAdminList.find(function(x){return x.id===t.sourceId;});
+    return (src && src.advancedTopicTitle) || '';
+  }
+  if(t.sourceType==='subject'){
+    const src = _xsubAdminList.find(function(x){return x.id===t.sourceId;});
+    return (src && src.report && src.report.advanced) || '';
+  }
+  return '';
+}
+function _xfinMainActivityStatus(t){
+  const keys=['motivation','concept','example','issue','learned','reading'];
+  let filled=0;
+  keys.forEach(function(k){
+    const sec = t.sections && t.sections[k];
+    if(sec && sec.mode!=='none' && sec.text) filled++;
+  });
+  return filled+'/'+keys.length+'개 작성';
+}
+function _xfinLinkedActivityStatus(t){
+  const la = t.linkedActivity||{};
+  return (la.mode && la.mode!=='none' && la.text) ? ('✅ '+(_xfinResolvedLinkedType(t)||'있음')) : '❌ 없음';
+}
+function _xfinFormatDate(ms){
+  if(!ms) return '-';
+  const d = new Date(ms);
+  return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
+}
+function xfinAdminToggleSubjectSort(){
+  _xfinAdminSortSubjectAsc = (_xfinAdminSortSubjectAsc===true) ? false : true;
+  render();
+}
+function _xfinAdminSortedForSubjectTable(){
+  const rows = _xfinAdminList.slice();
+  if(_xfinAdminSortSubjectAsc===null) return rows.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  return rows.sort(function(a,b){
+    const sa=_xfinResolvedSubjectArea(a), sb=_xfinResolvedSubjectArea(b);
+    return _xfinAdminSortSubjectAsc ? sa.localeCompare(sb) : sb.localeCompare(sa);
+  });
+}
+
+// "과목별예상세특표": 작성일시·교과목·주제·심화확장주제·주요활동확인·연계활동확인 (과목순 정렬 가능)
+function renderXfinAdminSubjectTable(s){
+  const rows = _xfinAdminSortedForSubjectTable();
+  const sortLabel = _xfinAdminSortSubjectAsc===true?'과목순 ▲':(_xfinAdminSortSubjectAsc===false?'과목순 ▼':'과목순 정렬');
+  const btnBar = `<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px">
+    <button onclick="xfinAdminToggleSubjectSort()" style="padding:7px 14px;background:#fff;color:#b8860b;border:1.5px solid #b8860b;border-radius:8px;font-weight:700;font-size:12px">🔀 ${sortLabel}</button>
+    <button onclick="xfinAdminPrintSubjectTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>
+  </div>`;
+  if(!rows.length) return btnBar+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 최종예상세특이 없습니다.</div>';
+  return btnBar+`
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">작성일시</th><th style="padding:10px 12px">교과목</th><th style="padding:10px 12px">주제</th><th style="padding:10px 12px">심화·확장주제</th><th style="padding:10px 12px">주요활동확인</th><th style="padding:10px 12px">연계활동확인</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(function(t){
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:10px 12px">${_xfinFormatDate(t.savedAt||t.createdAt)}</td>
+            <td style="padding:10px 12px;font-weight:700">${_xfinResolvedSubjectArea(t)||'-'}</td>
+            <td style="padding:10px 12px">${t.topicTitle||''}</td>
+            <td style="padding:10px 12px;color:#7c3aed">${_xfinResolvedAdvancedTopic(t)||'(없음)'}</td>
+            <td style="padding:10px 12px">${_xfinMainActivityStatus(t)}</td>
+            <td style="padding:10px 12px">${_xfinLinkedActivityStatus(t)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+function xfinAdminPrintSubjectTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xfinAdminSortedForSubjectTable();
+  const rowsHtml = rows.map(function(t){
+    return '<tr><td>'+_xfinFormatDate(t.savedAt||t.createdAt)+'</td><td>'+_xlabEsc(_xfinResolvedSubjectArea(t)||'-')+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td>'+_xlabEsc(_xfinResolvedAdvancedTopic(t)||'(없음)')+'</td><td>'+_xfinMainActivityStatus(t)+'</td><td>'+_xfinLinkedActivityStatus(t)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 과목별예상세특표', '📊', s, '<th>작성일시</th><th>교과목</th><th>주제</th><th>심화·확장주제</th><th>주요활동확인</th><th>연계활동확인</th>', rowsHtml);
+}
+
+// "최종예상세특표": 작성일 + 과목별 최종예상세특 내용을 한눈에 확인
+function renderXfinAdminRecordTable(s){
+  const rows = _xfinAdminList.filter(function(t){return !!t.finalRecordText;}).slice().sort(function(a,b){return (b.savedAt||b.createdAt||0)-(a.savedAt||a.createdAt||0);});
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xfinAdminPrintRecordTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">생성된 최종예상세특이 없습니다.</div>';
+  return printBtn+`
+  <div style="display:flex;flex-direction:column;gap:10px">
+    ${rows.map(function(t){
+      return `<div style="background:#fffbe6;border:1.5px solid #f0d060;border-radius:10px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:800;font-size:12px;color:#b8860b">${_xfinFormatDate(t.savedAt||t.createdAt)} · ${_xfinResolvedSubjectArea(t)||'(과목 미지정)'}</span>
+          <span style="font-size:11px;color:#888">주제: ${t.topicTitle||''}</span>
+        </div>
+        <div style="font-size:13px;color:#333;white-space:pre-wrap;border:1px solid #f0d060;border-radius:8px;padding:10px;background:#fff">${t.finalRecordText||''}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function xfinAdminPrintRecordTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xfinAdminList.filter(function(t){return !!t.finalRecordText;}).slice().sort(function(a,b){return (b.savedAt||b.createdAt||0)-(a.savedAt||a.createdAt||0);});
+  const rowsHtml = rows.map(function(t){
+    return '<tr><td>'+_xfinFormatDate(t.savedAt||t.createdAt)+'</td><td>'+_xlabEsc(_xfinResolvedSubjectArea(t)||'(과목 미지정)')+'</td><td style="white-space:pre-wrap">'+_xlabEsc(t.finalRecordText)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 최종예상세특표', '🗂', s, '<th>작성일</th><th>과목</th><th>최종예상세특 내용</th>', rowsHtml);
 }
 
 // "기본입력" 탭: 학생 기본 인적사항 + 월별 주제보고서 목록(클릭하면 상세/인쇄)
