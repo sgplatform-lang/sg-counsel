@@ -3883,6 +3883,8 @@ function xlabNewTopic(){
     id: 'xlab_'+CU.id+'_'+Date.now(),
     studentId: String(CU.id),
     studentName: CU.name||'',
+    studentSchool: CU.school||'',
+    studentGrade: CU.grade||'',
     month: _xlabMonth,
     department: CU.xlabDepartment||'',
     topicSource: 'ai',
@@ -3970,15 +3972,18 @@ function xlabSetAdvancedManualTopic(){
 }
 
 async function xlabFindTopics(){
-  const deptEl = document.getElementById('xlabDeptInput2');
-  const dept = (deptEl?deptEl.value:'') || _xlabCurrent.department || CU.xlabDepartment || '';
-  const interestEl = document.getElementById('xlabInterestInput');
-  const keywordsEl = document.getElementById('xlabKeywordsInput');
-  const interest = interestEl?interestEl.value.trim():'';
-  const keywords = keywordsEl?keywordsEl.value.trim():'';
-  if(!dept.trim()){ alert('희망학과를 먼저 입력해주세요.'); return; }
-  if(!interest.trim()){ alert('관심 주제를 먼저 입력해주세요.'); return; }
-  _xlabCurrent.department = dept.trim();
+  // ★ 2026-09-28 수정: 이전에는 희망학과/관심주제/키워드만 읽어서 반영하고, 교과목
+  // 직접입력·교과개념입력 값은 반영하지 않은 채 render()를 호출해서, 그 사이 학생이
+  // 입력해둔 교과목/교과개념(그리고 간혹 키워드까지) 내용이 화면이 다시 그려지며
+  // 사라지는 문제가 있었다. _xlabCaptureFormFields()로 화면의 모든 입력값을 먼저
+  // 상태에 반영한 뒤 진행하도록 수정.
+  _xlabCaptureFormFields();
+  const dept = (_xlabCurrent.department||'').trim() || CU.xlabDepartment || '';
+  const interest = (_xlabCurrent.interest||'').trim();
+  const keywords = (_xlabCurrent.keywords||'').trim();
+  if(!dept){ alert('희망학과를 먼저 입력해주세요.'); return; }
+  if(!interest){ alert('관심 주제를 먼저 입력해주세요.'); return; }
+  _xlabCurrent.department = dept;
   _xlabCurrent.interest = interest;
   _xlabCurrent.keywords = keywords;
   _xlabAiLoading = true; render();
@@ -4074,7 +4079,9 @@ function renderXlabAdvancedTopicBlock(t){
 
 async function xlabGenerateReportSection(field){
   if(!_xlabCurrent.topicTitle){ alert('먼저 주제를 선택하거나 입력해주세요.'); return; }
-  if(!_xlabCurrent.advancedTopicTitle){ alert('먼저 "⑥ 주제 심화·확장 추천"에서 후속 주제를 선택하거나 입력해주세요.'); return; }
+  // ★ 2026-09-28 수정(관리자 요청): "①~⑤부터 순서대로 확인한 뒤 ⑥ 심화·확장 주제를
+  // 고르는 게 더 자연스럽다"는 피드백에 따라, ①~⑤ 생성 시 ⑥ 선택을 더 이상 강제하지
+  // 않는다(⑥은 xlabSaveTopic()의 최종 저장 시점에만 필수로 체크).
   // 편집 중이던 다른 항목의 내용이 날아가지 않게, 현재 textarea 값들을 먼저 반영
   if(!_xlabCurrent.report) _xlabCurrent.report = {reason:'',concept:'',example:'',issue:'',activity:''};
   XLAB_REPORT_FIELDS.forEach(function(pair){
@@ -4095,6 +4102,10 @@ async function xlabGenerateReportSection(field){
 async function xlabSaveTopic(){
   if(!_xlabCurrent.topicTitle){ alert('저장할 주제 내용이 없습니다.'); return; }
   if(!_xlabCurrent.advancedTopicTitle){ alert('"⑥ 주제 심화·확장 추천" 항목은 필수입니다. 후속 주제를 선택하거나 입력해주세요.'); return; }
+  // 보고서(인쇄용)에 학교/학년/이름을 함께 표기하기 위한 스냅샷 — 저장 시점 기준으로 최신화
+  _xlabCurrent.studentName = CU.name||'';
+  _xlabCurrent.studentSchool = CU.school||'';
+  _xlabCurrent.studentGrade = CU.grade||'';
   if(!_xlabCurrent.report) _xlabCurrent.report = {reason:'',concept:'',example:'',issue:'',activity:''};
   ['reason','concept','example','issue','activity'].forEach(function(f){
     const el = document.getElementById('xlabReport_'+f);
@@ -4127,24 +4138,66 @@ function xlabDeleteTopic(id){
   })();
 }
 
+// ★ 2026-09-28 추가(관리자 요청): "AI 주제활동 보고서" 정식 리포트 양식 — 학생용/관리자용
+// 인쇄·PDF에서 동일하게 사용(데이터는 xlabTopics 문서 하나를 그대로 공유하므로, 학생이
+// 저장한 내용을 관리자 쪽에서도 같은 모양으로 확인할 수 있다).
+function _xlabEsc(x){ return String(x==null?'':x); }
+function _xlabBuildFullReportHtml(t){
+  const savedDate = (t.report && t.report.savedAt) ? new Date(t.report.savedAt) : new Date();
+  const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  const sections = [
+    ['주제 선정이유', t.report&&t.report.reason],
+    ['개념·원리·이론', t.report&&t.report.concept],
+    ['실사례 예시', t.report&&t.report.example],
+    ['문제점·개선점', t.report&&t.report.issue],
+    ['교내활동 예시', t.report&&t.report.activity],
+  ];
+  let html = '<html><head><meta charset="utf-8"><title>X-lab 주제활동 보고서</title>'
+    +'<style>'
+    +'body{font-family:"Apple SD Gothic Neo",sans-serif;padding:40px;line-height:1.7;color:#1a1a2e}'
+    +'h1{font-size:22px;text-align:center;margin:0 0 14px}'
+    +'hr{border:none;border-top:2px solid #1a1a2e;margin:14px 0}'
+    +'.meta-row{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:#333}'
+    +'.meta-row b{color:#111}'
+    +'.topic-box{background:#f8f9fc;border-radius:10px;padding:14px 16px;margin:14px 0;font-size:13px}'
+    +'.topic-box div{margin-bottom:4px}'
+    +'h2{font-size:14px;margin:20px 0 6px;color:#3b5bdb;border-left:4px solid #3b5bdb;padding-left:8px}'
+    +'p{font-size:13px;white-space:pre-wrap;margin:0 0 4px}'
+    +'.record-box{border:1px solid #ddd;border-radius:8px;padding:14px;font-size:13px;white-space:pre-wrap}'
+    +'</style></head><body>'
+    +'<h1>📘 X-lab 주제활동 보고서</h1>'
+    +'<hr>'
+    +'<div class="meta-row">'
+      +'<span>년월일: <b>'+dateStr+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(t.studentSchool)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(t.studentGrade)+'</b></span>'
+      +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
+      +'<span>희망학과: <b>'+_xlabEsc(t.department)+'</b></span>'
+    +'</div>'
+    +'<hr>'
+    +'<div class="topic-box">'
+      +'<div><b>선택 주제:</b> '+_xlabEsc(t.topicTitle)+'</div>'
+      +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+      +'<div><b>교과목:</b> '+_xlabEsc(t.subjectArea||'-')+'</div>'
+      +'<div><b>교과개념:</b> '+_xlabEsc(t.subjectConcept||'-')+'</div>'
+    +'</div>'
+    +'<hr>';
+  sections.forEach(function(pair){
+    html += '<h2>'+pair[0]+'</h2><p>'+_xlabEsc(pair[1])+'</p>';
+  });
+  html += '<h2>주제 심화·확장 추천</h2><p>'+(t.advancedTopicTitle ? (_xlabEsc(t.advancedTopicTitle)+(t.advancedTopicDesc?(' — '+_xlabEsc(t.advancedTopicDesc)):'')) : '(미선택)')+'</p>';
+  if(t.expectedRecord){
+    html += '<hr><h2>📝 예상 세특 ('+_xlabEsc(t.expectedRecord.subject)+')</h2><div class="record-box">'+_xlabEsc(t.expectedRecord.recordText)+'</div>';
+  }
+  html += '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  return html;
+}
+
 function xlabPrintReport(){
   const t = _xlabCurrent;
   if(!t || !t.report) return;
   const w = window.open('','_blank');
-  w.document.write(
-    '<html><head><meta charset="utf-8"><title>주제탐구 보고서</title>'+
-    '<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:36px;line-height:1.7;color:#1a1a2e}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;margin:18px 0 6px;color:#3b5bdb}.meta{color:#666;font-size:12px;margin-bottom:20px}p{font-size:13px;white-space:pre-wrap}</style>'+
-    '</head><body>'+
-    '<h1>📘 주제탐구 보고서</h1>'+
-    '<div class="meta">희망학과: '+(t.department||'')+' · 주제: '+(t.topicTitle||'')+' · '+_xlabMonthLabel(t.month)+'</div>'+
-    '<h2>① 주제 선정이유</h2><p>'+(t.report.reason||'')+'</p>'+
-    '<h2>② 주제 개념·원리·이론</h2><p>'+(t.report.concept||'')+'</p>'+
-    '<h2>③ 주제 실사례 예시</h2><p>'+(t.report.example||'')+'</p>'+
-    '<h2>④ 주제 문제점·개선점</h2><p>'+(t.report.issue||'')+'</p>'+
-    '<h2>⑤ 주제 교내활동 예시</h2><p>'+(t.report.activity||'')+'</p>'+
-    '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script>'+
-    '</body></html>'
-  );
+  w.document.write(_xlabBuildFullReportHtml(t));
   w.document.close();
 }
 
