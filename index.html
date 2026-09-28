@@ -365,6 +365,10 @@ try{
     // ★ 2026-09-20(3차) 추가: 관리자페이지에서도 "다른 기관 학생 회차 조회"(_gg_fetchOtherOrgExamStudents)가
     // 이 함수를 재사용한다 — 학생용 파일과 동일한 서버 함수.
     getExamPeerSubjects: (payload)=>firebase.functions().httpsCallable('getExamPeerSubjects')(payload).then(r=>r.data),
+    // ★ 2026-09-28 추가: X-lab 예상세특 빌드업(관리자 전용) — 이미 작성된 예상세특 문구 +
+    // 희망 대학/학과 목록을 근거로 대학별 맞춤 재구성·강점약점 분석·발전주제/연계활동
+    // 추천을 생성. 분석 자체가 길어 AI 응답에 시간이 걸릴 수 있어 3분 타임아웃 부여.
+    xlabGenerateRecordBuildup: (payload)=>firebase.functions().httpsCallable('xlabGenerateRecordBuildup', {timeout: 180000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -48540,12 +48544,14 @@ function xlabAdminPrint(id){
 // 따라 헤더 배지/제목 아래에 "월별주제활동 / 월별교과활동 / 최종예상세특" 최상위 모드
 // 전환을 추가. 월별교과활동·최종예상세특을 선택하면 아래 4개 하위탭 대신 각각의 전용
 // 목록/상세를 보여준다.
-let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final'
+let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final' | 'buildup'
 function xlabAdminSwitchTopMode(mode){
   _xlabAdminTopMode = mode;
   _xlabAdminDetail = null;
   _xsubAdminDetail = null;
   _xfinAdminDetail = null;
+  _xbupAdminDetail = null;
+  _xbupAdminShowForm = false;
   render();
 }
 function xsubAdminSetSubTab(k){ _xsubAdminSubTab = k; render(); }
@@ -48554,7 +48560,8 @@ function renderXlabAdminHeader(){
   const tabs=[['기본입력','📝'],['주제통계표','📊'],['주제확장표','🧭'],['예상세특표','🗂']];
   const xsubTabs=[['기본입력','📝'],['교과활동표','📊'],['예상세특표','🗂']];
   const xfinTabs=[['기본입력','📝'],['과목별예상세특표','📊'],['최종예상세특표','🗂']];
-  const topModes=[['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특']];
+  const xbupTabs=[['기본입력','📝'],['예상세특 빌드업표','📊'],['전체빌드업표','🗂']];
+  const topModes=[['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['buildup','🚀 예상세특 빌드업']];
   return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #7c3aed;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
     <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(124,58,237,.05)"></div>
     <div style="position:relative;z-index:2">
@@ -48590,6 +48597,13 @@ function renderXlabAdminHeader(){
       const isAct=_xfinAdminSubTab===k;
       return `<button onclick="xfinAdminSetSubTab('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#b8860b':'transparent'};background:transparent;color:${isAct?'#b8860b':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${k}</button>`;
     }).join('')}
+  </div>` : ''}
+  ${_xlabAdminTopMode==='buildup' ? `<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
+    ${xbupTabs.map(function(pair){
+      const k=pair[0], icon=pair[1];
+      const isAct=_xbupAdminSubTab===k;
+      return `<button onclick="xbupAdminSetSubTab('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#b45309':'transparent'};background:transparent;color:${isAct?'#b45309':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${k}</button>`;
+    }).join('')}
   </div>` : ''}`;
 }
 
@@ -48608,6 +48622,11 @@ function renderXlabAdmin(s){
     _xfinAdminStudentId=String(s.id);
     _xfinAdminList=[]; _xfinAdminDetail=null; _xfinAdminSubTab='기본입력';
     _xfinAdminLoad(s.id);
+  }
+  if(_xbupAdminStudentId!==String(s.id)){
+    _xbupAdminStudentId=String(s.id);
+    _xbupAdminList=[]; _xbupAdminDetail=null; _xbupAdminSubTab='기본입력'; _xbupAdminShowForm=false;
+    _xbupAdminLoad(s.id);
   }
   let body;
   if(_xlabAdminTopMode==='subject'){
@@ -48629,6 +48648,16 @@ function renderXlabAdmin(s){
       body = renderXfinAdminRecordTable(s);
     } else {
       body = _xfinAdminDetail ? renderXfinAdminDetail(_xfinAdminDetail) : renderXfinAdminList(s);
+    }
+  } else if(_xlabAdminTopMode==='buildup'){
+    if(_xbupAdminLoading){
+      body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
+    } else if(_xbupAdminSubTab==='예상세특 빌드업표'){
+      body = renderXbupAdminTable(s);
+    } else if(_xbupAdminSubTab==='전체빌드업표'){
+      body = renderXbupAdminAllTable();
+    } else {
+      body = _xbupAdminDetail ? renderXbupAdminDetail(_xbupAdminDetail) : renderXbupAdminList(s);
     }
   } else if(_xlabAdminLoading){
     body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
@@ -49140,6 +49169,412 @@ function xfinAdminPrintRecordTable(){
     return '<tr><td>'+_xfinFormatDate(t.savedAt||t.createdAt)+'</td><td>'+_xlabEsc(_xfinResolvedSubjectArea(t)||'(과목 미지정)')+'</td><td style="white-space:pre-wrap">'+_xlabEsc(t.finalRecordText)+'</td></tr>';
   }).join('');
   _xlabAdminPrintTable('X-lab 최종예상세특표', '🗂', s, '<th>작성일</th><th>과목</th><th>최종예상세특 내용</th>', rowsHtml);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 🚀 X-lab · 예상세특 빌드업 (관리자 전용, 2026-09-28 신규)
+// 이미 작성된 월별주제활동/월별교과활동의 예상세특 문구 + 희망 대학/학과(최소 1개,
+// 최대 3개)를 근거로, 대학별 맞춤 재구성 예상세특·강점약점 분석·발전주제/연계활동
+// 추천을 한 번에 생성한다. 학생용 페이지에는 노출하지 않는다(관리자 전용 기능).
+// xlabRecordBuildups 컬렉션에 저장 — Firestore 규칙에 xlabTopics와 동일하게
+// `allow read, write: if true` 추가 필요.
+// ══════════════════════════════════════════════════════════════════════════
+let _xbupAdminStudentId = null;
+let _xbupAdminList = [];
+let _xbupAdminLoading = false;
+let _xbupAdminDetail = null;
+let _xbupAdminSubTab = '기본입력';
+let _xbupAdminShowForm = false;
+let _xbupAdminFormSourceKey = ''; // "topic:<id>" 또는 "subject:<id>"
+let _xbupAdminFormTargets = [{university:'',department:''}];
+let _xbupAdminGenerating = false;
+let _xbupAdminError = null;
+let _xbupAdminAllList = [];
+let _xbupAdminAllLoading = false;
+let _xbupAdminAllLoaded = false;
+
+function _xbupFormatDate(ms){
+  if(!ms) return '-';
+  const d = new Date(ms);
+  return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+async function _xbupAdminLoad(studentId){
+  _xbupAdminLoading = true; render();
+  try{
+    const all = await window._fb.getAll('xlabRecordBuildups');
+    _xbupAdminList = (all||[]).filter(function(t){return String(t.studentId)===String(studentId);})
+      .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('X-lab 예상세특 빌드업 관리자 목록 로딩 실패:', e.message);
+    _xbupAdminList = [];
+  }
+  _xbupAdminLoading = false; render();
+}
+function xbupAdminOpenDetail(id){ _xbupAdminDetail = _xbupAdminList.find(function(t){return t.id===id;}) || null; render(); }
+function xbupAdminCloseDetail(){ _xbupAdminDetail=null; render(); }
+function xbupAdminSetSubTab(k){
+  _xbupAdminSubTab = k;
+  if(k==='전체빌드업표' && !_xbupAdminAllLoaded) _xbupAdminLoadAll();
+  render();
+}
+async function _xbupAdminLoadAll(){
+  _xbupAdminAllLoading = true; render();
+  try{
+    const all = await window._fb.getAll('xlabRecordBuildups');
+    _xbupAdminAllList = (all||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('X-lab 예상세특 빌드업 전체 목록 로딩 실패:', e.message);
+    _xbupAdminAllList = [];
+  }
+  _xbupAdminAllLoading = false; _xbupAdminAllLoaded = true; render();
+}
+
+// "예상세특 빌드업" 대상 후보: 월별주제활동(xlabTopics) + 월별교과활동(xlabSubjectReports) 중
+// 이미 예상세특(expectedRecord.recordText)이 작성된 항목만 모아서 선택지로 제공한다.
+// _xlabAdminList/_xsubAdminList는 renderXlabAdmin(s)에서 top-mode와 무관하게 항상 로딩돼 있음.
+function _xbupAdminCandidates(){
+  const fromTopic = (_xlabAdminList||[]).filter(function(t){return t.expectedRecord && t.expectedRecord.recordText;})
+    .map(function(t){return {
+      key:'topic:'+t.id, kind:'topic', id:t.id,
+      subjectArea: t.expectedRecord.subject || t.subjectArea || '',
+      topicTitle: t.topicTitle||'', topicDesc: t.topicDesc||'',
+      recordText: t.expectedRecord.recordText||'',
+      label: '📘 ['+(t.month||'')+'] '+(t.expectedRecord.subject||t.subjectArea||'과목 미지정')+' · '+(t.topicTitle||'(제목 없음)'),
+    };});
+  const fromSubject = (_xsubAdminList||[]).filter(function(t){return t.expectedRecord && t.expectedRecord.recordText;})
+    .map(function(t){return {
+      key:'subject:'+t.id, kind:'subject', id:t.id,
+      subjectArea: _xsubResolvedSubjectArea(t),
+      topicTitle: t.topicTitle||'', topicDesc: t.topicDesc||'',
+      recordText: t.expectedRecord.recordText||'',
+      label: '📗 ['+(t.month||'')+'] '+(_xsubResolvedSubjectArea(t)||'과목 미지정')+' · '+(t.topicTitle||'(제목 없음)'),
+    };});
+  return fromTopic.concat(fromSubject);
+}
+
+function xbupAdminShowForm(){ _xbupAdminShowForm=true; _xbupAdminFormSourceKey=''; _xbupAdminFormTargets=[{university:'',department:''}]; _xbupAdminError=null; render(); }
+function xbupAdminCancelForm(){ _xbupAdminShowForm=false; render(); }
+function xbupAdminChooseSource(key){ _xbupAdminFormSourceKey = key; render(); }
+function xbupAdminAddTargetRow(){
+  if(_xbupAdminFormTargets.length>=3) return;
+  _xbupAdminFormTargets.push({university:'',department:''});
+  render();
+}
+function xbupAdminRemoveTargetRow(idx){
+  _xbupAdminFormTargets.splice(idx,1);
+  if(!_xbupAdminFormTargets.length) _xbupAdminFormTargets=[{university:'',department:''}];
+  render();
+}
+// select/버튼 클릭으로 재렌더링하기 전에, 입력 중이던 대학/학과 텍스트가 날아가지 않도록
+// DOM에서 현재 값을 읽어와 state에 먼저 반영한다.
+function xbupAdminCaptureTargetInputs(){
+  document.querySelectorAll('.xbup-target-univ').forEach(function(el){
+    const idx = Number(el.dataset.idx);
+    if(_xbupAdminFormTargets[idx]) _xbupAdminFormTargets[idx].university = el.value;
+  });
+  document.querySelectorAll('.xbup-target-dept').forEach(function(el){
+    const idx = Number(el.dataset.idx);
+    if(_xbupAdminFormTargets[idx]) _xbupAdminFormTargets[idx].department = el.value;
+  });
+}
+
+async function xbupAdminGenerate(){
+  const s = _xlabAdminCurrentStudent();
+  xbupAdminCaptureTargetInputs();
+  const cand = _xbupAdminCandidates().find(function(c){return c.key===_xbupAdminFormSourceKey;});
+  if(!cand){ _xbupAdminError = '불러올 예상세특 항목을 선택해주세요.'; render(); return; }
+  const targets = _xbupAdminFormTargets.map(function(t){return {university:(t.university||'').trim(), department:(t.department||'').trim()};})
+    .filter(function(t){return t.university && t.department;});
+  if(!targets.length){ _xbupAdminError = '희망 대학/학과를 최소 1개 이상 입력해주세요.'; render(); return; }
+
+  _xbupAdminGenerating = true; _xbupAdminError = null; render();
+  try{
+    const result = await window._fb.xlabGenerateRecordBuildup({
+      department: s.xlabDepartment||'',
+      subjectArea: cand.subjectArea,
+      topic: cand.topicTitle,
+      topicDesc: cand.topicDesc,
+      recordText: cand.recordText,
+      grade: s.grade||'',
+      targets: targets,
+    });
+    const doc = {
+      id: 'xbup_'+s.id+'_'+Date.now(),
+      studentId: String(s.id), studentName: s.name||'', studentSchool: s.school||'', studentGrade: s.grade||'',
+      department: s.xlabDepartment||'',
+      subjectArea: cand.subjectArea, topicTitle: cand.topicTitle, topicDesc: cand.topicDesc,
+      sourceType: cand.kind, sourceId: cand.id,
+      recordText: cand.recordText,
+      targets: targets,
+      result: result,
+      createdAt: Date.now(),
+    };
+    await window._fb.set('xlabRecordBuildups', doc.id, doc);
+    _xbupAdminList = [doc].concat(_xbupAdminList);
+    _xbupAdminShowForm = false;
+    _xbupAdminAllLoaded = false; // 전체빌드업표는 다음에 열 때 새로 불러오도록 무효화
+    xbupAdminOpenDetail(doc.id);
+  }catch(e){
+    console.error(e);
+    _xbupAdminError = '빌드업 생성 중 오류가 발생했습니다: ' + (e.message||e);
+  }finally{
+    _xbupAdminGenerating = false; render();
+  }
+}
+
+function renderXbupAdminForm(){
+  if(!_xbupAdminShowForm){
+    return `<button onclick="xbupAdminShowForm()" style="padding:9px 16px;border-radius:8px;border:1px dashed #b45309;background:transparent;color:#b45309;font-weight:700;font-size:13px;margin-bottom:16px">＋ 새 예상세특 빌드업 만들기</button>`;
+  }
+  const candidates = _xbupAdminCandidates();
+  return `
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:18px;margin-bottom:18px">
+    <div style="font-weight:800;font-size:14px;margin-bottom:12px">🚀 새 예상세특 빌드업</div>
+    ${_xbupAdminError?`<div style="color:#b4432f;font-size:12.5px;margin-bottom:10px">⚠ ${_xlabEsc(_xbupAdminError)}</div>`:''}
+    <div style="font-size:12px;color:#888;margin-bottom:6px">① 불러올 예상세특 선택 (월별주제활동/월별교과활동 중 예상세특이 작성된 항목만 표시)</div>
+    ${!candidates.length ? '<div style="color:#aaa;font-size:12.5px;padding:10px 0 16px">불러올 수 있는 예상세특이 없습니다. 먼저 월별주제활동/월별교과활동에서 예상세특을 작성해주세요.</div>' : `
+    <select onchange="xbupAdminChooseSource(this.value)" style="width:100%;padding:9px 10px;border-radius:8px;border:1px solid #ddd;font-size:13px;margin-bottom:14px">
+      <option value="">선택하세요</option>
+      ${candidates.map(function(c){return `<option value="${c.key}" ${_xbupAdminFormSourceKey===c.key?'selected':''}>${_xlabEsc(c.label)}</option>`;}).join('')}
+    </select>`}
+    <div style="font-size:12px;color:#888;margin-bottom:6px">② 희망 대학/학과 (최소 1개, 최대 3개)</div>
+    <div id="xbupTargetRows">
+      ${_xbupAdminFormTargets.map(function(t,i){return `
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <input class="xbup-target-univ" data-idx="${i}" value="${_xlabEsc(t.university)}" placeholder="대학명 (예: 연세대학교)" style="flex:1;padding:8px 10px;border-radius:7px;border:1px solid #ddd;font-size:13px" />
+        <input class="xbup-target-dept" data-idx="${i}" value="${_xlabEsc(t.department)}" placeholder="학과명 (예: 경영학과)" style="flex:1;padding:8px 10px;border-radius:7px;border:1px solid #ddd;font-size:13px" />
+        ${_xbupAdminFormTargets.length>1?`<button onclick="xbupAdminCaptureTargetInputs();xbupAdminRemoveTargetRow(${i})" style="padding:0 10px;border:none;background:transparent;color:#b4432f;font-size:15px">✕</button>`:''}
+      </div>`;}).join('')}
+    </div>
+    ${_xbupAdminFormTargets.length<3?`<button onclick="xbupAdminCaptureTargetInputs();xbupAdminAddTargetRow()" style="background:none;border:none;color:#3b5bdb;font-size:12px;font-weight:700;margin-bottom:14px">＋ 대학/학과 추가</button>`:''}
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="xbupAdminGenerate()" ${_xbupAdminGenerating?'disabled':''} style="padding:9px 16px;border-radius:8px;background:#b45309;color:#fff;border:none;font-weight:700;font-size:13px">${_xbupAdminGenerating?'⏳ 생성 중... (최대 1~2분)':'✨ 예상세특 빌드업 생성'}</button>
+      <button onclick="xbupAdminCancelForm()" style="padding:9px 16px;border-radius:8px;background:transparent;color:#888;border:1px solid #ddd;font-size:13px">취소</button>
+    </div>
+  </div>`;
+}
+
+function renderXbupAdminList(s){
+  return `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:10px">👤 학생 기본 인적사항</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;font-size:12px">
+        <div><span style="color:#888">이름</span><div style="font-weight:700;margin-top:2px">${s.name||''}</div></div>
+        <div><span style="color:#888">학교</span><div style="font-weight:700;margin-top:2px">${s.school||''}</div></div>
+        <div><span style="color:#888">학년</span><div style="font-weight:700;margin-top:2px">${s.grade||''}</div></div>
+        <div><span style="color:#888">담당</span><div style="font-weight:700;margin-top:2px">${s.counselor||''}</div></div>
+        <div><span style="color:#888">희망학과(X-lab)</span><div style="font-weight:700;margin-top:2px">${s.xlabDepartment||'(미입력)'}</div></div>
+      </div>
+    </div>
+    ${renderXbupAdminForm()}
+    <div style="font-weight:800;font-size:14px;margin-bottom:10px">🚀 예상세특 빌드업 작성 목록</div>
+    ${!_xbupAdminList.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 예상세특 빌드업이 없습니다.</div>' :
+      _xbupAdminList.map(function(t){return `
+      <div onclick="xbupAdminOpenDetail('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;color:#888">${t.subjectArea||'교과목 미선택'} · ${_xbupFormatDate(t.createdAt)}</div>
+          <div style="font-weight:700;font-size:13px;margin-top:2px">${t.topicTitle||'(제목 없음)'}</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">목표: ${(t.targets||[]).map(function(x){return (x.university||'')+' '+(x.department||'');}).join(' · ')}</div>
+        </div>
+        <span style="color:#bbb;font-size:16px">›</span>
+      </div>`;}).join('')
+    }`;
+}
+
+function _xbupBuildFullReportHtml(t){
+  const savedDate = t.createdAt ? new Date(t.createdAt) : new Date();
+  const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  const dateCompact = savedDate.getFullYear()+String(savedDate.getMonth()+1).padStart(2,'0')+String(savedDate.getDate()).padStart(2,'0');
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab 예상세특 빌드업_'+dateCompact;
+  const r = t.result || {};
+  let html = '<html><head><meta charset="utf-8"><title>'+pdfTitle+'</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:40px;line-height:1.7;color:#1a1a2e}h1{font-size:22px;text-align:center;margin:0 0 14px}hr{border:none;border-top:2px solid #1a1a2e;margin:14px 0}.meta-row{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:#333}.meta-row b{color:#111}.topic-box{background:#f8f9fc;border-radius:10px;padding:14px 16px;margin:14px 0;font-size:13px}.topic-box div{margin-bottom:4px}h2{font-size:14px;margin:20px 0 6px;color:#b45309;border-left:4px solid #b45309;padding-left:8px}p{font-size:13px;white-space:pre-wrap;margin:0 0 4px}.record-box{border:1px solid #f0d060;background:#fffbe6;border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;margin-bottom:8px}.card{border:1px solid #ddd;border-radius:8px;padding:12px;margin-bottom:8px}</style></head><body>'
+    +'<h1>🚀 X-lab 예상세특 빌드업 리포트</h1>'
+    +'<hr>'
+    +'<div class="meta-row">'
+      +'<span>생성일: <b>'+dateStr+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(t.studentSchool)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(t.studentGrade)+'</b></span>'
+      +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
+      +'<span>목표: <b>'+(t.targets||[]).map(function(x){return _xlabEsc((x.university||'')+' '+(x.department||''));}).join(' · ')+'</b></span>'
+    +'</div>'
+    +'<hr>'
+    +'<div class="topic-box">'
+      +'<div><b>교과목:</b> '+_xlabEsc(t.subjectArea||'-')+'</div>'
+      +'<div><b>탐구 주제:</b> '+_xlabEsc(t.topicTitle)+'</div>'
+      +'<div style="margin-top:6px"><b>기존 예상 세특:</b></div>'
+      +'<div class="record-box">'+_xlabEsc(t.recordText)+'</div>'
+    +'</div>'
+    +'<h2>심화·확장 주제</h2><p><b>'+_xlabEsc(r.advanced_topic)+'</b>'+(r.advanced_topic_detail?(' — '+_xlabEsc(r.advanced_topic_detail)):'')+'</p>'
+    +'<h2>강점 분석</h2><p>'+_xlabEsc(r.strengths_detail)+'</p>'
+    +'<h2>약점 분석</h2><p>'+_xlabEsc(r.weaknesses_detail)+'</p>'
+    +'<h2>진로일관성·학종 경쟁력 분석</h2><p>'+_xlabEsc(r.career_consistency_analysis)+'</p>'
+    +'<h2>대학·학과별 맞춤 재구성 예상세특</h2>'
+    +(r.school_versions||[]).map(function(sv){
+      return '<div class="card"><div style="font-weight:700;font-size:13px;margin-bottom:4px">'+_xlabEsc(sv.university)+' · '+_xlabEsc(sv.department)+'</div>'
+        +'<div style="font-size:11.5px;color:#b45309;margin-bottom:6px">📌 '+_xlabEsc(sv.admission_focus)+'</div>'
+        +'<div style="font-size:13px;white-space:pre-wrap">'+_xlabEsc(sv.optimized_draft)+'</div>'
+        +'<div style="font-size:11px;color:#888;margin-top:6px">💡 '+_xlabEsc(sv.fit_note)+'</div></div>';
+    }).join('')
+    +'<h2>발전 주제 추천</h2>'
+    +(r.next_topics||[]).map(function(nt,i){return '<p>'+(i+1)+'. <b>'+_xlabEsc(nt.title)+'</b> — '+_xlabEsc(nt.reason)+'</p>';}).join('')
+    +'<h2>연계활동 추천</h2>'
+    +(r.connect_activities||[]).map(function(a){return '<p>['+_xlabEsc(a.type)+'] <b>'+_xlabEsc(a.title)+'</b> — '+_xlabEsc(a.description)+(a.why?(' (💡 '+_xlabEsc(a.why)+')'):'')+'</p>';}).join('')
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  return html;
+}
+function xbupAdminPrint(id){
+  const t = _xbupAdminList.find(function(x){return x.id===id;}) || _xbupAdminAllList.find(function(x){return x.id===id;});
+  if(!t) return;
+  const w = window.open('','_blank');
+  w.document.write(_xbupBuildFullReportHtml(t));
+  w.document.close();
+}
+
+function renderXbupAdminDetail(t){
+  const r = t.result || {};
+  return `
+    <button onclick="xbupAdminCloseDetail()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:12px">← 목록으로</button>
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">
+      <div>
+        <div style="font-size:17px;font-weight:800">${t.topicTitle||''}</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">📘 교과목: ${t.subjectArea||'-'} · 목표: ${(t.targets||[]).map(function(x){return (x.university||'')+' '+(x.department||'');}).join(' · ')}</div>
+      </div>
+      <button onclick="xbupAdminPrint('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>
+    </div>
+    <div style="background:#fffbe6;border:1.5px solid #f0d060;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:12.5px;margin-bottom:6px">기존 예상 세특</div>
+      <div style="font-size:13px;color:#333;white-space:pre-wrap">${t.recordText||''}</div>
+    </div>
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:8px">🧭 심화·확장 주제</div>
+      <div style="font-size:13px;font-weight:700;color:#b45309">${r.advanced_topic||''}</div>
+      <div style="font-size:12.5px;color:#555;margin-top:4px">${r.advanced_topic_detail||''}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px">
+        <div style="font-weight:800;font-size:13px;color:#0f766e;margin-bottom:6px">강점 분석</div>
+        <div style="font-size:12.5px;color:#333;white-space:pre-wrap">${r.strengths_detail||''}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px">
+        <div style="font-weight:800;font-size:13px;color:#b4432f;margin-bottom:6px">약점 분석</div>
+        <div style="font-size:12.5px;color:#333;white-space:pre-wrap">${r.weaknesses_detail||''}</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:8px">진로일관성·학종 경쟁력 분석</div>
+      <div style="font-size:12.5px;color:#333;white-space:pre-wrap">${r.career_consistency_analysis||''}</div>
+    </div>
+    <div style="font-weight:800;font-size:14px;margin-bottom:10px">🎓 대학·학과별 맞춤 재구성 예상세특</div>
+    ${(r.school_versions||[]).map(function(sv){return `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px">
+      <div style="font-weight:700;font-size:13px">${sv.university||''} · ${sv.department||''}</div>
+      <div style="font-size:11px;color:#b45309;margin:4px 0 8px">📌 ${sv.admission_focus||''}</div>
+      <div style="font-size:13px;color:#333;white-space:pre-wrap;border:1px solid #f0d060;background:#fffbe6;border-radius:8px;padding:10px">${sv.optimized_draft||''}</div>
+      <div style="font-size:11px;color:#888;margin-top:6px">💡 ${sv.fit_note||''}</div>
+    </div>`;}).join('')}
+    <div style="font-weight:800;font-size:14px;margin:16px 0 10px">🧭 발전 주제 추천</div>
+    ${(r.next_topics||[]).map(function(nt,i){return `<div style="background:#fff;border:1px solid #eee;border-left:3px solid #b45309;border-radius:0 10px 10px 0;padding:10px 14px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:13px">${i+1}. ${nt.title||''}</div>
+      <div style="font-size:12px;color:#888;margin-top:3px">${nt.reason||''}</div>
+    </div>`;}).join('')}
+    <div style="font-weight:800;font-size:14px;margin:16px 0 10px">🔗 연계활동 추천</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${(r.connect_activities||[]).map(function(a){return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px">
+        <span style="display:inline-block;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eef1f8;color:#324066;margin-bottom:6px">${a.type||''}</span>
+        <div style="font-weight:700;font-size:12.5px">${a.title||''}</div>
+        <div style="font-size:11.5px;color:#888;margin-top:4px">${a.description||''}</div>
+        <div style="font-size:11px;color:#0f766e;margin-top:4px">💡 ${a.why||''}</div>
+      </div>`;}).join('')}
+    </div>
+  `;
+}
+
+// "예상세특 빌드업표": 현재 선택된 학생의 작성일시·교과목·주제·확장심화주제·발전주제추천·연계활동추천
+function renderXbupAdminTable(s){
+  const rows = _xbupAdminList.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xbupAdminPrintTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 예상세특 빌드업이 없습니다.</div>';
+  return printBtn+`
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">작성일시</th><th style="padding:10px 12px">교과목</th><th style="padding:10px 12px">주제</th><th style="padding:10px 12px">확장·심화 주제</th><th style="padding:10px 12px">발전주제 추천</th><th style="padding:10px 12px">연계활동 추천</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(function(t){
+          const r=t.result||{};
+          const nextTopics=(r.next_topics||[]).map(function(n){return n.title;}).filter(Boolean).join(', ');
+          const connectAct=(r.connect_activities||[]).map(function(a){return a.title;}).filter(Boolean).join(', ');
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:10px 12px">${_xbupFormatDate(t.createdAt)}</td>
+            <td style="padding:10px 12px">${t.subjectArea||'-'}</td>
+            <td style="padding:10px 12px;font-weight:700">${t.topicTitle||''}</td>
+            <td style="padding:10px 12px;color:#b45309">${r.advanced_topic||'(없음)'}</td>
+            <td style="padding:10px 12px">${nextTopics||'(없음)'}</td>
+            <td style="padding:10px 12px">${connectAct||'(없음)'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+function xbupAdminPrintTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xbupAdminList.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  const rowsHtml = rows.map(function(t){
+    const r=t.result||{};
+    const nextTopics=(r.next_topics||[]).map(function(n){return n.title;}).filter(Boolean).join(', ');
+    const connectAct=(r.connect_activities||[]).map(function(a){return a.title;}).filter(Boolean).join(', ');
+    return '<tr><td>'+_xbupFormatDate(t.createdAt)+'</td><td>'+_xlabEsc(t.subjectArea||'-')+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td>'+_xlabEsc(r.advanced_topic||'(없음)')+'</td><td>'+_xlabEsc(nextTopics||'(없음)')+'</td><td>'+_xlabEsc(connectAct||'(없음)')+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 예상세특 빌드업표', '🚀', s, '<th>작성일시</th><th>교과목</th><th>주제</th><th>확장·심화 주제</th><th>발전주제 추천</th><th>연계활동 추천</th>', rowsHtml);
+}
+
+// "전체빌드업표": 특정 학생이 아니라 전체 학생의 예상세특 빌드업을 한 번에 모아보는 표
+// (관리자 요청: "기존과 다른게 있다면 전체빌드업표를 넣고 싶습니다") — xlabRecordBuildups
+// 컬렉션 전체를 studentId 필터 없이 조회해서 학생명 컬럼과 함께 보여준다.
+function renderXbupAdminAllTable(){
+  if(_xbupAdminAllLoading) return '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
+  const rows = _xbupAdminAllList;
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xbupAdminPrintAllTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  if(!rows.length) return printBtn+'<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 예상세특 빌드업이 없습니다.</div>';
+  return printBtn+`
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">학생</th><th style="padding:10px 12px">작성일시</th><th style="padding:10px 12px">교과목</th><th style="padding:10px 12px">주제</th><th style="padding:10px 12px">확장·심화 주제</th><th style="padding:10px 12px">발전주제 추천</th><th style="padding:10px 12px">연계활동 추천</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(function(t){
+          const r=t.result||{};
+          const nextTopics=(r.next_topics||[]).map(function(n){return n.title;}).filter(Boolean).join(', ');
+          const connectAct=(r.connect_activities||[]).map(function(a){return a.title;}).filter(Boolean).join(', ');
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:10px 12px;font-weight:700">${t.studentName||''}</td>
+            <td style="padding:10px 12px">${_xbupFormatDate(t.createdAt)}</td>
+            <td style="padding:10px 12px">${t.subjectArea||'-'}</td>
+            <td style="padding:10px 12px">${t.topicTitle||''}</td>
+            <td style="padding:10px 12px;color:#b45309">${r.advanced_topic||'(없음)'}</td>
+            <td style="padding:10px 12px">${nextTopics||'(없음)'}</td>
+            <td style="padding:10px 12px">${connectAct||'(없음)'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+function xbupAdminPrintAllTable(){
+  const rows = _xbupAdminAllList;
+  const rowsHtml = rows.map(function(t){
+    const r=t.result||{};
+    const nextTopics=(r.next_topics||[]).map(function(n){return n.title;}).filter(Boolean).join(', ');
+    const connectAct=(r.connect_activities||[]).map(function(a){return a.title;}).filter(Boolean).join(', ');
+    return '<tr><td>'+_xlabEsc(t.studentName)+'</td><td>'+_xbupFormatDate(t.createdAt)+'</td><td>'+_xlabEsc(t.subjectArea||'-')+'</td><td>'+_xlabEsc(t.topicTitle)+'</td><td>'+_xlabEsc(r.advanced_topic||'(없음)')+'</td><td>'+_xlabEsc(nextTopics||'(없음)')+'</td><td>'+_xlabEsc(connectAct||'(없음)')+'</td></tr>';
+  }).join('');
+  // 전체 학생 대상 표라 특정 학생 정보 대신 "전체 학생"으로 표기.
+  _xlabAdminPrintTable('X-lab 전체 예상세특 빌드업표', '🚀', {name:'전체 학생', school:'', grade:'', xlabDepartment:''}, '<th>학생</th><th>작성일시</th><th>교과목</th><th>주제</th><th>확장·심화 주제</th><th>발전주제 추천</th><th>연계활동 추천</th>', rowsHtml);
 }
 
 // "기본입력" 탭: 학생 기본 인적사항 + 월별 주제보고서 목록(클릭하면 상세/인쇄)
