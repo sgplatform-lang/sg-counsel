@@ -4109,6 +4109,7 @@ function renderDetail(s){
     {id:'jonghap',   label:'종합분석',   icon:'📚', sub:false,  perm:'jonghap'},
     {id:'nulsul',    label:'논술분석',   icon:'✏️', sub:false,  perm:'nulsul'},
     {id:'challenger', label:'챌린저',    icon:'🎯', sub:false,  perm:'challenger'},
+    {id:'xlab',       label:'X-lab',     icon:'🔬', sub:false,  perm:'xlab'},
     {id:'roadmap',    label:'입시상담',  icon:'🧭', sub:false,  perm:'roadmap'},
   ].filter(tab=>!tab.perm||hasPerm(tab.perm));
   // susi 계열, weekly 계열 판단
@@ -4211,7 +4212,7 @@ function renderDetail(s){
     <!-- ③ 성적·상담·개요: 인쇄 버튼만 우측에 -->
     ${!isSusiGroup&&!isWeekGroup&&curPrintBtn?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:6px">${curPrintBtn}</div>`:''}
 
-    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
+    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='xlab'?renderXlabAdmin(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
   </div>`;
 }
 
@@ -12574,6 +12575,30 @@ function checkStudentId(originalId, curId){
     window._sLidChecked=true;
   }
 }
+// ★ 2026-09-27 추가: renderStudentDetail() 안에서만 쓰이던 hasPerm(key) 로직(최종관리자/
+// 기관/선생님 권한 판정)을 학생 등록폼(_renderSForm)에서도 그대로 써야 해서 전역 함수로
+// 분리했다 — X-lab처럼 "이 기관/선생님이 애초에 이 기능 권한이 없으면, 그 선생님이 담당하는
+// 학생에게 그 기능을 개별로 켜줄 수도 없어야 한다"는 조건을 걸기 위함.
+function _sgHasPerm(key){
+  const isAdmin2 = ST.currentUser?.role==='admin';
+  if(isAdmin2) return true;
+  const isOrgAdmin2 = ST.currentUser?.role==='orgAdmin';
+  const oid = ST.currentOrg?.id || ST.currentUser?.orgId || null;
+  let orgPerms = null;
+  if(oid){
+    try{
+      const allOrgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+      const fo=allOrgs.find(o=>String(o.id)===String(oid));
+      orgPerms = fo?.permissions||null;
+    }catch(e){ orgPerms=null; }
+  }
+  if(orgPerms && !orgPerms.includes(key)) return false;
+  if(isOrgAdmin2) return true;
+  const teacher2 = ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId));
+  const teacherPerms = teacher2?.permissions||[];
+  return teacherPerms.includes(key);
+}
+
 function openSForm(s){
   // s가 undefined/null이면 최신 ST.sel로 대체 (안전 처리)
   const target = s || null;
@@ -12684,6 +12709,20 @@ function _renderSForm(s){
         <div style="font-size:10px;color:#0f9d58;margin-top:6px">학생용 페이지(SG상담플랫폼_학생용.html)에서 이 계정으로 로그인합니다</div>
       </div>
 
+      <!-- ★ 2026-09-27 추가: X-lab(월별 주제활동)은 모든 학생에게 기본 노출되면 안 되고,
+           담당 선생님/기관이 학생별로 개별 허용해야 학생용 페이지에 탭이 보인다. 이 체크박스
+           자체도 이 기관/선생님이 X-lab 권한이 있을 때만 노출(_sgHasPerm('xlab')) — 권한이
+           없는 선생님이 자기 학생에게 임의로 켜줄 수 없게 막음. -->
+      ${_sgHasPerm('xlab') ? `<div style="background:#f3e8ff;border:1.5px solid #d8b4fe;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="sf_xlab" ${s?.xlabEnabled?'checked':''} style="width:17px;height:17px;accent-color:#7c3aed">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#7c3aed">🔬 X-lab(월별 주제활동) 사용 허용</div>
+            <div style="font-size:10px;color:#888;margin-top:2px">체크하면 이 학생의 학생용 페이지에 "X-lab" 탭이 표시됩니다.</div>
+          </div>
+        </label>
+      </div>` : ''}
+
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn-g" onclick="this.closest('.overlay').remove()">취소</button>
         <button class="btn-b" style="padding:9px 24px;border-radius:8px" onclick="window._saveSForm(${s?s.id:'null'})">
@@ -12790,6 +12829,9 @@ window._saveSForm = function(sid){
     className: document.getElementById('sf_cls')?.value?.trim()||'',
     studentLoginId: document.getElementById('sf_lid')?.value?.trim()||existing?.studentLoginId||'',
     studentPassword: document.getElementById('sf_lpw')?.value?.trim()||existing?.studentPassword||'',
+    // ★ 체크박스 자체가 이 관리자/선생님의 권한 부족으로 폼에 없을 수 있으므로(_sgHasPerm),
+    // 그 경우엔 기존 값을 그대로 유지 — 없는 체크박스를 "체크 해제"로 오인해 꺼버리면 안 됨.
+    xlabEnabled: document.getElementById('sf_xlab') ? document.getElementById('sf_xlab').checked : !!existing?.xlabEnabled,
     extraSubjs: finalExtra,
     // ── 기관: 최종관리자가 변경했으면 새 값, 아니면 기존 유지 ──
     orgId:   resolvedOrgId,
@@ -18854,7 +18896,7 @@ function renderOrgMgmt(){
           <div style="font-size:10px;color:#64748b;font-weight:600;margin-bottom:4px">🔑 허용 기능 권한</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px">
             ${(()=>{
-              const ALL=[{key:'grade',label:'📊성적'},{key:'weekly',label:'📅주간플랜'},{key:'consult',label:'💬상담'},{key:'susi',label:'🏫수시'},{key:'gyogwa',label:'📋교과분석'},{key:'jonghap',label:'📚종합분석'},{key:'jeongsi',label:'🎯정시'},{key:'apex',label:'🏆APEX'},{key:'addStudent',label:'➕학생추가'},{key:'nulsul',label:'✏논술분석'},{key:'challenger',label:'🎯챌린저'},{key:'roadmap',label:'🧭입시상담'}];
+              const ALL=[{key:'grade',label:'📊성적'},{key:'weekly',label:'📅주간플랜'},{key:'consult',label:'💬상담'},{key:'susi',label:'🏫수시'},{key:'gyogwa',label:'📋교과분석'},{key:'jonghap',label:'📚종합분석'},{key:'jeongsi',label:'🎯정시'},{key:'apex',label:'🏆APEX'},{key:'addStudent',label:'➕학생추가'},{key:'nulsul',label:'✏논술분석'},{key:'challenger',label:'🎯챌린저'},{key:'xlab',label:'🔬X-lab'},{key:'roadmap',label:'🧭입시상담'}];
               const perms=org.permissions||ALL.map(p=>p.key);
               return ALL.map(p=>`<span style="font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600;background:${perms.includes(p.key)?'#eef1ff':'#f8fafc'};color:${perms.includes(p.key)?'#3b5bdb':'#cbd5e1'};border:1px solid ${perms.includes(p.key)?'#c7d2fe':'#e2e8f0'}">${p.label}</span>`).join('');
             })()}
@@ -19003,6 +19045,7 @@ function openOrgForm(orgData){
           {key:'addStudent',label:'➕ 학생 추가'},
           {key:'nulsul',    label:'✏ 논술분석'},
           {key:'challenger',label:'🎯 챌린저(모의고사 분석)'},
+          {key:'xlab',      label:'🔬 X-lab(월별 주제활동)'},
           {key:'roadmap',   label:'🧭 입시상담(로드맵 리포트)'},
         ].map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:8px;border:1.5px solid #e8eaf6;cursor:pointer">
           <input type="checkbox" id="org_perm_${p.key}" ${(org?.permissions||['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent']).includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:#3b5bdb">
@@ -19040,7 +19083,7 @@ function openOrgForm(orgData){
       mobile: ov.querySelector('#of_mobile').value.trim(),
       email:  ov.querySelector('#of_email').value.trim(),
       createdAt: org?.createdAt||Date.now(),
-      permissions: ['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked)
+      permissions: ['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','xlab','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked)
     };
 
     const idx=orgs.findIndex(o=>o.id===org?.id);
@@ -19359,6 +19402,7 @@ function openTForm(t){
     {key:'addStudent',label:'➕ 학생 추가'},
     {key:'nulsul',   label:'✏ 논술분석'},
     {key:'challenger',label:'🎯 챌린저(모의고사 분석)'},
+    {key:'xlab',      label:'🔬 X-lab(월별 주제활동)'},
     {key:'roadmap',   label:'🧭 입시상담(로드맵 리포트)'},
   ];
   const curPerms=t?.permissions||PERMS.map(p=>p.key); // 기본: 전체 허용
@@ -48361,7 +48405,129 @@ function generateReport() {
 </script>
 
 <!-- ★ 2026-09-17 제거: "sg-v47-summary-units-only" 몽키패치 스크립트(w.aarSummaryTable을
-     "주요 오답 단원" 열이 추가된 구버전 표로 800ms마다 덮어쓰던 스크립트)는 "1. 과목별
-     결과" 카드형 재구성(window.aarSummaryTable, __CHALLENGER_HTML__ 안 v41 IIFE 참고)과
+     "주요 오답 단원" 열이 추가된 카드형 재구성(window.aarSummaryTable, __CHALLENGER_HTML__ 안 v41 IIFE 참고)과
      충돌해 삭제함 — 남겨두면 800ms 뒤 새 카드 레이아웃이 이 구버전 표로 다시 덮어써짐. -->
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// 🔬 X-lab — 월별 주제활동 (관리자용 열람화면, 2026-09-27 신규)
+// 학생용페이지(renderXlab)에서 학생이 작성한 주제탐구 보고서/예상세특을 학생별로
+// 확인하는 화면. 다른 학생 상세 탭(renderGyogwa 등)과 동일하게, 현재 열람 중인
+// 학생ID가 바뀌면 캐시를 비우고 xlabTopics 컬렉션을 다시 불러온다.
+// ══════════════════════════════════════════════════════════════════════════
+let _xlabAdminStudentId = null;
+let _xlabAdminList = [];
+let _xlabAdminLoading = false;
+let _xlabAdminDetail = null;
+
+async function _xlabAdminLoad(studentId){
+  _xlabAdminLoading = true; render();
+  try{
+    const all = await window._fb.getAll('xlabTopics');
+    _xlabAdminList = (all||[]).filter(function(t){return String(t.studentId)===String(studentId);})
+      .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('X-lab 관리자 목록 로딩 실패:', e.message);
+    _xlabAdminList = [];
+  }
+  _xlabAdminLoading = false; render();
+}
+
+function xlabAdminOpenDetail(id){
+  _xlabAdminDetail = _xlabAdminList.find(function(t){return t.id===id;}) || null;
+  render();
+}
+function xlabAdminCloseDetail(){ _xlabAdminDetail=null; render(); }
+
+function xlabAdminPrint(id){
+  const t = _xlabAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  const w = window.open('','_blank');
+  let html = '<html><head><meta charset="utf-8"><title>X-lab 주제활동</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:36px;line-height:1.7;color:#1a1a2e}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;margin:18px 0 6px;color:#3b5bdb}.meta{color:#666;font-size:12px;margin-bottom:20px}p{font-size:13px;white-space:pre-wrap}</style>'
+    +'</head><body>'
+    +'<h1>🔬 X-lab 주제활동</h1>'
+    +'<div class="meta">학생: '+(t.studentName||'')+' · 희망학과: '+(t.department||'')+' · 주제: '+(t.topicTitle||'')+'</div>';
+  if(t.report){
+    html += '<h2>① 주제 선정이유</h2><p>'+(t.report.reason||'')+'</p>'
+      +'<h2>② 개념·원리·이론</h2><p>'+(t.report.concept||'')+'</p>'
+      +'<h2>③ 실사례 예시</h2><p>'+(t.report.example||'')+'</p>'
+      +'<h2>④ 문제점·개선점</h2><p>'+(t.report.issue||'')+'</p>'
+      +'<h2>⑤ 교내활동 예시</h2><p>'+(t.report.activity||'')+'</p>';
+  }
+  if(t.expectedRecord){
+    html += '<h2>📝 예상 세특 ('+(t.expectedRecord.subject||'')+')</h2><p>'+(t.expectedRecord.recordText||'')+'</p>';
+  }
+  html += '<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+
+function renderXlabAdmin(s){
+  if(_xlabAdminStudentId!==String(s.id)){
+    _xlabAdminStudentId=String(s.id);
+    _xlabAdminList=[]; _xlabAdminDetail=null;
+    _xlabAdminLoad(s.id);
+  }
+  if(_xlabAdminDetail) return renderXlabAdminDetail(_xlabAdminDetail);
+
+  const byMonth={};
+  _xlabAdminList.forEach(function(t){ (byMonth[t.month]=byMonth[t.month]||[]).push(t); });
+  const months=Object.keys(byMonth).sort().reverse();
+
+  return `
+  <div style="padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:17px;font-weight:800">🔬 X-lab · 월별주제활동</span>
+      <span style="font-size:12px;color:#888">희망학과: ${s.xlabDepartment||'(미입력)'}</span>
+    </div>
+    ${_xlabAdminLoading ? '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>' :
+      !months.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 주제활동이 없습니다.</div>' :
+      months.map(function(m){
+        const p=m.split('-'); const label=p[0]+'년 '+parseInt(p[1],10)+'월';
+        return `
+        <div style="margin-bottom:18px">
+          <div style="font-weight:800;font-size:13px;color:#3b5bdb;margin-bottom:8px">${label}</div>
+          ${byMonth[m].map(function(t){return `
+          <div onclick="xlabAdminOpenDetail('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700;font-size:13px">${t.topicTitle||'(제목 없음)'}</div>
+              <div style="font-size:11px;color:#888;margin-top:3px">${t.topicSource==='ai'?'🤖 AI추천':'✍️ 직접입력'}${(t.report&&t.report.savedAt)?' · 보고서 완료':' · 보고서 미작성'}${t.expectedRecord?' · 예상세특 완료':''}</div>
+            </div>
+            <span style="color:#bbb;font-size:16px">›</span>
+          </div>`;}).join('')}
+        </div>`;
+      }).join('')
+    }
+  </div>`;
+}
+
+function renderXlabAdminDetail(t){
+  return `
+  <div style="padding:20px">
+    <button onclick="xlabAdminCloseDetail()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:12px">← 목록으로</button>
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">
+      <div>
+        <div style="font-size:17px;font-weight:800">${t.topicTitle||''}</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">${t.topicSource==='ai'?'🤖 AI추천':'✍️ 직접입력'} · 희망학과: ${t.department||''}</div>
+      </div>
+      <button onclick="xlabAdminPrint('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>
+    </div>
+    ${t.topicDesc?`<div style="background:#f8f9fc;border-radius:10px;padding:12px;font-size:12px;color:#555;margin-bottom:16px">${t.topicDesc}</div>`:''}
+    ${t.report ? `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:10px">📘 주제탐구 보고서</div>
+      ${[['reason','① 주제 선정이유'],['concept','② 개념·원리·이론'],['example','③ 실사례 예시'],['issue','④ 문제점·개선점'],['activity','⑤ 교내활동 예시']].map(function(pair){return `
+        <div style="font-size:12px;font-weight:700;color:#3b5bdb;margin-top:10px">${pair[1]}</div>
+        <div style="font-size:13px;color:#333;white-space:pre-wrap;margin-top:4px">${t.report[pair[0]]||''}</div>
+      `;}).join('')}
+    </div>` : '<div style="color:#aaa;font-size:12px;padding:12px 0">보고서가 아직 작성되지 않았습니다.</div>'}
+    ${t.expectedRecord ? `
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:8px">📝 예상 세특</div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px">과목: ${t.expectedRecord.subject||''} · 동기: ${t.expectedRecord.motivation||''} · 관련활동: ${t.expectedRecord.relatedActivity||''}${t.expectedRecord.linkedActivity?(' · 연계활동: '+t.expectedRecord.linkedActivity):''}</div>
+      <div style="font-size:13px;color:#333;white-space:pre-wrap;border:1px solid #eee;border-radius:8px;padding:12px">${t.expectedRecord.recordText||''}</div>
+    </div>` : ''}
+  </div>`;
+}
+</script>
 </body></html>
