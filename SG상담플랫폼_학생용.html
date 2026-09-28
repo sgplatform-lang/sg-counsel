@@ -3842,6 +3842,46 @@ async function xlabSaveDepartment(){
 const XLAB_SUBJECT_AREA_OPTS = ['국어','수학','영어','사회','과학','역사','직접입력'];
 let _xlabSubjectChoice = {area:'', areaCustom:'', concept:''};
 
+// ★ 2026-09-28 추가(관리자 요청: "중학교 3학년도 사용하므로 주제 난이도 구분 필요"):
+// AI 주제추천 전에 4단계 난이도 중 하나를 고르게 하고, 학생의 학년(중/고)에 따라 서버
+// 프롬프트가 자동으로 "전문용어 괄호풀이"(중등) 또는 "논문·통계 등 데이터 접근 가능
+// 주제 우선"(고등) 지침을 추가하도록 한다. 난이도 선택은 칩 클릭 즉시 반영되므로
+// (다른 텍스트 입력처럼 타이핑 중 사라질 값이 없으므로) 별도 캡처 없이 바로 _xlabCurrent에
+// 저장한다.
+const XLAB_DIFFICULTY_OPTS = [
+  {key:'basic',  label:'교과서 수준 개념 중심', desc:'교과서 핵심 개념 위주'},
+  {key:'extend', label:'교과 개념의 학술적/사회적 확장', desc:'학술·사회 이슈로 확장'},
+  {key:'record', label:'교과 세특 연결 가능 수준', desc:'세특 문구로 바로 연결'},
+  {key:'expert', label:'전문', desc:'논문·통계·정책 등 심화'},
+];
+function _xlabDefaultDifficulty(){
+  const g = String((typeof CU!=='undefined' && CU ? CU.grade : '')||'');
+  if(/중\s*[1-3]/.test(g)) return 'basic';
+  if(/고\s*[1-3]/.test(g)) return 'record';
+  return 'basic';
+}
+function xlabChooseDifficulty(v){
+  _xlabCaptureFormFields();
+  _xlabCurrent.difficultyLevel = v;
+  render();
+}
+function renderXlabDifficultyPicker(){
+  const g = String((typeof CU!=='undefined' && CU ? CU.grade : '')||'');
+  const gradeNote = /중\s*[1-3]/.test(g)
+    ? '💡 중학생은 전문 용어 사용 시 괄호 안에 쉬운 풀이가 자동으로 함께 제시됩니다.'
+    : (/고\s*[1-3]/.test(g) ? '💡 고등학생은 논문·통계·정책 분석 등 자료 접근이 가능한 주제가 우선 추천됩니다.' : '');
+  return `
+    <label style="font-size:12px;color:#666;font-weight:700">주제 선정 난이도 <span style="color:#aaa;font-weight:400">(선택)</span></label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px">
+      ${XLAB_DIFFICULTY_OPTS.map(function(o){
+        const on = (_xlabCurrent.difficultyLevel||_xlabDefaultDifficulty())===o.key;
+        return `<button onclick="xlabChooseDifficulty('${o.key}')" title="${o.desc}" style="padding:7px 12px;border-radius:16px;border:1.5px solid ${on?'#f08c00':'#ddd'};background:${on?'#f08c00':'#fff'};color:${on?'#fff':'#333'};font-weight:700;font-size:11px">${o.label}</button>`;
+      }).join('')}
+    </div>
+    ${gradeNote ? `<div style="font-size:11px;color:#f08c00;margin-bottom:10px">${gradeNote}</div>` : '<div style="margin-bottom:10px"></div>'}
+  `;
+}
+
 function _xlabCaptureFormFields(){
   if(!_xlabCurrent) return;
   const deptEl = document.getElementById('xlabDeptInput2');
@@ -3891,6 +3931,7 @@ function xlabNewTopic(){
     topicTitle: '', topicDesc: '',
     interest:'', keywords:'',
     subjectArea:'', subjectConcept:'',
+    difficultyLevel: _xlabDefaultDifficulty(),
     advancedTopicTitle:'', advancedTopicDesc:'', advancedTopicSource:'',
     report: null,
     expectedRecord: null,
@@ -3909,6 +3950,7 @@ function xlabOpenExisting(id){
   const t = _xlabList.find(x=>x.id===id);
   if(!t) return;
   _xlabCurrent = t;
+  if(!_xlabCurrent.difficultyLevel) _xlabCurrent.difficultyLevel = _xlabDefaultDifficulty();
   _xlabTopicMode = t.topicSource||'ai';
   _xlabAiCandidates = null;
   _xlabSubjectChoice = {area:'', areaCustom:'', concept:''};
@@ -3941,7 +3983,7 @@ async function xlabFindAdvancedTopics(){
   if(!_xlabCurrent || !_xlabCurrent.topicTitle){ alert('먼저 주제를 확정해주세요.'); return; }
   _xlabAdvancedLoading = true; render();
   try{
-    const r = await window._fb.xlabRecommendAdvancedTopics({department:_xlabCurrent.department||'', topic:_xlabCurrent.topicTitle, topicDesc:_xlabCurrent.topicDesc||''});
+    const r = await window._fb.xlabRecommendAdvancedTopics({department:_xlabCurrent.department||'', topic:_xlabCurrent.topicTitle, topicDesc:_xlabCurrent.topicDesc||'', difficultyLevel:_xlabCurrent.difficultyLevel||'', grade:CU.grade||''});
     _xlabAdvancedCandidates = r.topics||[];
   }catch(e){
     alert('심화·확장 주제 추천 중 오류가 발생했습니다: '+e.message);
@@ -3988,7 +4030,7 @@ async function xlabFindTopics(){
   _xlabCurrent.keywords = keywords;
   _xlabAiLoading = true; render();
   try{
-    const r = await window._fb.xlabRecommendTopics({department:_xlabCurrent.department, interest:_xlabCurrent.interest, keywords:_xlabCurrent.keywords});
+    const r = await window._fb.xlabRecommendTopics({department:_xlabCurrent.department, interest:_xlabCurrent.interest, keywords:_xlabCurrent.keywords, difficultyLevel:_xlabCurrent.difficultyLevel||_xlabDefaultDifficulty(), grade:CU.grade||''});
     _xlabAiCandidates = r.topics||[];
   }catch(e){
     alert('주제 추천 중 오류가 발생했습니다: '+e.message);
@@ -4090,7 +4132,7 @@ async function xlabGenerateReportSection(field){
   });
   _xlabReportLoading[field] = true; render();
   try{
-    const r = await window._fb.xlabGenerateTopicReport({department:_xlabCurrent.department, topic:_xlabCurrent.topicTitle, topicDesc:_xlabCurrent.topicDesc, section:field, subjectArea:_xlabCurrent.subjectArea||'', subjectConcept:_xlabCurrent.subjectConcept||'', advancedTopic:_xlabCurrent.advancedTopicTitle||'', advancedTopicDesc:_xlabCurrent.advancedTopicDesc||''});
+    const r = await window._fb.xlabGenerateTopicReport({department:_xlabCurrent.department, topic:_xlabCurrent.topicTitle, topicDesc:_xlabCurrent.topicDesc, section:field, subjectArea:_xlabCurrent.subjectArea||'', subjectConcept:_xlabCurrent.subjectConcept||'', advancedTopic:_xlabCurrent.advancedTopicTitle||'', advancedTopicDesc:_xlabCurrent.advancedTopicDesc||'', difficultyLevel:_xlabCurrent.difficultyLevel||'', grade:CU.grade||''});
     _xlabCurrent.report[field] = r.text;
     _xlabCurrent.report.generatedAt = Date.now();
   }catch(e){
@@ -4145,6 +4187,15 @@ function _xlabEsc(x){ return String(x==null?'':x); }
 function _xlabBuildFullReportHtml(t){
   const savedDate = (t.report && t.report.savedAt) ? new Date(t.report.savedAt) : new Date();
   const dateStr = savedDate.getFullYear()+'.'+String(savedDate.getMonth()+1).padStart(2,'0')+'.'+String(savedDate.getDate()).padStart(2,'0');
+  // ★ 2026-09-28 추가: 이 필드를 나중에 추가했기 때문에, 그 이전에 저장된 주제활동
+  // 문서에는 studentSchool/studentGrade 스냅샷이 없을 수 있다. 그런 경우 지금 로그인한
+  // 학생 본인(CU) 정보로 보충한다.
+  const schoolVal = t.studentSchool || (typeof CU!=='undefined' && CU ? CU.school : '') || '';
+  const gradeVal = t.studentGrade || (typeof CU!=='undefined' && CU ? CU.grade : '') || '';
+  // ★ 2026-09-28 추가: 브라우저의 "PDF로 저장"은 <title>을 파일명으로 그대로 쓰므로,
+  // "학생명_X-lab 주제활동 보고서_YYYYMMDD" 형태가 되도록 제목을 동적으로 구성한다.
+  const dateCompact = savedDate.getFullYear()+String(savedDate.getMonth()+1).padStart(2,'0')+String(savedDate.getDate()).padStart(2,'0');
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab 주제활동 보고서_'+dateCompact;
   const sections = [
     ['주제 선정이유', t.report&&t.report.reason],
     ['개념·원리·이론', t.report&&t.report.concept],
@@ -4152,7 +4203,7 @@ function _xlabBuildFullReportHtml(t){
     ['문제점·개선점', t.report&&t.report.issue],
     ['교내활동 예시', t.report&&t.report.activity],
   ];
-  let html = '<html><head><meta charset="utf-8"><title>X-lab 주제활동 보고서</title>'
+  let html = '<html><head><meta charset="utf-8"><title>'+pdfTitle+'</title>'
     +'<style>'
     +'body{font-family:"Apple SD Gothic Neo",sans-serif;padding:40px;line-height:1.7;color:#1a1a2e}'
     +'h1{font-size:22px;text-align:center;margin:0 0 14px}'
@@ -4169,8 +4220,8 @@ function _xlabBuildFullReportHtml(t){
     +'<hr>'
     +'<div class="meta-row">'
       +'<span>년월일: <b>'+dateStr+'</b></span>'
-      +'<span>학교: <b>'+_xlabEsc(t.studentSchool)+'</b></span>'
-      +'<span>학년: <b>'+_xlabEsc(t.studentGrade)+'</b></span>'
+      +'<span>학교: <b>'+_xlabEsc(schoolVal)+'</b></span>'
+      +'<span>학년: <b>'+_xlabEsc(gradeVal)+'</b></span>'
       +'<span>이름: <b>'+_xlabEsc(t.studentName)+'</b></span>'
       +'<span>희망학과: <b>'+_xlabEsc(t.department)+'</b></span>'
     +'</div>'
@@ -4357,6 +4408,7 @@ function renderXlabEdit(){
         ${renderXlabSubjectFields()}
         <label style="font-size:12px;color:#666;font-weight:700">관심 키워드 <span style="color:#aaa;font-weight:400">(선택)</span></label>
         <input id="xlabKeywordsInput" value="${(t.keywords||'').replace(/"/g,'&quot;')}" placeholder="예: 딥러닝, 태양광" style="margin:6px 0 10px">
+        ${renderXlabDifficultyPicker()}
         <button onclick="xlabFindTopics()" ${_xlabAiLoading?'disabled':''} style="width:100%;padding:12px;background:#3b5bdb;color:#fff;border:none;border-radius:10px;font-weight:800">${_xlabAiLoading?'⏳ 주제 찾는 중...':'🔍 주제찾기'}</button>
         ${_xlabAiCandidates ? `
           <div style="margin-top:14px;max-height:340px;overflow-y:auto">
@@ -4381,6 +4433,7 @@ function renderXlabEdit(){
       <div style="font-weight:800;font-size:15px;margin-top:4px">${t.topicTitle}</div>
       <div style="font-size:12px;color:#666;margin-top:6px">${t.topicDesc||''}</div>
       ${(t.subjectArea||t.subjectConcept) ? `<div style="font-size:11px;color:#0f766e;margin-top:6px;background:#0f766e0f;border-radius:8px;padding:6px 8px">${t.subjectArea?('📘 교과목: '+t.subjectArea):''}${(t.subjectArea&&t.subjectConcept)?' · ':''}${t.subjectConcept?('교과개념: '+t.subjectConcept):''}</div>` : ''}
+      ${t.difficultyLevel ? `<div style="font-size:11px;color:#f08c00;margin-top:6px;background:#f08c000f;border-radius:8px;padding:6px 8px">🎯 난이도: ${(XLAB_DIFFICULTY_OPTS.find(function(o){return o.key===t.difficultyLevel;})||{label:t.difficultyLevel}).label}</div>` : ''}
       ${!(t.report&&t.report.savedAt) ? `<button onclick="xlabResetTopic()" style="margin-top:10px;background:none;border:none;color:#3b5bdb;font-size:12px;font-weight:700">주제 다시 선택</button>` : ''}
     </div>
 
