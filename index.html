@@ -17460,13 +17460,20 @@ function _scAiDraftPreviewHtml(id, draft){
 }
 function _scAiUploadPanelHtml(p){
   const st = SC_AI_STATE[p.id] || {};
+  const files = st.files || [];
+  const hasFiles = files.length>0;
+  const fileListHtml = hasFiles
+    ? '<div style="display:flex;flex-direction:column;gap:2px;margin-top:2px">'+files.map(function(f,idx){
+        return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#555"><span>📄 '+esc(f.name)+'</span><button onclick="_scAiRemoveFile(\''+p.id+'\','+idx+')" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:11px;padding:0">✕</button></div>';
+      }).join('')+'</div>'
+    : '<span style="font-size:11px;color:#555">선택된 파일 없음</span>';
   return `<div style="background:#fff;border:1px dashed #93c5fd;border-radius:8px;padding:10px 12px;margin-bottom:14px">
-    <div style="font-size:12px;font-weight:800;color:#1e3a8a;margin-bottom:6px">🤖 AI 초안 채우기 (PDF·워드 업로드)</div>
-    <div style="font-size:10.5px;color:#666;margin-bottom:8px">학교에서 받은 교육과정·세특관리·특색사업 안내자료(PDF 또는 워드 파일)를 올리면 AI가 아래 항목들의 초안을 자동으로 채웁니다. 학교마다 자료 형식이 달라 100% 정확하지 않을 수 있으니, 반드시 내용을 확인·수정한 뒤 저장하세요.</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <label style="font-size:11.5px;color:#3b5bdb;cursor:pointer;border:1px solid #c5cae9;border-radius:6px;padding:6px 12px;background:#fff">📁 파일 선택(PDF/DOCX)<input type="file" accept=".pdf,.docx" style="display:none" onchange="_scAiSetFile('${p.id}',this)"></label>
-      <span style="font-size:11px;color:#555">${st.fileName?esc(st.fileName):'선택된 파일 없음'}</span>
-      <button onclick="_scAiAnalyze('${p.id}')" ${(st.fileName&&!st.busy)?'':'disabled'} style="background:${(st.fileName&&!st.busy)?'#1e3a8a':'#93a5c8'};color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${st.busy?'⏳ 분석 중... (최대 2~3분)':'✨ AI 초안 생성'}</button>
+    <div style="font-size:12px;font-weight:800;color:#1e3a8a;margin-bottom:6px">🤖 AI 초안 채우기 (PDF·워드 업로드, 여러 개 가능)</div>
+    <div style="font-size:10.5px;color:#666;margin-bottom:8px">학교에서 받은 교육과정·세특관리·특색사업 안내자료(PDF 또는 워드 파일, 여러 개 동시 선택 가능)를 올리면 AI가 모든 파일 내용을 종합해서 아래 항목들의 초안을 자동으로 채웁니다. 학교마다 자료 형식이 달라 100% 정확하지 않을 수 있으니, 반드시 내용을 확인·수정한 뒤 저장하세요.</div>
+    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <label style="font-size:11.5px;color:#3b5bdb;cursor:pointer;border:1px solid #c5cae9;border-radius:6px;padding:6px 12px;background:#fff;white-space:nowrap">📁 파일 선택(PDF/DOCX, 여러 개)<input type="file" accept=".pdf,.docx" multiple style="display:none" onchange="_scAiSetFile('${p.id}',this)"></label>
+      ${fileListHtml}
+      <button onclick="_scAiAnalyze('${p.id}')" ${(hasFiles&&!st.busy)?'':'disabled'} style="background:${(hasFiles&&!st.busy)?'#1e3a8a':'#93a5c8'};color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${st.busy?'⏳ 분석 중... (최대 2~3분)':'✨ AI 초안 생성'}</button>
     </div>
     ${st.error?`<div style="color:#dc2626;font-size:11px;margin-top:6px">⚠️ ${esc(st.error)}</div>`:''}
     ${st.draft?_scAiDraftPreviewHtml(p.id, st.draft):''}
@@ -17518,13 +17525,22 @@ function scReportV2PanelHtml(p){
     </div>
   </div>`;
 }
+// ★ 2026-09-29(2차) 수정(관리자 요청: "파일 업로드가 하나만 되는데 여러개도 되게"):
+// 학교 안내자료가 여러 문서(교육과정 편성·운영·평가 계획, 세특관리 자료 등)로 나뉘어 있는
+// 경우가 많아, 한 번에 여러 PDF/DOCX 파일을 선택해서 함께 분석할 수 있게 한다. 기존에
+// 선택해둔 파일 목록에 새로 고른 파일들을 추가하는 방식(같은 학교에 여러 번 나눠 추가 가능).
 function _scAiSetFile(id, input){
-  const file = input.files && input.files[0];
+  const newFiles = input.files ? Array.from(input.files) : [];
   SC_AI_STATE[id] = SC_AI_STATE[id] || {};
-  SC_AI_STATE[id].file = file || null;
-  SC_AI_STATE[id].fileName = file ? file.name : '';
+  SC_AI_STATE[id].files = (SC_AI_STATE[id].files || []).concat(newFiles);
   SC_AI_STATE[id].draft = null;
   SC_AI_STATE[id].error = '';
+  input.value=''; // 같은 파일을 다시 골라도 change 이벤트가 발생하도록 초기화
+  schoolCatalogRenderList();
+}
+function _scAiRemoveFile(id, idx){
+  const st = SC_AI_STATE[id]; if(!st || !Array.isArray(st.files)) return;
+  st.files.splice(idx,1);
   schoolCatalogRenderList();
 }
 function _scReadFileAsBase64(file){
@@ -17544,24 +17560,33 @@ function _scEnsureMammothLoaded(){
     document.head.appendChild(s);
   });
 }
+// ★ 2026-09-29(2차) 수정: 파일이 여러 개면 PDF는 각각 base64로 읽어 pdfBase64List 배열로,
+// DOCX는 mammoth로 텍스트를 뽑아 파일명 구분과 함께 하나의 텍스트로 이어붙여 보낸다.
+// 서버(xschoolAnalyzeReportDoc)는 pdfBase64List의 각 PDF를 별도 document 블록으로,
+// 합쳐진 docText를 텍스트 블록으로 함께 첨부해서 한 번에 분석한다.
 async function _scAiAnalyze(id){
-  const st=SC_AI_STATE[id]; if(!st || !st.file) return;
+  const st=SC_AI_STATE[id]; if(!st || !Array.isArray(st.files) || !st.files.length) return;
   const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
   st.busy=true; st.error=''; schoolCatalogRenderList();
   try{
-    const nameLower=st.file.name.toLowerCase();
-    const payload={schoolName:p.name||''};
-    if(nameLower.endsWith('.pdf')){
-      payload.pdfBase64=await _scReadFileAsBase64(st.file);
-    } else if(nameLower.endsWith('.docx')){
-      await _scEnsureMammothLoaded();
-      const arrBuf=await st.file.arrayBuffer();
-      const result=await mammoth.extractRawText({arrayBuffer:arrBuf});
-      payload.docText=(result && result.value) || '';
-      if(!payload.docText.trim()) throw new Error('워드 파일에서 텍스트를 추출하지 못했습니다.');
-    } else {
-      throw new Error('PDF 또는 DOCX 파일만 지원합니다.');
+    const pdfBase64List=[];
+    const docTextParts=[];
+    for(const f of st.files){
+      const nameLower=f.name.toLowerCase();
+      if(nameLower.endsWith('.pdf')){
+        pdfBase64List.push(await _scReadFileAsBase64(f));
+      } else if(nameLower.endsWith('.docx')){
+        await _scEnsureMammothLoaded();
+        const arrBuf=await f.arrayBuffer();
+        const result=await mammoth.extractRawText({arrayBuffer:arrBuf});
+        const text=(result && result.value) || '';
+        if(text.trim()) docTextParts.push('--- 파일: '+f.name+' ---\n'+text);
+      } else {
+        throw new Error('"'+f.name+'"은(는) 지원하지 않는 형식입니다. PDF 또는 DOCX 파일만 올려주세요.');
+      }
     }
+    if(!pdfBase64List.length && !docTextParts.length) throw new Error('파일에서 분석할 내용을 추출하지 못했습니다.');
+    const payload={schoolName:p.name||'', pdfBase64List:pdfBase64List, docText:docTextParts.join('\n\n')};
     const result=await window._fb.xschoolAnalyzeReportDoc(payload);
     st.draft=(result && result.report) ? result.report : null;
     if(!st.draft) throw new Error('AI가 유효한 결과를 반환하지 않았습니다.');
@@ -17588,7 +17613,7 @@ function _scAiApplyDraft(id){
   }
   p.reportV2.updatedAt=new Date().toISOString();
   _scSaveWhole(p);
-  st.draft=null; st.file=null; st.fileName='';
+  st.draft=null; st.files=[];
   schoolCatalogRenderList();
   alert('AI 초안이 반영되었습니다. 내용을 확인·수정해주세요.');
 }
