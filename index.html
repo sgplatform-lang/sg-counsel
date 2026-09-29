@@ -357,6 +357,10 @@ try{
     // ★ 2026-09-15 추가: 문제지 PDF에서 문항별 위치(페이지+사각형 좌표%)를 AI가 추정해
     // 알려주는 서버 함수. 위 analyzeExamPdf와 같은 5분 타임아웃(문항 많은 PDF 대비).
     analyzeExamPdfRegions: (payload)=>firebase.functions().httpsCallable('analyzeExamPdfRegions', {timeout: 300000})(payload).then(r=>r.data),
+    // ★ 2026-09-29 추가: 학교 안내자료(PDF/워드에서 추출한 텍스트)를 AI가 분석해서 "학교정보
+    // 상세 리포트(reportV2)" 8개 섹션 구조로 초안을 채워주는 서버 함수. analyzeExamPdf와
+    // 동일하게 5분 타임아웃(자료 분량이 많을 수 있음).
+    xschoolAnalyzeReportDoc: (payload)=>firebase.functions().httpsCallable('xschoolAnalyzeReportDoc', {timeout: 300000})(payload).then(r=>r.data),
     // ★ 2026-09-20 추가(2단계 방법 B): 학생 등록/아이디·비번 수정 시 Firebase Auth
     // 계정을 서버(Cloud Function)에서 자동으로 만들거나 갱신. 브라우저는 절대로
     // Firebase 계정을 직접 만들 권한이 없으므로(보안상 당연히 막혀있음) 반드시
@@ -15901,6 +15905,69 @@ function RM_captureLiveDraft(){
   if(!RM_STUDENT_REF || RM_VIEWING_ARCHIVED_IDX!==null) return;
   try{ RM_LIVE_DRAFT = { studentId: RM_STUDENT_REF.id, snap: RM_collectFormSnapshot() }; }catch(e){ /* 폼이 아직 DOM에 없으면 조용히 무시 */ }
 }
+// ★ 2026-09-29 추가: 상담리포트의 "5. 고등학교 현황" 섹션을 학교의 reportV2(상세 리포트,
+// 학교정보 탭에서 관리)가 있으면 섹션 카드+표 형태로, 없으면 예전 평문표로 렌더링한다.
+function rmSchoolCardSection(titleNum, titleText, bodyHtml){
+  if(!bodyHtml) return '';
+  return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:#8B3A3A;margin-bottom:6px">'+esc(titleNum+'. '+titleText)+'</div>'+bodyHtml+'</div>';
+}
+function rmSchoolMiniTable(headers, rows){
+  if(!rows || !rows.length) return '';
+  const thead='<tr>'+headers.map(function(h){ return '<th style="border:1px solid #ddd;padding:6px 8px;background:#f5f5f0;font-size:11px;text-align:left">'+esc(h)+'</th>'; }).join('')+'</tr>';
+  const tbody=rows.map(function(r){ return '<tr>'+r.map(function(c){ return '<td style="border:1px solid #ddd;padding:6px 8px;font-size:11.5px">'+(c?esc(c):'—')+'</td>'; }).join('')+'</tr>'; }).join('');
+  return '<table style="width:100%;border-collapse:collapse;margin-bottom:6px">'+thead+tbody+'</table>';
+}
+function rmSchoolReportCardHtml(entry){
+  const r=entry.reportV2;
+  const hasV2 = r && (r.overviewText || r.curriculumOverviewText || ['commonSubjects','electiveSubjects','specialPrograms','recordTips','examDifficulty','clubActivities'].some(function(k){ return Array.isArray(r[k]) && r[k].length; }));
+  const head='<div style="background:#f5f0e8;border-left:4px solid #8B3A3A;padding:10px 14px;margin-bottom:12px">'
+    +'<div style="font-size:15px;font-weight:900;color:#1a1a2e">'+esc(entry.name||'')+'</div>'
+    +'<div style="font-size:11px;color:#666;margin-top:2px">'+[entry.region,entry.type,entry.studentsPerGrade?('학년당 '+entry.studentsPerGrade+'명'):''].filter(Boolean).map(function(x){ return esc(x); }).join(' · ')+'</div>'
+    +'</div>';
+  if(!hasV2){
+    // 상세 리포트(reportV2)가 아직 입력되지 않은 학교 — 기존 방식(평문 12필드 표) 그대로 표시
+    function legacyRow(label,val){ return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:140px;background:#fafaf8">'+esc(label)+'</td><td style="border:1px solid #ddd;padding:8px">'+(val?esc(val):'—')+'</td></tr>'; }
+    return head+'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +legacyRow('학교 성향 분류', entry.schoolStyle)+legacyRow('교과과정 편성', entry.curriculum)+legacyRow('핵심 적합포인트', entry.keyFitPoint)
+      +legacyRow('교육과정특색', entry.curriculumFeature)+legacyRow('활동 및 동아리', entry.activities)+legacyRow('진학 실적 (추정)', entry.admissionResults)
+      +legacyRow('추천학생 유형', entry.recommendedType)+(entry.note?legacyRow('특이사항', entry.note):'')+'</table>';
+  }
+  let html=head;
+  if(r.overviewText || r.admissionNote){
+    html+=rmSchoolCardSection(1,'학교 개요', '<div style="font-size:12px;color:#333;line-height:1.6">'+esc(r.overviewText||'')+'</div>'+(r.admissionNote?'<div style="font-size:10.5px;color:#888;margin-top:4px">※ '+esc(r.admissionNote)+'</div>':''));
+  }
+  const gs=r.gradStats||{};
+  if(gs.total || gs.college){
+    const gsRows=[['졸업자 계',gs.total],['남',gs.male],['여',gs.female],
+      ['대학교 진학',gs.college?(gs.college+(gs.collegePct?(' ('+gs.collegePct+'%)'):'')):''],
+      ['전문대학',gs.junior?(gs.junior+(gs.juniorPct?(' ('+gs.juniorPct+'%)'):'')):''],
+      ['취업',gs.employ],
+      ['기타',gs.etc?(gs.etc+(gs.etcPct?(' ('+gs.etcPct+'%)'):'')):'']];
+    html+=rmSchoolCardSection(2,'최근 졸업생 진학 현황 (정보공시 기준)', rmSchoolMiniTable(['구분','값'],gsRows.filter(function(x){ return x[1]; }))+(gs.note?'<div style="font-size:10.5px;color:#888">※ '+esc(gs.note)+'</div>':''));
+  }
+  if(r.curriculumOverviewText || (r.commonSubjects&&r.commonSubjects.length)){
+    let body='';
+    if(r.curriculumOverviewText) body+='<div style="font-size:12px;color:#333;line-height:1.6;margin-bottom:6px">'+esc(r.curriculumOverviewText)+'</div>';
+    if(r.commonSubjects&&r.commonSubjects.length) body+=rmSchoolMiniTable(['교과','공통과목명','학점','비고'], r.commonSubjects.map(function(x){ return [x.subject,x.name,x.credit,x.note]; }));
+    html+=rmSchoolCardSection(3,'교육과정 개관', body);
+  }
+  if(r.electiveSubjects && r.electiveSubjects.length){
+    html+=rmSchoolCardSection(4,'2·3학년 선택과목 현황', rmSchoolMiniTable(['학년·학기/영역','대표 선택과목','선택 방식'], r.electiveSubjects.map(function(x){ return [x.term,x.area,x.method]; })));
+  }
+  if(r.specialPrograms && r.specialPrograms.length){
+    html+=rmSchoolCardSection(5,'중점과정 · 특색 프로그램', rmSchoolMiniTable(['프로그램명','설명'], r.specialPrograms.map(function(x){ return [x.name,x.desc]; })));
+  }
+  if(r.recordTips && r.recordTips.length){
+    html+=rmSchoolCardSection(6,'학생부(세특) 관리 포인트', rmSchoolMiniTable(['프로그램','세특 연계 방식','기재란'], r.recordTips.map(function(x){ return [x.program,x.method,x.recordField]; })));
+  }
+  if(r.examDifficulty && r.examDifficulty.length){
+    html+=rmSchoolCardSection(7,'시험 난이도 · 수행평가 안내', rmSchoolMiniTable(['과목','지필%','수행%','특징 요약','학생 팁'], r.examDifficulty.map(function(x){ return [x.subject,x.writtenPct,x.performPct,x.example,x.note]; })));
+  }
+  if(r.clubActivities && r.clubActivities.length){
+    html+=rmSchoolCardSection(8,'동아리 운영 현황', rmSchoolMiniTable(['구분','특징','개수'], r.clubActivities.map(function(x){ return [x.type,x.feature,x.count]; })));
+  }
+  return html;
+}
 // ★ 2026-09-05 추가: 학생의 학교명과 일치/포함되는 고등학교를 schoolCatalog에서 찾아
 // 지역·학교 선택란을 미리 채워두기 위한 상태(학생이 바뀔 때만 다시 추측한다).
 let RM_SCHOOL_GUESS_DONE_FOR = null;
@@ -16781,26 +16848,17 @@ function RM_generateReport(){
   const rmSchoolInfos=rmSchoolCheckedIds.map(function(id){ return (ST.schoolCatalog||[]).find(function(p){ return String(p.id)===String(id); }); }).filter(Boolean);
   const rmSchoolManualNames=((document.getElementById('rmSchoolManual')||{}).value||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
   if(rmSchoolInfos.length || rmSchoolManualNames.length){
-    function rmSchoolRow(label,val){ return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:140px;background:#fafaf8">'+esc(label)+'</td><td style="border:1px solid #ddd;padding:8px">'+(val?esc(val):'—')+'</td></tr>'; }
+    // ★ 2026-09-29 수정(관리자 요청: "학교정보가 가독성이 떨어지고 학부모가 궁금해하는
+    // 학년별 교과과정·내신 난이도가 잘 안 보인다"): 평문 12필드를 단순 나열하던 표를,
+    // 학교의 reportV2(상세 리포트)가 입력돼 있으면 섹션 카드+표 형태로 바꿔서 보여준다.
+    // reportV2가 없는 학교(아직 상세 리포트를 안 채운 경우)는 기존 방식 그대로 표시한다
+    // (rmSchoolReportCardHtml 내부에서 자동 분기).
     html+='<div style="margin-bottom:30px"><div style="display:flex;gap:8px;align-items:baseline;border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:14px"><span style="color:#8B3A3A;font-weight:700;font-size:13px">5</span><span style="font-weight:700;font-size:15px;color:#1a1a2e">고등학교 현황</span></div>';
     rmSchoolInfos.forEach(function(rmSchoolInfo, idx){
-      html+=(idx>0?'<div style="height:12px"></div>':'')
-        +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
-        +rmSchoolRow('학교명', rmSchoolInfo.name)
-        +rmSchoolRow('지역', rmSchoolInfo.region)
-        +rmSchoolRow('학교 유형', rmSchoolInfo.type)
-        +rmSchoolRow('학년당 학생수', rmSchoolInfo.studentsPerGrade)
-        +rmSchoolRow('학교 성향 분류', rmSchoolInfo.schoolStyle)
-        +rmSchoolRow('교과과정 편성', rmSchoolInfo.curriculum)
-        +rmSchoolRow('핵심 적합포인트', rmSchoolInfo.keyFitPoint)
-        +rmSchoolRow('교육과정특색', rmSchoolInfo.curriculumFeature)
-        +rmSchoolRow('활동 및 동아리', rmSchoolInfo.activities)
-        +rmSchoolRow('진학 실적 (추정)', rmSchoolInfo.admissionResults)
-        +rmSchoolRow('추천학생 유형', rmSchoolInfo.recommendedType)
-        +(rmSchoolInfo.note?rmSchoolRow('특이사항', rmSchoolInfo.note):'')
-        +'</table>';
+      html+=(idx>0?'<div style="height:18px"></div>':'')+rmSchoolReportCardHtml(rmSchoolInfo);
     });
     if(rmSchoolManualNames.length){
+      function rmSchoolRow(label,val){ return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:140px;background:#fafaf8">'+esc(label)+'</td><td style="border:1px solid #ddd;padding:8px">'+(val?esc(val):'—')+'</td></tr>'; }
       html+=(rmSchoolInfos.length?'<div style="height:12px"></div>':'')
         +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
         +rmSchoolRow('직접 입력한 학교', rmSchoolManualNames.join(', ')+' (카탈로그 미등록 — 상세정보 없음)')
@@ -16980,12 +17038,34 @@ let RM_VIEWING_ARCHIVED_IDX=null;
 let RM_VIEWING_SCROLLED=false;
 function renderRoadmapConsult(s){
   const list=Array.isArray(s.roadmapReports)?s.roadmapReports.slice().reverse():[];
+  // ★ 2026-09-29 수정(관리자 요청: "상담리포트 이력에 일시만 있고 학생명이 없어서
+  // 누구것인지 확인이 어렵다"): 리포트 생성 당시 스냅샷(formSnapshot.displayName/
+  // displaySchool/displayGrade — 실제 학생정보와 달라질 수 있어 리포트 저장 시점 값을
+  // 그대로 따로 저장해둔 값)을 우선 사용하고, 없으면 현재 학생 레코드(s.name/school/grade)로
+  // 대체 표시한다. 학년도는 별도 필드가 없어 저장 일시(rpt.date)에서 연도를 추출한다.
   const rows=list.map(function(rpt,i){
     const origIdx=s.roadmapReports.length-1-i;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;background:#fff;border:1px solid #e8eaf6;border-radius:10px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px">
+    const snap=rpt.formSnapshot||{};
+    const rName=(snap.displayName||s.name||'').trim()||'(이름 미상)';
+    const rSchool=(snap.displaySchool||s.school||'').trim();
+    const rGrade=(snap.displayGrade||s.grade||'').trim();
+    let rYear='';
+    const dsrc=rpt.date||'';
+    const ym=String(dsrc).match(/^(\d{4})-/);
+    if(ym) rYear=ym[1]+'학년도';
+    const metaChips=[rSchool,rGrade,rYear].filter(Boolean).map(function(v){
+      return `<span style="font-size:10.5px;color:#4b5563;background:#f1f5f9;border-radius:10px;padding:2px 8px">${esc(v)}</span>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;background:#fff;border:1px solid #e8eaf6;border-radius:10px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-size:18px">📄</span>
-        <span style="font-size:13px;font-weight:700;color:#1e293b">${esc(rpt.label||rpt.date||'')}</span>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+            <span style="font-size:13.5px;font-weight:900;color:#1a1a2e">${esc(rName)}</span>
+            ${metaChips}
+          </div>
+          <span style="font-size:11.5px;color:#888">${esc(rpt.label||rpt.date||'')}</span>
+        </div>
       </div>
       <div style="display:flex;gap:6px">
         <button onclick="RM_replayArchived(${origIdx})" style="background:#1e3a8a;color:#fff;border:none;border-radius:16px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">👁 다시 보기</button>
@@ -17042,6 +17122,92 @@ function RM_deleteArchived(idx){
 // 서버 권한 문제 등) 화면엔 이미 추가된 것처럼 보이고 성공 알림까지 떠서, 실제로는 서버에
 // 저장되지 않은 채 그 세션에서만 보이다가 새로고침(또는 새 버전 배포로 인한 재접속) 시
 // 감쪽같이 사라지는 문제가 있었다. 아래부터는 저장 실패를 반드시 alert로 알려준다.
+// ★ 2026-09-29 추가(관리자 요청: "학교정보 리포트가 가독성이 떨어지고 학부모가 궁금해하는
+// 학년별 교과과정·내신 난이도·시험형태가 잘 안 보인다"): 기존 schoolCatalog의 12개 평문
+// 필드(문단 텍스트 위주)와는 별개로, 실제 학교 안내자료(예: 교육과정·세특관리·특색사업
+// 요약자료)의 8개 섹션 구조를 그대로 담는 reportV2를 추가한다. 기존 필드는 그대로 두고
+// (하위호환) reportV2가 있으면 더 상세한 카드형 리포트로, 없으면 기존 평문표로 보여준다.
+function _scDefaultReportV2(){
+  return {
+    overviewText:'', admissionNote:'',
+    gradStats:{total:'',male:'',female:'',college:'',collegePct:'',junior:'',juniorPct:'',employ:'',etc:'',etcPct:'',note:''},
+    curriculumOverviewText:'',
+    commonSubjects:[],      // [{subject,name,credit,note}] — 예: 국어 / 공통국어1·2 / 6 / ...
+    electiveSubjects:[],    // [{term,area,subjects,method}] — 예: 2-1 / 과학 / 물리학·화학... / 택2(6학점)
+    specialPrograms:[],     // [{name,desc}] — 중점과정·특색 프로그램
+    recordTips:[],          // [{program,method,recordField}] — 세특 관리 포인트
+    examDifficulty:[],      // [{subject,writtenPct,performPct,example,note,source}] — 시험 난이도(선생님 설문 자동반영 가능)
+    clubActivities:[],      // [{type,feature,count}]
+    updatedAt:''
+  };
+}
+function _scEnsureReportV2(p){
+  if(!p.reportV2 || typeof p.reportV2!=='object') p.reportV2=_scDefaultReportV2();
+  const def=_scDefaultReportV2();
+  Object.keys(def).forEach(function(k){
+    if(p.reportV2[k]===undefined) p.reportV2[k]=def[k];
+  });
+  ['commonSubjects','electiveSubjects','specialPrograms','recordTips','examDifficulty','clubActivities'].forEach(function(k){
+    if(!Array.isArray(p.reportV2[k])) p.reportV2[k]=[];
+  });
+  if(!p.reportV2.gradStats || typeof p.reportV2.gradStats!=='object') p.reportV2.gradStats=def.gradStats;
+  return p.reportV2;
+}
+function _scSaveWhole(p){
+  if(FB_USE()) window._fb.set('schoolCatalog', p.id, p).catch(function(e){ alert('⚠️ 저장에 실패했습니다(서버 연결 문제일 수 있습니다). 새로고침하면 방금 수정한 내용이 사라질 수 있으니, 인터넷 연결을 확인한 뒤 다시 시도해주세요.\n\n'+(e&&e.message?e.message:'')); });
+}
+// 상세 리포트(reportV2) 편집 패널을 펼친 학교 id 집합(카드가 다시 그려져도 펼침 상태 유지)
+const ST_SC_EXPANDED = new Set();
+function scToggleDetail(id){
+  if(ST_SC_EXPANDED.has(id)) ST_SC_EXPANDED.delete(id); else ST_SC_EXPANDED.add(id);
+  schoolCatalogRenderList();
+}
+function scRV2TextUpdate(id, field, value){
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  _scEnsureReportV2(p);
+  p.reportV2[field]=value;
+  p.reportV2.updatedAt=new Date().toISOString();
+  _scSaveWhole(p);
+}
+function scRV2StatUpdate(id, field, value){
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  _scEnsureReportV2(p);
+  p.reportV2.gradStats[field]=value;
+  p.reportV2.updatedAt=new Date().toISOString();
+  _scSaveWhole(p);
+}
+const SC_RV2_ROW_TEMPLATES={
+  commonSubjects:{subject:'',name:'',credit:'',note:''},
+  electiveSubjects:{term:'',area:'',subjects:'',method:''},
+  specialPrograms:{name:'',desc:''},
+  recordTips:{program:'',method:'',recordField:''},
+  examDifficulty:{subject:'',writtenPct:'',performPct:'',example:'',note:'',source:'manual'},
+  clubActivities:{type:'',feature:'',count:''}
+};
+function scRV2RowAdd(id, arrKey){
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  _scEnsureReportV2(p);
+  p.reportV2[arrKey].push(Object.assign({}, SC_RV2_ROW_TEMPLATES[arrKey]));
+  p.reportV2.updatedAt=new Date().toISOString();
+  _scSaveWhole(p);
+  schoolCatalogRenderList();
+}
+function scRV2RowRemove(id, arrKey, idx){
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  _scEnsureReportV2(p);
+  p.reportV2[arrKey].splice(idx,1);
+  p.reportV2.updatedAt=new Date().toISOString();
+  _scSaveWhole(p);
+  schoolCatalogRenderList();
+}
+function scRV2RowUpdate(id, arrKey, idx, field, value){
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  _scEnsureReportV2(p);
+  if(!p.reportV2[arrKey][idx]) return;
+  p.reportV2[arrKey][idx][field]=value;
+  p.reportV2.updatedAt=new Date().toISOString();
+  _scSaveWhole(p);
+}
 function schoolCatalogAdd(){
   const id='sc_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   const p={id:id,name:'',region:'',type:'',studentsPerGrade:'',schoolStyle:'',curriculum:'',keyFitPoint:'',curriculumFeature:'',activities:'',admissionResults:'',recommendedType:'',note:''};
@@ -17247,8 +17413,275 @@ function schoolCatalogListHtml(){
         <div><label style="display:block;font-size:10.5px;color:#888;margin-bottom:4px">추천학생 유형</label><textarea onchange="schoolCatalogUpdate('${p.id}','recommendedType',this.value)" placeholder="예: 자기주도적이고 내신 관리에 강한 학생" style="width:100%;min-height:56px;font-size:12px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(p.recommendedType)}</textarea></div>
       </div>
       <div><label style="display:block;font-size:10.5px;color:#888;margin-bottom:4px">특이사항</label><textarea onchange="schoolCatalogUpdate('${p.id}','note',this.value)" placeholder="상담 시 참고할 특이사항" style="width:100%;min-height:44px;font-size:12px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(p.note)}</textarea></div>
+      <div style="margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:10px">
+        <button onclick="scToggleDetail('${p.id}')" style="background:${ST_SC_EXPANDED.has(p.id)?'#3b5bdb':'#eef1fb'};color:${ST_SC_EXPANDED.has(p.id)?'#fff':'#3b5bdb'};border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">${ST_SC_EXPANDED.has(p.id)?'▲ 상세 리포트(학부모용) 접기':'📋 상세 리포트(학부모용) 관리 — 교육과정·내신난이도 등'}</button>
+        ${_scHasAnyReportV2Content(p)?'<span style="font-size:10.5px;color:#2e7d32;margin-left:8px">● 상세 리포트 입력됨</span>':'<span style="font-size:10.5px;color:#aaa;margin-left:8px">아직 상세 리포트 없음(기존 요약 정보만 표시됨)</span>'}
+        ${ST_SC_EXPANDED.has(p.id)?scReportV2PanelHtml(p):''}
+      </div>
     </div>`;
   }).join('');
+}
+function _scHasAnyReportV2Content(p){
+  const r=p.reportV2; if(!r) return false;
+  if(r.overviewText||r.curriculumOverviewText||r.admissionNote) return true;
+  return ['commonSubjects','electiveSubjects','specialPrograms','recordTips','examDifficulty','clubActivities'].some(function(k){ return Array.isArray(r[k]) && r[k].length; });
+}
+// ── 상세 리포트(reportV2) 편집 패널 ─────────────────────────────────
+function _scRV2TableEditor(schoolId, arrKey, columns, rows, addLabel){
+  rows = rows||[];
+  const headHtml = columns.map(function(c){ return `<th style="border:1px solid #ddd;padding:6px;background:#f8fafc;font-size:10.5px">${esc(c.label)}</th>`; }).join('') + `<th style="border:1px solid #ddd;padding:6px;background:#f8fafc;width:32px"></th>`;
+  const bodyHtml = rows.map(function(row,idx){
+    const cells = columns.map(function(c){
+      const val = row[c.key]||'';
+      if(c.type==='textarea'){
+        return `<td style="border:1px solid #ddd;padding:4px"><textarea onchange="scRV2RowUpdate('${schoolId}','${arrKey}',${idx},'${c.key}',this.value)" style="width:100%;min-height:36px;font-size:11px;border:1px solid #eee;border-radius:4px;padding:4px;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(val)}</textarea></td>`;
+      }
+      return `<td style="border:1px solid #ddd;padding:4px"><input value="${esc(val)}" onchange="scRV2RowUpdate('${schoolId}','${arrKey}',${idx},'${c.key}',this.value)" style="width:100%;font-size:11px;border:1px solid #eee;border-radius:4px;padding:5px;box-sizing:border-box"></td>`;
+    }).join('');
+    return `<tr>${cells}<td style="border:1px solid #ddd;padding:4px;text-align:center"><button onclick="scRV2RowRemove('${schoolId}','${arrKey}',${idx})" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer">✕</button></td></tr>`;
+  }).join('');
+  return `<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><thead><tr>${headHtml}</tr></thead><tbody>${bodyHtml||('<tr><td colspan="'+(columns.length+1)+'" style="border:1px solid #ddd;padding:10px;text-align:center;color:#aaa;font-size:11px">등록된 행이 없습니다</td></tr>')}</tbody></table>
+  <button onclick="scRV2RowAdd('${schoolId}','${arrKey}')" style="background:#eef1fb;color:#3b5bdb;border:none;border-radius:6px;padding:5px 10px;font-size:10.5px;cursor:pointer">${addLabel||'+ 행 추가'}</button>`;
+}
+const SC_AI_STATE = {}; // schoolId -> {file,fileName,draft,busy,error}
+function _scAiDraftPreviewHtml(id, draft){
+  const counts=[];
+  ['commonSubjects','electiveSubjects','specialPrograms','recordTips','examDifficulty','clubActivities'].forEach(function(k){
+    counts.push(({commonSubjects:'공통과목',electiveSubjects:'선택과목',specialPrograms:'특색프로그램',recordTips:'세특포인트',examDifficulty:'시험난이도',clubActivities:'동아리'})[k]+' '+((draft[k]||[]).length)+'행');
+  });
+  return `<div style="margin-top:10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px">
+    <div style="font-size:11.5px;font-weight:700;color:#0c4a6e;margin-bottom:4px">✅ AI 초안이 준비되었습니다</div>
+    <div style="font-size:10.5px;color:#0369a1;margin-bottom:8px">${counts.join(' · ')} · 아래 "초안으로 채우기"를 누르면 각 항목 편집칸에 반영되며, 그 후 자유롭게 수정할 수 있습니다.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onclick="_scAiApplyDraft('${id}')" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">✅ 이 초안으로 채우기(기존 상세 리포트 내용을 덮어씀)</button>
+      <button onclick="_scAiCancelDraft('${id}')" style="background:#fff;color:#666;border:1px solid #ddd;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer">취소</button>
+    </div>
+  </div>`;
+}
+function _scAiUploadPanelHtml(p){
+  const st = SC_AI_STATE[p.id] || {};
+  return `<div style="background:#fff;border:1px dashed #93c5fd;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:800;color:#1e3a8a;margin-bottom:6px">🤖 AI 초안 채우기 (PDF·워드 업로드)</div>
+    <div style="font-size:10.5px;color:#666;margin-bottom:8px">학교에서 받은 교육과정·세특관리·특색사업 안내자료(PDF 또는 워드 파일)를 올리면 AI가 아래 항목들의 초안을 자동으로 채웁니다. 학교마다 자료 형식이 달라 100% 정확하지 않을 수 있으니, 반드시 내용을 확인·수정한 뒤 저장하세요.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:11.5px;color:#3b5bdb;cursor:pointer;border:1px solid #c5cae9;border-radius:6px;padding:6px 12px;background:#fff">📁 파일 선택(PDF/DOCX)<input type="file" accept=".pdf,.docx" style="display:none" onchange="_scAiSetFile('${p.id}',this)"></label>
+      <span style="font-size:11px;color:#555">${st.fileName?esc(st.fileName):'선택된 파일 없음'}</span>
+      <button onclick="_scAiAnalyze('${p.id}')" ${(st.fileName&&!st.busy)?'':'disabled'} style="background:${(st.fileName&&!st.busy)?'#1e3a8a':'#93a5c8'};color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${st.busy?'⏳ 분석 중... (최대 2~3분)':'✨ AI 초안 생성'}</button>
+    </div>
+    ${st.error?`<div style="color:#dc2626;font-size:11px;margin-top:6px">⚠️ ${esc(st.error)}</div>`:''}
+    ${st.draft?_scAiDraftPreviewHtml(p.id, st.draft):''}
+  </div>`;
+}
+function scReportV2PanelHtml(p){
+  const r=_scEnsureReportV2(p);
+  const id=p.id;
+  const gsFields=[['total','졸업자 계'],['male','남'],['female','여'],['college','대학교 진학'],['collegePct','대학 진학률(%)'],['junior','전문대학'],['juniorPct','전문대 진학률(%)'],['employ','취업'],['etc','기타'],['etcPct','기타 비율(%)']];
+  return `<div style="margin-top:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px">
+    ${_scAiUploadPanelHtml(p)}
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">1. 학교 개요</div>
+      <textarea onchange="scRV2TextUpdate('${id}','overviewText',this.value)" placeholder="설립유형·운영중점·진로진학체계·교육과정 특징 등 서술형 개요" style="width:100%;min-height:56px;font-size:12px;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(r.overviewText)}</textarea>
+      <input value="${esc(r.admissionNote)}" onchange="scRV2TextUpdate('${id}','admissionNote',this.value)" placeholder="입학전형(모집요강) 관련 참고 문구 (예: 정확한 배정·지원 절차는 교육청 안내 통해 별도 확인 필요)" style="width:100%;margin-top:6px;font-size:11.5px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">2. 최근 졸업생 진학 현황 (정보공시 기준)</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px">
+        ${gsFields.map(function(f){ return `<div><label style="display:block;font-size:10px;color:#888;margin-bottom:2px">${f[1]}</label><input value="${esc(r.gradStats[f[0]])}" onchange="scRV2StatUpdate('${id}','${f[0]}',this.value)" style="width:100%;font-size:11px;padding:6px 7px;border:1px solid #ddd;border-radius:5px;box-sizing:border-box"></div>`; }).join('')}
+      </div>
+      <input value="${esc(r.gradStats.note)}" onchange="scRV2StatUpdate('${id}','note',this.value)" placeholder="비고 (예: '기타' 비율이 높아 세부 사유 확인 필요 등)" style="width:100%;font-size:11.5px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">3. 교육과정 개관</div>
+      <textarea onchange="scRV2TextUpdate('${id}','curriculumOverviewText',this.value)" placeholder="총 이수학점, 필수 이수학점, 학기별 이수학점·과목수 등 개관 서술" style="width:100%;min-height:48px;font-size:12px;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;box-sizing:border-box;margin-bottom:8px">${esc(r.curriculumOverviewText)}</textarea>
+      <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:4px">가. 1학년 공통과목</div>
+      ${_scRV2TableEditor(id,'commonSubjects',[{key:'subject',label:'교과'},{key:'name',label:'공통과목명'},{key:'credit',label:'학점'},{key:'note',label:'비고'}],r.commonSubjects,'+ 공통과목 행 추가')}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">4. 2·3학년 선택과목 현황</div>
+      ${_scRV2TableEditor(id,'electiveSubjects',[{key:'term',label:'학년·학기/영역'},{key:'area',label:'대표 선택과목',type:'textarea'},{key:'method',label:'선택 방식'}],r.electiveSubjects,'+ 선택과목 행 추가')}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">5. 중점과정 · 특색 프로그램</div>
+      ${_scRV2TableEditor(id,'specialPrograms',[{key:'name',label:'프로그램명'},{key:'desc',label:'설명',type:'textarea'}],r.specialPrograms,'+ 프로그램 행 추가')}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">6. 학생부(세특) 관리 포인트</div>
+      ${_scRV2TableEditor(id,'recordTips',[{key:'program',label:'프로그램'},{key:'method',label:'세특 연계 방식',type:'textarea'},{key:'recordField',label:'기재란'}],r.recordTips,'+ 관리포인트 행 추가')}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">7. 시험 난이도 · 수행평가 안내 <span style="font-weight:400;color:#888;font-size:10.5px">(source: survey=선생님 설문 자동반영 / ai=AI초안 / manual=직접입력)</span></div>
+      ${_scRV2TableEditor(id,'examDifficulty',[{key:'subject',label:'과목'},{key:'writtenPct',label:'지필%'},{key:'performPct',label:'수행%'},{key:'example',label:'특징 요약',type:'textarea'},{key:'note',label:'학생 팁',type:'textarea'},{key:'source',label:'출처'}],r.examDifficulty,'+ 과목 행 추가')}
+    </div>
+    <div>
+      <div style="font-size:12.5px;font-weight:800;color:#1a1a2e;margin-bottom:6px">8. 동아리 운영 현황</div>
+      ${_scRV2TableEditor(id,'clubActivities',[{key:'type',label:'구분'},{key:'feature',label:'특징',type:'textarea'},{key:'count',label:'개수'}],r.clubActivities,'+ 동아리 행 추가')}
+    </div>
+  </div>`;
+}
+function _scAiSetFile(id, input){
+  const file = input.files && input.files[0];
+  SC_AI_STATE[id] = SC_AI_STATE[id] || {};
+  SC_AI_STATE[id].file = file || null;
+  SC_AI_STATE[id].fileName = file ? file.name : '';
+  SC_AI_STATE[id].draft = null;
+  SC_AI_STATE[id].error = '';
+  schoolCatalogRenderList();
+}
+function _scReadFileAsBase64(file){
+  return new Promise(function(resolve,reject){
+    const reader=new FileReader();
+    reader.onload=function(e){ resolve(String(e.target.result).split(',')[1]); };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+function _scEnsureMammothLoaded(){
+  return new Promise(function(resolve,reject){
+    if(typeof mammoth!=='undefined'){ resolve(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js';
+    s.onload=resolve; s.onerror=reject;
+    document.head.appendChild(s);
+  });
+}
+async function _scAiAnalyze(id){
+  const st=SC_AI_STATE[id]; if(!st || !st.file) return;
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  st.busy=true; st.error=''; schoolCatalogRenderList();
+  try{
+    const nameLower=st.file.name.toLowerCase();
+    const payload={schoolName:p.name||''};
+    if(nameLower.endsWith('.pdf')){
+      payload.pdfBase64=await _scReadFileAsBase64(st.file);
+    } else if(nameLower.endsWith('.docx')){
+      await _scEnsureMammothLoaded();
+      const arrBuf=await st.file.arrayBuffer();
+      const result=await mammoth.extractRawText({arrayBuffer:arrBuf});
+      payload.docText=(result && result.value) || '';
+      if(!payload.docText.trim()) throw new Error('워드 파일에서 텍스트를 추출하지 못했습니다.');
+    } else {
+      throw new Error('PDF 또는 DOCX 파일만 지원합니다.');
+    }
+    const result=await window._fb.xschoolAnalyzeReportDoc(payload);
+    st.draft=(result && result.report) ? result.report : null;
+    if(!st.draft) throw new Error('AI가 유효한 결과를 반환하지 않았습니다.');
+  }catch(e){
+    st.error=(e && e.message) ? e.message : '분석 중 오류가 발생했습니다.';
+  }
+  st.busy=false;
+  schoolCatalogRenderList();
+}
+function _scAiApplyDraft(id){
+  const st=SC_AI_STATE[id]; if(!st || !st.draft) return;
+  const p=(ST.schoolCatalog||[]).find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  _scEnsureReportV2(p);
+  const d=st.draft;
+  ['overviewText','admissionNote','curriculumOverviewText'].forEach(function(k){ if(d[k]) p.reportV2[k]=String(d[k]); });
+  if(d.gradStats && typeof d.gradStats==='object') Object.assign(p.reportV2.gradStats, d.gradStats);
+  ['commonSubjects','electiveSubjects','specialPrograms','recordTips','clubActivities'].forEach(function(k){
+    if(Array.isArray(d[k]) && d[k].length) p.reportV2[k]=d[k];
+  });
+  if(Array.isArray(d.examDifficulty) && d.examDifficulty.length){
+    // AI 초안의 시험난이도는 source:'ai'로 표시하고, 이미 있던 선생님설문(source:'survey') 행은 그대로 보존해서 병합
+    const survey=(p.reportV2.examDifficulty||[]).filter(function(row){ return row.source==='survey'; });
+    p.reportV2.examDifficulty=survey.concat(d.examDifficulty.map(function(row){ return Object.assign({source:'ai'}, row); }));
+  }
+  p.reportV2.updatedAt=new Date().toISOString();
+  _scSaveWhole(p);
+  st.draft=null; st.file=null; st.fileName='';
+  schoolCatalogRenderList();
+  alert('AI 초안이 반영되었습니다. 내용을 확인·수정해주세요.');
+}
+function _scAiCancelDraft(id){
+  const st=SC_AI_STATE[id]; if(!st) return;
+  st.draft=null;
+  schoolCatalogRenderList();
+}
+// ── 선생님 내신 설문(엑셀) 업로드 → 학교·과목별 시험난이도 자동 반영 ──────
+function _scSurveyFindCol(headers, mustInclude){
+  for(let i=0;i<headers.length;i++){
+    if(String(headers[i]||'').indexOf(mustInclude)!==-1) return i;
+  }
+  return -1;
+}
+async function schoolExamSurveyHandleFile(inputEl){
+  const file=inputEl.files && inputEl.files[0];
+  if(!file) return;
+  function afterReady(){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        if(!rows.length){ alert('빈 파일입니다.'); return; }
+        const headers=rows[0];
+        const dataRows=rows.slice(1);
+        const col={
+          school:_scSurveyFindCol(headers,'학교명'),
+          grade:_scSurveyFindCol(headers,'지도 학년'),
+          subjectDetail:_scSurveyFindCol(headers,'세부 과목명'),
+          difficulty:_scSurveyFindCol(headers,'최근 시험 난이도'),
+          discrimination:_scSurveyFindCol(headers,'가르는 변별력'),
+          timePressure:_scSurveyFindCol(headers,'시험 시간 압박'),
+          tips:_scSurveyFindCol(headers,'꼭 알려주고 싶은 특징'),
+          changes:_scSurveyFindCol(headers,'특별히 달라진 점')
+        };
+        if(col.school===-1 || col.subjectDetail===-1){
+          alert('"학교명" 또는 "세부 과목명" 열을 찾을 수 없습니다. 설문 양식이 맞는지 확인해주세요.');
+          return;
+        }
+        const groups={};
+        dataRows.forEach(function(r){
+          const schoolRaw=String(r[col.school]||'').trim();
+          const subjRaw=String(col.subjectDetail>=0?r[col.subjectDetail]:'').trim();
+          if(!schoolRaw || !subjRaw) return;
+          // 세부과목명 칸에 콤마로 여러 값이 적힌 경우(예: "공통영어2, 23년 고1 모의고사...")가 있어 첫 항목만 과목명으로 사용
+          const subj=subjRaw.split(',')[0].trim();
+          const key=_sgNormSchoolName(schoolRaw)+'|'+subj;
+          if(!groups[key]) groups[key]={schoolRaw:schoolRaw,subject:subj,difficulties:[],discriminations:[],timePressures:[],tips:[]};
+          const g=groups[key];
+          if(col.difficulty>=0 && r[col.difficulty]) g.difficulties.push(String(r[col.difficulty]));
+          if(col.discrimination>=0 && r[col.discrimination]) g.discriminations.push(String(r[col.discrimination]));
+          if(col.timePressure>=0 && r[col.timePressure]) g.timePressures.push(String(r[col.timePressure]));
+          if(col.tips>=0 && r[col.tips]) g.tips.push(String(r[col.tips]));
+        });
+        const groupList=Object.keys(groups).map(function(k){ return groups[k]; });
+        if(!groupList.length){ alert('반영할 응답이 없습니다.'); return; }
+        function mode(arr){ if(!arr.length) return ''; const cnt={}; arr.forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); return Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a]; })[0]; }
+        const unmatched=[];
+        let matchedSubjects=0;
+        groupList.forEach(function(g){
+          const school=(ST.schoolCatalog||[]).find(function(sc){ return _sgNormSchoolName(sc.name)===_sgNormSchoolName(g.schoolRaw); });
+          if(!school){ if(unmatched.indexOf(g.schoolRaw)===-1) unmatched.push(g.schoolRaw); return; }
+          _scEnsureReportV2(school);
+          const summaryParts=[];
+          const diffMode=mode(g.difficulties); if(diffMode) summaryParts.push('난이도: '+diffMode);
+          const discMode=mode(g.discriminations); if(discMode) summaryParts.push('변별력: '+discMode);
+          const timeMode=mode(g.timePressures); if(timeMode) summaryParts.push('시간압박: '+timeMode);
+          const noteText=g.tips.slice(0,2).join(' / ');
+          const rowData={subject:g.subject,writtenPct:'',performPct:'',example:summaryParts.join(' · '),note:noteText,source:'survey'};
+          const existing=school.reportV2.examDifficulty.find(function(row){ return row.source==='survey' && row.subject===g.subject; });
+          if(existing) Object.assign(existing, rowData); else school.reportV2.examDifficulty.push(rowData);
+          school.reportV2.updatedAt=new Date().toISOString();
+          _scSaveWhole(school);
+          matchedSubjects++;
+        });
+        let msg=matchedSubjects+'개 학교·과목의 내신 난이도 정보가 반영되었습니다.';
+        if(unmatched.length) msg+='\n\n⚠️ 아래 학교는 "고등학교 정보"에 아직 등록되어 있지 않아 반영되지 못했습니다. 먼저 학교를 등록한 뒤 다시 업로드해주세요:\n'+unmatched.join(', ');
+        alert(msg);
+        inputEl.value='';
+        render();
+      }catch(err){ alert('파일을 읽는 중 오류가 발생했습니다: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  if(typeof XLSX==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=afterReady;
+    document.head.appendChild(s);
+  } else { afterReady(); }
 }
 function schoolCatalogRenderList(){
   const el=document.getElementById('scCatalogList');
@@ -17279,6 +17712,11 @@ function renderRoadmapSchool(s){
         <label style="font-size:11.5px;color:#3b5bdb;cursor:pointer;border:1px solid #c5cae9;border-radius:6px;padding:6px 12px;background:#fff">📁 엑셀/CSV 파일 업로드<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="schoolCatalogHandleFile(this)"></label>
         <span style="font-size:10.5px;color:#aaa">엑셀은 첫 줄이 "학교명"으로 시작하는 제목행이면 자동으로 건너뜁니다</span>
       </div>
+    </div>
+    <div style="background:#fff7ed;border:1px dashed #fdba74;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+      <div style="font-size:12.5px;font-weight:700;color:#7c2d12;margin-bottom:6px">📊 선생님 내신 설문 엑셀 업로드 → 학교·과목별 시험 난이도 자동 반영</div>
+      <div style="font-size:11px;color:#9a3412;margin-bottom:8px">구글폼으로 받은 "학교별 내신 실태조사" 응답 엑셀(응답자별 시트)을 그대로 업로드하면, 학교명·세부 과목명으로 자동 그룹핑해서 각 학교의 "상세 리포트 → 7. 시험 난이도" 항목에 자동으로 채워집니다(여러 응답은 다수값으로 요약). 학교가 아직 등록되지 않았다면 먼저 위에서 학교를 추가해주세요.</div>
+      <label style="font-size:11.5px;color:#c2410c;cursor:pointer;border:1px solid #fdba74;border-radius:6px;padding:6px 12px;background:#fff">📁 내신 설문 엑셀 업로드<input type="file" accept=".xlsx,.xls" style="display:none" onchange="schoolExamSurveyHandleFile(this)"></label>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
       <select id="scRegionFilter" onchange="schoolCatalogRenderList()" style="font-size:13px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;min-width:130px">
