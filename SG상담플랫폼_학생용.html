@@ -523,8 +523,12 @@ function render(){
   if(_newContent && _prevScrollTop) _newContent.scrollTop = _prevScrollTop;
   // X-lab 월 선택 스크롤바: innerHTML 교체로 매번 새로 만들어지므로, 최신 월(오른쪽 끝)이
   // 기본으로 보이도록 렌더될 때마다 스크롤을 맨 오른쪽으로 맞춰준다.
-  const _monthScroller = document.getElementById('xlabMonthScroller');
-  if(_monthScroller) _monthScroller.scrollLeft = _monthScroller.scrollWidth;
+  // ★ 2026-09-29 수정: 월별주제활동(xlabMonthScroller)만 처리하고 있어서 월별교과활동
+  // (xsubMonthScroller)은 최신 월이 화면 밖(왼쪽)에 가려져 있었음 — 두 스크롤바 모두 처리.
+  ['xlabMonthScroller','xsubMonthScroller'].forEach(function(id){
+    const _monthScroller = document.getElementById(id);
+    if(_monthScroller) _monthScroller.scrollLeft = _monthScroller.scrollWidth;
+  });
 }
 
 function renderLogin(){
@@ -4308,11 +4312,17 @@ async function xlabGenerateRecord(){
   const linkedActivity = c.linkedActivity ? (c.linkedActivity==='직접입력' ? c.linkedActivityCustom : c.linkedActivity) : '';
   if(!subject || !motivation || !relatedActivity){ alert('필수 항목이 비어있습니다. 처음부터 다시 진행해주세요.'); _xlabRecordWizardStep=1; render(); return; }
   const t = _xlabCurrent;
-  const reportSummary = t.report ? [t.report.reason,t.report.concept].filter(Boolean).join(' ') : '';
+  // ★ 2026-09-29 수정: 예상세특 AI가 "탐구계기"와 "개념" 두 항목만 보고 작성해서 내용이
+  // 빈약했음 — 실사례/문제점·개선점/교내활동 예시까지, 그리고 심화·확장주제까지 모두
+  // 넘겨서 세특 문구에 구체적인 활동과 후속 연계활동 언급이 자연스럽게 들어가게 한다.
+  const reportSummary = t.report
+    ? ['reason','concept','example','issue','activity'].map(function(k){return t.report[k]||'';}).filter(Boolean).join(' ')
+      + (t.advancedTopicTitle ? (' [심화·확장 주제] '+t.advancedTopicTitle+(t.advancedTopicDesc?(' - '+t.advancedTopicDesc):'')) : '')
+    : '';
   _xlabRecordLoading = true; render();
   try{
     const r = await window._fb.xlabGenerateExpectedRecord({
-      department:t.department, topic:t.topicTitle, reportSummary,
+      department:t.department, topic:t.topicTitle, reportSummary: reportSummary.slice(0,2000),
       subject, motivation, relatedActivity, linkedActivity,
     });
     t.expectedRecord = { subject, motivation, relatedActivity, linkedActivity, recordText:r.recordText, generatedAt:Date.now() };
@@ -5181,7 +5191,7 @@ function xfinNewRecord(){
     topicTitle:'',
     sourceType:'', sourceId:'',
     sections: _xfinBlankSections(),
-    linkedActivity: {type:'', typeCustom:'', mode:'', text:''},
+    linkedActivity: {types:[], typeCustom:'', mode:'', text:''},
     finalRecordText:'',
     createdAt: Date.now(),
   };
@@ -5195,7 +5205,12 @@ function xfinOpenExisting(id){
   if(!t) return;
   _xfinCurrent = t;
   if(!_xfinCurrent.sections) _xfinCurrent.sections = _xfinBlankSections();
-  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {type:'', typeCustom:'', mode:'', text:''};
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {types:[], typeCustom:'', mode:'', text:''};
+  // ★ 2026-09-29 수정: 연계활동을 중복 선택 가능하게 바꾸면서 단일값 "type"을
+  // 배열 "types"로 변경 — 이전에 저장된 단일 선택 기록도 배열로 옮겨서 계속 보이게 함.
+  if(!Array.isArray(_xfinCurrent.linkedActivity.types)){
+    _xfinCurrent.linkedActivity.types = _xfinCurrent.linkedActivity.type ? [_xfinCurrent.linkedActivity.type] : [];
+  }
   _xfinCandidates = null;
   _xfinView = 'edit';
   render();
@@ -5213,7 +5228,7 @@ function xfinCaptureFormFields(){
     const el=document.getElementById('xfinSection_'+pair[0]);
     if(el){ if(!_xfinCurrent.sections[pair[0]]) _xfinCurrent.sections[pair[0]]={mode:'',text:''}; _xfinCurrent.sections[pair[0]].text=el.value; }
   });
-  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity={type:'',typeCustom:'',mode:'',text:''};
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity={types:[],typeCustom:'',mode:'',text:''};
   const linkedCustomEl=document.getElementById('xfinLinkedTypeCustom'); if(linkedCustomEl) _xfinCurrent.linkedActivity.typeCustom=linkedCustomEl.value;
   const linkedContentEl=document.getElementById('xfinLinkedContent'); if(linkedContentEl) _xfinCurrent.linkedActivity.text=linkedContentEl.value;
   const finalEl=document.getElementById('xfinFinalRecordText'); if(finalEl) _xfinCurrent.finalRecordText=finalEl.value;
@@ -5223,9 +5238,12 @@ function _xfinResolvedSubjectArea(t){
   if(!t) return '';
   return (t.subjectArea==='직접입력') ? (t.subjectAreaCustom||'').trim() : (t.subjectArea||'');
 }
+// ★ 2026-09-29 수정: 연계활동 유형을 여러 개 중복 선택할 수 있게 되어, 선택된 유형들을
+// 쉼표로 이어붙인 문자열로 반환한다("직접입력"은 사용자가 입력한 커스텀 텍스트로 치환).
 function _xfinResolvedLinkedType(t){
   const la = (t && t.linkedActivity) || {};
-  return la.type==='직접입력' ? (la.typeCustom||'').trim() : (la.type||'');
+  const types = Array.isArray(la.types) ? la.types : (la.type ? [la.type] : []);
+  return types.map(function(v){ return v==='직접입력' ? (la.typeCustom||'').trim() : v; }).filter(Boolean).join(', ');
 }
 
 function xfinChooseSubjectArea(v){
@@ -5369,17 +5387,22 @@ function renderXfinSectionBlock(t, key, label){
   </div>`;
 }
 
+// ★ 2026-09-29 수정(관리자 요청: "연계활동은 중복 선택도 가능해도 될것 같습니다"):
+// 단일 선택 토글에서 다중 선택 토글로 변경 — 클릭할 때마다 배열에 추가/제거한다.
 function xfinChooseLinkedType(v){
   xfinCaptureFormFields();
-  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {type:'', typeCustom:'', mode:'', text:''};
-  _xfinCurrent.linkedActivity.type = v;
-  if(v!=='직접입력') _xfinCurrent.linkedActivity.typeCustom = '';
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {types:[], typeCustom:'', mode:'', text:''};
+  if(!Array.isArray(_xfinCurrent.linkedActivity.types)) _xfinCurrent.linkedActivity.types = [];
+  const idx = _xfinCurrent.linkedActivity.types.indexOf(v);
+  if(idx===-1) _xfinCurrent.linkedActivity.types.push(v);
+  else _xfinCurrent.linkedActivity.types.splice(idx,1);
+  if(_xfinCurrent.linkedActivity.types.indexOf('직접입력')===-1) _xfinCurrent.linkedActivity.typeCustom = '';
   render();
 }
 
 function xfinChooseLinkedMode(mode){
   xfinCaptureFormFields();
-  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {type:'', typeCustom:'', mode:'', text:''};
+  if(!_xfinCurrent.linkedActivity) _xfinCurrent.linkedActivity = {types:[], typeCustom:'', mode:'', text:''};
   _xfinCurrent.linkedActivity.mode = mode;
   if(mode==='none') _xfinCurrent.linkedActivity.text = '';
   render();
@@ -5586,14 +5609,15 @@ function renderXfinEdit(){
 
     <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
       <div style="font-weight:800;font-size:14px;margin-bottom:10px">🔗 연계 활동</div>
+      <div style="font-size:10.5px;color:#888;margin-bottom:6px">여러 유형을 함께 선택할 수 있습니다.</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
         ${XFIN_LINKED_TYPES.map(function(o){
-          const on = (t.linkedActivity && t.linkedActivity.type)===o;
-          return `<button onclick="xfinChooseLinkedType('${o}')" style="padding:7px 12px;border-radius:16px;border:1.5px solid ${on?'#3b5bdb':'#ddd'};background:${on?'#3b5bdb':'#fff'};color:${on?'#fff':'#333'};font-weight:700;font-size:11px">${o}</button>`;
+          const on = ((t.linkedActivity && t.linkedActivity.types)||[]).indexOf(o)!==-1;
+          return `<button onclick="xfinChooseLinkedType('${o}')" style="padding:7px 12px;border-radius:16px;border:1.5px solid ${on?'#3b5bdb':'#ddd'};background:${on?'#3b5bdb':'#fff'};color:${on?'#fff':'#333'};font-weight:700;font-size:11px">${on?'✓ ':''}${o}</button>`;
         }).join('')}
       </div>
-      ${(t.linkedActivity && t.linkedActivity.type==='직접입력') ? `<input id="xfinLinkedTypeCustom" placeholder="연계활동 유형 직접 입력" value="${((t.linkedActivity&&t.linkedActivity.typeCustom)||'').replace(/"/g,'&quot;')}" style="margin-bottom:10px">` : ''}
-      ${(t.linkedActivity && t.linkedActivity.type) ? `
+      ${(t.linkedActivity && (t.linkedActivity.types||[]).indexOf('직접입력')!==-1) ? `<input id="xfinLinkedTypeCustom" placeholder="연계활동 유형 직접 입력" value="${((t.linkedActivity&&t.linkedActivity.typeCustom)||'').replace(/"/g,'&quot;')}" style="margin-bottom:10px">` : ''}
+      ${(t.linkedActivity && (t.linkedActivity.types||[]).length) ? `
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button onclick="xfinChooseLinkedMode('ai')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${(t.linkedActivity.mode==='ai')?'#3b5bdb':'#ddd'};background:${(t.linkedActivity.mode==='ai')?'#3b5bdb18':'#fff'};font-weight:700;font-size:11px">🤖 AI추천</button>
         <button onclick="xfinChooseLinkedMode('manual')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${(t.linkedActivity.mode==='manual')?'#3b5bdb':'#ddd'};background:${(t.linkedActivity.mode==='manual')?'#3b5bdb18':'#fff'};font-weight:700;font-size:11px">✍️ 직접입력</button>
