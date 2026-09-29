@@ -4393,7 +4393,7 @@ function renderXlabList(){
   months.reverse();
   if(_xlabLoadedForMonth!==_xlabMonth && !_xlabLoading) _xlabLoadList();
   return `
-  <div style="padding:16px">
+  <div>
     ${_xlabTopModeBar()}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <span style="font-size:18px;font-weight:800">🔬 X-lab · 월별주제활동</span>
@@ -4428,7 +4428,7 @@ function renderXlabList(){
 function renderXlabEdit(){
   const t = _xlabCurrent;
   return `
-  <div style="padding:16px">
+  <div>
     <button onclick="xlabBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
     <div style="font-size:16px;font-weight:800;margin-bottom:14px">🔬 ${t.topicTitle?t.topicTitle:'새 주제활동'}</div>
 
@@ -4991,7 +4991,7 @@ function renderXsubList(){
   months.reverse();
   if(_xsubLoadedForMonth!==_xsubMonth && !_xsubLoading) _xsubLoadList();
   return `
-  <div style="padding:16px">
+  <div>
     ${_xlabTopModeBar()}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <span style="font-size:18px;font-weight:800">📗 X-lab · 월별교과활동</span>
@@ -5026,7 +5026,7 @@ function renderXsubList(){
 function renderXsubEdit(){
   const t = _xsubCurrent;
   return `
-  <div style="padding:16px">
+  <div>
     <button onclick="xsubBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
     <div style="font-size:16px;font-weight:800;margin-bottom:14px">📗 ${t.topicTitle?t.topicTitle:'새 교과활동'}</div>
 
@@ -5512,7 +5512,7 @@ function renderXfin(){
 function renderXfinList(){
   if(!_xfinLoaded && !_xfinLoading) _xfinLoadList();
   return `
-  <div style="padding:16px">
+  <div>
     ${_xlabTopModeBar()}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <span style="font-size:18px;font-weight:800">🏆 X-lab · 최종예상세특</span>
@@ -5545,7 +5545,7 @@ function renderXfinEdit(){
   const t = _xfinCurrent;
   const locked = !!t.finalRecordText;
   return `
-  <div style="padding:16px">
+  <div>
     <button onclick="xfinBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
     <div style="font-size:16px;font-weight:800;margin-bottom:14px">🏆 ${t.topicTitle?t.topicTitle:'새 최종예상세특'}</div>
 
