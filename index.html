@@ -50638,6 +50638,59 @@ function _xaarAdminReviewBadge(session){
   if(st==='workVerified') return '📎 작업물확인됨';
   return '⏳ 미확인';
 }
+// ★ 2026-09-30 추가(관리자 요청: "인쇄시 시각적으로 확인이 너무 작아서 어려울수 있으니
+// 챌린저 AAR 결과리포트처럼 항목별 디자인"): 화면(renderXaarAdminDetail)과 인쇄(xaarAdminPrintDetail)
+// 양쪽에서 함께 쓰는 세션 카드 1건 렌더 함수. 요청한 배치대로 구성:
+// 1행(오늘 단계, 1칸) → 2행(직접 한 일/막힌 지점/확인 자료, 3칸) → 3행(다음 행동, 1칸) →
+// 4행(교과 심화/교사 확인, 2칸). forPrint=true면 버튼(확인/상담/행동변경/작업물확인)을 뺀다
+// (팝업 인쇄창은 부모창 함수를 갖고 있지 않아 버튼이 눌려도 동작하지 않기 때문).
+function _xaarSessionCardHtml(sess, idx, total, forPrint){
+  const d = sess.createdAt ? new Date(sess.createdAt) : null;
+  const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')) : '-';
+  const ordinal = total - idx;
+  const ordinalLabel = ordinal===1 ? '최초입력' : (ordinal+'회 입력');
+  const dp = sess.deepening;
+  const reviewBadge = _xaarAdminReviewBadge(sess);
+  const reviewNote = (sess.review && sess.review.note) ? _lxEsc(sess.review.note) : '';
+  const overrideText = (sess.review && sess.review.teacherOverrideActionLabel) ? _lxEsc(sess.review.teacherOverrideActionLabel) : '';
+  const prevActionHtml = sess.prevActionLabel ? ('<div style="font-size:11.5px;color:#888;margin-bottom:8px">지난 행동 실행: \''+_lxEsc(sess.prevActionLabel)+'\' → '+_lxEsc(_xaarLabelAdmin(XAAR_A_OPTS,sess.actionExecution))+(sess.notDoneReason?' ('+_lxEsc(_xaarLabelAdmin(XAAR_A1_OPTS,sess.notDoneReason))+')':'')+'</div>') : '';
+  const box = function(label, value){
+    return '<div style="background:#f8f9fc;border-radius:8px;padding:9px 11px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">'+label+'</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700;white-space:pre-wrap">'+value+'</div></div>';
+  };
+  const stageBox = '<div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">📍 오늘 단계</div><div style="font-size:13.5px;color:#1a1a2e;font-weight:800">'+_lxEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))+'</div></div>';
+  const threeColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+    + box('직접 한 일', (sess.contributionCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_C_OPTS,c));}).join(', ')||'-')
+    + box('막힌 지점', _lxEsc(_xaarLabelAdmin(XAAR_D_OPTS,sess.blockerCode))||'-')
+    + box('확인 자료', (sess.evidenceCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_E_OPTS,c));}).join(', ')||'-')
+    + '</div>';
+  const nextActionBox = '<div style="background:#e7f7ef;border:1.5px solid #0f766e;border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:10.5px;color:#0f766e;font-weight:800;margin-bottom:4px">➡️ 다음 행동(학생 선택)'+(overrideText?' · <span style="color:#7c3aed">교사 변경: '+overrideText+'</span>':'')+'</div><div style="font-size:13.5px;color:#0f766e;font-weight:800">'+_lxEsc(sess.nextActionLabel||'-')+'</div></div>';
+  const deepenBox = dp
+    ? '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">🧪 교과 심화</div><div style="font-size:12px;color:#4c1d95;line-height:1.6"><b>연결 개념:</b> '+_lxEsc(dp.conceptLabel||'-')+'<br><b>확인 자료:</b> '+_lxEsc(_xaarLabelAdmin(XAAR_H_OPTS,dp.resourceType))+(dp.resourceCardTitle?' · '+_lxEsc(dp.resourceCardTitle):'')+(dp.limitationCode?'<br><b>선택한 한계:</b> '+_lxEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode)):'')+(dp.changeLabel?'<br><b>바뀔 조건:</b> '+_lxEsc(dp.changeLabel):'')+'</div></div>'
+    : '<div style="background:#f8f9fc;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">🧪 교과 심화</div><div style="font-size:12px;color:#ccc">진행 안 함</div></div>';
+  const teacherBox = '<div style="background:#f8f9fc;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">교사 확인</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700">'+_lxEsc(reviewBadge)+'</div>'+(reviewNote?'<div style="font-size:11px;color:#555;margin-top:4px">💬 '+reviewNote+'</div>':'')+'</div>';
+  const twoColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+deepenBox+teacherBox+'</div>';
+  const actionsHtml = forPrint ? '' : ('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
+    +'<button onclick="xaarAdminMarkChecked(\''+sess.id+'\')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">✅ 확인</button>'
+    +'<button onclick="xaarAdminConsult(\''+sess.id+'\')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">💬 짧은 상담</button>'
+    +'<button onclick="xaarAdminChangeAction(\''+sess.id+'\')" style="padding:6px 10px;background:#f3e8ff;color:#7c3aed;border:none;border-radius:7px;font-size:10.5px;font-weight:700">🔁 다음 행동 변경</button>'
+    +'<button onclick="xaarAdminVerifyWork(\''+sess.id+'\')" style="padding:6px 10px;background:#e7f7ef;color:#0f766e;border:none;border-radius:7px;font-size:10.5px;font-weight:700">📎 작업물 확인</button>'
+    +'</div>');
+  return '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:12px;page-break-inside:avoid">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +   '<div style="display:flex;align-items:center;gap:8px">'
+    +     '<span style="font-size:11px;color:#888;font-weight:700">'+_lxEsc(dateLabel)+'</span>'
+    +     '<span style="font-size:10px;font-weight:800;color:#7c3aed;background:#f3e8ff;padding:2px 8px;border-radius:20px">'+ordinalLabel+'</span>'
+    +   '</div>'
+    +   '<span style="font-size:10.5px;font-weight:800;color:#7c3aed">'+_lxEsc(reviewBadge)+'</span>'
+    + '</div>'
+    + prevActionHtml
+    + stageBox
+    + threeColHtml
+    + nextActionBox
+    + twoColHtml
+    + actionsHtml
+    + '</div>';
+}
 function _xaarAdminSourceSummary(sourceType, t){
   if(!t) return [];
   if(sourceType==='topic'){
@@ -50790,40 +50843,9 @@ function renderXaarAdminDetail(item){
       ${summary.length ? summary.map(function(p){return `<div style="margin-bottom:10px"><div style="font-size:11px;color:#888;font-weight:700;margin-bottom:3px">${p[0]}</div><div style="font-size:13px;color:#1a1a2e;white-space:pre-wrap">${_lxEsc(p[1])}</div></div>`;}).join('') : '<div style="color:#aaa;font-size:12.5px">작성된 보고서 내용이 없습니다.</div>'}
     </div>
 
-    <div style="font-size:12.5px;font-weight:800;color:#7c3aed;margin-bottom:6px">🎯 AAR 입력 이력 (${sessions.length}건)</div>
+    <div style="font-size:12.5px;font-weight:800;color:#7c3aed;margin-bottom:6px">🎯 ${_xaarSourceTypeLabelAdmin(item.sourceType)} AAR 입력 이력 (${sessions.length}건)</div>
     ${!sessions.length ? '<div style="color:#aaa;font-size:12.5px;padding:10px 0">아직 AAR을 입력하지 않았습니다.</div>' :
-      sessions.map(function(sess){
-        const d = sess.createdAt ? new Date(sess.createdAt) : null;
-        const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')) : '-';
-        const dp = sess.deepening;
-        return `<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div style="font-size:11px;color:#888;font-weight:700">${_xlabEsc(dateLabel)}</div>
-            <span style="font-size:10.5px;font-weight:800;color:#7c3aed">${_xaarAdminReviewBadge(sess)}</span>
-          </div>
-          ${sess.prevActionLabel?`<div style="font-size:12px;margin-bottom:4px"><b>지난 행동 실행:</b> '${_lxEsc(sess.prevActionLabel)}' → ${_lxEsc(_xaarLabelAdmin(XAAR_A_OPTS,sess.actionExecution))}${sess.notDoneReason?' ('+_lxEsc(_xaarLabelAdmin(XAAR_A1_OPTS,sess.notDoneReason))+')':''}</div>`:''}
-          <div style="font-size:12px;margin-bottom:4px"><b>오늘 단계:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))}</div>
-          <div style="font-size:12px;margin-bottom:4px"><b>직접 한 일:</b> ${(sess.contributionCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_C_OPTS,c));}).join(', ')||'-'}</div>
-          <div style="font-size:12px;margin-bottom:4px"><b>막힌 지점:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_D_OPTS,sess.blockerCode))}</div>
-          <div style="font-size:12px;margin-bottom:4px"><b>확인 자료:</b> ${(sess.evidenceCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_E_OPTS,c));}).join(', ')||'-'}</div>
-          <div style="font-size:12px;color:#0f766e;margin-bottom:4px"><b>다음 행동(학생 선택):</b> ${_lxEsc(sess.nextActionLabel||'')}</div>
-          ${sess.review&&sess.review.teacherOverrideActionLabel?`<div style="font-size:12px;color:#7c3aed;margin-bottom:4px"><b>교사 변경 행동:</b> ${_lxEsc(sess.review.teacherOverrideActionLabel)}</div>`:''}
-          ${dp?`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #eee">
-            <div style="font-size:11px;color:#7c3aed;font-weight:800;margin-bottom:4px">🧪 교과 심화</div>
-            <div style="font-size:12px;margin-bottom:3px"><b>연결 개념:</b> ${_lxEsc(dp.conceptLabel||'-')}</div>
-            <div style="font-size:12px;margin-bottom:3px"><b>확인 자료:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_H_OPTS,dp.resourceType))}${dp.resourceCardTitle?' · '+_lxEsc(dp.resourceCardTitle):''}</div>
-            ${dp.limitationCode?`<div style="font-size:12px;margin-bottom:3px"><b>선택한 한계:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode))}</div>`:''}
-            ${dp.changeLabel?`<div style="font-size:12px"><b>바꿔볼 조건:</b> ${_lxEsc(dp.changeLabel)}</div>`:''}
-          </div>`:''}
-          ${sess.review&&sess.review.note?`<div style="margin-top:8px;font-size:11.5px;color:#555;background:#f7f7fb;border-radius:8px;padding:8px"><b>상담 메모:</b> ${_lxEsc(sess.review.note)}</div>`:''}
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-            <button onclick="xaarAdminMarkChecked('${sess.id}')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">✅ 확인</button>
-            <button onclick="xaarAdminConsult('${sess.id}')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">💬 짧은 상담</button>
-            <button onclick="xaarAdminChangeAction('${sess.id}')" style="padding:6px 10px;background:#f3e8ff;color:#7c3aed;border:none;border-radius:7px;font-size:10.5px;font-weight:700">🔁 다음 행동 변경</button>
-            <button onclick="xaarAdminVerifyWork('${sess.id}')" style="padding:6px 10px;background:#e7f7ef;color:#0f766e;border:none;border-radius:7px;font-size:10.5px;font-weight:700">📎 작업물 확인</button>
-          </div>
-        </div>`;
-      }).join('')
+      sessions.map(function(sess, idx){ return _xaarSessionCardHtml(sess, idx, sessions.length, false); }).join('')
     }
   </div>`;
 }
@@ -51177,26 +51199,23 @@ function xaarAdminPrintDetail(sourceType, sourceId){
   const summaryHtml = summary.map(function(p){return '<div style="margin-bottom:8px"><b>'+p[0]+':</b><div style="white-space:pre-wrap">'+_xlabEsc(p[1])+'</div></div>';}).join('') || '<div>작성된 보고서 내용이 없습니다.</div>';
   const signals = _xaarPrioritySignalsAdmin(sessions);
   const signalsHtml = signals.length ? ('<h2>⚠️ 확인이 필요한 신호</h2><ul>'+signals.map(function(t){return '<li>'+_xlabEsc(t)+'</li>';}).join('')+'</ul>') : '';
-  const sessionsHtml = sessions.map(function(sess){
-    const d = sess.createdAt ? new Date(sess.createdAt) : null;
-    const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
-    const dp = sess.deepening;
-    const deepText = dp ? ('개념: '+_xlabEsc(dp.conceptLabel||'-')+' / 한계: '+_xlabEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode))+' / 바꿀 조건: '+_xlabEsc(dp.changeLabel||'-')) : '-';
-    const reviewBadge = _xaarAdminReviewBadge(sess);
-    const reviewNote = (sess.review && sess.review.note) ? _xlabEsc(sess.review.note) : '';
-    const overrideText = (sess.review && sess.review.teacherOverrideActionLabel) ? ('→ 교사 변경: '+_xlabEsc(sess.review.teacherOverrideActionLabel)) : '';
-    return '<tr><td>'+dateLabel+'</td><td>'+_xlabEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))+'</td><td>'+(sess.contributionCodes||[]).map(function(c){return _xaarLabelAdmin(XAAR_C_OPTS,c);}).join(', ')+'</td><td>'+_xlabEsc(_xaarLabelAdmin(XAAR_D_OPTS,sess.blockerCode))+'</td><td>'+(sess.evidenceCodes||[]).map(function(c){return _xaarLabelAdmin(XAAR_E_OPTS,c);}).join(', ')+'</td><td>'+_xlabEsc(sess.nextActionLabel)+(overrideText?('<br><span style="color:#b45309">'+overrideText+'</span>'):'')+'</td><td style="font-size:10.5px">'+deepText+'</td><td>'+_xlabEsc(reviewBadge)+(reviewNote?('<br><span style="color:#666">'+reviewNote+'</span>'):'')+'</td></tr>';
-  }).join('');
+  // ★ 2026-09-30 수정(관리자 요청: "인쇄시 너무 작아서 확인이 어려우니 챌린저 AAR 결과리포트처럼
+  // 항목별 디자인"): 촘촘한 <table> 대신, 화면과 동일한 카드형 렌더(_xaarSessionCardHtml)를
+  // 그대로 재사용 — 1행(오늘 단계)→2행(직접 한 일/막힌 지점/확인 자료, 3칸)→3행(다음 행동)→
+  // 4행(교과 심화/교사 확인, 2칸) 배치, forPrint=true라 버튼은 빠짐.
+  const sessionsHtml = sessions.length
+    ? sessions.map(function(sess, idx){ return _xaarSessionCardHtml(sess, idx, sessions.length, true); }).join('')
+    : '<div style="color:#aaa;font-size:12.5px">아직 AAR을 입력하지 않았습니다.</div>';
   const w = window.open('','_blank');
   const html = '<html><head><meta charset="utf-8"><title>X-lab_AAR 상세</title>'
-    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:20px 0 8px}.meta{color:#666;font-size:12px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}th{background:#f8f9fc}ul{margin:0 0 12px 0;padding-left:18px;font-size:12px;color:#b45309}</style>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:20px 0 8px}.meta{color:#666;font-size:12px;margin-bottom:16px}ul{margin:0 0 12px 0;padding-left:18px;font-size:12px;color:#b45309}</style>'
     +'</head><body>'
     +'<h1>🎯 '+_xaarSourceTypeLabelAdmin(sourceType)+' · '+_xlabEsc(item.sourceTitle)+'</h1>'
     +'<div class="meta">학생: '+_xlabEsc(s.name)+' · 학교: '+_xlabEsc(s.school)+' · 학년: '+_xlabEsc(s.grade)+'</div>'
     +'<h2>📄 보고서/기록 내용</h2>'+summaryHtml
     +signalsHtml
-    +'<h2>🎯 AAR 입력 이력</h2>'
-    +'<table><thead><tr><th>입력일</th><th>오늘 단계</th><th>직접 한 일</th><th>막힌 지점</th><th>확인 자료</th><th>다음 행동</th><th>교과 심화(G~J)</th><th>교사 확인</th></tr></thead><tbody>'+sessionsHtml+'</tbody></table>'
+    +'<h2>🎯 '+_xaarSourceTypeLabelAdmin(sourceType)+' AAR 입력 이력 ('+sessions.length+'건)</h2>'
+    +sessionsHtml
     +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
   w.document.write(html);
   w.document.close();
