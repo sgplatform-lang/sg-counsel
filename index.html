@@ -50834,7 +50834,7 @@ async function _xaarAdminReviewUpdate(sessionId, patch){
   if(!session) return;
   session.review = Object.assign({}, session.review, patch);
   try{
-    if(FB()) await window._fb.set('xlabAar', sessionId, {review: session.review});
+    if(FB_USE()) await window._fb.set('xlabAar', sessionId, {review: session.review});
   }catch(e){ alert('저장 실패: '+e.message); }
   render();
 }
@@ -50914,7 +50914,7 @@ async function xaarAdminSaveCardForm(){
   const id = f.editingId || (f.type+'_'+Date.now());
   const data = Object.assign({}, f.data, {id: id, createdAt: existing ? (existing.createdAt||Date.now()) : Date.now()});
   try{
-    if(FB()) await window._fb.set(col, id, data);
+    if(FB_USE()) await window._fb.set(col, id, data);
     toast('저장되었습니다');
     _xaarAdminCardForm = null; _xaarCardAi = null; _xaarResAi = null;
     await _xaarAdminLoadCards();
@@ -50924,7 +50924,7 @@ async function xaarAdminDeleteCard(type, id){
   if(!confirm('이 카드를 삭제하시겠습니까?')) return;
   const col = type==='concept' ? 'xlabConceptCards' : 'xlabResourceCards';
   try{
-    if(FB()) await window._db.collection(col).doc(id).delete();
+    if(FB_USE()) await window._db.collection(col).doc(id).delete();
     await _xaarAdminLoadCards();
   }catch(e){ alert('삭제 실패: '+e.message); }
 }
