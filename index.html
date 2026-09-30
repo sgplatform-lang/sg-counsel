@@ -373,6 +373,10 @@ try{
     // 희망 대학/학과 목록을 근거로 대학별 맞춤 재구성·강점약점 분석·발전주제/연계활동
     // 추천을 생성. 분석 자체가 길어 AI 응답에 시간이 걸릴 수 있어 3분 타임아웃 부여.
     xlabGenerateRecordBuildup: (payload)=>firebase.functions().httpsCallable('xlabGenerateRecordBuildup', {timeout: 180000})(payload).then(r=>r.data),
+    // ★ 2026-09-30 추가: X-lab AAR 카드관리(개념·자료 카드) — 교과명/파일/링크만 주면
+    // 나머지 칸을 AI가 채워주는 두 서버 함수. 자료 분량이 많을 수 있어 5분 타임아웃.
+    xaarAnalyzeConceptCards: (payload)=>firebase.functions().httpsCallable('xaarAnalyzeConceptCards', {timeout: 300000})(payload).then(r=>r.data),
+    xaarAnalyzeResourceCard: (payload)=>firebase.functions().httpsCallable('xaarAnalyzeResourceCard', {timeout: 300000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료: sg-counsel");
@@ -27052,6 +27056,24 @@ function SG_updatePickBadge(){
   var w=document.getElementById('sg-pick-btn-wrap'); if(w) w.style.display=SG_pickCount()>0?'flex':'none';
   if(typeof SG_updateReportBadge==='function') SG_updateReportBadge();
 }
+// ★ 2026-09-30 추가: 우측 하단 "저장 리포트"·"선택자료/통합인쇄" 위젯이 화면 하단 버튼(저장/취소 등)을
+//   가리는 문제가 있어, 각각 접기/펼치기 할 수 있도록 상태를 localStorage에 저장해 유지한다.
+var SG_reportCollapsed = (function(){ try{ return localStorage.getItem('sg_report_collapsed')==='1'; }catch(e){ return false; } })();
+var SG_pickCollapsed = (function(){ try{ return localStorage.getItem('sg_pick_collapsed')==='1'; }catch(e){ return false; } })();
+function SG_setReportCollapsed(v){
+  SG_reportCollapsed = !!v;
+  try{ localStorage.setItem('sg_report_collapsed', SG_reportCollapsed?'1':'0'); }catch(e){}
+  var t=document.getElementById('sg-report-label-text'); if(t) t.style.display=SG_reportCollapsed?'none':'inline';
+  var b=document.getElementById('sg-report-collapse-btn'); if(b) b.textContent=SG_reportCollapsed?'▸':'▾';
+  var w=document.getElementById('sg-report-btn-wrap'); if(w) w.style.padding=SG_reportCollapsed?'8px 10px':'8px 14px';
+}
+function SG_togglePickCollapsed(){
+  SG_pickCollapsed = !SG_pickCollapsed;
+  try{ localStorage.setItem('sg_pick_collapsed', SG_pickCollapsed?'1':'0'); }catch(e){}
+  var t=document.getElementById('sg-pick-label-text'); if(t) t.style.display=SG_pickCollapsed?'none':'inline';
+  var a=document.getElementById('sg-pick-actions'); if(a) a.style.display=SG_pickCollapsed?'none':'inline-flex';
+  var w=document.getElementById('sg-pick-btn-wrap'); if(w) w.style.padding=SG_pickCollapsed?'8px 10px':'8px 10px 8px 16px';
+}
 function SG_isPickedGG(id){ return !!SG_crossPick.gyogwa['gg_'+id]; }
 function SG_isPickedJH(id){ return !!SG_crossPick.jonghap['jh_'+id]; }
 function SG_isPickedNS(id){ return !!SG_crossPick.nulsul['ns_'+id]; }
@@ -27189,18 +27211,24 @@ function SG_checkMigrateBanner(){
       var r=document.createElement('div');
       r.id='sg-report-btn-wrap';
       r.style.cssText='position:fixed;right:22px;bottom:74px;z-index:99999;display:none;gap:8px;align-items:center;background:#fff;border:2px solid #6d28d9;border-radius:30px;padding:8px 14px;box-shadow:0 6px 20px rgba(109,40,217,.25);cursor:pointer';
-      r.onclick=function(){ SG_openReportArchive(); };
-      r.innerHTML='<span style="font-size:12px;font-weight:800;color:#6d28d9;white-space:nowrap">📁 저장 리포트 <span id="sg-report-badge">0</span>건</span>';
+      r.onclick=function(){ if(SG_reportCollapsed){ SG_setReportCollapsed(false); return; } SG_openReportArchive(); };
+      r.innerHTML='<span style="font-size:12px;font-weight:800;color:#6d28d9;white-space:nowrap">📁<span id="sg-report-label-text"> 저장 리포트 <span id="sg-report-badge">0</span>건</span></span>'
+        +'<button id="sg-report-collapse-btn" onclick="event.stopPropagation();SG_setReportCollapsed(!SG_reportCollapsed);" title="접기/펼치기" style="background:none;border:none;color:#6d28d9;font-size:11px;cursor:pointer;padding:0 0 0 4px;line-height:1">▾</button>';
       document.body.appendChild(r);
     }
     if(document.getElementById('sg-pick-btn-wrap')) return;
     var d=document.createElement('div');
     d.id='sg-pick-btn-wrap';
     d.style.cssText='position:fixed;right:22px;bottom:22px;z-index:99999;display:none;gap:8px;align-items:center;background:#fff;border:2px solid #1e3a8a;border-radius:30px;padding:8px 10px 8px 16px;box-shadow:0 6px 20px rgba(30,58,138,.28)';
-    d.innerHTML='<span style="font-size:12px;font-weight:800;color:#1e3a8a;white-space:nowrap">📎 선택자료 <span id="sg-pick-badge">0</span>건</span>'
+    d.innerHTML='<span onclick="SG_togglePickCollapsed()" title="접기/펼치기" style="font-size:12px;font-weight:800;color:#1e3a8a;white-space:nowrap;cursor:pointer">📎<span id="sg-pick-label-text"> 선택자료 <span id="sg-pick-badge">0</span>건</span></span>'
+      +'<span id="sg-pick-actions" style="display:inline-flex;gap:8px;align-items:center">'
       +'<button onclick="SG_printCombined()" style="background:#1e3a8a;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🖨️ 통합 인쇄</button>'
-      +'<button onclick="SG_clearPicks()" style="background:#fff;color:#dc2626;border:1.5px solid #fecaca;border-radius:20px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">초기화</button>';
+      +'<button onclick="SG_clearPicks()" style="background:#fff;color:#dc2626;border:1.5px solid #fecaca;border-radius:20px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">초기화</button>'
+      +'</span>';
     document.body.appendChild(d);
+    // 이전에 접어둔 상태가 있으면 위젯 생성 직후 그대로 반영
+    if(SG_reportCollapsed) SG_setReportCollapsed(true);
+    if(SG_pickCollapsed){ SG_pickCollapsed=false; SG_togglePickCollapsed(); }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ensureSGPickBtn);
   else ensureSGPickBtn();
@@ -49001,13 +49029,76 @@ function xlabAdminPrint(id){
   w.document.close();
 }
 
+// ★ 2026-09-30 추가: 📘 월별주제활동 워크북 — 주제 선정 → 개념·원리·이론 → 실사례 →
+// 문제점·개선점 → 학교연계 → 심화·확장(AI 추천) → 예상세특 확인, 순서로 참고박스+밑줄칸.
+function _xlabBuildWorkbookHtml(t){
+  const dateCompact = (function(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab_월별주제활동_워크북_'+dateCompact;
+  const topicBox = '<div class="topic-box">'
+    +'<div><b>선택 주제:</b> '+_xlabEsc(t.topicTitle||'-')+(t.topicSource==='ai'?' <span style="color:#3b5bdb">(🤖 AI추천)</span>':'')+'</div>'
+    +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+    +'<div><b>교과목:</b> '+_xlabEsc(t.subjectArea||'-')+' · <b>교과개념:</b> '+_xlabEsc(t.subjectConcept||'-')+'</div>'
+    +'</div>';
+  let body = topicBox
+    + _xlabWorksheetStep('1','주제 선정이유','지난 시간에 정리한 이유', t.report&&t.report.reason, '오늘 다시 한 번, 이 주제를 고른 이유를 적어보세요', 5)
+    + _xlabWorksheetStep('2','개념·원리·이론','저장된 내용', t.report&&t.report.concept, '이 주제와 관련된 개념·원리·이론을 정리해보세요', 7)
+    + _xlabWorksheetStep('3','실사례','저장된 내용', t.report&&t.report.example, '실제 사례나 예시를 찾아 적어보세요', 7)
+    + _xlabWorksheetStep('4','문제점·개선점','저장된 내용', t.report&&t.report.issue, '문제점과 개선 아이디어를 적어보세요', 7)
+    + _xlabWorksheetStep('5','학교 연계 활동','저장된 내용', t.report&&t.report.activity, '학교에서 연계해볼 수 있는 활동을 적어보세요', 5)
+    + _xlabWorksheetStep('6','🤖 심화·확장 주제', 'AI 추천 심화·확장 주제', t.advancedTopicTitle ? (t.advancedTopicTitle+(t.advancedTopicDesc?(' — '+t.advancedTopicDesc):'')) : '', 'AI 추천을 참고해서 내가 더 파고들고 싶은 부분을 적어보세요', 5)
+    + _xlabWorksheetStep('7','예상세특 확인', '저장된 예상세특'+(t.expectedRecord&&t.expectedRecord.subject?(' ('+t.expectedRecord.subject+')'):''), t.expectedRecord&&t.expectedRecord.recordText, '더 다듬고 싶은 표현이나 보완할 점을 메모해보세요', 5);
+  return _xlabWorksheetShell({title:'X-lab 월별주제활동 워크북', icon:'📘', accent:'#3b5bdb', s:_xlabAdminCurrentStudent(), department:t.department, pdfTitle:pdfTitle, bodyHtml:body});
+}
+function xlabAdminPrintWorkbook(id){
+  const t = _xlabAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  const w = window.open('','_blank');
+  w.document.write(_xlabBuildWorkbookHtml(t));
+  w.document.close();
+}
+// ★ 2026-09-30(2차) 추가: "빈 워크북" — 특정 학생의 저장된 내용(AI 추천 등)을 전혀 보여주지
+// 않고, 항목 제목·안내 질문과 넉넉한 밑줄 칸만 있는 백지형 활동지. 아직 AI 보고서를
+// 만들기 전에 미리 나눠주거나, 처음부터 손으로 직접 써보게 하고 싶을 때 사용한다.
+function _xlabBuildBlankWorkbookHtml(){
+  const body =
+      _xlabWorksheetStep('1','주제 선정이유','', '', '이 주제를 고른 이유를 적어보세요', 6)
+    + _xlabWorksheetStep('2','개념·원리·이론','', '', '이 주제와 관련된 개념·원리·이론을 정리해보세요', 8)
+    + _xlabWorksheetStep('3','실사례','', '', '실제 사례나 예시를 찾아 적어보세요', 8)
+    + _xlabWorksheetStep('4','문제점·개선점','', '', '문제점과 개선 아이디어를 적어보세요', 8)
+    + _xlabWorksheetStep('5','학교 연계 활동','', '', '학교에서 연계해볼 수 있는 활동을 적어보세요', 6)
+    + _xlabWorksheetStep('6','심화·확장 주제','', '', '더 파고들고 싶은 부분을 적어보세요', 6)
+    + _xlabWorksheetStep('7','예상세특 메모','', '', '이 주제로 예상세특에 들어갈 내용을 메모해보세요', 6);
+  return _xlabWorksheetShell({title:'X-lab 월별주제활동 워크북(빈 양식)', icon:'📘', accent:'#3b5bdb', s:_xlabAdminCurrentStudent(), subtitle:'저장된 내용 없이, 항목별 안내 질문과 밑줄 칸만 있는 빈 활동지입니다.', pdfTitle:'X-lab_월별주제활동_빈워크북', bodyHtml:body});
+}
+function xlabAdminPrintBlankWorkbook(){
+  const w = window.open('','_blank');
+  w.document.write(_xlabBuildBlankWorkbookHtml());
+  w.document.close();
+}
+function renderXlabAdminWorkbookList(s){
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px">
+      <div style="font-size:11.5px;color:#888">각 항목의 저장된 내용(주제·AI 추천·예상세특 등)을 참고 자료로 인쇄하고, 학생이 수업 시간에 밑줄 칸에 손으로 직접 작성해볼 수 있는 워크북입니다.</div>
+      <button onclick="xlabAdminPrintBlankWorkbook()" style="padding:7px 14px;background:#fff;border:1.5px solid #3b5bdb;color:#3b5bdb;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">📝 빈 워크북 인쇄/PDF</button>
+    </div>
+    ${!_xlabAdminList.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 월별주제활동이 없습니다.</div>' :
+      _xlabAdminList.map(function(t){
+        const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:11px;color:#888">${mLabel} · ${_xlabEsc(t.subjectArea||'교과목 미선택')}</div><div style="font-weight:700;font-size:13px;margin-top:2px">${_xlabEsc(t.topicTitle||'(제목 없음)')}</div></div>
+        <button onclick="xlabAdminPrintWorkbook('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">🖨 워크북 인쇄/PDF</button>
+      </div>`;
+      }).join('')
+    }`;
+}
+
 // ★ 2026-09-28 추가: renderRoadmapSubNav()와 동일한 "배지+제목+설명" 헤더 카드 패턴을
 // X-lab에도 적용(관리자 요청: "상단을 이미지처럼"). 그 아래 4개 하위탭을 함께 그린다.
 // ★ 2026-09-28(2차) 추가: 관리자 요청("학생별 월별주제활동, 월별교과활동을 탭으로 구분")에
 // 따라 헤더 배지/제목 아래에 "월별주제활동 / 월별교과활동 / 최종예상세특" 최상위 모드
 // 전환을 추가. 월별교과활동·최종예상세특을 선택하면 아래 4개 하위탭 대신 각각의 전용
 // 목록/상세를 보여준다.
-let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final' | 'buildup'
+let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final' | 'buildup' | 'activity'
 function xlabAdminSwitchTopMode(mode){
   _xlabAdminTopMode = mode;
   _xlabAdminDetail = null;
@@ -49015,16 +49106,18 @@ function xlabAdminSwitchTopMode(mode){
   _xfinAdminDetail = null;
   _xbupAdminDetail = null;
   _xbupAdminShowForm = false;
+  _xactAdminDetail = null;
+  _xaarAdminDetail = null;
   render();
 }
 function xsubAdminSetSubTab(k){ _xsubAdminSubTab = k; render(); }
 function xfinAdminSetSubTab(k){ _xfinAdminSubTab = k; render(); }
 function renderXlabAdminHeader(){
-  const tabs=[['기본입력','📝'],['주제통계표','📊'],['주제확장표','🧭'],['예상세특표','🗂']];
-  const xsubTabs=[['기본입력','📝'],['교과활동표','📊'],['예상세특표','🗂']];
-  const xfinTabs=[['기본입력','📝'],['과목별예상세특표','📊'],['최종예상세특표','🗂']];
+  const tabs=[['기본입력','📝'],['주제통계표','📊'],['주제확장표','🧭'],['예상세특표','🗂'],['워크북','📓']];
+  const xsubTabs=[['기본입력','📝'],['교과활동표','📊'],['예상세특표','🗂'],['워크북','📓']];
+  const xfinTabs=[['기본입력','📝'],['과목별예상세특표','📊'],['최종예상세특표','🗂'],['워크북','📓']];
   const xbupTabs=[['기본입력','📝'],['예상세특 빌드업표','📊'],['전체빌드업표','🗂']];
-  const topModes=[['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['buildup','🚀 예상세특 빌드업']];
+  const topModes=[['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['buildup','🚀 예상세특 빌드업'],['activity','📓 월별셀프활동'],['aar','🎯 X-lab_AAR']];
   return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #7c3aed;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
     <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(124,58,237,.05)"></div>
     <div style="position:relative;z-index:2">
@@ -49033,11 +49126,11 @@ function renderXlabAdminHeader(){
       <p style="margin:8px 0 0;color:#5b6478;font-size:13px;max-width:760px">희망 진로에서 출발해 주제 선정 → 개념·원리·이론 → 실사례 → 문제점·개선점 → 학교 연계 활동까지, 한 편의 탐구가 완성되는 과정을 한 곳에서 확인하세요.</p>
     </div>
   </div>
-  <div style="display:flex;gap:8px;margin-bottom:12px">
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     ${topModes.map(function(pair){
       const k=pair[0], label=pair[1];
       const on=_xlabAdminTopMode===k;
-      return `<button onclick="xlabAdminSwitchTopMode('${k}')" style="flex:1;padding:11px 6px;border-radius:10px;border:1.5px solid ${on?'#7c3aed':'#ddd'};background:${on?'#7c3aed':'#fff'};color:${on?'#fff':'#333'};font-weight:800;font-size:12.5px">${label}</button>`;
+      return `<button onclick="xlabAdminSwitchTopMode('${k}')" style="flex:1;min-width:110px;padding:11px 6px;border-radius:10px;border:1.5px solid ${on?'#7c3aed':'#ddd'};background:${on?'#7c3aed':'#fff'};color:${on?'#fff':'#333'};font-weight:800;font-size:12.5px">${label}</button>`;
     }).join('')}
   </div>
   ${_xlabAdminTopMode==='topic' ? `<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
@@ -49091,6 +49184,16 @@ function renderXlabAdmin(s){
     _xbupAdminList=[]; _xbupAdminDetail=null; _xbupAdminSubTab='기본입력'; _xbupAdminShowForm=false;
     _xbupAdminLoad(s.id);
   }
+  if(_xactAdminStudentId!==String(s.id)){
+    _xactAdminStudentId=String(s.id);
+    _xactAdminList=[]; _xactAdminDetail=null;
+    _xactAdminLoad(s.id);
+  }
+  if(_xaarAdminStudentId!==String(s.id)){
+    _xaarAdminStudentId=String(s.id);
+    _xaarAdminSources=[]; _xaarAdminSessions=[]; _xaarAdminDetail=null;
+    _xaarAdminLoad(s.id);
+  }
   let body;
   if(_xlabAdminTopMode==='subject'){
     if(_xsubAdminLoading){
@@ -49099,6 +49202,8 @@ function renderXlabAdmin(s){
       body = renderXsubAdminActivityTable(s);
     } else if(_xsubAdminSubTab==='예상세특표'){
       body = renderXsubAdminRecordTable(s);
+    } else if(_xsubAdminSubTab==='워크북'){
+      body = renderXsubAdminWorkbookList(s);
     } else {
       body = _xsubAdminDetail ? renderXsubAdminDetail(_xsubAdminDetail) : renderXsubAdminList(s);
     }
@@ -49109,6 +49214,8 @@ function renderXlabAdmin(s){
       body = renderXfinAdminSubjectTable(s);
     } else if(_xfinAdminSubTab==='최종예상세특표'){
       body = renderXfinAdminRecordTable(s);
+    } else if(_xfinAdminSubTab==='워크북'){
+      body = renderXfinAdminWorkbookList(s);
     } else {
       body = _xfinAdminDetail ? renderXfinAdminDetail(_xfinAdminDetail) : renderXfinAdminList(s);
     }
@@ -49122,6 +49229,10 @@ function renderXlabAdmin(s){
     } else {
       body = _xbupAdminDetail ? renderXbupAdminDetail(_xbupAdminDetail) : renderXbupAdminList(s);
     }
+  } else if(_xlabAdminTopMode==='activity'){
+    body = _xactAdminLoading ? '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>' : renderXactAdmin(s);
+  } else if(_xlabAdminTopMode==='aar'){
+    body = _xaarAdminLoading ? '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>' : renderXaarAdmin(s);
   } else if(_xlabAdminLoading){
     body = '<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>';
   } else if(_xlabAdminSubTab==='주제통계표'){
@@ -49130,6 +49241,8 @@ function renderXlabAdmin(s){
     body = renderXlabAdminExpandTable(s);
   } else if(_xlabAdminSubTab==='예상세특표'){
     body = renderXlabAdminRecordTable(s);
+  } else if(_xlabAdminSubTab==='워크북'){
+    body = renderXlabAdminWorkbookList(s);
   } else {
     body = _xlabAdminDetail ? renderXlabAdminDetail(_xlabAdminDetail) : renderXlabAdminBasicInput(s);
   }
@@ -49231,6 +49344,70 @@ function xsubAdminPrint(id){
   const w = window.open('','_blank');
   w.document.write(_xsubBuildFullReportHtml(t));
   w.document.close();
+}
+
+// ★ 2026-09-30 추가: 📗 월별교과활동 워크북 — 계기 → 개념·원리·이론 → 실사례 →
+// 문제점·개선점 → 배운점·느낀점 → 독서활동 → 심화·확장(AI 추천) → 교과 예상세특, 순서.
+function _xsubBuildWorkbookHtml(t){
+  const dateCompact = (function(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab_월별교과활동_워크북_'+dateCompact;
+  const subjArea = _xsubResolvedSubjectArea(t);
+  const reasonLine = _xsubReasonSummaryText(t.reason||{});
+  const topicBox = '<div class="topic-box">'
+    +'<div><b>교과목:</b> '+_xlabEsc(subjArea||'-')+'</div>'
+    +'<div><b>탐구 주제:</b> '+_xlabEsc(t.topicTitle||'-')+'</div>'
+    +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+    +'</div>';
+  let body = topicBox
+    + _xlabWorksheetStep('0','탐구 계기','저장된 계기', reasonLine, '이 주제가 궁금해진 계기를 내 말로 다시 적어보세요', 4)
+    + _xlabWorksheetStep('1','개념·원리·이론','저장된 내용', t.report&&t.report.concept, '관련된 개념·원리·이론을 정리해보세요', 7)
+    + _xlabWorksheetStep('2','실사례','저장된 내용', t.report&&t.report.example, '실제 사례나 예시를 찾아 적어보세요', 7)
+    + _xlabWorksheetStep('3','문제점·개선점','저장된 내용', t.report&&t.report.issue, '문제점과 개선 아이디어를 적어보세요', 7)
+    + _xlabWorksheetStep('4','배운점·느낀점','저장된 내용', t.report&&t.report.learned, '배우고 느낀 점을 적어보세요', 5)
+    + (t.report&&t.report.reading ? _xlabWorksheetStep('5','독서활동 기록','저장된 내용', t.report.reading, '독서활동과 연결해서 더 적어볼 내용이 있다면 적어보세요', 5) : '')
+    + _xlabWorksheetStep('6','🤖 심화·확장 주제', 'AI 추천/저장된 심화·확장 주제', t.report&&t.report.advanced, 'AI 추천을 참고해서 더 파고들고 싶은 부분을 적어보세요', 5)
+    + _xlabWorksheetStep('7','교과 예상세특 확인', '저장된 예상세특'+(t.expectedRecord&&t.expectedRecord.subject?(' ('+t.expectedRecord.subject+')'):''), t.expectedRecord&&t.expectedRecord.recordText, '더 다듬고 싶은 표현이나 보완할 점을 메모해보세요', 5);
+  return _xlabWorksheetShell({title:'X-lab 월별교과활동 워크북', icon:'📗', accent:'#0f766e', s:_xlabAdminCurrentStudent(), department:t.department, pdfTitle:pdfTitle, bodyHtml:body});
+}
+function xsubAdminPrintWorkbook(id){
+  const t = _xsubAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  const w = window.open('','_blank');
+  w.document.write(_xsubBuildWorkbookHtml(t));
+  w.document.close();
+}
+function _xsubBuildBlankWorkbookHtml(){
+  const body =
+      _xlabWorksheetStep('0','탐구 계기','', '', '이 주제가 궁금해진 계기를 적어보세요', 5)
+    + _xlabWorksheetStep('1','개념·원리·이론','', '', '관련된 개념·원리·이론을 정리해보세요', 8)
+    + _xlabWorksheetStep('2','실사례','', '', '실제 사례나 예시를 찾아 적어보세요', 8)
+    + _xlabWorksheetStep('3','문제점·개선점','', '', '문제점과 개선 아이디어를 적어보세요', 8)
+    + _xlabWorksheetStep('4','배운점·느낀점','', '', '배우고 느낀 점을 적어보세요', 6)
+    + _xlabWorksheetStep('5','독서활동 기록','', '', '독서활동과 연결해서 더 적어볼 내용이 있다면 적어보세요', 6)
+    + _xlabWorksheetStep('6','심화·확장 주제','', '', '더 파고들고 싶은 부분을 적어보세요', 6)
+    + _xlabWorksheetStep('7','교과 예상세특 메모','', '', '이 교과 활동으로 예상세특에 들어갈 내용을 메모해보세요', 6);
+  return _xlabWorksheetShell({title:'X-lab 월별교과활동 워크북(빈 양식)', icon:'📗', accent:'#0f766e', s:_xlabAdminCurrentStudent(), subtitle:'저장된 내용 없이, 항목별 안내 질문과 밑줄 칸만 있는 빈 활동지입니다.', pdfTitle:'X-lab_월별교과활동_빈워크북', bodyHtml:body});
+}
+function xsubAdminPrintBlankWorkbook(){
+  const w = window.open('','_blank');
+  w.document.write(_xsubBuildBlankWorkbookHtml());
+  w.document.close();
+}
+function renderXsubAdminWorkbookList(s){
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px">
+      <div style="font-size:11.5px;color:#888">각 항목의 저장된 내용(계기·AI 추천 심화주제·예상세특 등)을 참고 자료로 인쇄하고, 학생이 수업 시간에 밑줄 칸에 손으로 직접 작성해볼 수 있는 워크북입니다.</div>
+      <button onclick="xsubAdminPrintBlankWorkbook()" style="padding:7px 14px;background:#fff;border:1.5px solid #0f766e;color:#0f766e;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">📝 빈 워크북 인쇄/PDF</button>
+    </div>
+    ${!_xsubAdminList.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 월별교과활동이 없습니다.</div>' :
+      _xsubAdminList.map(function(t){
+        const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:11px;color:#888">${mLabel} · ${_xlabEsc(_xsubResolvedSubjectArea(t)||'교과목 미선택')}</div><div style="font-weight:700;font-size:13px;margin-top:2px">${_xlabEsc(t.topicTitle||'(제목 없음)')}</div></div>
+        <button onclick="xsubAdminPrintWorkbook('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">🖨 워크북 인쇄/PDF</button>
+      </div>`;
+      }).join('')
+    }`;
 }
 
 function renderXsubAdminList(s){
@@ -49389,6 +49566,70 @@ function xfinAdminPrint(id){
   const w = window.open('','_blank');
   w.document.write(_xfinBuildFullReportHtml(t));
   w.document.close();
+}
+
+// ★ 2026-09-30 추가: 🏆 최종예상세특 워크북 — 완성된 최종예상세특 전체를 먼저 참고자료로
+// 보여준 뒤, 그 근거가 된 항목별 구성 내용(동기/개념/실사례/문제점/배운점/독서활동)과
+// 연계활동을 하나씩 다시 참고하며 학생이 자기 말로 다듬어 써보게 한다.
+function _xfinBuildWorkbookHtml(t){
+  const dateCompact = (function(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab_최종예상세특_워크북_'+dateCompact;
+  const subjArea = _xfinResolvedSubjectArea(t);
+  const sectionLabels = [['motivation','주제 선정동기'],['concept','개념·원리·이론'],['example','실사례'],['issue','문제점·개선점'],['learned','배운점·느낀점·알게된점'],['reading','독서활동']];
+  const topicBox = '<div class="topic-box">'
+    +'<div><b>교과목:</b> '+_xlabEsc(subjArea||'-')+'</div>'
+    +'<div><b>주제/활동명:</b> '+_xlabEsc(t.topicTitle||'-')+'</div>'
+    +'</div>';
+  const finalBox = '<div class="ref-label">🏆 저장된 최종 예상세특(참고)</div><div class="ref-box" style="border-left-color:#b8860b;background:#fffbe6">'+_xlabEsc(t.finalRecordText||'')+'</div>';
+  let stepNo=1, body = topicBox + finalBox;
+  sectionLabels.forEach(function(pair){
+    const sec = t.sections && t.sections[pair[0]];
+    if(!sec || sec.mode==='none' || !sec.text) return;
+    body += _xlabWorksheetStep(String(stepNo++), pair[1], '저장된 내용', sec.text, '내 말로 다시 정리해서 적어보세요', 5);
+  });
+  const laText = (t.linkedActivity && t.linkedActivity.mode!=='none') ? t.linkedActivity.text : '';
+  if(laText){
+    body += _xlabWorksheetStep(String(stepNo++), '연계 활동 ('+_xfinResolvedLinkedType(t)+')', '저장된 내용', laText, '이 활동과 어떻게 연결되는지 적어보세요', 4);
+  }
+  body += _xlabWorksheetStep(String(stepNo++), '최종 다듬기', '', '', '위 내용을 참고해서, 최종예상세특에서 더 다듬고 싶은 표현이나 추가하고 싶은 내용을 적어보세요', 6);
+  return _xlabWorksheetShell({title:'X-lab 최종예상세특 워크북', icon:'🏆', accent:'#b8860b', s:_xlabAdminCurrentStudent(), department:t.department, pdfTitle:pdfTitle, bodyHtml:body});
+}
+function xfinAdminPrintWorkbook(id){
+  const t = _xfinAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  const w = window.open('','_blank');
+  w.document.write(_xfinBuildWorkbookHtml(t));
+  w.document.close();
+}
+function _xfinBuildBlankWorkbookHtml(){
+  const sectionLabels = [['주제 선정동기','이 주제/활동을 고른 동기를 적어보세요'],['개념·원리·이론','관련된 개념·원리·이론을 정리해보세요'],['실사례','실제 사례나 예시를 찾아 적어보세요'],['문제점·개선점','문제점과 개선 아이디어를 적어보세요'],['배운점·느낀점·알게된점','배우고 느낀 점, 알게 된 점을 적어보세요'],['독서활동','관련된 독서활동이 있다면 적어보세요']];
+  let stepNo=1, body='';
+  sectionLabels.forEach(function(pair){
+    body += _xlabWorksheetStep(String(stepNo++), pair[0], '', '', pair[1], 6);
+  });
+  body += _xlabWorksheetStep(String(stepNo++), '연계 활동', '', '', '이 주제/활동과 연결되는 다른 활동이 있다면 적어보세요', 5);
+  body += _xlabWorksheetStep(String(stepNo++), '최종 다듬기', '', '', '위 내용을 참고해서, 최종예상세특에서 다듬고 싶은 표현이나 추가하고 싶은 내용을 적어보세요', 7);
+  return _xlabWorksheetShell({title:'X-lab 최종예상세특 워크북(빈 양식)', icon:'🏆', accent:'#b8860b', s:_xlabAdminCurrentStudent(), subtitle:'저장된 내용 없이, 항목별 안내 질문과 밑줄 칸만 있는 빈 활동지입니다.', pdfTitle:'X-lab_최종예상세특_빈워크북', bodyHtml:body});
+}
+function xfinAdminPrintBlankWorkbook(){
+  const w = window.open('','_blank');
+  w.document.write(_xfinBuildBlankWorkbookHtml());
+  w.document.close();
+}
+function renderXfinAdminWorkbookList(s){
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px">
+      <div style="font-size:11.5px;color:#888">완성된 최종예상세특과 그 근거 항목들을 참고 자료로 인쇄하고, 학생이 수업 시간에 밑줄 칸에 손으로 직접 다듬어 써볼 수 있는 워크북입니다.</div>
+      <button onclick="xfinAdminPrintBlankWorkbook()" style="padding:7px 14px;background:#fff;border:1.5px solid #b8860b;color:#b8860b;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">📝 빈 워크북 인쇄/PDF</button>
+    </div>
+    ${!_xfinAdminList.length ? '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 최종예상세특이 없습니다.</div>' :
+      _xfinAdminList.map(function(t){
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:11px;color:#888">${_xlabEsc(_xfinResolvedSubjectArea(t)||'교과목 미선택')}</div><div style="font-weight:700;font-size:13px;margin-top:2px">${_xlabEsc(t.topicTitle||'(제목 없음)')}</div></div>
+        <button onclick="xfinAdminPrintWorkbook('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">🖨 워크북 인쇄/PDF</button>
+      </div>`;
+      }).join('')
+    }`;
 }
 
 function renderXfinAdminList(s){
@@ -50122,11 +50363,832 @@ function _xlabAdminPrintTable(title, icon, s, theadHtml, rowsHtml){
   w.document.close();
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// ★ 2026-09-30 추가: X-lab 워크북 — 월별주제활동/월별교과활동/최종예상세특 각각에서
+// 이미 저장된(AI 추천 포함) 주제·보고서·예상세특 내용을 "참고 자료"로 인쇄하고, 그
+// 옆/아래에 학생이 수업 시간에 손으로 직접 써볼 수 있는 밑줄 칸을 넣은 활동지(워크북)를
+// 만든다. 기존 xxxBuildFullReportHtml(전체 보고서 인쇄용)과는 별개 용도 — 그건 "다 쓴
+// 결과물"을 보기 좋게 인쇄하는 것이고, 이건 "수업 중 학생이 참고하며 새로 써보는" 용도.
+// ══════════════════════════════════════════════════════════════════════════
+function _xlabWorksheetLines(n){
+  let out='';
+  for(let i=0;i<(n||3);i++) out += '<div class="wline"></div>';
+  return out;
+}
+function _xlabWorksheetRefBox(label, text){
+  if(!text) return '';
+  return '<div class="ref-label">📌 '+_xlabEsc(label)+' (참고 — 저장된 내용)</div><div class="ref-box">'+_xlabEsc(text)+'</div>';
+}
+// no: 단계 번호(문자열), title: 단계 제목, refLabel/refText: 참고자료 박스(없으면 생략),
+// blankLabel: 학생이 채울 칸의 안내문, lines: 밑줄 칸 수
+function _xlabWorksheetStep(no, title, refLabel, refText, blankLabel, lines){
+  return '<div class="step">'
+    +'<div class="step-head"><span class="step-no">'+_xlabEsc(no)+'</span>'+_xlabEsc(title)+'</div>'
+    +_xlabWorksheetRefBox(refLabel, refText)
+    +'<div class="blank-label">✏️ '+_xlabEsc(blankLabel)+'</div>'
+    +_xlabWorksheetLines(lines)
+    +'</div>';
+}
+function _xlabWorksheetShell(opts){
+  // opts: {title, icon, accent, s, metaLine, bodyHtml, pdfTitle}
+  const accent = opts.accent || '#3b5bdb';
+  const s = opts.s || {};
+  return '<html><head><meta charset="utf-8"><title>'+_xlabEsc(opts.pdfTitle||opts.title)+'</title>'
+    +'<style>'
+    +'body{font-family:"Apple SD Gothic Neo",sans-serif;padding:34px;line-height:1.6;color:#1a1a2e}'
+    +'h1{font-size:20px;margin:0 0 4px}'
+    +'.sub{color:#888;font-size:11.5px;margin-bottom:12px}'
+    +'hr{border:none;border-top:2px solid '+accent+';margin:12px 0 16px}'
+    +'.meta-row{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;color:#333;margin-bottom:6px}'
+    +'.meta-row b{color:#111}'
+    +'.fill-row{display:flex;gap:18px;font-size:12px;color:#888;margin-bottom:14px}'
+    +'.fill-row span{border-bottom:1px dashed #aaa;padding:2px 30px 2px 2px}'
+    +'.topic-box{background:#f8f9fc;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12.5px}'
+    +'.topic-box div{margin-bottom:3px}'
+    +'.step{margin:16px 0;page-break-inside:avoid}'
+    +'.step-head{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;margin-bottom:7px;color:'+accent+'}'
+    +'.step-no{width:20px;height:20px;border-radius:50%;background:'+accent+';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex:none}'
+    +'.ref-label{font-size:10px;color:'+accent+';font-weight:700;margin-bottom:3px}'
+    +'.ref-box{background:#f8f9fc;border-left:3px solid '+accent+';border-radius:6px;padding:8px 10px;font-size:11.5px;color:#555;white-space:pre-wrap;margin-bottom:7px}'
+    +'.blank-label{font-size:11px;color:#888;margin:5px 0 3px}'
+    +'.wline{border-bottom:1px dashed #aaa;height:30px}'
+    +'</style></head><body>'
+    +'<h1>'+opts.icon+' '+_xlabEsc(opts.title)+'</h1>'
+    +'<div class="sub">'+_xlabEsc(opts.subtitle||'수업 시간에 참고 자료를 확인하며 손으로 직접 작성해보는 활동지입니다.')+'</div>'
+    +'<hr>'
+    +'<div class="fill-row"><span>이름</span><span>학교</span><span>학년</span><span>날짜</span></div>'
+    +'<div class="meta-row"><span>희망학과: <b>'+_xlabEsc(s.xlabDepartment||opts.department||'')+'</b></span>'+(opts.metaLine||'')+'</div>'
+    +'<hr>'
+    +opts.bodyHtml
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+}
+
 // 인쇄 버튼은 표 헤더에서 onclick으로 인자 없이 호출되므로, 지금 보고 있는 학생(id)을
 // _xlabAdminStudentId로 추적해서 ST.students 명부에서 이름/학교/학년 등을 직접 찾는다.
 function _xlabAdminCurrentStudent(){
   if(typeof ST==='undefined' || !Array.isArray(ST.students)) return {};
   return ST.students.find(function(x){return String(x.id)===String(_xlabAdminStudentId);}) || {};
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 📓 X-lab · 월별셀프활동 (관리자/학부모 열람화면, 2026-09-29 신규, 명칭 변경:
+// "월별활동체크" → "월별셀프활동") — 학생용페이지(renderXact)에서 학생이 챌린저
+// AAR과 동일한 탭 방식으로 자유롭게 기록한 활동들(수행/독서/동아리/진로/자율/봉사
+// /실험/탐구/토론/학생회/교내대회 등, 학생 1명이 여러 건 작성 가능)을 xlabTopics
+// 관리자 열람화면과 동일한 "목록 → 상세" 구조로 확인하는 화면. 신규 컬렉션
+// xlabSelfActivities를 studentId로 조회한다(이전 xlabMonthlyActivities는 폐기).
+// ══════════════════════════════════════════════════════════════════════════
+let _xactAdminStudentId = null;
+let _xactAdminList = [];
+let _xactAdminLoading = false;
+let _xactAdminDetail = null;
+// ★ 2026-09-30 추가(관리자 요청: "관리자페이지에서 한눈에 월별 셀프 활동을 볼 수 있게"):
+// 학생용페이지와 동일한 월 스크롤 + 활동유형별 현황 요약을 관리자 화면에도 추가.
+// (학생용 파일의 XACT_TYPE_OPTS와 동일한 목록을 이 파일에도 그대로 유지해야 함)
+const XACT_TYPE_OPTS = ['수행','발표','독서','동아리','진로','자율','봉사','실험','탐구','토론','학생회','교내 대회','직접입력'];
+let _xactAdminMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+
+async function _xactAdminLoad(studentId){
+  _xactAdminLoading = true; render();
+  try{
+    const all = await window._fb.getWhere('xlabSelfActivities','studentId','==',String(studentId));
+    _xactAdminList = (all||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('월별셀프활동 관리자 목록 로딩 실패:', e.message);
+    _xactAdminList = [];
+  }
+  _xactAdminLoading = false; render();
+}
+function xactAdminOpenDetail(id){
+  _xactAdminDetail = _xactAdminList.find(function(t){return t.id===id;}) || null;
+  render();
+}
+function xactAdminBackToList(){ _xactAdminDetail = null; render(); }
+function xactAdminChangeMonth(m){ _xactAdminMonth = m; render(); }
+function _xactAdminResolved(v, custom){ return v==='직접입력' ? (custom||'(직접입력 미기재)') : (v||''); }
+function _xactAdminMonthEntries(){ return _xactAdminList.filter(function(t){return t.month===_xactAdminMonth;}); }
+function _xactAdminStatusRows(){
+  const list = _xactAdminMonthEntries();
+  return XACT_TYPE_OPTS.map(function(type){
+    const matches = list.filter(function(e){return e.activityType===type;}).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    const recent = matches[0];
+    const fieldLabel = recent ? [recent.fieldCategory, (recent.fieldDetail==='직접입력'?recent.fieldDetailCustom:recent.fieldDetail)].filter(Boolean).join(' · ') : '';
+    return { type: type, count: matches.length, fieldLabel: fieldLabel, topicLabel: recent ? (recent.interestTopic||'') : '' };
+  });
+}
+
+function renderXactAdmin(s){
+  if(_xactAdminDetail) return renderXactAdminDetail(_xactAdminDetail);
+  if(!_xactAdminList.length) return '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">아직 학생이 기록한 셀프활동이 없습니다.</div>';
+  const months=[]; const now=new Date();
+  for(let i=0;i<12;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  months.reverse();
+  const monthScroller = `<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:4px">
+    ${months.map(m=>`<button onclick="xactAdminChangeMonth('${m}')" style="flex:none;padding:8px 14px;border-radius:20px;border:1.5px solid ${m===_xactAdminMonth?'#0f766e':'#ddd'};background:${m===_xactAdminMonth?'#0f766e':'#fff'};color:${m===_xactAdminMonth?'#fff':'#333'};font-weight:700;font-size:12px">${_xlabMonthLabel(m)}</button>`).join('')}
+  </div>`;
+  const statusRows = _xactAdminStatusRows();
+  const statusHtml = `<div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px">
+      <span style="font-size:12.5px;font-weight:800;color:#0f766e">📊 ${_xlabMonthLabel(_xactAdminMonth)} 활동유형별 현황</span>
+      <button onclick="xactAdminPrintStatusTable()" style="padding:6px 12px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:11px">🖨 인쇄/PDF</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:8px 10px">활동유형</th><th style="padding:8px 10px;text-align:center">횟수(누적)</th><th style="padding:8px 10px">관련분야(최근)</th><th style="padding:8px 10px">관심주제(최근)</th>
+      </tr></thead>
+      <tbody>
+        ${statusRows.map(function(r){
+          return `<tr style="border-top:1px solid #f1f1f1">
+            <td style="padding:7px 10px;font-weight:700">${_xlabEsc(r.type)}</td>
+            <td style="padding:7px 10px;text-align:center;${r.count?'color:#0f766e;font-weight:800':'color:#ccc'}">${r.count}</td>
+            <td style="padding:7px 10px;color:#555">${_xlabEsc(r.fieldLabel)||'-'}</td>
+            <td style="padding:7px 10px;color:#555">${_xlabEsc(r.topicLabel)||'-'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+  const monthEntries = _xactAdminMonthEntries();
+  const listHtml = !monthEntries.length ? '<div style="text-align:center;color:#aaa;padding:30px;font-size:13px">이 달에 기록된 셀프활동이 없습니다.</div>' : `
+  <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">활동유형</th><th style="padding:10px 12px">관련분야</th><th style="padding:10px 12px">관심주제</th><th style="padding:10px 12px"></th>
+      </tr></thead>
+      <tbody>
+        ${monthEntries.map(function(t){
+          return `<tr style="border-top:1px solid #f1f1f1;cursor:pointer" onclick="xactAdminOpenDetail('${t.id}')">
+            <td style="padding:10px 12px">${_xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-'}</td>
+            <td style="padding:10px 12px">${_xlabEsc(t.fieldCategory)||'-'}${t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):''}</td>
+            <td style="padding:10px 12px;font-weight:700">${_xlabEsc(t.interestTopic)||'(미입력)'}</td>
+            <td style="padding:10px 12px;color:#3b5bdb">자세히 →</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+  const fullPrintBtn = `<div style="display:flex;justify-content:flex-end;margin:10px 0 4px"><button onclick="xactAdminPrintTable()" style="padding:7px 14px;background:none;border:1px solid #ccc;color:#333;border-radius:8px;font-weight:700;font-size:11px">🖨 전체 기간 목록 인쇄</button></div>`;
+  return `<div>${monthScroller}${statusHtml}${listHtml}${fullPrintBtn}</div>`;
+}
+function xactAdminPrintStatusTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rows = _xactAdminStatusRows();
+  const rowsHtml = rows.map(function(r){
+    return '<tr><td>'+_xlabEsc(r.type)+'</td><td style="text-align:center">'+r.count+'</td><td>'+_xlabEsc(r.fieldLabel)+'</td><td>'+_xlabEsc(r.topicLabel)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 월별셀프활동 현황('+_xlabMonthLabel(_xactAdminMonth)+')', '📓', s, '<th>활동유형</th><th>횟수(누적)</th><th>관련분야(최근)</th><th>관심주제(최근)</th>', rowsHtml);
+}
+
+function renderXactAdminDetail(t){
+  const m = t.motivation||{};
+  const motiveLabel = m.type==='subject' ? '📚 교과활동시 궁금증이 생김' : m.type==='reading' ? '📖 독서활동 중 궁금증이 생김' : m.type==='school' ? '🏫 교내활동 중 궁금증이 생김' : '(미선택)';
+  const motiveBody =
+    m.type==='subject' ? `교과목: ${_lxEsc(_xactAdminResolved(m.subjectArea,m.subjectAreaCustom))||'-'}<br>궁금해진 개념: ${_lxEsc(m.subjectConcept)||'-'}` :
+    m.type==='reading' ? `도서명: ${_lxEsc(m.bookTitle)||'-'} · 저자: ${_lxEsc(m.bookAuthor)||'-'}<br>궁금한 내용: ${_lxEsc(m.bookQuestion)||'-'}` :
+    m.type==='school' ? `교내활동 유형: ${_lxEsc(_xactAdminResolved(m.schoolActivityType,m.schoolActivityTypeCustom))||'-'}<br>궁금한 내용: ${_lxEsc(m.schoolQuestion)||'-'}` : '';
+  const rows = [
+    ['① 활동 유형', _xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-'],
+    ['② 주제 관련분야', (_xlabEsc(t.fieldCategory)||'-')+(t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):'')],
+    ['③ 관심주제·키워드', _xlabEsc(t.interestTopic)||'-'],
+    ['④ 알게 된 계기', motiveLabel+(motiveBody?'<br><span style="color:#888;font-size:11.5px">'+motiveBody+'</span>':'')],
+    ['⑤ 활동시 역할', _xlabEsc(_xactAdminResolved(t.role,t.roleCustom))||'-'],
+    ['⑥ 사용 기법', (Array.isArray(t.skills)&&t.skills.length) ? t.skills.map(function(sk){return sk==='직접입력'?_lxEsc(t.skillsCustom||'직접입력'):_lxEsc(sk);}).join(', ') : '-'],
+    ['⑦ 알게 된 점·키워드', _xlabEsc(t.learned)||'-'],
+  ];
+  return `
+  <div>
+    <button onclick="xactAdminBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px">
+      ${rows.map(function(pair){return `<div style="margin-bottom:12px"><div style="font-size:11.5px;color:#888;font-weight:700;margin-bottom:3px">${pair[0]}</div><div style="font-size:13.5px;color:#1a1a2e;white-space:pre-wrap">${pair[1]}</div></div>`;}).join('')}
+    </div>
+  </div>`;
+}
+function _lxEsc(x){ return String(x==null?'':x).replace(/</g,'&lt;'); }
+
+function xactAdminPrintTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rowsHtml = _xactAdminList.map(function(t){
+    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))+'</td><td>'+_xlabEsc(t.fieldCategory)+(t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):'')+'</td><td>'+_xlabEsc(t.interestTopic)+'</td><td style="white-space:pre-wrap">'+_xlabEsc(t.learned)+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab 월별셀프활동표', '📓', s, '<th>월</th><th>활동유형</th><th>관련분야</th><th>관심주제</th><th>알게된점</th>', rowsHtml);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 🎯 X-lab_AAR (관리자 열람화면, 2026-09-30 신규) — 학생용페이지(renderXaar)에서
+// 학생이 월별주제활동/월별교과활동/최종예상세특 항목별로 기록한 수업전후 AAR을
+// 관리자가 항목(구분+주제명) 단위로 목록에서 확인하고, 각 항목을 열면 그 보고서
+// 내용과 AAR 입력 이력을 함께 본다. xlabAar 컬렉션을 studentId로 조회한다.
+// (XAAR_* 상수는 학생용 파일과 동일한 코드/라벨을 유지해야 함)
+// ══════════════════════════════════════════════════════════════════════════
+const XAAR_A_OPTS = [['했어요','done'],['일부 했어요','partial'],['못 했어요','not_done'],['기억나지 않아요','unknown']];
+const XAAR_A1_OPTS = [['시간 부족','time'],['방법 모름','method'],['자료 못 찾음','source'],['주제 변경','topic_changed'],['기타 사정','other']];
+const XAAR_B_OPTS = [['주제 정하기','TOPIC'],['질문 좁히기','QUESTION'],['자료 찾기','SOURCE'],['분석·실험','ANALYSIS'],['결론·보고서','CONCLUSION'],['발표·토론','PRESENTATION'],['아직 진행 못함','NO_PROGRESS']];
+const XAAR_C_OPTS = [['질문 제안·수정','ASK'],['자료·출처 찾기','FIND'],['비교','COMPARE'],['계산·실험·분석','TEST'],['의견 조정','DISCUSS'],['글·발표 수정','REVISE'],['직접 한 일 없음','NONE']];
+const XAAR_D_OPTS = [['시작을 모르겠음','START'],['질문이 넓음','BROAD'],['자료 부족','SOURCE_GAP'],['자료 해석 어려움','INTERPRET'],['내 분석 부족','ANALYSIS_GAP'],['결론·근거 약함','CONCLUSION_GAP'],['설명 어려움','EXPLAIN'],['막힌 곳 없음','NONE']];
+const XAAR_E_OPTS = [['질문 수정 기록','QUESTION_VERSION'],['출처 있는 자료','SOURCE_RECORD'],['비교·계산·실험 결과','ANALYSIS_ARTIFACT'],['토론·발표 기록','PRESENTATION_RECORD'],['수정 전후 결과','REVISION_DIFF'],['아직 자료 없음','NO_EVIDENCE']];
+// ★ 2026-09-30 추가: 심화형(G~J) 라벨/코드 — 학생용 파일과 동일하게 유지해야 함.
+const XAAR_H_OPTS = [['교과서·수업 자료','TEXTBOOK'],['심화 강의','LECTURE'],['도서','BOOK'],['학회 발표·자료','CONFERENCE'],['리뷰·기술동향 보고서','REVIEW_REPORT'],['논문','PAPER'],['아직 확인 안 함','NOT_READ']];
+const XAAR_I_OPTS = [['대상 범위','LIMIT_SCOPE'],['데이터 부족','LIMIT_DATA'],['가정·변수 차이','LIMIT_ASSUMPTION'],['측정 오차','LIMIT_MEASURE'],['다른 연구와 불일치','LIMIT_CONFLICT'],['비용·안전·윤리','LIMIT_PRACTICAL'],['아직 모름','LIMIT_UNKNOWN']];
+const XAAR_J_OPTS = [['대상 비교','CHANGE_TARGET'],['조건·변수 변경','CHANGE_VARIABLE'],['측정법 변경','CHANGE_METHOD'],['반례 확인','CHECK_COUNTER'],['두 방법 결합','COMBINE_METHODS'],['작은 검증 실험','TEST_LIMIT'],['아직 결정 못함','CHANGE_UNKNOWN']];
+const XAAR_J_UNKNOWN_OPTS = [['한계 부분 다시 보기','REVIEW_LIMIT'],['교사에게 적용 조건 질문','ASK_CONDITION'],['다른 자료 한계와 비교','COMPARE_LIMIT']];
+function _xaarLabelAdmin(opts, code){ const f=(opts||[]).find(function(p){return p[1]===code;}); return f?f[0]:(code||''); }
+function _xaarSourceTypeLabelAdmin(t){ return t==='topic'?'월별주제활동':t==='subject'?'월별교과활동':t==='final'?'최종예상세특':t==='self'?'월별셀프활동':(t||''); }
+// 교사 우선 확인 신호(명세 5장 표) — 최근 세션들을 기준으로 상담 우선순위 문구를 계산.
+function _xaarPrioritySignalsAdmin(sessions){
+  const list = (sessions||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  const signals = [];
+  if(list.length>=2 && (list[0].contributionCodes||[]).length===1 && list[0].contributionCodes[0]==='NONE'
+     && (list[1].contributionCodes||[]).length===1 && list[1].contributionCodes[0]==='NONE'){
+    signals.push('직접 한 일 "없음"이 2회 연속 — 학생이 실제로 한 역할은 무엇이었는지 확인이 필요합니다.');
+  }
+  if(list.length>=2 && (list[0].evidenceCodes||[]).indexOf('NO_EVIDENCE')>=0 && (list[1].evidenceCodes||[]).indexOf('NO_EVIDENCE')>=0){
+    signals.push('확인 자료 "아직 없음"이 2회 연속 — 구두·토론 활동인지, 남길 결과물이 필요한지 확인이 필요합니다.');
+  }
+  if(list.length>=2 && list[0].blockerCode && list[0].blockerCode===list[1].blockerCode && list[0].blockerCode!=='NONE'){
+    signals.push('같은 지점에서 2회 연속 막힘 — 지난 행동을 했는데도 막혔는지, 행동을 바꿔야 하는지 확인이 필요합니다.');
+  }
+  const limitUnknownCount = list.filter(function(s){return s.deepening && s.deepening.limitationCode==='LIMIT_UNKNOWN';}).length;
+  if(limitUnknownCount>=2){
+    signals.push('한계를 "아직 모름"으로 답한 횟수가 2회 이상 — 개념의 가정·적용 범위를 짚어줄 필요가 있습니다.');
+  }
+  const noCardTypes = ['LECTURE','PAPER','CONFERENCE'];
+  const noCardHit = list.find(function(s){return s.deepening && noCardTypes.indexOf(s.deepening.resourceType)>=0 && !s.deepening.resourceCardId;});
+  if(noCardHit){
+    signals.push('강의·논문·학회 자료를 선택했지만 연결된 자료 카드가 없음 — 어느 자료를 실제 확인했는지 확인이 필요합니다.');
+  }
+  return signals;
+}
+function _xaarAdminReviewBadge(session){
+  const st = session.review && session.review.status;
+  if(st==='checked') return '✅ 확인함';
+  if(st==='consulted') return '💬 상담함';
+  if(st==='actionChanged') return '🔁 행동변경됨';
+  if(st==='workVerified') return '📎 작업물확인됨';
+  return '⏳ 미확인';
+}
+function _xaarAdminSourceSummary(sourceType, t){
+  if(!t) return [];
+  if(sourceType==='topic'){
+    return [
+      ['주제 선정이유', t.report&&t.report.reason],
+      ['개념·원리·이론', t.report&&t.report.concept],
+      ['실사례 예시', t.report&&t.report.example],
+      ['문제점·개선점', t.report&&t.report.issue],
+      ['교내활동 예시', t.report&&t.report.activity],
+      ['예상세특', t.expectedRecord&&t.expectedRecord.recordText],
+    ].filter(function(p){return p[1];});
+  }
+  if(sourceType==='subject'){
+    return [
+      ['개념·원리·이론', t.report&&t.report.concept],
+      ['실사례 예시', t.report&&t.report.example],
+      ['문제점·개선점', t.report&&t.report.issue],
+      ['배운점·느낀점', t.report&&t.report.learned],
+      ['독서활동 기록', t.report&&t.report.reading],
+      ['심화·확장주제', t.report&&t.report.advanced],
+    ].filter(function(p){return p[1];});
+  }
+  if(sourceType==='final'){
+    return [['최종예상세특', t.finalRecordText]].filter(function(p){return p[1];});
+  }
+  if(sourceType==='self'){
+    const m = t.motivation||{};
+    const motiveText = m.type==='subject' ? '교과활동: '+_lxEsc(_xactAdminResolved(m.subjectArea,m.subjectAreaCustom))+' · '+_lxEsc(m.subjectConcept||'') :
+      m.type==='reading' ? '독서활동: '+_lxEsc(m.bookTitle||'')+'('+_lxEsc(m.bookAuthor||'')+') · '+_lxEsc(m.bookQuestion||'') :
+      m.type==='school' ? '교내활동: '+_lxEsc(_xactAdminResolved(m.schoolActivityType,m.schoolActivityTypeCustom))+' · '+_lxEsc(m.schoolQuestion||'') : '';
+    return [
+      ['활동 유형', _xactAdminResolved(t.activityType,t.activityTypeCustom)],
+      ['주제 관련분야', (t.fieldCategory||'')+(t.fieldDetail?' · '+_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom):'')],
+      ['알게 된 계기', motiveText],
+      ['활동시 역할', _xactAdminResolved(t.role,t.roleCustom)],
+      ['사용 기법', (Array.isArray(t.skills)&&t.skills.length) ? t.skills.map(function(sk){return sk==='직접입력'?(t.skillsCustom||'직접입력'):sk;}).join(', ') : ''],
+      ['알게 된 점·키워드', t.learned],
+    ].filter(function(p){return p[1];});
+  }
+  return [];
+}
+let _xaarAdminStudentId = null;
+let _xaarAdminSources = []; // [{sourceType,sourceId,sourceTitle,createdAt,doc}]
+let _xaarAdminSessions = []; // 해당 학생의 xlabAar 제출 전체
+let _xaarAdminLoading = false;
+let _xaarAdminDetail = null; // 선택된 소스 항목 {sourceType,sourceId,sourceTitle,doc}
+let _xaarAdminSubView = 'list'; // 'list' | 'cards' — X-lab_AAR 탭 안의 하위 화면
+let _xaarAdminConceptCards = null; // null=아직 미조회(전체 학생 공유 컬렉션)
+let _xaarAdminResourceCards = null;
+let _xaarAdminCardForm = null; // {type:'concept'|'resource', editingId, data}
+// ★ 2026-09-30 추가: 카드관리 폼의 "AI로 자동 채우기" 도우미 상태.
+let _xaarCardAi = null; // {busy, error, files:[], candidates:null} — 개념 카드용
+let _xaarResAi = null;  // {busy, error, file:null, urlInput:''} — 자료 카드용
+function _xaarCardAiReset(){ _xaarCardAi = {busy:false, error:'', files:[], candidates:null}; }
+function _xaarResAiReset(){ _xaarResAi = {busy:false, error:'', file:null, urlInput:''}; }
+
+async function _xaarAdminLoad(studentId){
+  _xaarAdminLoading = true; render();
+  try{
+    const [topics, subs, fins, selfActs, sessions] = await Promise.all([
+      window._fb.getWhere('xlabTopics','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabSubjectReports','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabFinalRecords','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabSelfActivities','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabAar','studentId','==',String(studentId)),
+    ]);
+    const items = [];
+    (topics||[]).forEach(function(t){ if(t.topicTitle) items.push({sourceType:'topic', sourceId:t.id, sourceTitle:t.topicTitle, createdAt:t.createdAt||0, doc:t}); });
+    (subs||[]).forEach(function(t){ if(t.topicTitle) items.push({sourceType:'subject', sourceId:t.id, sourceTitle:t.topicTitle, createdAt:t.createdAt||0, doc:t}); });
+    (fins||[]).forEach(function(t){ if(t.topicTitle) items.push({sourceType:'final', sourceId:t.id, sourceTitle:t.topicTitle, createdAt:t.createdAt||0, doc:t}); });
+    (selfActs||[]).forEach(function(t){ if(t.interestTopic) items.push({sourceType:'self', sourceId:t.id, sourceTitle:t.interestTopic, createdAt:t.createdAt||0, doc:t}); });
+    items.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    _xaarAdminSources = items;
+    _xaarAdminSessions = (sessions||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('X-lab_AAR 관리자 로딩 실패:', e.message);
+    _xaarAdminSources = []; _xaarAdminSessions = [];
+  }
+  _xaarAdminLoading = false; render();
+}
+function _xaarAdminSessionsFor(sourceId){
+  return _xaarAdminSessions.filter(function(s){return s.sourceId===sourceId;}).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+}
+function xaarAdminOpenDetail(sourceType, sourceId){
+  _xaarAdminDetail = _xaarAdminSources.find(function(x){return x.sourceType===sourceType && x.sourceId===sourceId;}) || null;
+  render();
+}
+function xaarAdminBackToList(){ _xaarAdminDetail = null; render(); }
+function xaarAdminSwitchSubView(v){
+  _xaarAdminSubView = v;
+  if(v==='cards' && _xaarAdminConceptCards===null) _xaarAdminLoadCards();
+  render();
+}
+
+function renderXaarAdmin(s){
+  const _xaarSubTabs=[['list','📋','학생별 현황'],['cards','🗂','카드관리(개념·자료)']];
+  const subTabBar = `<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">
+    ${_xaarSubTabs.map(function(t){
+      const k=t[0], icon=t[1], label=t[2];
+      const isAct=_xaarAdminSubView===k;
+      return `<button onclick="xaarAdminSwitchSubView('${k}')" style="border:none;border-bottom:4px solid ${isAct?'#7c3aed':'transparent'};background:transparent;color:${isAct?'#7c3aed':'#64748b'};border-radius:0;padding:14px 16px;font-weight:${isAct?'800':'700'};font-size:13.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">${icon} ${label}</button>`;
+    }).join('')}
+  </div>`;
+  if(_xaarAdminSubView==='cards') return subTabBar + renderXaarAdminCards();
+  if(_xaarAdminDetail) return subTabBar + renderXaarAdminDetail(_xaarAdminDetail);
+  if(!_xaarAdminSources.length) return subTabBar + '<div style="text-align:center;color:#aaa;padding:40px;font-size:13px">등록된 월별주제활동·월별교과활동·최종예상세특·월별셀프활동이 없습니다.</div>';
+  const printBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="xaarAdminPrintListTable()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button></div>`;
+  const rows = _xaarAdminSources.map(function(it){
+    const d = it.createdAt ? new Date(it.createdAt) : null;
+    const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
+    const sess = _xaarAdminSessionsFor(it.sourceId);
+    const cnt = sess.length;
+    const warn = _xaarPrioritySignalsAdmin(sess).length>0;
+    return `<tr style="border-top:1px solid #f1f1f1;cursor:pointer" onclick="xaarAdminOpenDetail('${it.sourceType}','${it.sourceId}')">
+      <td style="padding:10px 12px">${_xlabEsc(dateLabel)}</td>
+      <td style="padding:10px 12px">${warn?'⚠️ ':''}${_xaarSourceTypeLabelAdmin(it.sourceType)}</td>
+      <td style="padding:10px 12px;font-weight:700">${_xlabEsc(it.sourceTitle)}</td>
+      <td style="padding:10px 12px;${cnt?'color:#0f766e;font-weight:800':'color:#ccc'}">${cnt?'있음 '+cnt+'회':'없음'}</td>
+      <td style="padding:10px 12px;color:#3b5bdb">자세히 →</td>
+    </tr>`;
+  }).join('');
+  return `<div>${subTabBar}${printBtn}<div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8f9fc;text-align:left">
+        <th style="padding:10px 12px">입력일</th><th style="padding:10px 12px">구분</th><th style="padding:10px 12px">주제명</th><th style="padding:10px 12px">AAR입력유무</th><th style="padding:10px 12px"></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div></div>`;
+}
+function renderXaarAdminDetail(item){
+  const sessions = _xaarAdminSessionsFor(item.sourceId);
+  const summary = _xaarAdminSourceSummary(item.sourceType, item.doc);
+  const signals = _xaarPrioritySignalsAdmin(sessions);
+  return `<div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <button onclick="xaarAdminBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700">← 목록으로</button>
+      <button onclick="xaarAdminPrintDetail('${item.sourceType}','${item.sourceId}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>
+    </div>
+    <div style="font-size:11px;color:#3b5bdb;font-weight:800">${_xaarSourceTypeLabelAdmin(item.sourceType)}</div>
+    <div style="font-size:16px;font-weight:800;margin:4px 0 14px">${_xlabEsc(item.sourceTitle)}</div>
+
+    ${signals.length ? `<div style="background:#fff7ed;border:1.5px solid #fbbf24;border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:800;color:#b45309;margin-bottom:6px">⚠ 우선 확인이 필요한 신호</div>
+      ${signals.map(function(t){return `<div style="font-size:12px;color:#78350f;margin-bottom:4px">· ${t}</div>`;}).join('')}
+    </div>` : ''}
+
+    <div style="font-size:12.5px;font-weight:800;color:#7c3aed;margin-bottom:6px">📄 보고서/기록 내용</div>
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:18px">
+      ${summary.length ? summary.map(function(p){return `<div style="margin-bottom:10px"><div style="font-size:11px;color:#888;font-weight:700;margin-bottom:3px">${p[0]}</div><div style="font-size:13px;color:#1a1a2e;white-space:pre-wrap">${_lxEsc(p[1])}</div></div>`;}).join('') : '<div style="color:#aaa;font-size:12.5px">작성된 보고서 내용이 없습니다.</div>'}
+    </div>
+
+    <div style="font-size:12.5px;font-weight:800;color:#7c3aed;margin-bottom:6px">🎯 AAR 입력 이력 (${sessions.length}건)</div>
+    ${!sessions.length ? '<div style="color:#aaa;font-size:12.5px;padding:10px 0">아직 AAR을 입력하지 않았습니다.</div>' :
+      sessions.map(function(sess){
+        const d = sess.createdAt ? new Date(sess.createdAt) : null;
+        const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')) : '-';
+        const dp = sess.deepening;
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-size:11px;color:#888;font-weight:700">${_xlabEsc(dateLabel)}</div>
+            <span style="font-size:10.5px;font-weight:800;color:#7c3aed">${_xaarAdminReviewBadge(sess)}</span>
+          </div>
+          ${sess.prevActionLabel?`<div style="font-size:12px;margin-bottom:4px"><b>지난 행동 실행:</b> '${_lxEsc(sess.prevActionLabel)}' → ${_lxEsc(_xaarLabelAdmin(XAAR_A_OPTS,sess.actionExecution))}${sess.notDoneReason?' ('+_lxEsc(_xaarLabelAdmin(XAAR_A1_OPTS,sess.notDoneReason))+')':''}</div>`:''}
+          <div style="font-size:12px;margin-bottom:4px"><b>오늘 단계:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))}</div>
+          <div style="font-size:12px;margin-bottom:4px"><b>직접 한 일:</b> ${(sess.contributionCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_C_OPTS,c));}).join(', ')||'-'}</div>
+          <div style="font-size:12px;margin-bottom:4px"><b>막힌 지점:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_D_OPTS,sess.blockerCode))}</div>
+          <div style="font-size:12px;margin-bottom:4px"><b>확인 자료:</b> ${(sess.evidenceCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_E_OPTS,c));}).join(', ')||'-'}</div>
+          <div style="font-size:12px;color:#0f766e;margin-bottom:4px"><b>다음 행동(학생 선택):</b> ${_lxEsc(sess.nextActionLabel||'')}</div>
+          ${sess.review&&sess.review.teacherOverrideActionLabel?`<div style="font-size:12px;color:#7c3aed;margin-bottom:4px"><b>교사 변경 행동:</b> ${_lxEsc(sess.review.teacherOverrideActionLabel)}</div>`:''}
+          ${dp?`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #eee">
+            <div style="font-size:11px;color:#7c3aed;font-weight:800;margin-bottom:4px">🧪 교과 심화</div>
+            <div style="font-size:12px;margin-bottom:3px"><b>연결 개념:</b> ${_lxEsc(dp.conceptLabel||'-')}</div>
+            <div style="font-size:12px;margin-bottom:3px"><b>확인 자료:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_H_OPTS,dp.resourceType))}${dp.resourceCardTitle?' · '+_lxEsc(dp.resourceCardTitle):''}</div>
+            ${dp.limitationCode?`<div style="font-size:12px;margin-bottom:3px"><b>선택한 한계:</b> ${_lxEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode))}</div>`:''}
+            ${dp.changeLabel?`<div style="font-size:12px"><b>바꿔볼 조건:</b> ${_lxEsc(dp.changeLabel)}</div>`:''}
+          </div>`:''}
+          ${sess.review&&sess.review.note?`<div style="margin-top:8px;font-size:11.5px;color:#555;background:#f7f7fb;border-radius:8px;padding:8px"><b>상담 메모:</b> ${_lxEsc(sess.review.note)}</div>`:''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+            <button onclick="xaarAdminMarkChecked('${sess.id}')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">✅ 확인</button>
+            <button onclick="xaarAdminConsult('${sess.id}')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">💬 짧은 상담</button>
+            <button onclick="xaarAdminChangeAction('${sess.id}')" style="padding:6px 10px;background:#f3e8ff;color:#7c3aed;border:none;border-radius:7px;font-size:10.5px;font-weight:700">🔁 다음 행동 변경</button>
+            <button onclick="xaarAdminVerifyWork('${sess.id}')" style="padding:6px 10px;background:#e7f7ef;color:#0f766e;border:none;border-radius:7px;font-size:10.5px;font-weight:700">📎 작업물 확인</button>
+          </div>
+        </div>`;
+      }).join('')
+    }
+  </div>`;
+}
+
+// ── 교사검토(확인/상담/행동변경/작업물확인) ────────────────────────────────
+async function _xaarAdminReviewUpdate(sessionId, patch){
+  const session = _xaarAdminSessions.find(function(s){return s.id===sessionId;});
+  if(!session) return;
+  session.review = Object.assign({}, session.review, patch);
+  try{
+    if(FB()) await window._fb.set('xlabAar', sessionId, {review: session.review});
+  }catch(e){ alert('저장 실패: '+e.message); }
+  render();
+}
+function xaarAdminMarkChecked(sessionId){
+  _xaarAdminReviewUpdate(sessionId, {status:'checked', reviewedAt:Date.now()});
+}
+function xaarAdminConsult(sessionId){
+  const note = prompt('짧은 상담 내용을 남겨주세요(선택):','');
+  if(note===null) return;
+  _xaarAdminReviewUpdate(sessionId, {status:'consulted', note:note, reviewedAt:Date.now()});
+}
+function xaarAdminChangeAction(sessionId){
+  const session = _xaarAdminSessions.find(function(s){return s.id===sessionId;});
+  if(!session) return;
+  const opts = XAAR_F_BY_D[session.blockerCode]||[];
+  if(!opts.length){ alert('이 회차는 F단계 선택지를 찾을 수 없습니다.'); return; }
+  const listText = opts.map(function(p,i){return (i+1)+'. '+p[0];}).join('\n');
+  const answer = prompt('다음 행동으로 변경할 항목의 번호를 입력하세요:\n'+listText, '1');
+  if(answer===null) return;
+  const idx = parseInt(answer,10)-1;
+  if(!(idx>=0 && idx<opts.length)){ alert('올바른 번호를 입력해주세요.'); return; }
+  _xaarAdminReviewUpdate(sessionId, {status:'actionChanged', teacherOverrideActionCode:opts[idx][1], teacherOverrideActionLabel:opts[idx][0], reviewedAt:Date.now()});
+}
+function xaarAdminVerifyWork(sessionId){
+  _xaarAdminReviewUpdate(sessionId, {status:'workVerified', workVerifiedAt:Date.now()});
+}
+
+// ── 🗂 카드관리(개념카드·자료카드) — 전체 학생 공유 컬렉션(xlabConceptCards/xlabResourceCards) ──
+async function _xaarAdminLoadCards(){
+  try{
+    const [concepts, resources] = await Promise.all([
+      window._fb.getAll('xlabConceptCards'),
+      window._fb.getAll('xlabResourceCards'),
+    ]);
+    _xaarAdminConceptCards = (concepts||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    _xaarAdminResourceCards = (resources||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('카드 로딩 실패:', e.message);
+    _xaarAdminConceptCards = []; _xaarAdminResourceCards = [];
+  }
+  render();
+}
+function xaarAdminNewConceptCard(){
+  _xaarAdminCardForm = {type:'concept', editingId:null, data:{subject:'', unit:'', conceptName:'', description:''}};
+  _xaarCardAiReset();
+  render();
+}
+function xaarAdminEditConceptCard(id){
+  const c = (_xaarAdminConceptCards||[]).find(function(x){return x.id===id;});
+  if(!c) return;
+  _xaarAdminCardForm = {type:'concept', editingId:id, data:{subject:c.subject||'', unit:c.unit||'', conceptName:c.conceptName||'', description:c.description||''}};
+  _xaarCardAiReset();
+  render();
+}
+function xaarAdminNewResourceCard(){
+  _xaarAdminCardForm = {type:'resource', editingId:null, data:{title:'',author:'',year:'',resourceType:'PAPER',url:'',conceptId:'',difficulty:'',checkedDate:'',enabledWhat:'',remainingLimit:'',limitLocation:'',sampleQuestion:''}};
+  _xaarResAiReset();
+  render();
+}
+function xaarAdminEditResourceCard(id){
+  const c = (_xaarAdminResourceCards||[]).find(function(x){return x.id===id;});
+  if(!c) return;
+  _xaarAdminCardForm = {type:'resource', editingId:id, data:Object.assign({title:'',author:'',year:'',resourceType:'PAPER',url:'',conceptId:'',difficulty:'',checkedDate:'',enabledWhat:'',remainingLimit:'',limitLocation:'',sampleQuestion:''}, c)};
+  _xaarResAiReset();
+  render();
+}
+function xaarAdminCardFormSet(field, value){
+  if(!_xaarAdminCardForm) return;
+  _xaarAdminCardForm.data[field] = value;
+}
+function xaarAdminCancelCardForm(){ _xaarAdminCardForm = null; _xaarCardAi = null; _xaarResAi = null; render(); }
+async function xaarAdminSaveCardForm(){
+  const f = _xaarAdminCardForm;
+  if(!f) return;
+  const col = f.type==='concept' ? 'xlabConceptCards' : 'xlabResourceCards';
+  const existing = f.editingId ? ((f.type==='concept'?_xaarAdminConceptCards:_xaarAdminResourceCards)||[]).find(function(x){return x.id===f.editingId;}) : null;
+  const id = f.editingId || (f.type+'_'+Date.now());
+  const data = Object.assign({}, f.data, {id: id, createdAt: existing ? (existing.createdAt||Date.now()) : Date.now()});
+  try{
+    if(FB()) await window._fb.set(col, id, data);
+    toast('저장되었습니다');
+    _xaarAdminCardForm = null; _xaarCardAi = null; _xaarResAi = null;
+    await _xaarAdminLoadCards();
+  }catch(e){ alert('저장 실패: '+e.message); }
+}
+async function xaarAdminDeleteCard(type, id){
+  if(!confirm('이 카드를 삭제하시겠습니까?')) return;
+  const col = type==='concept' ? 'xlabConceptCards' : 'xlabResourceCards';
+  try{
+    if(FB()) await window._db.collection(col).doc(id).delete();
+    await _xaarAdminLoadCards();
+  }catch(e){ alert('삭제 실패: '+e.message); }
+}
+function renderXaarAdminCards(){
+  if(_xaarAdminConceptCards===null) return '<div style="text-align:center;color:#888;padding:30px">불러오는 중...</div>';
+  if(_xaarAdminCardForm) return renderXaarAdminCardForm();
+  const concepts = _xaarAdminConceptCards||[];
+  const resources = _xaarAdminResourceCards||[];
+  return `<div>
+    <div style="font-size:11.5px;color:#888;margin-bottom:14px">여기서 등록한 카드는 모든 학생의 X-lab AAR "교과 심화하기" 단계에서 함께 노출됩니다(개념 카드 최대 5개, 유형별 자료 카드 최대 5개까지 학생에게 보여집니다).</div>
+    <div style="font-size:12.5px;font-weight:800;color:#7c3aed;margin-bottom:8px">📘 교과 개념 카드 (${concepts.length}개)</div>
+    <button onclick="xaarAdminNewConceptCard()" style="padding:8px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;margin-bottom:10px">+ 개념 카드 추가</button>
+    ${!concepts.length ? '<div style="color:#aaa;font-size:12.5px;padding:10px 0">등록된 개념 카드가 없습니다.</div>' :
+      concepts.map(function(c){
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-weight:800;font-size:13px">${_xlabEsc(c.conceptName)}</div><div style="font-size:11px;color:#888;margin-top:2px">${_xlabEsc(c.subject||'')} ${c.unit?'· '+_xlabEsc(c.unit):''}</div></div>
+          <div style="display:flex;gap:6px"><button onclick="xaarAdminEditConceptCard('${c.id}')" style="padding:6px 10px;background:#f2f2f5;border:none;border-radius:6px;font-size:11px;font-weight:700">수정</button><button onclick="xaarAdminDeleteCard('concept','${c.id}')" style="padding:6px 10px;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;font-size:11px;font-weight:700">삭제</button></div>
+        </div>`;
+      }).join('')
+    }
+    <div style="font-size:12.5px;font-weight:800;color:#7c3aed;margin:20px 0 8px">📚 자료 카드 (${resources.length}개)</div>
+    <button onclick="xaarAdminNewResourceCard()" style="padding:8px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;margin-bottom:10px">+ 자료 카드 추가</button>
+    ${!resources.length ? '<div style="color:#aaa;font-size:12.5px;padding:10px 0">등록된 자료 카드가 없습니다.</div>' :
+      resources.map(function(c){
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-weight:800;font-size:13px">${_xlabEsc(c.title)}</div><div style="font-size:11px;color:#888;margin-top:2px">${_xlabEsc(_xaarLabelAdmin(XAAR_H_OPTS,c.resourceType))} · ${_xlabEsc(c.author||'')} · ${_xlabEsc(c.year||'')}</div></div>
+          <div style="display:flex;gap:6px"><button onclick="xaarAdminEditResourceCard('${c.id}')" style="padding:6px 10px;background:#f2f2f5;border:none;border-radius:6px;font-size:11px;font-weight:700">수정</button><button onclick="xaarAdminDeleteCard('resource','${c.id}')" style="padding:6px 10px;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;font-size:11px;font-weight:700">삭제</button></div>
+        </div>`;
+      }).join('')
+    }
+  </div>`;
+}
+// ★ 2026-09-30 추가: 개념 카드 "AI로 자동 채우기" — 교과명(폼에 입력된 값)을 힌트로 주고,
+// 관리자가 올린 파일(PDF/DOCX — 교과서 목차, 성취기준, 수업자료 등)을 분석해서 개념 카드
+// 후보를 최대 8개까지 뽑아온다. school-report AI 초안(_scAiAnalyze)과 같은 파일 처리 방식
+// (PDF는 base64 그대로, DOCX는 mammoth로 텍스트 추출)을 그대로 재사용한다.
+function _xaarCardAiSetFiles(input){
+  if(!_xaarCardAi) _xaarCardAiReset();
+  const newFiles = input.files ? Array.from(input.files) : [];
+  _xaarCardAi.files = (_xaarCardAi.files||[]).concat(newFiles);
+  _xaarCardAi.candidates = null; _xaarCardAi.error = '';
+  input.value='';
+  render();
+}
+function _xaarCardAiRemoveFile(idx){
+  if(!_xaarCardAi) return;
+  _xaarCardAi.files.splice(idx,1);
+  render();
+}
+async function _xaarCardAiAnalyze(){
+  if(!_xaarCardAi || !_xaarCardAi.files.length) return;
+  _xaarCardAi.busy=true; _xaarCardAi.error=''; _xaarCardAi.candidates=null; render();
+  try{
+    const pdfBase64List=[]; const docTextParts=[];
+    for(const f of _xaarCardAi.files){
+      const nameLower=f.name.toLowerCase();
+      if(nameLower.endsWith('.pdf')){
+        pdfBase64List.push(await _scReadFileAsBase64(f));
+      } else if(nameLower.endsWith('.docx')){
+        await _scEnsureMammothLoaded();
+        const arrBuf=await f.arrayBuffer();
+        const result=await mammoth.extractRawText({arrayBuffer:arrBuf});
+        const text=(result && result.value) || '';
+        if(text.trim()) docTextParts.push('--- 파일: '+f.name+' ---\n'+text);
+      } else {
+        throw new Error('"'+f.name+'"은(는) 지원하지 않는 형식입니다. PDF 또는 DOCX 파일만 올려주세요.');
+      }
+    }
+    if(!pdfBase64List.length && !docTextParts.length) throw new Error('파일에서 분석할 내용을 추출하지 못했습니다.');
+    const subjectHint = (_xaarAdminCardForm && _xaarAdminCardForm.data.subject) || '';
+    const payload = {subjectHint: subjectHint, pdfBase64List: pdfBase64List, docText: docTextParts.join('\n\n')};
+    const result = await window._fb.xaarAnalyzeConceptCards(payload);
+    _xaarCardAi.candidates = (result && Array.isArray(result.cards)) ? result.cards : [];
+    if(!_xaarCardAi.candidates.length) _xaarCardAi.error = '이 자료에서 개념을 찾지 못했습니다. 다른 자료로 다시 시도해주세요.';
+  }catch(e){
+    _xaarCardAi.error = (e && e.message) ? e.message : '분석 중 오류가 발생했습니다.';
+  }
+  _xaarCardAi.busy=false; render();
+}
+function _xaarCardAiPickCandidate(idx){
+  if(!_xaarCardAi || !_xaarAdminCardForm) return;
+  const c = _xaarCardAi.candidates[idx]; if(!c) return;
+  Object.assign(_xaarAdminCardForm.data, {subject:c.subject||_xaarAdminCardForm.data.subject||'', unit:c.unit||'', conceptName:c.conceptName||'', description:c.description||''});
+  render();
+}
+// ★ 자료 카드 "AI로 자동 채우기" — 링크(URL) 또는 파일(PDF/DOCX) 중 하나로 제목·저자·연도·
+// 자료종류 등 나머지 칸을 채운다. 링크는 서버(xaarAnalyzeResourceCard)가 직접 페이지를
+// 가져와 분석하므로, 로그인이 필요하거나 크롤링이 막힌 사이트는 실패할 수 있다(그 경우
+// 에러 메시지가 파일 업로드를 대신 안내한다).
+function _xaarResAiSetFile(input){
+  if(!_xaarResAi) _xaarResAiReset();
+  const f = input.files && input.files[0] ? input.files[0] : null;
+  _xaarResAi.file = f; _xaarResAi.error='';
+  input.value='';
+  render();
+}
+function _xaarResAiSetUrl(v){
+  if(!_xaarResAi) _xaarResAiReset();
+  _xaarResAi.urlInput = v;
+}
+function _xaarResAiApplyCard(card, sourceUrl){
+  if(!_xaarAdminCardForm || !card) return;
+  const d = _xaarAdminCardForm.data;
+  ['title','author','year','difficulty','enabledWhat','remainingLimit','limitLocation','sampleQuestion'].forEach(function(k){
+    if(card[k]) d[k] = String(card[k]);
+  });
+  const validTypes = XAAR_H_OPTS.map(function(p){return p[1];});
+  if(card.resourceType && validTypes.indexOf(card.resourceType)>=0) d.resourceType = card.resourceType;
+  if(sourceUrl && !d.url) d.url = sourceUrl;
+  if(!d.checkedDate) d.checkedDate = new Date().toISOString().slice(0,10);
+}
+async function _xaarResAiAnalyzeFromUrl(){
+  if(!_xaarResAi || !_xaarResAi.urlInput || !_xaarResAi.urlInput.trim()) return;
+  _xaarResAi.busy=true; _xaarResAi.error=''; render();
+  try{
+    const url = _xaarResAi.urlInput.trim();
+    const result = await window._fb.xaarAnalyzeResourceCard({url: url});
+    _xaarResAiApplyCard(result && result.card, url);
+    toast('링크에서 내용을 채웠습니다. 확인 후 저장해주세요.');
+  }catch(e){
+    _xaarResAi.error = (e && e.message) ? e.message : '분석 중 오류가 발생했습니다.';
+  }
+  _xaarResAi.busy=false; render();
+}
+async function _xaarResAiAnalyzeFromFile(){
+  if(!_xaarResAi || !_xaarResAi.file) return;
+  _xaarResAi.busy=true; _xaarResAi.error=''; render();
+  try{
+    const f = _xaarResAi.file;
+    const nameLower = f.name.toLowerCase();
+    const payload = {};
+    if(nameLower.endsWith('.pdf')){
+      payload.pdfBase64 = await _scReadFileAsBase64(f);
+    } else if(nameLower.endsWith('.docx')){
+      await _scEnsureMammothLoaded();
+      const arrBuf=await f.arrayBuffer();
+      const result=await mammoth.extractRawText({arrayBuffer:arrBuf});
+      payload.docText = (result && result.value) || '';
+      if(!payload.docText.trim()) throw new Error('파일에서 텍스트를 추출하지 못했습니다.');
+    } else {
+      throw new Error('PDF 또는 DOCX 파일만 올려주세요.');
+    }
+    const result = await window._fb.xaarAnalyzeResourceCard(payload);
+    _xaarResAiApplyCard(result && result.card, '');
+    toast('파일에서 내용을 채웠습니다. 확인 후 저장해주세요.');
+  }catch(e){
+    _xaarResAi.error = (e && e.message) ? e.message : '분석 중 오류가 발생했습니다.';
+  }
+  _xaarResAi.busy=false; render();
+}
+function _xaarCardAiPanelHtml(){
+  const st = _xaarCardAi || {busy:false, error:'', files:[], candidates:null};
+  return `<div style="background:#faf5ff;border:1px dashed #c4b5fd;border-radius:10px;padding:12px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:800;color:#7c3aed;margin-bottom:6px">🧠 AI로 자동 채우기 (선택)</div>
+    <div style="font-size:11px;color:#7c5cbf;margin-bottom:8px">위 "교과"란에 교과명을 적고, 교과서 목차·성취기준·수업 자료(PDF/DOCX)를 올리면 단원·개념명·설명 후보를 찾아드립니다.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      ${(st.files||[]).map(function(f,i){ return `<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #ddd;border-radius:14px;padding:4px 8px;font-size:11px">📄 ${_xlabEsc(f.name)}<button onclick="_xaarCardAiRemoveFile(${i})" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:11px">✕</button></span>`; }).join('')}
+      <label style="display:inline-block;background:#fff;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155">📁 파일 선택(PDF/DOCX)<input type="file" accept=".pdf,.docx" multiple style="display:none" onchange="_xaarCardAiSetFiles(this)"></label>
+    </div>
+    <button type="button" onclick="_xaarCardAiAnalyze()" ${st.busy || !(st.files||[]).length ? 'disabled' : ''} style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;opacity:${st.busy || !(st.files||[]).length ? '0.55':'1'}">${st.busy?'⏳ 분석 중...':'🧠 AI로 분석해서 후보 찾기'}</button>
+    ${st.error ? `<div style="color:#dc2626;font-size:11.5px;margin-top:8px">${_xlabEsc(st.error)}</div>` : ''}
+    ${st.candidates && st.candidates.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+      ${st.candidates.map(function(c,i){ return `<div style="background:#fff;border:1px solid #e9d5ff;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div><div style="font-weight:800;font-size:12px">${_xlabEsc(c.conceptName||'')}</div><div style="font-size:10.5px;color:#888">${_xlabEsc(c.subject||'')}${c.unit?' · '+_xlabEsc(c.unit):''}</div></div>
+        <button onclick="_xaarCardAiPickCandidate(${i})" style="white-space:nowrap;padding:6px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">이 개념 채우기</button>
+      </div>`; }).join('')}
+    </div>` : ''}
+  </div>`;
+}
+function _xaarResAiPanelHtml(){
+  const st = _xaarResAi || {busy:false, error:'', file:null, urlInput:''};
+  return `<div style="background:#faf5ff;border:1px dashed #c4b5fd;border-radius:10px;padding:12px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:800;color:#7c3aed;margin-bottom:6px">🧠 AI로 자동 채우기 (선택)</div>
+    <div style="font-size:11px;color:#7c5cbf;margin-bottom:8px">자료의 링크(URL)를 입력하거나 파일(PDF/DOCX)을 올리면 제목·저자·연도·자료종류 등을 채워드립니다. 채워진 내용은 반드시 확인 후 저장해주세요.</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input value="${_xlabEsc(st.urlInput)}" oninput="_xaarResAiSetUrl(this.value)" placeholder="https://... (논문·기사·자료 페이지 링크)" style="flex:1;padding:8px 9px;border:1px solid #ddd;border-radius:6px;font-size:11.5px">
+      <button type="button" onclick="_xaarResAiAnalyzeFromUrl()" ${st.busy || !st.urlInput || !st.urlInput.trim() ? 'disabled':''} style="white-space:nowrap;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:11.5px;font-weight:700;cursor:pointer;opacity:${st.busy || !st.urlInput || !st.urlInput.trim() ? '0.55':'1'}">${st.busy?'⏳':'🔗 링크에서 채우기'}</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="display:inline-block;background:#fff;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155">${st.file?('📄 '+_xlabEsc(st.file.name)):'📁 파일 선택(PDF/DOCX)'}<input type="file" accept=".pdf,.docx" style="display:none" onchange="_xaarResAiSetFile(this)"></label>
+      <button type="button" onclick="_xaarResAiAnalyzeFromFile()" ${st.busy || !st.file ? 'disabled':''} style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;opacity:${st.busy || !st.file ? '0.55':'1'}">${st.busy?'⏳ 분석 중...':'🧠 파일에서 채우기'}</button>
+    </div>
+    ${st.error ? `<div style="color:#dc2626;font-size:11.5px;margin-top:8px">${_xlabEsc(st.error)}</div>` : ''}
+  </div>`;
+}
+function renderXaarAdminCardForm(){
+  const f = _xaarAdminCardForm;
+  const d = f.data;
+  if(f.type==='concept'){
+    return `<div>
+      <div style="font-size:14px;font-weight:800;margin-bottom:12px">${f.editingId?'개념 카드 수정':'개념 카드 추가'}</div>
+      <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">교과</label><input value="${_xlabEsc(d.subject)}" oninput="xaarAdminCardFormSet('subject',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+      ${_xaarCardAiPanelHtml()}
+      <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">단원</label><input value="${_xlabEsc(d.unit)}" oninput="xaarAdminCardFormSet('unit',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+      <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">개념명</label><input value="${_xlabEsc(d.conceptName)}" oninput="xaarAdminCardFormSet('conceptName',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+      <div style="margin-bottom:14px"><label style="font-size:11px;color:#888;font-weight:700">설명(선택)</label><textarea oninput="xaarAdminCardFormSet('description',this.value)" rows="3" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px">${_xlabEsc(d.description)}</textarea></div>
+      <div style="display:flex;gap:8px"><button onclick="xaarAdminSaveCardForm()" style="flex:1;padding:11px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:800">저장</button><button onclick="xaarAdminCancelCardForm()" style="flex:1;padding:11px;background:#f2f2f5;color:#555;border:none;border-radius:8px;font-weight:700">취소</button></div>
+    </div>`;
+  }
+  return `<div>
+    <div style="font-size:14px;font-weight:800;margin-bottom:12px">${f.editingId?'자료 카드 수정':'자료 카드 추가'}</div>
+    ${_xaarResAiPanelHtml()}
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">제목</label><input value="${_xlabEsc(d.title)}" oninput="xaarAdminCardFormSet('title',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1"><label style="font-size:11px;color:#888;font-weight:700">저자/기관</label><input value="${_xlabEsc(d.author)}" oninput="xaarAdminCardFormSet('author',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+      <div style="width:100px"><label style="font-size:11px;color:#888;font-weight:700">연도</label><input value="${_xlabEsc(d.year)}" oninput="xaarAdminCardFormSet('year',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+    </div>
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">자료 종류</label>
+      <select onchange="xaarAdminCardFormSet('resourceType',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+        ${XAAR_H_OPTS.filter(function(p){return p[1]!=='NOT_READ';}).map(function(p){return `<option value="${p[1]}" ${d.resourceType===p[1]?'selected':''}>${p[0]}</option>`;}).join('')}
+      </select>
+    </div>
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">URL/DOI/서지정보</label><input value="${_xlabEsc(d.url)}" oninput="xaarAdminCardFormSet('url',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1"><label style="font-size:11px;color:#888;font-weight:700">난도</label><input value="${_xlabEsc(d.difficulty)}" oninput="xaarAdminCardFormSet('difficulty',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+      <div style="flex:1"><label style="font-size:11px;color:#888;font-weight:700">확인 날짜</label><input type="date" value="${_xlabEsc(d.checkedDate)}" onchange="xaarAdminCardFormSet('checkedDate',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+    </div>
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">연결 교과 개념(선택)</label>
+      <select onchange="xaarAdminCardFormSet('conceptId',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px">
+        <option value="">(연결 안 함)</option>
+        ${(_xaarAdminConceptCards||[]).map(function(c){return `<option value="${c.id}" ${d.conceptId===c.id?'selected':''}>${_xlabEsc(c.conceptName)}</option>`;}).join('')}
+      </select>
+    </div>
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">무엇이 가능해졌는지</label><textarea oninput="xaarAdminCardFormSet('enabledWhat',this.value)" rows="2" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px">${_xlabEsc(d.enabledWhat)}</textarea></div>
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">남은 한계</label><textarea oninput="xaarAdminCardFormSet('remainingLimit',this.value)" rows="2" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px">${_xlabEsc(d.remainingLimit)}</textarea></div>
+    <div style="margin-bottom:10px"><label style="font-size:11px;color:#888;font-weight:700">한계가 쓰인 절/쪽/표·그림</label><input value="${_xlabEsc(d.limitLocation)}" oninput="xaarAdminCardFormSet('limitLocation',this.value)" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
+    <div style="margin-bottom:14px"><label style="font-size:11px;color:#888;font-weight:700">고교 수준에서 확인 가능한 작은 질문</label><textarea oninput="xaarAdminCardFormSet('sampleQuestion',this.value)" rows="2" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;margin-top:4px">${_xlabEsc(d.sampleQuestion)}</textarea></div>
+    <div style="display:flex;gap:8px"><button onclick="xaarAdminSaveCardForm()" style="flex:1;padding:11px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:800">저장</button><button onclick="xaarAdminCancelCardForm()" style="flex:1;padding:11px;background:#f2f2f5;color:#555;border:none;border-radius:8px;font-weight:700">취소</button></div>
+  </div>`;
+}
+function xaarAdminPrintListTable(){
+  const s = _xlabAdminCurrentStudent();
+  const rowsHtml = _xaarAdminSources.map(function(it){
+    const d = it.createdAt ? new Date(it.createdAt) : null;
+    const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
+    const sess = _xaarAdminSessionsFor(it.sourceId);
+    const cnt = sess.length;
+    const deepCnt = sess.filter(function(x){return x.deepening;}).length;
+    const warn = _xaarPrioritySignalsAdmin(sess).length>0 ? '⚠️ 확인필요' : '-';
+    return '<tr><td>'+_xlabEsc(dateLabel)+'</td><td>'+_xaarSourceTypeLabelAdmin(it.sourceType)+'</td><td>'+_xlabEsc(it.sourceTitle)+'</td><td>'+(cnt?'있음 '+cnt+'회':'없음')+'</td><td>'+(deepCnt?deepCnt+'회':'-')+'</td><td>'+warn+'</td></tr>';
+  }).join('');
+  _xlabAdminPrintTable('X-lab_AAR 현황', '🎯', s, '<th>입력일</th><th>구분</th><th>주제명</th><th>AAR입력유무</th><th>심화 완료</th><th>교사 확인</th>', rowsHtml);
+}
+function xaarAdminPrintDetail(sourceType, sourceId){
+  const item = _xaarAdminSources.find(function(x){return x.sourceType===sourceType && x.sourceId===sourceId;});
+  if(!item) return;
+  const s = _xlabAdminCurrentStudent();
+  const sessions = _xaarAdminSessionsFor(sourceId);
+  const summary = _xaarAdminSourceSummary(sourceType, item.doc);
+  const summaryHtml = summary.map(function(p){return '<div style="margin-bottom:8px"><b>'+p[0]+':</b><div style="white-space:pre-wrap">'+_xlabEsc(p[1])+'</div></div>';}).join('') || '<div>작성된 보고서 내용이 없습니다.</div>';
+  const signals = _xaarPrioritySignalsAdmin(sessions);
+  const signalsHtml = signals.length ? ('<h2>⚠️ 확인이 필요한 신호</h2><ul>'+signals.map(function(t){return '<li>'+_xlabEsc(t)+'</li>';}).join('')+'</ul>') : '';
+  const sessionsHtml = sessions.map(function(sess){
+    const d = sess.createdAt ? new Date(sess.createdAt) : null;
+    const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
+    const dp = sess.deepening;
+    const deepText = dp ? ('개념: '+_xlabEsc(dp.conceptLabel||'-')+' / 한계: '+_xlabEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode))+' / 바꿀 조건: '+_xlabEsc(dp.changeLabel||'-')) : '-';
+    const reviewBadge = _xaarAdminReviewBadge(sess);
+    const reviewNote = (sess.review && sess.review.note) ? _xlabEsc(sess.review.note) : '';
+    const overrideText = (sess.review && sess.review.teacherOverrideActionLabel) ? ('→ 교사 변경: '+_xlabEsc(sess.review.teacherOverrideActionLabel)) : '';
+    return '<tr><td>'+dateLabel+'</td><td>'+_xlabEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))+'</td><td>'+(sess.contributionCodes||[]).map(function(c){return _xaarLabelAdmin(XAAR_C_OPTS,c);}).join(', ')+'</td><td>'+_xlabEsc(_xaarLabelAdmin(XAAR_D_OPTS,sess.blockerCode))+'</td><td>'+(sess.evidenceCodes||[]).map(function(c){return _xaarLabelAdmin(XAAR_E_OPTS,c);}).join(', ')+'</td><td>'+_xlabEsc(sess.nextActionLabel)+(overrideText?('<br><span style="color:#b45309">'+overrideText+'</span>'):'')+'</td><td style="font-size:10.5px">'+deepText+'</td><td>'+_xlabEsc(reviewBadge)+(reviewNote?('<br><span style="color:#666">'+reviewNote+'</span>'):'')+'</td></tr>';
+  }).join('');
+  const w = window.open('','_blank');
+  const html = '<html><head><meta charset="utf-8"><title>X-lab_AAR 상세</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:20px 0 8px}.meta{color:#666;font-size:12px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}th{background:#f8f9fc}ul{margin:0 0 12px 0;padding-left:18px;font-size:12px;color:#b45309}</style>'
+    +'</head><body>'
+    +'<h1>🎯 '+_xaarSourceTypeLabelAdmin(sourceType)+' · '+_xlabEsc(item.sourceTitle)+'</h1>'
+    +'<div class="meta">학생: '+_xlabEsc(s.name)+' · 학교: '+_xlabEsc(s.school)+' · 학년: '+_xlabEsc(s.grade)+'</div>'
+    +'<h2>📄 보고서/기록 내용</h2>'+summaryHtml
+    +signalsHtml
+    +'<h2>🎯 AAR 입력 이력</h2>'
+    +'<table><thead><tr><th>입력일</th><th>오늘 단계</th><th>직접 한 일</th><th>막힌 지점</th><th>확인 자료</th><th>다음 행동</th><th>교과 심화(G~J)</th><th>교사 확인</th></tr></thead><tbody>'+sessionsHtml+'</tbody></table>'
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  w.document.write(html);
+  w.document.close();
 }
 
 function xlabAdminPrintStatsTable(){
