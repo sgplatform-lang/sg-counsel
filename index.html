@@ -50484,7 +50484,11 @@ function _xactAdminStatusRows(){
     const matches = list.filter(function(e){return e.activityType===type;}).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
     const recent = matches[0];
     const fieldLabel = recent ? [recent.fieldCategory, (recent.fieldDetail==='직접입력'?recent.fieldDetailCustom:recent.fieldDetail)].filter(Boolean).join(' · ') : '';
-    return { type: type, count: matches.length, fieldLabel: fieldLabel, topicLabel: recent ? (recent.interestTopic||'') : '' };
+    // ★ 2026-09-30 추가(관리자 요청: "활동유형과 횟수 사이에 최근 입력일 추가"): 그 유형의
+    // 가장 최근 기록일(recent.createdAt)을 "2026.09.30" 형식으로 함께 반환.
+    const recentDate = recent && recent.createdAt ? new Date(recent.createdAt) : null;
+    const dateLabel = recentDate ? (recentDate.getFullYear()+'.'+String(recentDate.getMonth()+1).padStart(2,'0')+'.'+String(recentDate.getDate()).padStart(2,'0')) : '';
+    return { type: type, count: matches.length, fieldLabel: fieldLabel, topicLabel: recent ? (recent.interestTopic||'') : '', dateLabel: dateLabel };
   });
 }
 
@@ -50505,12 +50509,13 @@ function renderXactAdmin(s){
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#f8f9fc;text-align:left">
-        <th style="padding:8px 10px">활동유형</th><th style="padding:8px 10px;text-align:center">횟수(누적)</th><th style="padding:8px 10px">관련분야(최근)</th><th style="padding:8px 10px">관심주제(최근)</th>
+        <th style="padding:8px 10px">활동유형</th><th style="padding:8px 10px">최근 입력일</th><th style="padding:8px 10px;text-align:center">횟수(누적)</th><th style="padding:8px 10px">관련분야(최근)</th><th style="padding:8px 10px">관심주제(최근)</th>
       </tr></thead>
       <tbody>
         ${statusRows.map(function(r){
           return `<tr style="border-top:1px solid #f1f1f1">
             <td style="padding:7px 10px;font-weight:700">${_xlabEsc(r.type)}</td>
+            <td style="padding:7px 10px;color:#888">${_xlabEsc(r.dateLabel)||'-'}</td>
             <td style="padding:7px 10px;text-align:center;${r.count?'color:#0f766e;font-weight:800':'color:#ccc'}">${r.count}</td>
             <td style="padding:7px 10px;color:#555">${_xlabEsc(r.fieldLabel)||'-'}</td>
             <td style="padding:7px 10px;color:#555">${_xlabEsc(r.topicLabel)||'-'}</td>
@@ -50524,11 +50529,14 @@ function renderXactAdmin(s){
   <div style="background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden">
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#f8f9fc;text-align:left">
-        <th style="padding:10px 12px">활동유형</th><th style="padding:10px 12px">관련분야</th><th style="padding:10px 12px">관심주제</th><th style="padding:10px 12px"></th>
+        <th style="padding:10px 12px">입력일</th><th style="padding:10px 12px">활동유형</th><th style="padding:10px 12px">관련분야</th><th style="padding:10px 12px">관심주제</th><th style="padding:10px 12px"></th>
       </tr></thead>
       <tbody>
         ${monthEntries.map(function(t){
+          const d = t.createdAt ? new Date(t.createdAt) : null;
+          const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
           return `<tr style="border-top:1px solid #f1f1f1;cursor:pointer" onclick="xactAdminOpenDetail('${t.id}')">
+            <td style="padding:10px 12px;color:#888">${_xlabEsc(dateLabel)}</td>
             <td style="padding:10px 12px">${_xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-'}</td>
             <td style="padding:10px 12px">${_xlabEsc(t.fieldCategory)||'-'}${t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):''}</td>
             <td style="padding:10px 12px;font-weight:700">${_xlabEsc(t.interestTopic)||'(미입력)'}</td>
@@ -50545,34 +50553,92 @@ function xactAdminPrintStatusTable(){
   const s = _xlabAdminCurrentStudent();
   const rows = _xactAdminStatusRows();
   const rowsHtml = rows.map(function(r){
-    return '<tr><td>'+_xlabEsc(r.type)+'</td><td style="text-align:center">'+r.count+'</td><td>'+_xlabEsc(r.fieldLabel)+'</td><td>'+_xlabEsc(r.topicLabel)+'</td></tr>';
+    return '<tr><td>'+_xlabEsc(r.type)+'</td><td>'+_xlabEsc(r.dateLabel)+'</td><td style="text-align:center">'+r.count+'</td><td>'+_xlabEsc(r.fieldLabel)+'</td><td>'+_xlabEsc(r.topicLabel)+'</td></tr>';
   }).join('');
-  _xlabAdminPrintTable('X-lab 월별셀프활동 현황('+_xlabMonthLabel(_xactAdminMonth)+')', '📓', s, '<th>활동유형</th><th>횟수(누적)</th><th>관련분야(최근)</th><th>관심주제(최근)</th>', rowsHtml);
+  // ★ 2026-09-30 추가(관리자 요청: "현재는 현황표만 인쇄되는데 활동유형별 상세내용도 아래에
+  // 함께 보여줘도 학부모·학생이 확인하기 편할것 같다"): 현황표 인쇄에 그 달 각 항목의 상세
+  // 카드(_xactEntryCardHtml)를 이어서 붙인다. _xlabAdminPrintTable은 표 하나만 찍는 용도라
+  // 추가 내용을 못 붙이므로, 이 함수만 직접 인쇄창을 구성하는 방식으로 변경.
+  const monthEntries = _xactAdminMonthEntries();
+  const detailHtml = monthEntries.length
+    ? '<h2 style="font-size:14px;margin:24px 0 10px">📋 '+_xlabMonthLabel(_xactAdminMonth)+' 활동 상세내용 ('+monthEntries.length+'건)</h2>'
+      + monthEntries.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).map(function(t){ return _xactEntryCardHtml(t, true); }).join('')
+    : '';
+  const w = window.open('','_blank');
+  const html = '<html><head><meta charset="utf-8"><title>X-lab 월별셀프활동 현황</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px}.meta{color:#666;font-size:12px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}th{background:#f8f9fc}</style>'
+    +'</head><body>'
+    +'<h1>📓 X-lab 월별셀프활동 현황('+_xlabMonthLabel(_xactAdminMonth)+')</h1>'
+    +'<div class="meta">학생: '+_xlabEsc(s.name)+' · 학교: '+_xlabEsc(s.school)+' · 학년: '+_xlabEsc(s.grade)+' · 희망학과: '+_xlabEsc(s.xlabDepartment)+'</div>'
+    +'<table><thead><tr><th>활동유형</th><th>최근 입력일</th><th>횟수(누적)</th><th>관련분야(최근)</th><th>관심주제(최근)</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>'
+    +detailHtml
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  w.document.write(html);
+  w.document.close();
 }
 
-function renderXactAdminDetail(t){
+// ★ 2026-09-30 추가(관리자 요청: "AAR 입력 이력 항목별 카드 디자인 수정처럼 이 부분도"):
+// 월별셀프활동 항목 1건을 화면·인쇄 공통으로 렌더하는 카드 함수. 요청한 배치대로 구성:
+// 헤더(입력일+활동유형명) → 주제 관련분야·관심주제·키워드(한 칸) → ④ 알게 된 계기(하위
+// 항목 포함, 한 칸) → ⑤활동시 역할/⑥사용 기법(2칸) → ⑦알게 된 점·키워드(한 칸).
+// forPrint=true면 화면 전용 버튼(목록으로)을 뺀다.
+function _xactEntryCardHtml(t, forPrint){
+  const d = t.createdAt ? new Date(t.createdAt) : null;
+  const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
+  const typeLabel = _xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-';
   const m = t.motivation||{};
   const motiveLabel = m.type==='subject' ? '📚 교과활동시 궁금증이 생김' : m.type==='reading' ? '📖 독서활동 중 궁금증이 생김' : m.type==='school' ? '🏫 교내활동 중 궁금증이 생김' : '(미선택)';
   const motiveBody =
-    m.type==='subject' ? `교과목: ${_lxEsc(_xactAdminResolved(m.subjectArea,m.subjectAreaCustom))||'-'}<br>궁금해진 개념: ${_lxEsc(m.subjectConcept)||'-'}` :
-    m.type==='reading' ? `도서명: ${_lxEsc(m.bookTitle)||'-'} · 저자: ${_lxEsc(m.bookAuthor)||'-'}<br>궁금한 내용: ${_lxEsc(m.bookQuestion)||'-'}` :
-    m.type==='school' ? `교내활동 유형: ${_lxEsc(_xactAdminResolved(m.schoolActivityType,m.schoolActivityTypeCustom))||'-'}<br>궁금한 내용: ${_lxEsc(m.schoolQuestion)||'-'}` : '';
-  const rows = [
-    ['① 활동 유형', _xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-'],
-    ['② 주제 관련분야', (_xlabEsc(t.fieldCategory)||'-')+(t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):'')],
-    ['③ 관심주제·키워드', _xlabEsc(t.interestTopic)||'-'],
-    ['④ 알게 된 계기', motiveLabel+(motiveBody?'<br><span style="color:#888;font-size:11.5px">'+motiveBody+'</span>':'')],
-    ['⑤ 활동시 역할', _xlabEsc(_xactAdminResolved(t.role,t.roleCustom))||'-'],
-    ['⑥ 사용 기법', (Array.isArray(t.skills)&&t.skills.length) ? t.skills.map(function(sk){return sk==='직접입력'?_lxEsc(t.skillsCustom||'직접입력'):_lxEsc(sk);}).join(', ') : '-'],
-    ['⑦ 알게 된 점·키워드', _xlabEsc(t.learned)||'-'],
-  ];
+    m.type==='subject' ? ('교과목: '+(_lxEsc(_xactAdminResolved(m.subjectArea,m.subjectAreaCustom))||'-')+'<br>궁금해진 개념: '+(_lxEsc(m.subjectConcept)||'-')) :
+    m.type==='reading' ? ('도서명: '+(_lxEsc(m.bookTitle)||'-')+' · 저자: '+(_lxEsc(m.bookAuthor)||'-')+'<br>궁금한 내용: '+(_lxEsc(m.bookQuestion)||'-')) :
+    m.type==='school' ? ('교내활동 유형: '+(_lxEsc(_xactAdminResolved(m.schoolActivityType,m.schoolActivityTypeCustom))||'-')+'<br>궁금한 내용: '+(_lxEsc(m.schoolQuestion)||'-')) : '';
+  const fieldText = (_lxEsc(t.fieldCategory)||'-')+(t.fieldDetail?' · '+_lxEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):'');
+  const topicText = _lxEsc(t.interestTopic)||'-';
+  const roleText = _lxEsc(_xactAdminResolved(t.role,t.roleCustom))||'-';
+  const skillsText = (Array.isArray(t.skills)&&t.skills.length) ? t.skills.map(function(sk){return sk==='직접입력'?_lxEsc(t.skillsCustom||'직접입력'):_lxEsc(sk);}).join(', ') : '-';
+  const learnedText = _lxEsc(t.learned)||'-';
+  const box = function(label, value){
+    return '<div style="background:#f8f9fc;border-radius:8px;padding:9px 11px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">'+label+'</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700;white-space:pre-wrap">'+value+'</div></div>';
+  };
+  const headHtml = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    + '<span style="font-size:11px;color:#888;font-weight:700">'+_xlabEsc(dateLabel)+'</span>'
+    + '<span style="font-size:10px;font-weight:800;color:#0f766e;background:#e7f7ef;padding:2px 8px;border-radius:20px">'+typeLabel+'</span>'
+    + '</div>';
+  const fieldTopicBox = box('② 주제 관련분야 · ③ 관심주제·키워드', '관련분야: '+fieldText+'<br>관심주제: '+topicText);
+  const motiveBox = '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:10px 12px;margin-top:8px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">④ 알게 된 계기</div><div style="font-size:12.5px;color:#4c1d95;font-weight:700">'+motiveLabel+'</div>'+(motiveBody?'<div style="font-size:11.5px;color:#6b21a8;margin-top:4px">'+motiveBody+'</div>':'')+'</div>';
+  const twoColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+    + box('⑤ 활동시 역할', roleText)
+    + box('⑥ 사용 기법', skillsText)
+    + '</div>';
+  const learnedBox = '<div style="background:#e7f7ef;border:1.5px solid #0f766e;border-radius:8px;padding:10px 12px;margin-top:8px"><div style="font-size:10.5px;color:#0f766e;font-weight:800;margin-bottom:4px">⑦ 알게 된 점·키워드</div><div style="font-size:13px;color:#0f766e;font-weight:800;white-space:pre-wrap">'+learnedText+'</div></div>';
+  return '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:12px;page-break-inside:avoid">'
+    + headHtml + fieldTopicBox + motiveBox + twoColHtml + learnedBox
+    + '</div>';
+}
+function renderXactAdminDetail(t){
   return `
   <div>
-    <button onclick="xactAdminBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:10px">← 목록으로</button>
-    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px">
-      ${rows.map(function(pair){return `<div style="margin-bottom:12px"><div style="font-size:11.5px;color:#888;font-weight:700;margin-bottom:3px">${pair[0]}</div><div style="font-size:13.5px;color:#1a1a2e;white-space:pre-wrap">${pair[1]}</div></div>`;}).join('')}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <button onclick="xactAdminBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700">← 목록으로</button>
+      <button onclick="xactAdminPrintDetail('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px">🖨 인쇄/PDF</button>
     </div>
+    ${_xactEntryCardHtml(t, false)}
   </div>`;
+}
+function xactAdminPrintDetail(id){
+  const t = _xactAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  const s = _xlabAdminCurrentStudent();
+  const w = window.open('','_blank');
+  const html = '<html><head><meta charset="utf-8"><title>X-lab_월별셀프활동 상세</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}.meta{color:#666;font-size:12px;margin-bottom:16px}</style>'
+    +'</head><body>'
+    +'<h1>📓 월별셀프활동 · '+_xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))+'</h1>'
+    +'<div class="meta">학생: '+_xlabEsc(s.name)+' · 학교: '+_xlabEsc(s.school)+' · 학년: '+_xlabEsc(s.grade)+'</div>'
+    +_xactEntryCardHtml(t, true)
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  w.document.write(html);
+  w.document.close();
 }
 function _lxEsc(x){ return String(x==null?'':x).replace(/</g,'&lt;'); }
 
