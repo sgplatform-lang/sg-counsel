@@ -341,6 +341,10 @@ try{
     // 학생용과 동일한 API (연동용)
     set: (col,id,data)=>_db.collection(col).doc(String(id)).set({...data,_t:Date.now()},{merge:true}),
     getAll: (col)=>_db.collection(col).get().then(s=>s.docs.map(d=>({...d.data(),id:d.id}))),
+    // ★ 2026-09-30 추가: 학생용과 동일한 이름/동작의 헬퍼 — 월별셀프활동(_xactAdminLoad)과
+    // X-lab_AAR(_xaarAdminLoad)이 이 이름으로 호출하고 있었는데 관리자 쪽 _fb에는 빠져있어서
+    // "window._fb.getWhere is not a function" 오류로 두 화면 모두 데이터가 안 보이던 원인이었음.
+    getWhere: (col,field,op,value)=>_db.collection(col).where(field,op,value).get().then(s=>s.docs.map(d=>({...d.data(),id:d.id}))),
     delete: (col,id)=>_db.collection(col).doc(String(id)).delete(),
     // ★ 2026-08-27 추가: Storage 업로드/삭제 — path 예: 'examCatalog/{examId}/q/21.png'
     uploadBlob: (path, blob)=>_storage.ref(path).put(blob).then(snap=>snap.ref.getDownloadURL()),
