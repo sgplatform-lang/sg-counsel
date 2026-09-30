@@ -50455,6 +50455,9 @@ let _xactAdminDetail = null;
 // (학생용 파일의 XACT_TYPE_OPTS와 동일한 목록을 이 파일에도 그대로 유지해야 함)
 const XACT_TYPE_OPTS = ['수행','발표','독서','동아리','진로','자율','봉사','실험','탐구','토론','학생회','교내 대회','직접입력'];
 let _xactAdminMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+// ★ 2026-09-30 추가: 학생용 파일(3813행)에 있던 것과 동일한 헬퍼인데 관리자 파일엔
+// 정의가 누락되어 있었음 — "_xlabMonthLabel is not defined" 화면 오류의 원인.
+function _xlabMonthLabel(m){ const p=String(m).split('-'); return p[0]+'년 '+parseInt(p[1],10)+'월'; }
 
 async function _xactAdminLoad(studentId){
   _xactAdminLoading = true; render();
