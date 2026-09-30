@@ -50454,6 +50454,21 @@ let _xactAdminDetail = null;
 // 학생용페이지와 동일한 월 스크롤 + 활동유형별 현황 요약을 관리자 화면에도 추가.
 // (학생용 파일의 XACT_TYPE_OPTS와 동일한 목록을 이 파일에도 그대로 유지해야 함)
 const XACT_TYPE_OPTS = ['수행','발표','독서','동아리','진로','자율','봉사','실험','탐구','토론','학생회','교내 대회','직접입력'];
+// ★ 2026-09-30 추가(관리자 요청: "입력일 옆 활동명이 너무 작은데 활동명마다 색깔을 다르게
+// 해서 시각적으로 잘 보이게"): 활동유형별 배지 색상표 — [배경색, 글자색].
+const XACT_TYPE_COLORS = {
+  '수행':['#e0f2fe','#0369a1'], '발표':['#fef3c7','#b45309'], '독서':['#ede9fe','#6d28d9'],
+  '동아리':['#fce7f3','#be185d'], '진로':['#dcfce7','#15803d'], '자율':['#e0e7ff','#4338ca'],
+  '봉사':['#ffe4e6','#be123c'], '실험':['#cffafe','#0e7490'], '탐구':['#f3e8ff','#7c3aed'],
+  '토론':['#fee2e2','#b91c1c'], '학생회':['#fef9c3','#a16207'], '교내 대회':['#ffedd5','#c2410c'],
+  '직접입력':['#f1f5f9','#475569']
+};
+function _xactTypeColor(type){ return XACT_TYPE_COLORS[type] || ['#f1f5f9','#475569']; }
+function _xactTypeBadgeHtml(t){
+  const c = _xactTypeColor(t.activityType);
+  const label = _xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-';
+  return '<span style="display:inline-block;font-size:12px;font-weight:800;color:'+c[1]+';background:'+c[0]+';padding:4px 12px;border-radius:20px">'+label+'</span>';
+}
 let _xactAdminMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
 // ★ 2026-09-30 추가: 학생용 파일(3813행)에 있던 것과 동일한 헬퍼인데 관리자 파일엔
 // 정의가 누락되어 있었음 — "_xlabMonthLabel is not defined" 화면 오류의 원인.
@@ -50537,7 +50552,7 @@ function renderXactAdmin(s){
           const dateLabel = d ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : '-';
           return `<tr style="border-top:1px solid #f1f1f1;cursor:pointer" onclick="xactAdminOpenDetail('${t.id}')">
             <td style="padding:10px 12px;color:#888">${_xlabEsc(dateLabel)}</td>
-            <td style="padding:10px 12px">${_xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))||'-'}</td>
+            <td style="padding:10px 12px">${_xactTypeBadgeHtml(t)}</td>
             <td style="padding:10px 12px">${_xlabEsc(t.fieldCategory)||'-'}${t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):''}</td>
             <td style="padding:10px 12px;font-weight:700">${_xlabEsc(t.interestTopic)||'(미입력)'}</td>
             <td style="padding:10px 12px;color:#3b5bdb">자세히 →</td>
@@ -50600,9 +50615,9 @@ function _xactEntryCardHtml(t, forPrint){
   const box = function(label, value){
     return '<div style="background:#f8f9fc;border-radius:8px;padding:9px 11px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">'+label+'</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700;white-space:pre-wrap">'+value+'</div></div>';
   };
-  const headHtml = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-    + '<span style="font-size:11px;color:#888;font-weight:700">'+_xlabEsc(dateLabel)+'</span>'
-    + '<span style="font-size:10px;font-weight:800;color:#0f766e;background:#e7f7ef;padding:2px 8px;border-radius:20px">'+typeLabel+'</span>'
+  const headHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+    + '<span style="font-size:12px;color:#888;font-weight:700">'+_xlabEsc(dateLabel)+'</span>'
+    + _xactTypeBadgeHtml(t)
     + '</div>';
   const fieldTopicBox = box('② 주제 관련분야 · ③ 관심주제·키워드', '관련분야: '+fieldText+'<br>관심주제: '+topicText);
   const motiveBox = '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:10px 12px;margin-top:8px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">④ 알게 된 계기</div><div style="font-size:12.5px;color:#4c1d95;font-weight:700">'+motiveLabel+'</div>'+(motiveBody?'<div style="font-size:11.5px;color:#6b21a8;margin-top:4px">'+motiveBody+'</div>':'')+'</div>';
@@ -50642,13 +50657,31 @@ function xactAdminPrintDetail(id){
 }
 function _lxEsc(x){ return String(x==null?'':x).replace(/</g,'&lt;'); }
 
+// ★ 2026-09-30 수정(관리자 요청: "전체 기간 목록 인쇄에는 이번 카드 디자인이 반영 안 됨"):
+// 현황표 인쇄(xactAdminPrintStatusTable)와 동일하게, 촘촘한 <table> 대신 월별로 묶어서
+// _xactEntryCardHtml 카드를 이어붙이는 방식으로 전면 교체.
 function xactAdminPrintTable(){
   const s = _xlabAdminCurrentStudent();
-  const rowsHtml = _xactAdminList.map(function(t){
-    const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
-    return '<tr><td>'+mLabel+'</td><td>'+_xlabEsc(_xactAdminResolved(t.activityType,t.activityTypeCustom))+'</td><td>'+_xlabEsc(t.fieldCategory)+(t.fieldDetail?' · '+_xlabEsc(_xactAdminResolved(t.fieldDetail,t.fieldDetailCustom)):'')+'</td><td>'+_xlabEsc(t.interestTopic)+'</td><td style="white-space:pre-wrap">'+_xlabEsc(t.learned)+'</td></tr>';
-  }).join('');
-  _xlabAdminPrintTable('X-lab 월별셀프활동표', '📓', s, '<th>월</th><th>활동유형</th><th>관련분야</th><th>관심주제</th><th>알게된점</th>', rowsHtml);
+  const byMonth = {};
+  _xactAdminList.forEach(function(t){ (byMonth[t.month]=byMonth[t.month]||[]).push(t); });
+  const months = Object.keys(byMonth).sort().reverse();
+  const bodyHtml = !months.length ? '<div style="color:#aaa;font-size:12.5px">등록된 월별셀프활동이 없습니다.</div>' :
+    months.map(function(m){
+      const p=String(m).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
+      const entries = byMonth[m].slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+      return '<h2 style="font-size:14px;margin:22px 0 10px">'+mLabel+' ('+entries.length+'건)</h2>'
+        + entries.map(function(t){ return _xactEntryCardHtml(t, true); }).join('');
+    }).join('');
+  const w = window.open('','_blank');
+  const html = '<html><head><meta charset="utf-8"><title>X-lab 월별셀프활동표</title>'
+    +'<style>body{font-family:"Apple SD Gothic Neo",sans-serif;padding:30px;color:#1a1a2e}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px}.meta{color:#666;font-size:12px;margin-bottom:16px}</style>'
+    +'</head><body>'
+    +'<h1>📓 X-lab 월별셀프활동표</h1>'
+    +'<div class="meta">학생: '+_xlabEsc(s.name)+' · 학교: '+_xlabEsc(s.school)+' · 학년: '+_xlabEsc(s.grade)+' · 희망학과: '+_xlabEsc(s.xlabDepartment)+'</div>'
+    +bodyHtml
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>';
+  w.document.write(html);
+  w.document.close();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
