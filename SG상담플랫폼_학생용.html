@@ -1685,6 +1685,10 @@ function chgInit(){
   if(!cd.meta) cd.meta = {};
   if(!Array.isArray(cd.lastSubjects)) cd.lastSubjects = [];
   if(!Array.isArray(cd.history)) cd.history = [];
+  // ★ 2026-10-01(AAR 2.0 2단계) 추가: 과목(subject+detail)별로 발급된 "행동강령" 목록.
+  // lastSubjects/history와 달리 회차가 바뀌어도 누적 유지되며, chgSaveRound에서
+  // 회차 저장 시점에 그 회차의 causePrimary 분포를 기준으로 갱신된다.
+  if(!Array.isArray(cd.directives)) cd.directives = [];
   return cd;
 }
 function chgNewSubject(){
@@ -1773,6 +1777,82 @@ async function chgArchiveRound(date, test, subjectsSnapshot){
   setTimeout(function(){window._studentSaving=false;},2000);
   return true;
 }
+// ★ 2026-10-01(AAR 2.0 2단계) 추가: 원인코드(K/T/M/J/C/U)별 고정 1차 처방 문구.
+// 명세서(CHALLENGER AAR 2.0) 7절의 "코드별 1차 처방" 개념을, 과목별 25종 세분코드 대신
+// 기존 causePrimary 6종 코드 기준으로 가장 단순하게 적용한 버전(1차 범위 — 재발시
+// 상향 처방·가중치 조정은 이후 단계에서 추가 예정).
+const CHG_DIRECTIVE_ACTION_BY_CAUSE = {
+  K: '다음 시험 전까지 이번에 틀린 개념 중 1개를 골라 직접 설명해보고 시험에 들어가세요.',
+  T: '다음 시험에서는 영역별 목표 시각을 먼저 정하고, 그 시각이 지나면 표시만 하고 다음으로 넘어가세요.',
+  M: '다음 시험에서는 마지막 5분을 검산·마킹 확인 시간으로 남겨두세요.',
+  J: '한 문항에서 2분 이상 진전이 없으면 표시만 하고 다음 문항으로 넘어가세요.',
+  C: '집중이 흔들리는 순간을 느끼면 20초만 멈췄다가 다시 시작하세요.',
+  U: '이번엔 원인이 분명하지 않은 문항이 있었습니다. 다음 시험 후 그 문항을 다시 확인해보세요.'
+};
+// 과목(subject+detail) 하나의 이번 회차 causePrimary 분포를 가지고 ① 기존 active
+// 행동강령을 비교판정(개선/반복/판정보류)하고 ② 이번 회차 결과로 새 행동강령(최대 3개)을
+// 발급한다(명세 7·8절). 기존 active 행동강령은 삭제하지 않고 status만 바꿔 이력으로
+// 남긴다 — 화면(chgDirectiveBannerHtml)에서 "지난 행동강령 결과"로 한 번 보여주기 위함.
+// 반환값은 "오답입력 최종완료" 토스트에 발급/판정 결과를 바로 보여주기 위한 집계치.
+function chgGenerateDirectives(cd, sub){
+  const stats={issued:0, improved:0, repeated:0, hold:0};
+  if(!sub) return stats;
+  const counts={};
+  (sub.items||[]).forEach(function(it){
+    const c=it&&it.causePrimary;
+    if(c) counts[c]=(counts[c]||0)+1;
+  });
+  const currentCodes=Object.keys(counts);
+  if(!Array.isArray(cd.directives)) cd.directives=[];
+  // ① 비교판정: 같은 과목의 기존 active 행동강령 각각에 대해, 그 원인코드가 이번 회차
+  // 오답에도 또 나타나면 "반복", 안 나타나면 "개선". 이번 회차에 원인코드 입력 자체가
+  // 없으면(학생이 1차원인을 전혀 선택하지 않음) 비교 불가로 보고 "판정보류"(명세 8절).
+  cd.directives.forEach(function(d){
+    if(d.status!=='active' || d.subject!==sub.subject || (d.detail||'')!==(sub.detail||'')) return;
+    const newStatus = !currentCodes.length ? 'hold' : (currentCodes.indexOf(d.causeCode)>=0 ? 'repeated' : 'improved');
+    d.status=newStatus;
+    d.comparedAt=Date.now();
+    d.comparedTestDate=cd.lastTestDate||'';
+    d.comparedTestName=cd.lastTestName||'';
+    stats[newStatus]++;
+  });
+  // ② 이번 회차 결과로 새 행동강령 최대 3개 발급(실행여부(executed)는 다음 회차를
+  // 입력하기 시작할 때 chgDirectiveBannerHtml의 라디오로 자기보고받는다).
+  const ranked=currentCodes.sort(function(a,b){ return counts[b]-counts[a] || a.localeCompare(b); }).slice(0,3);
+  ranked.forEach(function(code){
+    cd.directives.push({
+      id: 'd_'+Date.now()+'_'+code+'_'+Math.random().toString(36).slice(2,6),
+      subject: sub.subject, detail: sub.detail||'',
+      causeCode: code,
+      actionText: CHG_DIRECTIVE_ACTION_BY_CAUSE[code]||'',
+      sourceTestDate: cd.lastTestDate||'', sourceTestName: cd.lastTestName||'',
+      issuedAt: Date.now(),
+      status: 'active',
+      executed: ''
+    });
+    stats.issued++;
+  });
+  return stats;
+}
+function chgSetDirectiveExecuted(did, val){
+  const cd=chgInit();
+  const d=(cd.directives||[]).find(function(x){ return x.id===did; });
+  if(!d) return;
+  d.executed = val;
+  render();
+  chgSaveDirectives(cd);
+}
+async function chgSaveDirectives(cd){
+  if(!CU.id) return;
+  if(!FB()) return;
+  const ref=window._db.collection('students').doc(String(CU.id));
+  try{
+    await ref.update({'challengerData.directives': cd.directives||[], '_t': Date.now()});
+  }catch(e2){
+    try{ await ref.set({challengerData:{directives:cd.directives||[]}}, {merge:true}); }
+    catch(e3){ console.warn('행동강령 저장 오류:', e3.message); }
+  }
+}
 async function chgSaveRound(){
   const cd=chgInit();
   if(!cd.lastTestDate||!cd.lastTestName){ toast('응시일과 시험명/회차를 먼저 입력해주세요'); return; }
@@ -1780,12 +1860,32 @@ async function chgSaveRound(){
   if(!confirm(cd.lastTestDate+' · '+cd.lastTestName+' 회차를 저장할까요?\n(같은 응시일+시험명으로 이미 저장된 회차가 있으면 그 내용을 덮어씁니다)\n저장 후에는 응시일/시험명을 바꿔서 다음 회차를 이어서 입력하시면 됩니다.')) return;
   const ok=await chgArchiveRound(cd.lastTestDate, cd.lastTestName, cd.lastSubjects);
   if(!ok){ toast('회차 저장 중 오류가 발생했습니다'); return; }
+  // ★ 2026-10-01(AAR 2.0 2·3단계) 추가: 회차 저장이 "오답" 뷰에서 이뤄진 경우에만(=이번
+  // 회차에 오답원인 입력이 있었다는 뜻) 과목별 행동강령 비교판정·생성을 수행한다. "AAR" 뷰에서
+  // 누른 최종 입력 완료는 오답원인 데이터가 아직 없을 수 있어 건드리지 않는다.
+  let _directiveMsg='';
+  if((_chgViewMode||'wrong')==='wrong'){
+    const _tot={issued:0,improved:0,repeated:0,hold:0};
+    cd.lastSubjects.forEach(function(sub){
+      const r=chgGenerateDirectives(cd, sub);
+      _tot.issued+=r.issued; _tot.improved+=r.improved; _tot.repeated+=r.repeated; _tot.hold+=r.hold;
+    });
+    await chgSaveDirectives(cd);
+    // ★ "조용히 저장만 되어 확인할 방법이 없다"는 피드백 반영 — 저장 직후 토스트에
+    // 발급/판정 결과를 바로 보여준다.
+    const _parts=[];
+    if(_tot.issued) _parts.push('📌 새 행동강령 '+_tot.issued+'개 발급');
+    if(_tot.improved) _parts.push('🎉 개선 '+_tot.improved+'개');
+    if(_tot.repeated) _parts.push('🔁 반복 '+_tot.repeated+'개');
+    if(_tot.hold) _parts.push('❔ 판정보류 '+_tot.hold+'개');
+    if(_parts.length) _directiveMsg='\n'+_parts.join(' · ');
+  }
   // ★ 2026-09-20 추가: 저장 후에도 화면이 그대로라 실제로 저장됐는지 헷갈린다는 요청 —
   // 화면을 맨 위로 스크롤해 눈에 띄게 "화면이 바뀌게" 하고, 크고 확실한 초록색 성공
   // 알림을 평소 토스트(2초)보다 길게(4초) 보여준다.
   render();
   window.scrollTo({top:0, behavior:'smooth'});
-  toast('✅ 저장 완료!\n'+cd.lastTestDate+' · '+cd.lastTestName+' 회차가 정상적으로 저장되었습니다.', 4000, 'toast-success');
+  toast('✅ 저장 완료!\n'+cd.lastTestDate+' · '+cd.lastTestName+' 회차가 정상적으로 저장되었습니다.'+_directiveMsg, 4000, 'toast-success');
 }
 function chgAddSubject(){
   const cd=chgInit();
@@ -1812,7 +1912,8 @@ function chgRemoveSubject(idx){
 }
 function chgAddItem(sIdx){
   const cd=chgInit();
-  cd.lastSubjects[sIdx].items.push({no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false});
+  // ★ 2026-10-01(AAR 2.0 1단계) 추가: retryResult(다시풀기 결과) 필드 신설.
+  cd.lastSubjects[sIdx].items.push({no:'',unit:'',diff:'중',reasons:[],memo:'',points:'',causePrimary:'',guessedTime:false,retryResult:''});
   render();
   chgScheduleSave();
 }
@@ -2006,6 +2107,9 @@ function chgSetMeta(field,val){
   chgScheduleSave();
 }
 const CHG_SUBJ_OPT=[['KOR','국어'],['MATH','수학'],['ENG','영어'],['INQ','탐구'],['HIST','한국사'],['LANG','제2외국어']];
+// ★ 2026-10-01(AAR 2.0 1단계) 추가: "챌린저 오답" 문항별 다시풀기 결과 선택지.
+// causePrimary(K/T/M/J/C/U)와 동일한 "값-라벨 쌍 배열 + 역매핑" 패턴을 그대로 재사용한다.
+const CHG_RETRY_RESULT_OPTS=[['','다시풀기 결과'],['solo','혼자 해결'],['hint','힌트 후 해결'],['explain','해설 후 이해'],['unsolved','미해결'],['notyet','미실시']];
 function chgSelect(id,options,value,onch,extraStyle){
   return `<select onchange="${onch}"${extraStyle?` style="${extraStyle}"`:''}>${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
 }
@@ -3029,6 +3133,9 @@ async function chgAnsGradeAndSave(){
         // 자동 계산한다(peers 표본이 2명 미만이면 그때만 "중"으로 대체).
         const _autoDiff = _chgAutoDiffForItem(x.code, detail, no, _examPeerSubjects);
         items.push({no:String(no), unit:meta.unit||'', diff:meta.diff||_autoDiff||'중', reasons:[], memo:'', causePrimary:'', guessedTime:!(String(myRaw||'').trim()),
+          // ★ 2026-10-01(AAR 2.0 1단계) 추가: retryResult(다시풀기 결과) 필드 신설. 자동채점 직후엔
+          // 비어있는 채로 생성되고, "챌린저 오답" 탭에서 학생이 직접 선택해 채운다.
+          retryResult:'',
           points:points, answer:correctRaw, myAnswer:myRaw!=null?String(myRaw):'', explanation:ak.explain||meta.explain||'', question:ak.question||''});
       }
     }
@@ -3105,6 +3212,79 @@ async function chgAnsGradeAndSave(){
 // ★ 2026-09-14 추가: 과목 카드 하나를 그리는 부분을 renderChallengerInput에서 분리했다
 // (기관/셀프 모드별로 필터링된 목록에 재사용하기 위함). 카드 내용 자체는 전혀 바뀌지
 // 않았고, 기존 렌더 로직을 그대로 옮긴 것뿐이다.
+// ★ 2026-10-01(AAR 2.0 2단계) 추가: causePrimary(K/T/M/J/C/U) 코드→한글 라벨.
+// 관리자(457)의 _SG_CAUSE_LABEL과 값을 동일하게 유지해야 함.
+const CHG_CAUSE_LABEL={K:'K 지식부족',T:'T 시간손실',M:'M 실수',J:'J 판단·집착',C:'C 집중붕괴',U:'U 판정보류'};
+// "챌린저 오답" 탭에서 이 과목(subject+detail)의 행동강령 관련 안내를 보여준다.
+// chgGenerateDirectives가 저장해둔 값을 읽기만 하는 표시 전용 함수이며, 라디오 클릭만
+// chgSetDirectiveExecuted를 통해 실행여부(executed) 자기보고를 저장한다.
+// ★ 2026-10-01(AAR 2.0 3단계) 추가: ① "지난 행동강령 결과" — 이번 회차 저장 시점에 막
+// 비교판정(개선/반복/판정보류)된 행동강령을 한 번 보여줌(comparedTestDate/Name이 현재
+// 회차와 같을 때만 — 그 이후 또 다른 회차를 저장하면 조건이 안 맞아 자동으로 사라짐)
+// ② "지난 행동강령" — 아직 active 상태인(=이번 회차에서 비교판정될) 행동강령 + 실행여부
+// 자기보고 라디오(예/아니오/잘 모르겠음).
+function chgDirectiveBannerHtml(sub){
+  const cd=chgInit();
+  const list=(cd.directives||[]).filter(function(d){ return d && d.subject===sub.subject && (d.detail||'')===(sub.detail||''); });
+  if(!list.length) return '';
+  const active=list.filter(function(d){ return d.status==='active'; });
+  const judged=list.filter(function(d){ return d.status!=='active' && d.comparedTestDate===cd.lastTestDate && d.comparedTestName===cd.lastTestName; });
+  let html='';
+  if(judged.length){
+    const resultLabel={improved:'🎉 개선됨',repeated:'🔁 반복됨',hold:'❔ 판정보류'};
+    html += `<div class="card" style="margin-bottom:8px;background:#f0fdf4;border:1.5px solid #86efac"><div class="card-body" style="padding:10px 12px">
+      <div style="font-size:12px;font-weight:800;color:#15803d;margin-bottom:6px">✅ 지난 행동강령 결과</div>
+      ${judged.map(function(d){ return `<div style="font-size:12.5px;color:#334155;padding:3px 0;line-height:1.5"><b style="color:#15803d">[${esc(CHG_CAUSE_LABEL[d.causeCode]||d.causeCode)}]</b> ${esc(resultLabel[d.status]||d.status)} · ${esc(d.actionText||'')}</div>`; }).join('')}
+    </div></div>`;
+  }
+  if(active.length){
+    const srcLabel=(active[0].sourceTestName||'')+(active[0].sourceTestDate?(' · '+active[0].sourceTestDate):'');
+    html += `<div class="card" style="margin-bottom:10px;background:#eef1ff;border:1.5px solid #c7d2fe"><div class="card-body" style="padding:10px 12px">
+      <div style="font-size:12px;font-weight:800;color:#3b5bdb;margin-bottom:6px">📌 지난 행동강령${srcLabel?' ('+esc(srcLabel)+' 기준)':''}</div>
+      ${active.map(function(d,di){
+        // ★ 2026-10-01 수정(사용자 신고: "라디오가 전역 input 스타일(width:100%,
+        // appearance:none) 때문에 가로로 긴 빈 박스처럼 보여서, 학생이 뭔가 글자를
+        // 입력해야 하는 칸으로 착각할 수 있다") — guessedTime 체크박스와 동일하게
+        // width/height/padding/margin/appearance를 전부 인라인으로 강제 지정해 작은
+        // 원형 라디오로 되돌리고, 질문 문장과 보기 줄을 분리해 구분을 명확히 한다.
+        const _radio=function(val,label){
+          return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#334155;background:${d.executed===val?'#dbe4ff':'#f8f9fc'};border:1.5px solid ${d.executed===val?'#3b5bdb':'#e2e8f0'};border-radius:8px;padding:5px 10px;cursor:pointer"><input type="radio" name="chgExec_${esc(d.id)}" ${d.executed===val?'checked':''} onchange="chgSetDirectiveExecuted('${d.id}','${val}')" style="width:14px;height:14px;flex:none;padding:0;margin:0;-webkit-appearance:radio;appearance:radio">${label}</label>`;
+        };
+        return `<div style="padding:8px 0${di>0?';border-top:1px solid #dbe2ff':''}">
+        <div style="font-size:12.5px;color:#334155;line-height:1.5"><b style="color:#3b5bdb">[${esc(CHG_CAUSE_LABEL[d.causeCode]||d.causeCode)}]</b> ${esc(d.actionText||'')}</div>
+        <div style="margin-top:6px;font-size:11px;color:#64748b;font-weight:700">❓ 이번 시험에서 이 행동을 실천했나요?</div>
+        <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+          ${_radio('yes','예')}${_radio('no','아니오')}${_radio('unknown','잘 모르겠음')}
+        </div>
+      </div>`; }).join('')}
+    </div></div>`;
+  }
+  return html;
+}
+// ★ 2026-10-01(AAR 2.0 4단계) 추가: 과목 카드 안의 chgDirectiveBannerHtml은 그 과목에 해당하는
+// 행동강령만 보여주므로, 학생이 지금까지 모든 과목·모든 회차에서 받은 행동강령을 한 번에
+// 모아보는 전체 목록을 별도로 제공한다(기존 과목별 배너·동작은 전혀 바꾸지 않음, 읽기 전용).
+let _chgDirListOpen=false;
+function chgToggleDirList(){ _chgDirListOpen=!_chgDirListOpen; render(); }
+function chgDirectiveFullListHtml(cd){
+  const list=(cd.directives||[]);
+  if(!list.length) return `<div style="padding:12px;color:#94a3b8;font-size:12.5px;text-align:center">아직 받은 행동강령이 없습니다. "오답입력 최종완료"로 회차를 저장하면 자동으로 발급됩니다.</div>`;
+  const subjLabel={}; CHG_SUBJ_OPT.forEach(function(p){ subjLabel[p[0]]=p[1]; });
+  const statusLabel={active:'📌 진행중',improved:'🎉 개선됨',repeated:'🔁 반복됨',hold:'❔ 판정보류'};
+  const execLabel={yes:'실천함',no:'실천 못함',unknown:'잘 모르겠음'};
+  const sorted=[...list].sort(function(a,b){ return (b.issuedAt||0)-(a.issuedAt||0); });
+  return sorted.map(function(d){
+    const subj=(subjLabel[d.subject]||d.subject||'')+(d.detail?'('+esc(d.detail)+')':'');
+    return `<div style="border:1px solid #eef0f6;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11.5px;font-weight:700;color:#3b5bdb">${esc(subj)} · [${esc(CHG_CAUSE_LABEL[d.causeCode]||d.causeCode)}]</span>
+        <span style="font-size:11px;font-weight:700;color:#64748b">${esc(statusLabel[d.status]||d.status||'')}</span>
+      </div>
+      <div style="font-size:12.5px;color:#334155;margin-top:4px;line-height:1.5">${esc(d.actionText||'')}</div>
+      <div style="font-size:10.5px;color:#94a3b8;margin-top:4px">${esc(d.sourceTestName||'')} ${esc(d.sourceTestDate||'')} 발급${d.executed?' · 실천여부: '+esc(execLabel[d.executed]||d.executed):''}</div>
+    </div>`;
+  }).join('');
+}
 function _chgSubjectCardHtml(sub, sIdx, mode){
   // ★ 2026-09-17 추가: AAR 완료 직후 오답 뷰로 자동 전환됐을 때, 방금 완료한 과목 카드만
   // 잠깐 강조 테두리+안내 배지로 눈에 띄게 한다(스크롤 이동은 chgGenerateAarMemo에서 처리).
@@ -3120,6 +3300,7 @@ function _chgSubjectCardHtml(sub, sIdx, mode){
       ${(sub.subject==='ENG'||sub.subject==='HIST')?'':`<div><label style="font-size:11px;color:#888">세부 과목</label><input value="${esc(sub.detail)}" placeholder="예: 화작, 미적분" oninput="chgSetSubjField(${sIdx},'detail',this.value)"></div>`}
     </div>
     ${mode==='wrong'?`
+    ${chgDirectiveBannerHtml(sub)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:10px">
       <div><label style="font-size:11px;color:#888">실력 수준</label>${chgSelect(0,['상위권','중위권','하위권','불안정권'],sub.level,`chgSetSubjField(${sIdx},'level',this.value)`)}</div>
       <div><label style="font-size:11px;color:#888">이번 회차 집중 여부</label>${chgSelect(0,['집중','유지','관찰','보류'],sub.focus,`chgSetSubjField(${sIdx},'focus',this.value)`)}</div>
@@ -3155,6 +3336,7 @@ function _chgSubjectCardHtml(sub, sIdx, mode){
               <span style="font-size:13px;font-weight:700;padding:6px 12px;border-radius:8px;${(it.reasons&&it.reasons.length)?'color:#2e7d32;background:#f4fbf5;border:1.5px solid #8fd19e':'color:#aaa;background:#f5f5f5;border:1.5px solid #eee'}">${(it.reasons&&it.reasons.length)?esc(it.reasons.join(', ')):'선택 전'}</span>
             </div>
           </div>
+          <div style="grid-column:1 / -1"><label style="font-size:10px;color:#3b5bdb;font-weight:700;display:block;margin-bottom:2px">🔁 다시풀기 결과</label>${chgSelect(0,CHG_RETRY_RESULT_OPTS.map(o=>o[1]),(CHG_RETRY_RESULT_OPTS.find(o=>o[0]===(it.retryResult||''))||CHG_RETRY_RESULT_OPTS[0])[1],`chgSetItemField(${sIdx},${iIdx},'retryResult',({${CHG_RETRY_RESULT_OPTS.map(o=>`'${o[1]}':'${o[0]}'`).join(',')}})[this.value])`,'border-color:#9db4f5;background:#f4f6ff')}</div>
         </div>
       </div>`).join('')}
       <button class="btn-sm" style="margin-top:8px;width:100%" onclick="chgAddItem(${sIdx})">+ 문항 추가</button>
@@ -3211,6 +3393,11 @@ function renderChallengerInput(){
       : `<div class="card" style="margin-top:12px;background:#f0fdfa;border:1px solid #99f6e4"><div class="card-body" style="padding:12px 14px">
           <p style="font-size:12px;color:#0f766e;line-height:1.6;margin:0">🏫 <b>기관 챌린저</b>는 선생님이 등록한 시험의 AAR·오답원인을 입력하는 화면입니다. 답안 채점은 "챌린저 답안" 탭에서 진행해주세요. 이미 성적표를 받은 시험인데 목록에 안 보인다면 선생님께 등록을 요청해주세요.</p>
         </div></div>`}
+
+    <div style="margin:0 0 12px">
+      <button class="btn-sm" style="width:100%;min-height:38px;background:#f5f3ff;color:#7c3aed;border:1.5px solid #ddd6fe;font-size:12.5px;font-weight:700" onclick="chgToggleDirList()">📌 내 행동강령 전체보기${(cd.directives||[]).length?' ('+cd.directives.length+')':''} ${_chgDirListOpen?'▲':'▼'}</button>
+      ${_chgDirListOpen?`<div style="margin-top:8px">${chgDirectiveFullListHtml(cd)}</div>`:''}
+    </div>
 
     <div style="margin:16px 0 8px">
       <div class="stitle" style="margin:0">📚 ${regMode==='self'?'셀프 기록':'이번 회차'} 과목별 입력 <span style="font-size:11px;color:#dc2626;font-weight:700">(AAR,오답체크 필수)</span></div>
