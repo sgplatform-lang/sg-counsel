@@ -50612,20 +50612,25 @@ function _xactEntryCardHtml(t, forPrint){
   const roleText = _lxEsc(_xactAdminResolved(t.role,t.roleCustom))||'-';
   const skillsText = (Array.isArray(t.skills)&&t.skills.length) ? t.skills.map(function(sk){return sk==='직접입력'?_lxEsc(t.skillsCustom||'직접입력'):_lxEsc(sk);}).join(', ') : '-';
   const learnedText = _lxEsc(t.learned)||'-';
+  // ★ 2026-10-01 수정(관리자 요청: "질문항목과 입력항목을 한줄로, 입력항목은 찐하고 크게"):
+  // 라벨/값을 위아래로 나누던 box()를 한 줄(label: value) 인라인 표기로 변경해 칸 높이를 줄임.
   const box = function(label, value){
-    return '<div style="background:#f8f9fc;border-radius:8px;padding:9px 11px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">'+label+'</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700;white-space:pre-wrap">'+value+'</div></div>';
+    return '<div style="background:#f8f9fc;border-radius:7px;padding:6px 10px;line-height:1.55"><span style="font-size:10.5px;color:#888;font-weight:700">'+label+': </span><span style="font-size:13.5px;color:#1a1a2e;font-weight:800;white-space:pre-wrap">'+value+'</span></div>';
   };
-  const headHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+  const headHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
     + '<span style="font-size:12px;color:#888;font-weight:700">'+_xlabEsc(dateLabel)+'</span>'
     + _xactTypeBadgeHtml(t)
     + '</div>';
-  const fieldTopicBox = box('② 주제 관련분야 · ③ 관심주제·키워드', '관련분야: '+fieldText+'<br>관심주제: '+topicText);
-  const motiveBox = '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:10px 12px;margin-top:8px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">④ 알게 된 계기</div><div style="font-size:12.5px;color:#4c1d95;font-weight:700">'+motiveLabel+'</div>'+(motiveBody?'<div style="font-size:11.5px;color:#6b21a8;margin-top:4px">'+motiveBody+'</div>':'')+'</div>';
-  const twoColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+  const fieldTopicBox = '<div style="background:#f8f9fc;border-radius:7px;padding:6px 10px;line-height:1.55">'
+    + '<div><span style="font-size:10.5px;color:#888;font-weight:700">② 관련분야: </span><span style="font-size:13px;color:#1a1a2e;font-weight:800">'+fieldText+'</span></div>'
+    + '<div><span style="font-size:10.5px;color:#888;font-weight:700">③ 관심주제: </span><span style="font-size:13px;color:#1a1a2e;font-weight:800">'+topicText+'</span></div>'
+    + '</div>';
+  const motiveBox = '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:6px 12px;margin-top:6px;line-height:1.55"><span style="font-size:10.5px;color:#7c3aed;font-weight:700">④ 알게 된 계기: </span><span style="font-size:13.5px;color:#4c1d95;font-weight:800">'+motiveLabel+'</span>'+(motiveBody?'<div style="font-size:11.5px;color:#6b21a8;margin-top:3px">'+motiveBody+'</div>':'')+'</div>';
+  const twoColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">'
     + box('⑤ 활동시 역할', roleText)
     + box('⑥ 사용 기법', skillsText)
     + '</div>';
-  const learnedBox = '<div style="background:#e7f7ef;border:1.5px solid #0f766e;border-radius:8px;padding:10px 12px;margin-top:8px"><div style="font-size:10.5px;color:#0f766e;font-weight:800;margin-bottom:4px">⑦ 알게 된 점·키워드</div><div style="font-size:13px;color:#0f766e;font-weight:800;white-space:pre-wrap">'+learnedText+'</div></div>';
+  const learnedBox = '<div style="background:#e7f7ef;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;margin-top:6px;line-height:1.55"><span style="font-size:10.5px;color:#0f766e;font-weight:700">⑦ 알게 된 점·키워드: </span><span style="font-size:14px;color:#0f766e;font-weight:800;white-space:pre-wrap">'+learnedText+'</span></div>';
   return '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:12px;page-break-inside:avoid">'
     + headHtml + fieldTopicBox + motiveBox + twoColHtml + learnedBox
     + '</div>';
@@ -50753,20 +50758,22 @@ function _xaarSessionCardHtml(sess, idx, total, forPrint){
   const reviewNote = (sess.review && sess.review.note) ? _lxEsc(sess.review.note) : '';
   const overrideText = (sess.review && sess.review.teacherOverrideActionLabel) ? _lxEsc(sess.review.teacherOverrideActionLabel) : '';
   const prevActionHtml = sess.prevActionLabel ? ('<div style="font-size:11.5px;color:#888;margin-bottom:8px">지난 행동 실행: \''+_lxEsc(sess.prevActionLabel)+'\' → '+_lxEsc(_xaarLabelAdmin(XAAR_A_OPTS,sess.actionExecution))+(sess.notDoneReason?' ('+_lxEsc(_xaarLabelAdmin(XAAR_A1_OPTS,sess.notDoneReason))+')':'')+'</div>') : '';
+  // ★ 2026-10-01 수정(관리자 요청: "질문항목과 입력항목을 한줄로, 입력항목은 찐하고 크게"):
+  // 라벨/값을 위아래로 나누던 box()를 한 줄(label: value) 인라인 표기로 변경해 칸 높이를 줄임.
   const box = function(label, value){
-    return '<div style="background:#f8f9fc;border-radius:8px;padding:9px 11px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">'+label+'</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700;white-space:pre-wrap">'+value+'</div></div>';
+    return '<div style="background:#f8f9fc;border-radius:7px;padding:6px 10px;line-height:1.55"><span style="font-size:10.5px;color:#888;font-weight:700">'+label+': </span><span style="font-size:13.5px;color:#1a1a2e;font-weight:800;white-space:pre-wrap">'+value+'</span></div>';
   };
-  const stageBox = '<div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">📍 오늘 단계</div><div style="font-size:13.5px;color:#1a1a2e;font-weight:800">'+_lxEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))+'</div></div>';
-  const threeColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+  const stageBox = '<div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 12px;margin-bottom:6px;line-height:1.55"><span style="font-size:10.5px;color:#7c3aed;font-weight:700">📍 오늘 단계: </span><span style="font-size:14px;color:#1a1a2e;font-weight:800">'+_lxEsc(_xaarLabelAdmin(XAAR_B_OPTS,sess.stageCode))+'</span></div>';
+  const threeColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">'
     + box('직접 한 일', (sess.contributionCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_C_OPTS,c));}).join(', ')||'-')
     + box('막힌 지점', _lxEsc(_xaarLabelAdmin(XAAR_D_OPTS,sess.blockerCode))||'-')
     + box('확인 자료', (sess.evidenceCodes||[]).map(function(c){return _lxEsc(_xaarLabelAdmin(XAAR_E_OPTS,c));}).join(', ')||'-')
     + '</div>';
-  const nextActionBox = '<div style="background:#e7f7ef;border:1.5px solid #0f766e;border-radius:8px;padding:10px 12px;margin-bottom:8px"><div style="font-size:10.5px;color:#0f766e;font-weight:800;margin-bottom:4px">➡️ 다음 행동(학생 선택)'+(overrideText?' · <span style="color:#7c3aed">교사 변경: '+overrideText+'</span>':'')+'</div><div style="font-size:13.5px;color:#0f766e;font-weight:800">'+_lxEsc(sess.nextActionLabel||'-')+'</div></div>';
+  const nextActionBox = '<div style="background:#e7f7ef;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;margin-bottom:6px;line-height:1.55"><span style="font-size:10.5px;color:#0f766e;font-weight:700">➡️ 다음 행동(학생 선택)'+(overrideText?' · <span style="color:#7c3aed">교사 변경: '+overrideText+'</span>':'')+': </span><span style="font-size:14px;color:#0f766e;font-weight:800">'+_lxEsc(sess.nextActionLabel||'-')+'</span></div>';
   const deepenBox = dp
-    ? '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#7c3aed;font-weight:800;margin-bottom:4px">🧪 교과 심화</div><div style="font-size:12px;color:#4c1d95;line-height:1.6"><b>연결 개념:</b> '+_lxEsc(dp.conceptLabel||'-')+'<br><b>확인 자료:</b> '+_lxEsc(_xaarLabelAdmin(XAAR_H_OPTS,dp.resourceType))+(dp.resourceCardTitle?' · '+_lxEsc(dp.resourceCardTitle):'')+(dp.limitationCode?'<br><b>선택한 한계:</b> '+_lxEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode)):'')+(dp.changeLabel?'<br><b>바뀔 조건:</b> '+_lxEsc(dp.changeLabel):'')+'</div></div>'
-    : '<div style="background:#f8f9fc;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">🧪 교과 심화</div><div style="font-size:12px;color:#ccc">진행 안 함</div></div>';
-  const teacherBox = '<div style="background:#f8f9fc;border-radius:8px;padding:10px 12px"><div style="font-size:10.5px;color:#888;font-weight:700;margin-bottom:4px">교사 확인</div><div style="font-size:12.5px;color:#1a1a2e;font-weight:700">'+_lxEsc(reviewBadge)+'</div>'+(reviewNote?'<div style="font-size:11px;color:#555;margin-top:4px">💬 '+reviewNote+'</div>':'')+'</div>';
+    ? '<div style="background:#f3e8ff;border-left:3px solid #7c3aed;border-radius:8px;padding:6px 12px"><div style="font-size:10.5px;color:#7c3aed;font-weight:700;margin-bottom:3px">🧪 교과 심화</div><div style="font-size:12.5px;color:#4c1d95;line-height:1.6"><b>연결 개념:</b> '+_lxEsc(dp.conceptLabel||'-')+'<br><b>확인 자료:</b> '+_lxEsc(_xaarLabelAdmin(XAAR_H_OPTS,dp.resourceType))+(dp.resourceCardTitle?' · '+_lxEsc(dp.resourceCardTitle):'')+(dp.limitationCode?'<br><b>선택한 한계:</b> '+_lxEsc(_xaarLabelAdmin(XAAR_I_OPTS,dp.limitationCode)):'')+(dp.changeLabel?'<br><b>바뀔 조건:</b> '+_lxEsc(dp.changeLabel):'')+'</div></div>'
+    : '<div style="background:#f8f9fc;border-radius:8px;padding:6px 12px;line-height:1.55"><span style="font-size:10.5px;color:#888;font-weight:700">🧪 교과 심화: </span><span style="font-size:12.5px;color:#ccc">진행 안 함</span></div>';
+  const teacherBox = '<div style="background:#f8f9fc;border-radius:8px;padding:6px 12px;line-height:1.55"><span style="font-size:10.5px;color:#888;font-weight:700">교사 확인: </span><span style="font-size:13.5px;color:#1a1a2e;font-weight:800">'+_lxEsc(reviewBadge)+'</span>'+(reviewNote?'<div style="font-size:11px;color:#555;margin-top:3px">💬 '+reviewNote+'</div>':'')+'</div>';
   const twoColHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+deepenBox+teacherBox+'</div>';
   const actionsHtml = forPrint ? '' : ('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
     +'<button onclick="xaarAdminMarkChecked(\''+sess.id+'\')" style="padding:6px 10px;background:#eef1ff;color:#3b5bdb;border:none;border-radius:7px;font-size:10.5px;font-weight:700">✅ 확인</button>'
