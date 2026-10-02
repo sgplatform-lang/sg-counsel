@@ -100,6 +100,33 @@ button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 
+/* ── 학생별 개요: 2×2 쿼드런트(성적 | 챌린저 / X-lab | 최근상황) ──
+   한 화면에서 4개 영역을 동서남북처럼 한눈에 비교해 볼 수 있도록, 좁은 화면(태블릿 세로/모바일)에서만
+   1열로 쌓이고 그 외에는 항상 2열 그리드를 유지한다. 4개 카드는 헤더(아이콘+제목+상세버튼) 구조와
+   간격·폰트·배지 스타일을 공통 클래스로 통일해서 디자인이 들쭉날쭉해 보이지 않게 한다. */
+.ov-quad-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+@media(max-width:860px){.ov-quad-grid{grid-template-columns:1fr}}
+.ov-quad-card{background:#fff;border-radius:16px;border:1.5px solid #e8eaf6;padding:16px;box-shadow:0 2px 8px rgba(15,23,42,.04);display:flex;flex-direction:column;min-width:0;min-height:220px}
+.ov-quad-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
+@media(max-width:560px){.ov-quad-split{grid-template-columns:1fr}}
+.ov-quad-col-h{font-size:12.5px;font-weight:800;margin-bottom:6px}
+.ov-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ov-quad-body{flex:1;display:flex;flex-direction:column;min-height:0}
+.ov-quad-rows{display:flex;flex-direction:column;min-height:0}
+.ov-quad-hd-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.ov-quad-more-sm{background:transparent;border:none;font-size:11px;font-weight:700;cursor:pointer;padding:2px 0;white-space:nowrap}
+.ov-quad-headline{display:flex;align-items:baseline;gap:6px;margin-bottom:0}
+.ov-quad-headline-num{font-size:30px;font-weight:900}
+.ov-quad-headline-lb{font-size:12.5px;color:#777}
+.ov-quad-topzone{min-height:76px;display:flex;flex-direction:column;justify-content:center;margin-bottom:12px}
+.ov-quad-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid currentColor}
+.ov-quad-title{font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px}
+.ov-quad-more{background:transparent;border:1px solid currentColor;border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer}
+.ov-quad-sub{font-size:11px;font-weight:700;color:#555;margin:12px 0 4px}
+.ov-quad-sub:first-child{margin-top:0}
+.ov-quad-empty{text-align:center;color:#888;padding:20px 0;font-size:12px}
+.ov-quad-toggle{margin-top:4px;background:transparent;border:none;font-size:10.5px;font-weight:700;cursor:pointer;padding:2px 0}
+
 /* 통계 박스 */
 .stat{background:#f4f6fb;border-radius:8px;padding:10px 6px;text-align:center;border:1px solid #e8eaf6}
 .sv{font-size:17px;font-weight:800;color:#1a1a2e}
@@ -2635,9 +2662,27 @@ const JEON=['학생부교과','학생부종합','논술','실기/실적','정시
 
 // ── 학년 목록 (초/중/고 전체) ──
 const GRADE_LIST = ['초4','초5','초6','중1','중2','중3','고1','고2','고3'];
-const MOCK_SUBJS=['국어','수학','영어','탐구1','탐구2','한국사','제2외국어'];
+const MOCK_SUBJS=['국어','수학','영어','탐구1','탐구2','한국사','제2외국어','통합사회','통합과학'];
 const MOCK_TESTS=['3월모의','5월학평','6월모의','7월학평','9월모의','10월학평','수능'];
 const SEMS=['1-1','1-2','2-1','2-2','3-1'];
+// 2022 개정교육과정 모의고사 과목 체계: 고1/고2(및 이후 입학생)부터 탐구1/탐구2 선택 대신 통합사회/통합과학 적용.
+// 성적탭 모의고사 "입력" 폼(openMockForm 등)은 기존 MOCK_SUBJS 체계를 그대로 유지하며(과거 데이터 보존),
+// 이 분기는 "표시(요약/개요)" 용도로만 사용한다.
+const MOCK_SUBJS_NEW=['국어','수학','영어','한국사','통합사회','통합과학'];
+function isMockNewSystem(grade){
+  const g=String(grade||'').trim();
+  return g==='고1'||g==='고2';
+}
+// 학생 학년에 따라 개요 화면에 표시할 모의고사 과목 목록 반환.
+// 신규 체계(고1/고2) 학생이라도 전환 이전에 입력된 탐구1/탐구2 데이터가 남아있으면 함께 보존 표시한다.
+function getMockDisplaySubjs(s){
+  const mg=(s&&s.mockGrades)||{};
+  if(isMockNewSystem(s&&s.grade)){
+    const hasLegacy=['탐구1','탐구2'].some(sb=>mg[sb]&&Object.values(mg[sb]).some(v=>v));
+    return hasLegacy ? [...MOCK_SUBJS_NEW,'탐구1','탐구2'] : MOCK_SUBJS_NEW;
+  }
+  return ['국어','수학','영어','탐구1','탐구2'];
+}
 // 내신 기본 과목 (관리자 수정 가능)
 const GRADE_SUBJS_DEFAULT=[['korean','국어'],['math','수학'],['english','영어'],['science','과학'],['social','사회']];
 let GRADE_SUBJS=[...GRADE_SUBJS_DEFAULT];
@@ -4233,53 +4278,445 @@ function renderDetail(s){
 }
 
 // ══ 개요 탭 ══
+// ── 개요 화면: 챌린저 섹션 집계 헬퍼 ──
+// 과목코드(subject) → 표시용 라벨. 여기 없는 코드(기관이 직접 입력한 과목코드,
+// 예: 통합사회/통합과학 등)는 코드 문자열 그대로를 라벨로 사용해 "기관 등록 과목"으로 취급한다.
+const _SG_OV_CHG_SUBJ_LABEL={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구',INQ2:'탐구',LANG:'제2외국어'};
+function _sgOvChgSubjLabel(code){ return _SG_OV_CHG_SUBJ_LABEL[code]||code; }
+// 회차 1건의 과목 배열: fullSubjects(과목코드·세부과목 등 전체 필드 보존)가 있으면 그걸 쓰고,
+// 없으면 경량 요약(subjects)으로 대체한다.
+function _sgOvChgEntrySubjects(e){
+  return (Array.isArray(e&&e.fullSubjects)&&e.fullSubjects.length)?e.fullSubjects:((e&&e.subjects)||[]);
+}
+// 학생이 "챌린저" 탭에서 카탈로그 없이 직접 입력한 셀프 챌린저인지(과목 중 하나라도
+// _selfRegistered 표식이 있으면 셀프챌린저) 판별. 아니면 기관(카탈로그) 챌린저.
+function _sgOvChgIsSelf(e){
+  return _sgOvChgEntrySubjects(e).some(sub=>sub&&sub._selfRegistered);
+}
+function _sgOvChgStats(s){
+  const hist=(s.challengerData&&Array.isArray(s.challengerData.history))?s.challengerData.history:[];
+  const sorted=hist.slice().sort((a,b)=>{
+    const ta=(a&&a.savedAt)||0, tb=(b&&b.savedAt)||0;
+    if(ta&&tb) return tb-ta;
+    return String((b&&b.date)||'').localeCompare(String((a&&a.date)||''));
+  });
+  const BASIC_ORDER=['국어','수학','영어','한국사','통합사회','통합과학','탐구','제2외국어'];
+  const bySubj={}, order=[];
+  sorted.forEach(e=>{
+    _sgOvChgEntrySubjects(e).forEach(sub=>{
+      if(!sub) return;
+      const score=Number(sub.score);
+      if(sub.score===undefined||sub.score===null||sub.score===''||isNaN(score)) return;
+      const label=String(sub.subject?_sgOvChgSubjLabel(sub.subject):(sub.name||'')).trim();
+      if(!label) return;
+      if(!bySubj[label]){ bySubj[label]={count:0,sum:0,max:-Infinity,min:Infinity}; order.push(label); }
+      const st=bySubj[label];
+      st.count++; st.sum+=score; if(score>st.max)st.max=score; if(score<st.min)st.min=score;
+    });
+  });
+  const subjStats=order.slice().sort((a,b)=>{
+    const ia=BASIC_ORDER.indexOf(a), ib=BASIC_ORDER.indexOf(b);
+    if(ia>=0&&ib>=0) return ia-ib;
+    if(ia>=0) return -1;
+    if(ib>=0) return 1;
+    return 0;
+  }).map(label=>{
+    const st=bySubj[label];
+    return {label, count:st.count, avg:st.sum/st.count, max:st.max, min:st.min};
+  });
+  return {total:hist.length, recent:sorted, subjStats};
+}
+// "보이는 만큼 + 펼치기" 공통 토글 핸들러: 숨겨둔 영역을 열고/닫고 버튼 글자를 바꾼다.
+function ovToggleMore(id, moreLabel){
+  const el=document.getElementById(id); if(!el) return;
+  const show=el.style.display==='none';
+  el.style.display=show?'block':'none';
+  if(window.event&&window.event.target) window.event.target.textContent=show?'접기 ▲':moreLabel+' ▼';
+}
+// "더보기" 클릭 시 화면이 아래로 늘어나는 대신 팝업으로 나머지 데이터를 모두 보여주는 공통 핸들러.
+// id로 지정된 (항상 display:none 상태로 숨겨둔) 영역의 내용을 그대로 팝업에 복사해 보여준다.
+function ovShowMorePopup(title, html){
+  document.querySelectorAll('.ov-more-overlay').forEach(e=>e.remove());
+  const ov=document.createElement('div');
+  ov.className='overlay ov-more-overlay';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div class="modal" style="max-width:560px;max-height:82vh;overflow-y:auto">
+    <div class="mhd"><span style="font-size:15px;font-weight:800">${esc(title)}</span><button onclick="this.closest('.overlay').remove()" style="background:transparent;border:none;color:#777;font-size:22px;cursor:pointer">×</button></div>
+    <div style="padding:6px 18px 22px">${html}</div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function ovShowMorePopupFrom(id, title){
+  const src=document.getElementById(id);
+  if(!src) return;
+  ovShowMorePopup(title, src.innerHTML);
+}
+
+// ── 개요 화면: X-lab 주제활동 섹션 집계 헬퍼 ──
+// 월별주제활동(xlabTopics)·월별교과활동(xlabSubjectReports)·최종예상세특(xlabFinalRecords)은
+// 교과목(subjectArea) 필드가 있어 과목별로 묶을 수 있다. 셀프주제활동(xlabSelfActivities)은
+// 교과목이 아니라 관심분야·활동유형으로 분류되어 있어, 과목별 집계에서는 제외하고
+// 총 횟수만 별도로 보여준다(관리자 X-lab 요청과 동일 전제: fieldCategory/activityType 기준).
+let _ovXlabStudentId=null;
+let _ovXlabLoading=false;
+let _ovXlabItems=[]; // [{type:'topic'|'subject'|'final'|'self', title, subjectArea, createdAt}]
+const _OV_XLAB_TYPE_LABEL={topic:'월별주제활동', subject:'월별교과활동', final:'최종예상세특', self:'셀프주제활동'};
+function _ovXlabResolvedSubj(t){
+  return (t.subjectArea==='직접입력') ? String(t.subjectAreaCustom||'').trim() : String(t.subjectArea||'').trim();
+}
+function _ovFmtDate(ts){
+  if(!ts) return '-';
+  const d=new Date(ts);
+  if(isNaN(d.getTime())) return '-';
+  return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
+}
+async function _ovXlabLoad(studentId){
+  _ovXlabLoading=true; render();
+  try{
+    const [topics, subs, fins, selfActs] = await Promise.all([
+      window._fb.getWhere('xlabTopics','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabSubjectReports','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabFinalRecords','studentId','==',String(studentId)),
+      window._fb.getWhere('xlabSelfActivities','studentId','==',String(studentId)),
+    ]);
+    const items=[];
+    (topics||[]).forEach(t=>{ if(t.topicTitle) items.push({type:'topic', title:t.topicTitle, subjectArea:_ovXlabResolvedSubj(t), createdAt:t.createdAt||0}); });
+    (subs||[]).forEach(t=>{ if(t.topicTitle) items.push({type:'subject', title:t.topicTitle, subjectArea:_ovXlabResolvedSubj(t), createdAt:t.createdAt||0}); });
+    (fins||[]).forEach(t=>{ if(t.topicTitle) items.push({type:'final', title:t.topicTitle, subjectArea:_ovXlabResolvedSubj(t), createdAt:t.createdAt||0}); });
+    (selfActs||[]).forEach(t=>{ if(t.interestTopic) items.push({type:'self', title:t.interestTopic, subjectArea:'', createdAt:t.createdAt||0}); });
+    items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    _ovXlabItems=items;
+  }catch(e){
+    console.warn('개요 X-lab 집계 로딩 실패:', e.message);
+    _ovXlabItems=[];
+  }
+  _ovXlabLoading=false; render();
+}
+// 학생이 바뀌었으면 비동기 로드를 새로 시작(결과는 render() 재호출로 반영)하고,
+// 현재까지 캐시된 데이터를 기준으로 집계를 반환한다. (_xsubAdmin 등 기존 X-lab 지연로딩과 동일 패턴)
+function _ovXlabStats(s){
+  if(_ovXlabStudentId!==String(s.id)){
+    _ovXlabStudentId=String(s.id);
+    _ovXlabItems=[];
+    _ovXlabLoad(s.id);
+  }
+  const items=_ovXlabItems;
+  const selfTotal=items.filter(it=>it.type==='self').length;
+  const bySubj={}, order=[];
+  items.filter(it=>it.type!=='self').forEach(it=>{
+    const label=it.subjectArea||'(과목 미지정)';
+    if(!bySubj[label]){ bySubj[label]={topic:0,subject:0,final:0}; order.push(label); }
+    bySubj[label][it.type]++;
+  });
+  const subjStats=order.map(label=>Object.assign({label}, bySubj[label]));
+  const selfItems=items.filter(it=>it.type==='self');
+  return {loading:(_ovXlabLoading&&!items.length), total:items.length, selfTotal, recent:items, subjStats, selfItems};
+}
+
+// ── 개요 화면: 최근상황(5개 기능 통합 로그) 집계 헬퍼 ──
+// 기능별 관리자SG/학생SG 판정 기준(모두 확인받은 내용):
+//  - 챌린저: 회차에 학생 직접입력 신호(_selfRegistered/_studentSelfInput)가 있으면 학생SG=O, 없으면 관리자SG=O
+//  - X-lab 주제활동: 등록은 항상 학생만 가능 → 항상 학생SG=O
+//  - 학습상담: 학생용 페이지에 입력 기능 자체가 없음 → 항상 관리자SG=O
+//  - 주간플랜/성적: "마지막 저장 주체"를 저장 시점에 기록(_planLastEditRole/_gradeLastEditRole)해서 판정.
+//    이 필드가 아직 없는(추적 이전) 데이터는 최근상황에 아예 표시하지 않는다(시점을 알 수 없으므로).
+function _sgOvRecentEvents(s){
+  const events=[];
+  const chg=_sgOvChgStats(s);
+  chg.recent.forEach(e=>{
+    const isSelf=_sgOvChgIsSelf(e);
+    // ★ 정렬/표시 일관성: 화면에 보이는 "입력일"은 응시일(date)이므로, 정렬 기준도
+    // 저장된 시각(savedAt, 나중에 소급 저장되면 실제 응시일보다 커질 수 있음)이 아니라
+    // 이 응시일을 우선으로 삼는다. date가 없을 때만 savedAt으로 대체.
+    const ts=(e&&e.date?new Date(e.date).getTime():0)||(e&&e.savedAt)||0;
+    events.push({category:'챌린저', content:e.test||'(시험명 없음)', adminSG:!isSelf, studentSG:isSelf, ts:ts||0, dateLabel:e.date||_ovFmtDate(ts)});
+  });
+  const xl=_ovXlabStats(s);
+  xl.recent.forEach(it=>{
+    events.push({category:'X-lab', content:it.title||'(제목 없음)', adminSG:false, studentSG:true, ts:it.createdAt||0, dateLabel:_ovFmtDate(it.createdAt)});
+  });
+  (s.consultations||[]).forEach(c=>{
+    const ts=c.date?(new Date(c.date).getTime()||0):0;
+    events.push({category:'학습상담', content:c.topic||c.memo||'(내용 없음)', adminSG:true, studentSG:false, ts, dateLabel:c.date||'-'});
+  });
+  if(s._planLastEditAt){
+    events.push({category:'주간플랜', content:'학습플랜 저장', adminSG:s._planLastEditRole==='admin', studentSG:s._planLastEditRole==='student', ts:s._planLastEditAt, dateLabel:_ovFmtDate(s._planLastEditAt)});
+  }
+  if(s._gradeLastEditAt){
+    events.push({category:'성적', content:'내신/모의고사 성적 저장', adminSG:s._gradeLastEditRole==='admin', studentSG:s._gradeLastEditRole==='student', ts:s._gradeLastEditAt, dateLabel:_ovFmtDate(s._gradeLastEditAt)});
+  }
+  events.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  return events;
+}
+const _SG_OV_CATEGORY_COLOR={'챌린저':'#0f766e','X-lab':'#b8860b','학습상담':'#2563eb','주간플랜':'#10b981','성적':'#f59e0b'};
+
+// ══ 개요 화면 "성적" 분할(내신|모의고사 2열) 전용 헬퍼 ══
+function _ovFmtAvg(v){return(v===null||v===undefined||isNaN(v))?'-':(+v).toFixed(2);}
+// 학기별 내신 평균 (해당 학기에 값이 있는 과목만 평균)
+function _ovSemGradeAvg(s,sem){
+  const gd=s.gradeDetail||{};
+  const SGRADE_SUBJS=getStudentGradeSubjs(s);
+  const extraSubjs=s.extraSubjs||[];
+  const allLb=[...SGRADE_SUBJS.map(([,lb])=>lb),...extraSubjs];
+  const vals=allLb.map(lb=>fmtGrade((gd[lb]||{})[sem])).filter(v=>v!==null&&v!==undefined&&!isNaN(v)&&v>0);
+  return vals.length?vals.reduce((a,b)=>a+ +b,0)/vals.length:null;
+}
+// 모의고사 과목별 전체 평균 (모든 회차 평균 — 최신값이 아닌 누적 평균)
+function _ovMockSubjAvg(s,subj){
+  const mg=s.mockGrades||{};
+  const d=mg[subj]||{};
+  const vals=MOCK_TESTS.map(t=>{
+    const raw=d[t]; if(!raw) return null;
+    const gv=typeof raw==='object'?raw.grade:raw;
+    return(gv!==null&&gv!==undefined&&!isNaN(+gv)&&+gv>0)?+gv:null;
+  }).filter(v=>v!==null);
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+}
+// 모의고사 전체평균 (표시 대상 과목들의 평균의 평균)
+function _ovMockOverallAvg(s){
+  const subjs=getMockDisplaySubjs(s);
+  const vals=subjs.map(sb=>_ovMockSubjAvg(s,sb)).filter(v=>v!==null);
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+}
+// [{label,value}] 배열을 2개씩 짝지어 행으로 반환 (마지막 홀수 항목은 단독 행)
+function _ovPairRows(items){
+  const rows=[];
+  for(let i=0;i<items.length;i+=2) rows.push([items[i],items[i+1]||null]);
+  return rows;
+}
+
 function renderOverview(s){
   const a=gAvg(s.subjects);
   const mg=s.mockGrades||{};
-  const _chHist=(s.challengerData?.history)||[];
+  const _chg=_sgOvChgStats(s);
+  const _chgRecentShown=5, _chgStatsShown=5;
+  const _xl=_ovXlabStats(s);
+  const _xlRecentShown=5, _xlStatsShown=5, _xlSelfShown=3;
+  const _recent=_sgOvRecentEvents(s);
+  const _recentShown=5;
+  const _gdSemRows=_ovPairRows(SEMS.map(sem=>({label:sem,value:_ovSemGradeAvg(s,sem)})));
+  const _mockOverall=_ovMockOverallAvg(s);
+  const _mockHasAny=Object.values(mg).some(v=>Object.values(v||{}).some(x=>x));
+  const _mockSubjRows=_ovPairRows(getMockDisplaySubjs(s).map(subj=>({label:subj,value:_ovMockSubjAvg(s,subj)})));
+  const _a9=a?RM_convert5to9(a):null;
+  const _now=new Date();
+  const _3moAgoTs=new Date(_now.getFullYear(),_now.getMonth()-2,1).getTime();
+  const _recentLast3Mo=_recent.filter(ev=>ev.ts&&ev.ts>=_3moAgoTs).length;
+
+  // ── 성적: 내신/모의고사 짝 행(챌린저 배지와 동일한 알약형 라벨 + 가운데 정렬) ──
+  const _ovPairRowHtml=(pair,accent,bg)=>`
+    <div style="display:grid;grid-template-columns:1fr 1fr;padding:8px 0;border-bottom:1px solid #f1f5f9;gap:6px">
+      <div style="display:flex;align-items:center;justify-content:flex-start;gap:7px">
+        <span style="font-size:10.5px;font-weight:700;color:${accent};background:${bg};border-radius:999px;padding:2px 9px;white-space:nowrap">${pair[0].label}</span>
+        <span style="font-weight:800;font-size:13.5px;color:${pair[0].value?gc(pair[0].value):'#bbb'}">${_ovFmtAvg(pair[0].value)}</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:flex-start;gap:7px">
+        ${pair[1]?`<span style="font-size:10.5px;font-weight:700;color:${accent};background:${bg};border-radius:999px;padding:2px 9px;white-space:nowrap">${pair[1].label}</span><span style="font-weight:800;font-size:13.5px;color:${pair[1].value?gc(pair[1].value):'#bbb'}">${_ovFmtAvg(pair[1].value)}</span>`:''}
+      </div>
+    </div>`;
+
+  // ── 챌린저: 최근 챌린저 1행(배지-좌측) ──
+  const _ovChgRecentRowHtml=(e)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #e8eaf6">
+      <span style="font-size:10.5px;font-weight:700;color:${_sgOvChgIsSelf(e)?'#92400e':'#1e40af'};background:${_sgOvChgIsSelf(e)?'#fef3c7':'#dbeafe'};border-radius:999px;padding:2px 7px;white-space:nowrap;flex-shrink:0">${_sgOvChgIsSelf(e)?'셀프':'기관'}</span>
+      <span class="ov-ellipsis" style="flex:1;color:#333;font-weight:700;font-size:13px">${esc(e.test||'(시험명 없음)')}</span>
+      <span style="color:#888;font-size:11.5px;white-space:nowrap;flex-shrink:0">${esc(e.date||'-')}</span>
+    </div>`;
+  // ── 챌린저: 누적 통계 1행(과목+평균 좌측, 횟수/최고/최저 우측) ──
+  const _ovChgStatRowHtml=(st)=>`
+    <div style="display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9">
+      <span style="font-weight:800;color:#333;font-size:13px;flex-shrink:0">${esc(st.label)}</span>
+      <span style="font-weight:800;color:#0f766e;font-size:13px;flex-shrink:0">${st.avg.toFixed(1)}점</span>
+      <span style="font-size:10.5px;color:#999;white-space:nowrap;margin-left:auto">${st.count}회 · 최고 <span style="color:#16a34a">${st.max}</span> · 최저 <span style="color:#dc2626">${st.min}</span></span>
+    </div>`;
+
+  // ── X-lab: 최근 주제활동 1행(유형배지-좌측) ──
+  const _ovXlabRecentRowHtml=(it)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #e8eaf6">
+      <span style="font-size:10.5px;font-weight:700;color:#92400e;background:#fdf1dc;border-radius:999px;padding:2px 7px;white-space:nowrap;flex-shrink:0">${esc(_OV_XLAB_TYPE_LABEL[it.type]||it.type)}</span>
+      <span class="ov-ellipsis" style="flex:1;color:#333;font-weight:700;font-size:13px">${esc(it.title||'(제목 없음)')}</span>
+      <span style="color:#888;font-size:11.5px;white-space:nowrap;flex-shrink:0">${_ovFmtDate(it.createdAt)}</span>
+    </div>`;
+  // ── X-lab: 누적 통계 1행(과목 좌측, 주제/교과/세특 우측) ──
+  const _ovXlabStatRowHtml=(st)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9">
+      <span class="ov-ellipsis" style="flex:1;font-weight:800;color:#333;font-size:13px">${esc(st.label)}</span>
+      <span style="font-size:11px;color:#777;white-space:nowrap;flex-shrink:0">주제${st.topic||0}·교과${st.subject||0}·세특${st.final||0}</span>
+    </div>`;
+  // ── X-lab: 셀프주제활동 1행(제목 좌측, 날짜 우측) ──
+  const _ovXlabSelfRowHtml=(it)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #fdf1dc;gap:6px">
+      <span class="ov-ellipsis" style="font-size:13px;color:#333;font-weight:700">${esc(it.title||'(제목 없음)')}</span>
+      <span style="font-size:11.5px;color:#92400e;white-space:nowrap">${_ovFmtDate(it.createdAt)}</span>
+    </div>`;
+
+  // ── 최근상황: 1행(입력일-구분-내용) ──
+  const _ovRecentRowHtml=(ev)=>`
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9">
+      <span style="font-size:11px;color:#888;white-space:nowrap;min-width:60px;padding-top:2px;flex-shrink:0">${esc(ev.dateLabel)}</span>
+      <span style="font-size:10.5px;font-weight:700;color:${_SG_OV_CATEGORY_COLOR[ev.category]||'#555'};background:${_SG_OV_CATEGORY_COLOR[ev.category]||'#555'}18;border-radius:999px;padding:2px 7px;white-space:nowrap;flex-shrink:0">${esc(ev.category)}</span>
+      <span style="font-size:13px;color:#333;font-weight:700;flex:1;min-width:0">${esc(ev.content)}</span>
+    </div>`;
+
   return`
-  <div class="g4" style="margin-bottom:12px">
-    <div class="stat"><div class="sv" style="color:${gc(a)}">${a.toFixed(2)}</div><div class="sl">내신평균</div></div>
-    <div class="stat"><div class="sv" style="color:#f59e0b">${(s.targets||[]).length}</div><div class="sl">지원대학</div></div>
-    <div class="stat"><div class="sv" style="color:#10b981">${Object.keys(s.weeklyPlan||{}).length}h</div><div class="sl">주간플랜</div></div>
-    <div class="stat"><div class="sv" style="color:#8b5cf6">${(s.learningStyle||[]).length}</div><div class="sl">러닝기록</div></div>
-  </div>
-  ${_chHist.length?`<div class="box" style="margin-bottom:10px;cursor:pointer" onclick="ST.tab='challenger';render()">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:12px;font-weight:700;color:#0f766e">🎯 챌린저 누적 기록</span>
-      <span style="font-size:11px;color:#0f766e;font-weight:700">${_chHist.length}회차 저장됨 · 최근: ${esc(_chHist[_chHist.length-1]?.date||'-')} →</span>
+  <div class="ov-quad-grid">
+  <!-- ① 성적 (내신+모의고사) -->
+  <div class="ov-quad-card">
+    <div class="ov-quad-head" style="border-bottom-color:#3b5bdb33">
+      <span class="ov-quad-title" style="color:#3b5bdb">📊 성적</span>
+      <button class="ov-quad-more" onclick="ST.tab='grade';render()" style="color:#3b5bdb;border-color:#3b5bdb40">상세 →</button>
     </div>
-  </div>`:''}
-  <div class="box" style="margin-bottom:10px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:12px;font-weight:700;color:#555">📚 내신 성적 요약</span>
-      <button onclick="ST.tab='grade';render()" style="background:transparent;color:#3b82f6;border:1px solid #3b82f640;border-radius:6px;padding:2px 9px;font-size:10px;font-weight:700">상세 →</button>
+    <div class="ov-quad-body">
+    <div class="ov-quad-split">
+      <!-- 내신 열 -->
+      <div style="padding-right:12px;border-right:1px solid #e8eaf6;display:flex;flex-direction:column">
+        <div class="ov-quad-topzone" style="text-align:center">
+          <div style="font-size:12.5px;color:#777;font-weight:700;margin-bottom:4px">📚 내신 전체평균</div>
+          <div class="ov-quad-headline-num" style="color:${a?gc(a):'#bbb'}">${a?a.toFixed(2):'-'}</div>
+          <div style="font-size:11px;color:#999;margin-top:3px">${a?`(9등급 환산 ${_a9})`:'&nbsp;'}</div>
+        </div>
+        <div class="ov-quad-col-h" style="color:#3b5bdb">학기별 평균</div>
+        <div class="ov-quad-rows">
+        ${_gdSemRows.length?_gdSemRows.map(p=>_ovPairRowHtml(p,'#3b5bdb','#eef1ff')).join(''):`<div class="ov-quad-empty">내신 성적 미입력</div>`}
+        </div>
+      </div>
+      <!-- 모의고사 열 -->
+      <div style="padding-left:2px;display:flex;flex-direction:column">
+        <div class="ov-quad-topzone" style="text-align:center">
+          <div style="font-size:12.5px;color:#777;font-weight:700;margin-bottom:4px">📝 모의고사 전체평균</div>
+          <div class="ov-quad-headline-num" style="color:${_mockOverall?gc(_mockOverall):'#bbb'}">${_mockOverall?_mockOverall.toFixed(2):'-'}</div>
+          <div style="font-size:11px;color:#999;margin-top:3px">&nbsp;</div>
+        </div>
+        <div class="ov-quad-col-h" style="color:#f59e0b">과목별 평균</div>
+        <div class="ov-quad-rows">
+        ${_mockHasAny?_mockSubjRows.map(p=>_ovPairRowHtml(p,'#f59e0b','#fff3de')).join(''):`<div class="ov-quad-empty">모의고사 성적 미입력<br><button onclick="ST.tab='grade';render();setTimeout(()=>openMockForm(ST.sel?.id),100)" style="margin-top:8px;background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700">입력하기</button></div>`}
+        </div>
+      </div>
     </div>
-    ${GRADE_SUBJS.map(([k,lb])=>{
-  const raw=s.subjects[k];
-  const v=(raw===null||raw===undefined||raw==='')?null:(isNaN(+raw)?null:+raw);
-  const c=v?gc(v):'#cbd5e1';
-  const pct=v?((6-v)/5*100).toFixed(0):'0';
-  const label=(v!==null)?v+'등급':'미입력';
-  return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span style="font-size:11px;color:#555;width:36px;flex-shrink:0">${lb}</span><div class="bb" style="flex:1"><div class="bf" style="width:${pct}%;background:${c}"></div></div><span style="font-size:12px;font-weight:700;color:${c};min-width:36px;text-align:right">${label}</span></div>`;}).join('')}
-  </div>
-  <div class="box">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:12px;font-weight:700;color:#555">📝 모의고사 요약</span>
-      <button onclick="ST.tab='grade';render();setTimeout(()=>openMockForm(ST.sel?.id||ST.adminSel?.id),100)" style="background:transparent;color:#f59e0b;border:1px solid #f59e0b40;border-radius:6px;padding:2px 9px;font-size:10px;font-weight:700">상세 →</button>
-    </div>
-    ${Object.values(mg).some(v=>Object.values(v||{}).some(x=>x))?
-      ['국어','수학','영어','탐구1','탐구2'].map(subj=>{
-        const latest=MOCK_TESTS.slice().reverse().find(t=>(mg[subj]||{})[t]);
-        const raw=latest?(mg[subj]||{})[latest]:null;
-        if(!raw)return'';
-        const gv=typeof raw==='object'?raw.grade:raw;
-        const c=gv&&!isNaN(+gv)&&+gv>=1&&+gv<=9?gc(+gv):'#aaa';
-        const display=fmtMock(raw);
-        return`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #e8eaf6"><span style="color:#555">${subj}</span><span style="color:${c};font-weight:700">${display}${latest?'<span style="font-size:9px;color:#888;font-weight:400;margin-left:4px">('+latest+')</span>':''}</span></div>`;
-      }).filter(Boolean).join('')||'<div style="color:#888;font-size:12px">성적 없음</div>'
-    :`<div style="text-align:center;color:#888;padding:14px 0;font-size:12px">모의고사 성적 미입력<br><button onclick="ST.tab='grade';render();setTimeout(()=>openMockForm(ST.sel?.id),100)" style="margin-top:8px;background:#f59e0b18;color:#f59e0b;border:1px solid #f59e0b40;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700">입력하기</button></div>`}
     ${s.mockMemo?`<div style="margin-top:8px;font-size:11px;color:#777;border-top:1px solid #e8eaf6;padding-top:6px">${esc(s.mockMemo)}</div>`:''}
+    </div>
+  </div>
+  <!-- ② 챌린저 -->
+  <div class="ov-quad-card">
+    <div class="ov-quad-head" style="border-bottom-color:#0f766e33">
+      <span class="ov-quad-title" style="color:#0f766e">🎯 챌린저</span>
+      <button class="ov-quad-more" onclick="ST.tab='challenger';render()" style="color:#0f766e;border-color:#0f766e40">상세 →</button>
+    </div>
+    <div class="ov-quad-body">
+    ${_chg.total?`
+    <div class="ov-quad-topzone">
+      <div class="ov-quad-headline" style="margin-bottom:0">
+        <span class="ov-quad-headline-num" style="color:#0f766e">${_chg.total}</span>
+        <span class="ov-quad-headline-lb">회 진행</span>
+      </div>
+    </div>
+    <div class="ov-quad-split">
+      <!-- 최근 챌린저 -->
+      <div style="padding-right:12px;border-right:1px solid #e8eaf6;min-width:0;display:flex;flex-direction:column">
+        <div class="ov-quad-hd-row">
+          <div class="ov-quad-col-h" style="color:#0f766e;margin-bottom:0">최근 챌린저</div>
+          ${_chg.recent.length>_chgRecentShown?`<button class="ov-quad-more-sm" style="color:#0f766e" onclick="ovShowMorePopupFrom('ovChgRecentAll_${s.id}','최근 챌린저 전체')">더보기 ▶</button>`:''}
+        </div>
+        <div class="ov-quad-rows">
+        ${_chg.recent.slice(0,_chgRecentShown).map(_ovChgRecentRowHtml).join('')}
+        </div>
+        ${_chg.recent.length>_chgRecentShown?`<div id="ovChgRecentAll_${s.id}" style="display:none">${_chg.recent.map(_ovChgRecentRowHtml).join('')}</div>`:''}
+      </div>
+      <!-- 누적 통계 (과목별) -->
+      <div style="padding-left:2px;min-width:0;display:flex;flex-direction:column">
+        <div class="ov-quad-hd-row">
+          <div class="ov-quad-col-h" style="color:#0f766e;margin-bottom:0">누적 통계 (과목별)</div>
+          ${_chg.subjStats.length>_chgStatsShown?`<button class="ov-quad-more-sm" style="color:#0f766e" onclick="ovShowMorePopupFrom('ovChgStatsAll_${s.id}','누적 통계 (과목별) 전체')">더보기 ▶</button>`:''}
+        </div>
+        <div class="ov-quad-rows">
+        ${_chg.subjStats.slice(0,_chgStatsShown).map(_ovChgStatRowHtml).join('')}
+        </div>
+        ${_chg.subjStats.length>_chgStatsShown?`<div id="ovChgStatsAll_${s.id}" style="display:none">${_chg.subjStats.map(_ovChgStatRowHtml).join('')}</div>`:''}
+      </div>
+    </div>
+    `:`<div class="ov-quad-empty" style="flex:1;display:flex;align-items:center;justify-content:center">진행한 챌린저 기록이 없습니다</div>`}
+    </div>
+  </div>
+  <!-- ③ X-lab 주제활동 -->
+  <div class="ov-quad-card">
+    <div class="ov-quad-head" style="border-bottom-color:#b8860b33">
+      <span class="ov-quad-title" style="color:#b8860b">🔬 X-lab 주제활동</span>
+      <button class="ov-quad-more" onclick="ST.tab='xlab';render()" style="color:#b8860b;border-color:#b8860b40">상세 →</button>
+    </div>
+    <div class="ov-quad-body">
+    ${_xl.loading?`<div class="ov-quad-empty" style="flex:1;display:flex;align-items:center;justify-content:center">불러오는 중...</div>`:_xl.total?`
+    <div class="ov-quad-topzone">
+      <div class="ov-quad-headline" style="margin-bottom:0">
+        <span class="ov-quad-headline-num" style="color:#b8860b">${_xl.total}</span>
+        <span class="ov-quad-headline-lb">회 진행</span>
+      </div>
+    </div>
+    <div class="ov-quad-split">
+      <!-- 최근 주제활동 -->
+      <div style="padding-right:12px;border-right:1px solid #e8eaf6;min-width:0;display:flex;flex-direction:column">
+        <div class="ov-quad-hd-row">
+          <div class="ov-quad-col-h" style="color:#b8860b;margin-bottom:0">최근 주제활동</div>
+          ${_xl.recent.length>_xlRecentShown?`<button class="ov-quad-more-sm" style="color:#b8860b" onclick="ovShowMorePopupFrom('ovXlabRecentAll_${s.id}','최근 주제활동 전체')">더보기 ▶</button>`:''}
+        </div>
+        <div class="ov-quad-rows">
+        ${_xl.recent.slice(0,_xlRecentShown).map(_ovXlabRecentRowHtml).join('')}
+        </div>
+        ${_xl.recent.length>_xlRecentShown?`<div id="ovXlabRecentAll_${s.id}" style="display:none">${_xl.recent.map(_ovXlabRecentRowHtml).join('')}</div>`:''}
+      </div>
+      <!-- 누적 통계 (과목별) -->
+      <div style="padding-left:2px;min-width:0;display:flex;flex-direction:column">
+        <div class="ov-quad-hd-row">
+          <div class="ov-quad-col-h" style="color:#b8860b;margin-bottom:0">누적 통계 (과목별)</div>
+          ${_xl.subjStats.length>_xlStatsShown?`<button class="ov-quad-more-sm" style="color:#b8860b" onclick="ovShowMorePopupFrom('ovXlabStatsAll_${s.id}','누적 통계 (과목별) 전체')">더보기 ▶</button>`:''}
+        </div>
+        ${_xl.subjStats.length?`
+        <div class="ov-quad-rows">
+        ${_xl.subjStats.slice(0,_xlStatsShown).map(_ovXlabStatRowHtml).join('')}
+        </div>
+        ${_xl.subjStats.length>_xlStatsShown?`<div id="ovXlabStatsAll_${s.id}" style="display:none">${_xl.subjStats.map(_ovXlabStatRowHtml).join('')}</div>`:''}
+        `:`<div class="ov-quad-empty" style="flex:1">통계 없음</div>`}
+      </div>
+    </div>
+    ${_xl.selfTotal?`
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e8eaf6">
+      <div class="ov-quad-hd-row">
+        <div class="ov-quad-col-h" style="color:#92400e;margin-bottom:0">🧑‍🎓 셀프주제활동 (총 ${_xl.selfTotal}회 · 교과목 무관)</div>
+        ${_xl.selfItems.length>_xlSelfShown?`<button class="ov-quad-more-sm" style="color:#92400e" onclick="ovShowMorePopupFrom('ovXlabSelfAll_${s.id}','셀프주제활동 전체')">더보기 ▶</button>`:''}
+      </div>
+      ${_xl.selfItems.slice(0,_xlSelfShown).map(_ovXlabSelfRowHtml).join('')}
+      ${_xl.selfItems.length>_xlSelfShown?`<div id="ovXlabSelfAll_${s.id}" style="display:none">${_xl.selfItems.map(_ovXlabSelfRowHtml).join('')}</div>`:''}
+    </div>
+    `:''}
+    `:`<div class="ov-quad-empty" style="flex:1;display:flex;align-items:center;justify-content:center">진행한 X-lab 주제활동 기록이 없습니다</div>`}
+    </div>
+  </div>
+  <!-- ④ 최근상황 -->
+  <div class="ov-quad-card">
+    <div class="ov-quad-head" style="border-bottom-color:#33415533">
+      <span class="ov-quad-title" style="color:#334155">🕓 최근상황</span>
+    </div>
+    <div class="ov-quad-body">
+    <div class="ov-quad-topzone" style="flex-direction:row;justify-content:space-between;align-items:center">
+      <div class="ov-quad-headline" style="margin-bottom:0">
+        <span class="ov-quad-headline-lb">최근 3개월</span>
+        <span class="ov-quad-headline-num" style="color:#334155">${_recentLast3Mo}</span>
+        <span class="ov-quad-headline-lb">회 진행</span>
+      </div>
+      ${_recent.length>_recentShown?`<button class="ov-quad-more-sm" style="color:#334155" onclick="ovShowMorePopupFrom('ovRecentAll_${s.id}','최근상황 전체')">더보기 ▶</button>`:''}
+    </div>
+    ${_recent.length?`
+    <div style="display:flex;gap:10px;padding:4px 0 6px;border-bottom:1.5px solid #e2e8f0;font-size:10.5px;font-weight:800;color:#94a3b8">
+      <span style="min-width:60px;flex-shrink:0">입력일</span>
+      <span style="flex-shrink:0;width:44px">구분</span>
+      <span style="flex:1">내용</span>
+    </div>
+    <div class="ov-quad-rows">
+      ${_recent.slice(0,_recentShown).map(_ovRecentRowHtml).join('')}
+    </div>
+    ${_recent.length>_recentShown?`<div id="ovRecentAll_${s.id}" style="display:none">${_recent.map(_ovRecentRowHtml).join('')}</div>`:''}
+    `:`<div class="ov-quad-empty" style="flex:1;display:flex;align-items:center;justify-content:center">아직 표시할 최근 활동이 없습니다</div>`}
+    </div>
+  </div>
   </div>`;
 }
 
@@ -4806,7 +5243,9 @@ function saveGradeForm(sid){
     return document.getElementById(`gd_name_${SGRADE_SUBJS.length+i}`)?.value?.trim() || lb;
   }).filter(Boolean);
 
-  upd({...s, subjects, gradeDetail:gd, extraSubjs});
+  // ★ 개요 화면 "최근상황" 섹션: 성적(내신/모의고사)을 마지막으로 누가(관리자/학생) 저장했는지
+  // 기록 — 학생용 성적 입력 저장 함수의 동일 필드(_gradeLastEditRole/_gradeLastEditAt)와 짝을 이룸.
+  upd({...s, subjects, gradeDetail:gd, extraSubjs, _gradeLastEditRole:'admin', _gradeLastEditAt:Date.now()});
   document.querySelector('.grade-overlay')?.remove();
 }
 
@@ -4897,7 +5336,7 @@ function saveMockForm(sid, ov){
     });
   });
   const memo=ovEl?.querySelector('#mg_memo')?.value||'';
-  upd({...s, mockGrades:mg, mockMemo:memo, mockExtraSubjs:exSubj});
+  upd({...s, mockGrades:mg, mockMemo:memo, mockExtraSubjs:exSubj, _gradeLastEditRole:'admin', _gradeLastEditAt:Date.now()});
   ovEl?.remove();
 }
 
@@ -8450,7 +8889,7 @@ function ttCellClick(dayIdx, hour, wy, wm, ww){
       var p = Object.assign({}, s.weeklyPlan||{});
       var b = Object.assign({}, s.weeklyBookMap||{});
       delete p[k]; delete b[k];
-      upd(Object.assign({}, s, {weeklyPlan:p, weeklyBookMap:b, _planWeek:curKey2}));
+      upd(Object.assign({}, s, {weeklyPlan:p, weeklyBookMap:b, _planWeek:curKey2, _planLastEditRole:'admin', _planLastEditAt:Date.now()}));
     } else {
       // 이전 주차 이력에서 삭제
       var hist = (s.weeklyHistory||[]).slice();
@@ -8482,7 +8921,7 @@ function ttCellClick(dayIdx, hour, wy, wm, ww){
       // ST.weekBook이 선택된 경우 우선 사용, 없으면 첫 번째 교재
       var bk = ST.weekBook!==undefined && ST.weekBook!=='' ? ST.weekBook : ((sp.bookDetails||[]).filter(function(d){return d.name;})[0]?.name || (sp.books||[]).filter(function(x){return !!x;})[0]||'');
       hrs.forEach(function(hh){ p3[day+'-'+hh]=ST.weekSubj; if(bk)b3[day+'-'+hh]=bk; });
-      upd(Object.assign({}, s, {weeklyPlan:p3, weeklyBookMap:b3, _planWeek:curKey2}));
+      upd(Object.assign({}, s, {weeklyPlan:p3, weeklyBookMap:b3, _planWeek:curKey2, _planLastEditRole:'admin', _planLastEditAt:Date.now()}));
     } else {
       var hist2 = (s.weeklyHistory||[]).slice();
       var hi2 = hist2.findIndex(function(x){return x.year===wy&&x.month===wm&&x.weekNum===ww;});
@@ -9058,7 +9497,7 @@ function applyAiPlan(sid){
     alert('먼저 AI 플랜을 생성해주세요.');return;
   }
   if(!confirm(`현재 시간표를 AI 추천 플랜으로 교체할까요?\n기존 시간표는 삭제됩니다.`)) return;
-  upd({...s, weeklyPlan:{...window._lastAiPlanMap}});
+  upd({...s, weeklyPlan:{...window._lastAiPlanMap}, _planLastEditRole:'admin', _planLastEditAt:Date.now()});
   ST.weekTab='tt';
   render();
   setTimeout(()=>alert('✅ AI 추천 플랜이 학습플랜에 적용되었습니다!'),100);
@@ -9251,7 +9690,7 @@ function renderWeeklyHistory(s){
               <span style="font-size:11px;color:#555;font-weight:600">${hTotal}h</span>
             </div>
             <div style="display:flex;gap:5px;align-items:center">
-              <button onclick="event.stopPropagation();if(confirm('이 이력을 현재 학습플랜으로 불러올까요?')){upd({...ST.sel,weeklyPlan:{...h.plan},weeklyBookMap:{...h.bookMap},weeklySubjPlans:JSON.parse(JSON.stringify(h.subjPlans||{}))});ST.weekTab='tt';render();alert('불러오기 완료!')};"
+              <button onclick="event.stopPropagation();if(confirm('이 이력을 현재 학습플랜으로 불러올까요?')){upd({...ST.sel,weeklyPlan:{...h.plan},weeklyBookMap:{...h.bookMap},weeklySubjPlans:JSON.parse(JSON.stringify(h.subjPlans||{})),_planLastEditRole:'admin',_planLastEditAt:Date.now()});ST.weekTab='tt';render();alert('불러오기 완료!')};"
                 style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">📥 불러오기</button>
               <button onclick="event.stopPropagation();printWeeklyHistoryOne(${s.id},${h.id})"
                 style="background:#f0fdf4;color:#0f9d58;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">🖨 인쇄</button>
@@ -12987,7 +13426,7 @@ function copyPrevWeekPlan(sid, wy, wm, ww){
   var pLabel=py+'년 '+pm+'월 '+pw+'주차';
   if(!confirm(pLabel+' 플랜을 '+wLabel+'로 가져올까요?\n기존 내용은 덮어쓰입니다.')){return;}
   if(isCurrentWeek){
-    upd(Object.assign({},s,{weeklyPlan:Object.assign({},srcPlan),weeklyBookMap:Object.assign({},srcBm),_planWeek:curKey}));
+    upd(Object.assign({},s,{weeklyPlan:Object.assign({},srcPlan),weeklyBookMap:Object.assign({},srcBm),_planWeek:curKey,_planLastEditRole:'admin',_planLastEditAt:Date.now()}));
   } else {
     var hist2=history.slice();
     var wKey=getWeekNum(wy,wm,ww);
@@ -49141,6 +49580,37 @@ function xlabAdminPrintWorkbook(id){
   w.document.write(_xlabBuildWorkbookHtml(t));
   w.document.close();
 }
+// ★ 2026-10-02 추가: "학생워크북" — 학생용 디지털 워크북(renderXlabWorkbookTab, 학생 파일)에서
+// 학생이 직접 입력해 저장한 답변(t.workbookAnswers, step1~step7 키)을 _xlabBuildWorkbookHtml과
+// 동일한 단계 구성(주제선정이유~예상세특확인)으로 인쇄한다. 참고박스는 기존과 동일하게
+// 저장된 원본 자료를 보여주고, 밑줄 칸 대신 학생이 쓴 답변을 박스로 보여준다.
+function _xlabBuildStudentWorkbookHtml(t){
+  const wa = t.workbookAnswers || {};
+  const dateCompact = (function(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab_월별주제활동_학생워크북_'+dateCompact;
+  const topicBox = '<div class="topic-box">'
+    +'<div><b>선택 주제:</b> '+_xlabEsc(t.topicTitle||'-')+(t.topicSource==='ai'?' <span style="color:#3b5bdb">(🤖 AI추천)</span>':'')+'</div>'
+    +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+    +'<div><b>교과목:</b> '+_xlabEsc(t.subjectArea||'-')+' · <b>교과개념:</b> '+_xlabEsc(t.subjectConcept||'-')+'</div>'
+    +'</div>';
+  let body = topicBox
+    + _xlabWorksheetStepFilled('1','주제 선정이유','지난 시간에 정리한 이유', t.report&&t.report.reason, '오늘 다시 한 번, 이 주제를 고른 이유를 적어보세요', wa.step1)
+    + _xlabWorksheetStepFilled('2','개념·원리·이론','저장된 내용', t.report&&t.report.concept, '이 주제와 관련된 개념·원리·이론을 정리해보세요', wa.step2)
+    + _xlabWorksheetStepFilled('3','실사례','저장된 내용', t.report&&t.report.example, '실제 사례나 예시를 찾아 적어보세요', wa.step3)
+    + _xlabWorksheetStepFilled('4','문제점·개선점','저장된 내용', t.report&&t.report.issue, '문제점과 개선 아이디어를 적어보세요', wa.step4)
+    + _xlabWorksheetStepFilled('5','학교 연계 활동','저장된 내용', t.report&&t.report.activity, '학교에서 연계해볼 수 있는 활동을 적어보세요', wa.step5)
+    + _xlabWorksheetStepFilled('6','🤖 심화·확장 주제', 'AI 추천 심화·확장 주제', t.advancedTopicTitle ? (t.advancedTopicTitle+(t.advancedTopicDesc?(' — '+t.advancedTopicDesc):'')) : '', 'AI 추천을 참고해서 내가 더 파고들고 싶은 부분을 적어보세요', wa.step6)
+    + _xlabWorksheetStepFilled('7','예상세특 확인', '저장된 예상세특'+(t.expectedRecord&&t.expectedRecord.subject?(' ('+t.expectedRecord.subject+')'):''), t.expectedRecord&&t.expectedRecord.recordText, '더 다듬고 싶은 표현이나 보완할 점을 메모해보세요', wa.step7);
+  return _xlabWorksheetShell({title:'X-lab 월별주제활동 학생워크북', icon:'📘', accent:'#3b5bdb', s:_xlabAdminCurrentStudent(), subtitle:'학생이 디지털 워크북에서 직접 작성해 저장한 답변입니다.', department:t.department, pdfTitle:pdfTitle, bodyHtml:body});
+}
+function xlabAdminPrintStudentWorkbook(id){
+  const t = _xlabAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  if(!t.workbookAnswers){ alert('학생이 작성한 워크북이 없습니다.'); return; }
+  const w = window.open('','_blank');
+  w.document.write(_xlabBuildStudentWorkbookHtml(t));
+  w.document.close();
+}
 // ★ 2026-09-30(2차) 추가: "빈 워크북" — 특정 학생의 저장된 내용(AI 추천 등)을 전혀 보여주지
 // 않고, 항목 제목·안내 질문과 넉넉한 밑줄 칸만 있는 백지형 활동지. 아직 AI 보고서를
 // 만들기 전에 미리 나눠주거나, 처음부터 손으로 직접 써보게 하고 싶을 때 사용한다.
@@ -49171,7 +49641,10 @@ function renderXlabAdminWorkbookList(s){
         const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
         return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
         <div><div style="font-size:11px;color:#888">${mLabel} · ${_xlabEsc(t.subjectArea||'교과목 미선택')}</div><div style="font-weight:700;font-size:13px;margin-top:2px">${_xlabEsc(t.topicTitle||'(제목 없음)')}</div></div>
+        <div style="display:flex;gap:6px">
+        <button onclick="xlabAdminPrintStudentWorkbook('${t.id}')" style="padding:7px 14px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">👤 학생워크북</button>
         <button onclick="xlabAdminPrintWorkbook('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">🖨 워크북 인쇄/PDF</button>
+        </div>
       </div>`;
       }).join('')
     }`;
@@ -49461,6 +49934,39 @@ function xsubAdminPrintWorkbook(id){
   w.document.write(_xsubBuildWorkbookHtml(t));
   w.document.close();
 }
+// ★ 2026-10-02 추가: "학생워크북" — _xsubBuildWorkbookHtml과 동일한 단계 구성(탐구계기~
+// 교과예상세특확인, step0~step7, 독서활동(step5)은 저장된 독서활동 자료가 있을 때만 표시)
+// 으로, 학생이 디지털 워크북에서 작성한 답변(t.workbookAnswers)을 보여준다.
+function _xsubBuildStudentWorkbookHtml(t){
+  const wa = t.workbookAnswers || {};
+  const dateCompact = (function(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab_월별교과활동_학생워크북_'+dateCompact;
+  const subjArea = _xsubResolvedSubjectArea(t);
+  const reasonLine = _xsubReasonSummaryText(t.reason||{});
+  const topicBox = '<div class="topic-box">'
+    +'<div><b>교과목:</b> '+_xlabEsc(subjArea||'-')+'</div>'
+    +'<div><b>탐구 주제:</b> '+_xlabEsc(t.topicTitle||'-')+'</div>'
+    +(t.topicDesc?('<div style="color:#666">'+_xlabEsc(t.topicDesc)+'</div>'):'')
+    +'</div>';
+  let body = topicBox
+    + _xlabWorksheetStepFilled('0','탐구 계기','저장된 계기', reasonLine, '이 주제가 궁금해진 계기를 내 말로 다시 적어보세요', wa.step0)
+    + _xlabWorksheetStepFilled('1','개념·원리·이론','저장된 내용', t.report&&t.report.concept, '관련된 개념·원리·이론을 정리해보세요', wa.step1)
+    + _xlabWorksheetStepFilled('2','실사례','저장된 내용', t.report&&t.report.example, '실제 사례나 예시를 찾아 적어보세요', wa.step2)
+    + _xlabWorksheetStepFilled('3','문제점·개선점','저장된 내용', t.report&&t.report.issue, '문제점과 개선 아이디어를 적어보세요', wa.step3)
+    + _xlabWorksheetStepFilled('4','배운점·느낀점','저장된 내용', t.report&&t.report.learned, '배우고 느낀 점을 적어보세요', wa.step4)
+    + (t.report&&t.report.reading ? _xlabWorksheetStepFilled('5','독서활동 기록','저장된 내용', t.report.reading, '독서활동과 연결해서 더 적어볼 내용이 있다면 적어보세요', wa.step5) : '')
+    + _xlabWorksheetStepFilled('6','🤖 심화·확장 주제', 'AI 추천/저장된 심화·확장 주제', t.report&&t.report.advanced, 'AI 추천을 참고해서 더 파고들고 싶은 부분을 적어보세요', wa.step6)
+    + _xlabWorksheetStepFilled('7','교과 예상세특 확인', '저장된 예상세특'+(t.expectedRecord&&t.expectedRecord.subject?(' ('+t.expectedRecord.subject+')'):''), t.expectedRecord&&t.expectedRecord.recordText, '더 다듬고 싶은 표현이나 보완할 점을 메모해보세요', wa.step7);
+  return _xlabWorksheetShell({title:'X-lab 월별교과활동 학생워크북', icon:'📗', accent:'#0f766e', s:_xlabAdminCurrentStudent(), subtitle:'학생이 디지털 워크북에서 직접 작성해 저장한 답변입니다.', department:t.department, pdfTitle:pdfTitle, bodyHtml:body});
+}
+function xsubAdminPrintStudentWorkbook(id){
+  const t = _xsubAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  if(!t.workbookAnswers){ alert('학생이 작성한 워크북이 없습니다.'); return; }
+  const w = window.open('','_blank');
+  w.document.write(_xsubBuildStudentWorkbookHtml(t));
+  w.document.close();
+}
 function _xsubBuildBlankWorkbookHtml(){
   const body =
       _xlabWorksheetStep('0','탐구 계기','', '', '이 주제가 궁금해진 계기를 적어보세요', 5)
@@ -49489,7 +49995,10 @@ function renderXsubAdminWorkbookList(s){
         const p=String(t.month).split('-'); const mLabel=p[0]+'년 '+parseInt(p[1]||'1',10)+'월';
         return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
         <div><div style="font-size:11px;color:#888">${mLabel} · ${_xlabEsc(_xsubResolvedSubjectArea(t)||'교과목 미선택')}</div><div style="font-weight:700;font-size:13px;margin-top:2px">${_xlabEsc(t.topicTitle||'(제목 없음)')}</div></div>
+        <div style="display:flex;gap:6px">
+        <button onclick="xsubAdminPrintStudentWorkbook('${t.id}')" style="padding:7px 14px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">👤 학생워크북</button>
         <button onclick="xsubAdminPrintWorkbook('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">🖨 워크북 인쇄/PDF</button>
+        </div>
       </div>`;
       }).join('')
     }`;
@@ -49686,6 +50195,43 @@ function xfinAdminPrintWorkbook(id){
   w.document.write(_xfinBuildWorkbookHtml(t));
   w.document.close();
 }
+// ★ 2026-10-02 추가: "학생워크북" — _xfinBuildWorkbookHtml과 동일한 단계 구성(최종예상세특
+// 참고→섹션별 항목(저장되어 있는 것만, motivation/concept/example/issue/learned/reading
+// 키로 식별)→연계활동(있을 때만)→최종 다듬기)으로, 학생이 작성한 답변(t.workbookAnswers)을
+// 보여준다. 동적으로 번호가 매겨지는 원본과 달리 답변 키는 섹션의 "이름"(필드 키)을 그대로
+// 사용해 항목 등장 여부가 달라져도 어긋나지 않게 한다 — linkedActivity, finalPolish.
+function _xfinBuildStudentWorkbookHtml(t){
+  const wa = t.workbookAnswers || {};
+  const dateCompact = (function(){ const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const pdfTitle = (t.studentName?(_xlabEsc(t.studentName)+'_'):'')+'X-lab_최종예상세특_학생워크북_'+dateCompact;
+  const subjArea = _xfinResolvedSubjectArea(t);
+  const sectionLabels = [['motivation','주제 선정동기'],['concept','개념·원리·이론'],['example','실사례'],['issue','문제점·개선점'],['learned','배운점·느낀점·알게된점'],['reading','독서활동']];
+  const topicBox = '<div class="topic-box">'
+    +'<div><b>교과목:</b> '+_xlabEsc(subjArea||'-')+'</div>'
+    +'<div><b>주제/활동명:</b> '+_xlabEsc(t.topicTitle||'-')+'</div>'
+    +'</div>';
+  const finalBox = '<div class="ref-label">🏆 저장된 최종 예상세특(참고)</div><div class="ref-box" style="border-left-color:#b8860b;background:#fffbe6">'+_xlabEsc(t.finalRecordText||'')+'</div>';
+  let stepNo=1, body = topicBox + finalBox;
+  sectionLabels.forEach(function(pair){
+    const sec = t.sections && t.sections[pair[0]];
+    if(!sec || sec.mode==='none' || !sec.text) return;
+    body += _xlabWorksheetStepFilled(String(stepNo++), pair[1], '저장된 내용', sec.text, '내 말로 다시 정리해서 적어보세요', wa[pair[0]]);
+  });
+  const laText = (t.linkedActivity && t.linkedActivity.mode!=='none') ? t.linkedActivity.text : '';
+  if(laText){
+    body += _xlabWorksheetStepFilled(String(stepNo++), '연계 활동 ('+_xfinResolvedLinkedType(t)+')', '저장된 내용', laText, '이 활동과 어떻게 연결되는지 적어보세요', wa.linkedActivity);
+  }
+  body += _xlabWorksheetStepFilled(String(stepNo++), '최종 다듬기', '', '', '위 내용을 참고해서, 최종예상세특에서 더 다듬고 싶은 표현이나 추가하고 싶은 내용을 적어보세요', wa.finalPolish);
+  return _xlabWorksheetShell({title:'X-lab 최종예상세특 학생워크북', icon:'🏆', accent:'#b8860b', s:_xlabAdminCurrentStudent(), subtitle:'학생이 디지털 워크북에서 직접 작성해 저장한 답변입니다.', department:t.department, pdfTitle:pdfTitle, bodyHtml:body});
+}
+function xfinAdminPrintStudentWorkbook(id){
+  const t = _xfinAdminList.find(function(x){return x.id===id;});
+  if(!t) return;
+  if(!t.workbookAnswers){ alert('학생이 작성한 워크북이 없습니다.'); return; }
+  const w = window.open('','_blank');
+  w.document.write(_xfinBuildStudentWorkbookHtml(t));
+  w.document.close();
+}
 function _xfinBuildBlankWorkbookHtml(){
   const sectionLabels = [['주제 선정동기','이 주제/활동을 고른 동기를 적어보세요'],['개념·원리·이론','관련된 개념·원리·이론을 정리해보세요'],['실사례','실제 사례나 예시를 찾아 적어보세요'],['문제점·개선점','문제점과 개선 아이디어를 적어보세요'],['배운점·느낀점·알게된점','배우고 느낀 점, 알게 된 점을 적어보세요'],['독서활동','관련된 독서활동이 있다면 적어보세요']];
   let stepNo=1, body='';
@@ -49711,7 +50257,10 @@ function renderXfinAdminWorkbookList(s){
       _xfinAdminList.map(function(t){
         return `<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
         <div><div style="font-size:11px;color:#888">${_xlabEsc(_xfinResolvedSubjectArea(t)||'교과목 미선택')}</div><div style="font-weight:700;font-size:13px;margin-top:2px">${_xlabEsc(t.topicTitle||'(제목 없음)')}</div></div>
+        <div style="display:flex;gap:6px">
+        <button onclick="xfinAdminPrintStudentWorkbook('${t.id}')" style="padding:7px 14px;background:#b8860b;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">👤 학생워크북</button>
         <button onclick="xfinAdminPrintWorkbook('${t.id}')" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap">🖨 워크북 인쇄/PDF</button>
+        </div>
       </div>`;
       }).join('')
     }`;
@@ -50474,6 +51023,17 @@ function _xlabWorksheetStep(no, title, refLabel, refText, blankLabel, lines){
     +_xlabWorksheetLines(lines)
     +'</div>';
 }
+// ★ 2026-10-02 추가: "학생워크북"(디지털 워크북에서 학생이 실제로 작성한 답변) 인쇄용 —
+// _xlabWorksheetStep과 동일한 레이아웃(단계 번호+제목+참고박스+안내문)이지만, 밑줄 칸 대신
+// 학생이 저장한 답변을 박스 안에 그대로 보여준다(answer-box, _xlabWorksheetShell의 CSS 참고).
+function _xlabWorksheetStepFilled(no, title, refLabel, refText, answerLabel, answerText){
+  return '<div class="step">'
+    +'<div class="step-head"><span class="step-no">'+_xlabEsc(no)+'</span>'+_xlabEsc(title)+'</div>'
+    +_xlabWorksheetRefBox(refLabel, refText)
+    +'<div class="blank-label">✏️ '+_xlabEsc(answerLabel)+'</div>'
+    +'<div class="answer-box">'+_xlabEsc(answerText||'(학생이 작성하지 않음)')+'</div>'
+    +'</div>';
+}
 function _xlabWorksheetShell(opts){
   // opts: {title, icon, accent, s, metaLine, bodyHtml, pdfTitle}
   const accent = opts.accent || '#3b5bdb';
@@ -50501,6 +51061,7 @@ function _xlabWorksheetShell(opts){
     +'.ref-box{background:#f8f9fc;border-left:3px solid '+accent+';border-radius:6px;padding:8px 10px;font-size:11.5px;color:#555;white-space:pre-wrap;margin-bottom:7px}'
     +'.blank-label{font-size:11px;color:#888;margin:5px 0 3px}'
     +'.wline{border-bottom:1px dashed #aaa;height:30px}'
+    +'.answer-box{background:#f0f6ff;border:1.3px solid #c3d4f5;border-radius:8px;padding:10px 12px;font-size:13px;color:#1a1a2e;white-space:pre-wrap;min-height:20px}'
     +'</style></head><body>'
     +'<h1>'+opts.icon+' '+_xlabEsc(opts.title)+'</h1>'
     +'<div class="sub">'+_xlabEsc(opts.subtitle||'수업 시간에 참고 자료를 확인하며 손으로 직접 작성해보는 활동지입니다.')+'</div>'
