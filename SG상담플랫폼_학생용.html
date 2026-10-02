@@ -1130,6 +1130,10 @@ function _stuSaveNow(){
         _planWeek: wKey,
         weeklyPlanWeek: wKey,
         _weeklyHistory: CU._weeklyHistory||{},
+        // ★ 개요 화면 "최근상황" 섹션: 주간플랜을 마지막으로 누가(관리자/학생) 저장했는지
+        // 기록 — 관리자용 수정 457 파일의 동일 필드(_planLastEditRole/_planLastEditAt)와 짝을 이룸.
+        _planLastEditRole: 'student',
+        _planLastEditAt: Date.now(),
         _t: Date.now()
       };
       window._studentSaving=true;
@@ -1237,6 +1241,9 @@ async function saveTimetable(){
       _subjColors:CU._subjColors||{},
       _customNames:CU._customNames||{},
       _weeklyHistory:hist,
+      // ★ 개요 화면 "최근상황" 섹션: 저장 주체 기록 (관리자용과 짝을 이룸)
+      _planLastEditRole:'student',
+      _planLastEditAt:Date.now(),
       weeklyHistory:adminHist  // 관리자 형식으로도 저장
     };
     CU={...CU,...saveData};
@@ -1537,7 +1544,8 @@ window.openGradeEdit=function(){
         newSubjs[k]=autoGrade;
       });
 
-      const saveData={subjects:newSubjs, gradeDetail:newGd, extraSubjs:[...window._stuExtraSubjs.filter(Boolean)]};
+      // ★ 개요 화면 "최근상황" 섹션: 저장 주체 기록 (관리자용과 짝을 이룸)
+      const saveData={subjects:newSubjs, gradeDetail:newGd, extraSubjs:[...window._stuExtraSubjs.filter(Boolean)], _gradeLastEditRole:'student', _gradeLastEditAt:Date.now()};
       CU={...CU,...saveData};
       try{
         if(FB()){
@@ -1631,9 +1639,10 @@ window.openMockEdit=function(){
         }
       });
     });
-    CU={...CU,mockGrades:newMg,mockExtraSubjs:newExSubj};
+    // ★ 개요 화면 "최근상황" 섹션: 저장 주체 기록 (관리자용과 짝을 이룸)
+    CU={...CU,mockGrades:newMg,mockExtraSubjs:newExSubj,_gradeLastEditRole:'student',_gradeLastEditAt:Date.now()};
     try{
-      if(FB()) await window._fb.set('students',CU.id,{mockGrades:newMg,mockExtraSubjs:newExSubj});
+      if(FB()) await window._fb.set('students',CU.id,{mockGrades:newMg,mockExtraSubjs:newExSubj,_gradeLastEditRole:'student',_gradeLastEditAt:Date.now()});
       ov.remove(); render();
       toast('✅ 모의고사 성적이 저장되었습니다!');
     }catch(e){alert('저장 실패: '+e.message);}
@@ -5686,13 +5695,15 @@ function xlabSwitchTopMode(mode){
   }else if(mode==='aar'){
     _xaarView='list';
     if(!_xaarLoaded) _xaarLoadAll();
+  }else if(mode==='workbook'){
+    // 워크북 탭은 타입/항목을 고른 뒤에만 데이터를 불러오므로 여기서 미리 로드하지 않음.
   }else{
     _xlabView='list';
   }
   render();
 }
 function _xlabTopModeBar(){
-  const modes = [['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['self','📓 월별셀프활동'],['aar','🎯 X-lab AAR']];
+  const modes = [['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['workbook','📓 월별워크북'],['self','📓 월별셀프활동'],['aar','🎯 X-lab AAR']];
   return `<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
     ${modes.map(function(pair){
       const k=pair[0], label=pair[1];
@@ -5706,10 +5717,230 @@ function renderXlab(){
   if(!CU) return '';
   if(_xlabTopModeMain==='subject') return renderXsub();
   if(_xlabTopModeMain==='final') return renderXfin();
+  if(_xlabTopModeMain==='workbook') return renderXlabWorkbookTab();
   if(_xlabTopModeMain==='self') return renderXact();
   if(_xlabTopModeMain==='aar') return renderXaar();
   if(_xlabView==='edit' && _xlabCurrent) return renderXlabEdit();
   return renderXlabList();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 📓 X-lab · 월별워크북 (학생용 디지털 워크북, 2026-10-02 신규)
+// 관리자 파일의 "🖨 워크북 인쇄/PDF"(종이 워크북)와 짝을 이루는 디지털판 — 학생이
+// 월별주제활동/월별교과활동/최종예상세특 중 하나를 고르고, 그 항목을 고른 뒤, 각
+// 단계별로(관리자의 _xlabBuildWorkbookHtml/_xsubBuildWorkbookHtml/_xfinBuildWorkbookHtml
+// 와 동일한 단계 구성) 참고자료를 보며 직접 입력해 저장한다. 저장한 답은 해당 문서의
+// workbookAnswers 필드(스텝키→텍스트)에 들어가며, 관리자 파일의 "👤 학생워크북" 인쇄
+// 버튼(_xlabBuildStudentWorkbookHtml 등)이 이 필드를 그대로 읽어 인쇄한다.
+// ── 스텝키 규칙(관리자 파일과 반드시 동일하게 유지) ─────────────────────────
+//   · topic(xlabTopics): step1~step7 (관리자 _xlabWorksheetStep의 no 문자열 그대로)
+//   · subject(xlabSubjectReports): step0~step7 (step5=독서활동, 저장된 독서활동 자료가
+//     있을 때만 등장 — 관리자 쪽과 동일 조건)
+//   · final(xlabFinalRecords): 동적 번호 대신 섹션의 고유 키를 그대로 사용
+//     (motivation/concept/example/issue/learned/reading), + linkedActivity, + finalPolish
+// ══════════════════════════════════════════════════════════════════════════
+const XWB_COLLECTIONS = {topic:'xlabTopics', subject:'xlabSubjectReports', final:'xlabFinalRecords'};
+const XWB_TYPE_META = {
+  topic:{icon:'📘', label:'월별주제활동', accent:'#3b5bdb'},
+  subject:{icon:'📗', label:'월별교과활동', accent:'#0f766e'},
+  final:{icon:'🏆', label:'최종예상세특', accent:'#b8860b'}
+};
+let _xwbType = null; // 'topic' | 'subject' | 'final' | null(아직 유형 미선택)
+let _xwbItems = [];
+let _xwbLoading = false;
+let _xwbLoadedType = null;
+let _xwbCurrent = null; // 선택된 항목(xlabTopics/xlabSubjectReports/xlabFinalRecords 중 하나의 문서)
+let _xwbSaving = false;
+
+function xwbSelectType(type){
+  _xwbType = type; _xwbCurrent = null; _xwbItems = []; _xwbLoadedType = null;
+  render();
+}
+function xwbBackToTypes(){
+  _xwbType = null; _xwbCurrent = null; _xwbItems = []; _xwbLoadedType = null;
+  render();
+}
+function xwbSelectItem(id){
+  _xwbCurrent = (_xwbItems||[]).find(function(x){return x.id===id;}) || null;
+  render();
+}
+function xwbBackToList(){ _xwbCurrent = null; render(); }
+
+async function _xwbLoadItems(type){
+  if(!FB() || !CU) return;
+  _xwbLoading = true; render();
+  try{
+    const coll = XWB_COLLECTIONS[type];
+    const all = await window._fb.getWhere(coll, 'studentId', '==', String(CU.id));
+    _xwbItems = (all||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  }catch(e){
+    console.warn('워크북 항목 로딩 실패:', e.message);
+    _xwbItems = [];
+  }
+  _xwbLoadedType = type;
+  _xwbLoading = false; render();
+}
+
+// 관리자 파일의 _xlabBuildWorkbookHtml / _xsubBuildWorkbookHtml / _xfinBuildWorkbookHtml와
+// 1:1로 대응하는 단계 스키마. {key, no, title, refLabel, refText, blankLabel} 배열을 반환.
+function _xwbStepsFor(type, item){
+  if(type==='topic'){
+    return [
+      {key:'step1', no:'1', title:'주제 선정이유', refLabel:'지난 시간에 정리한 이유', refText:(item.report&&item.report.reason)||'', blankLabel:'오늘 다시 한 번, 이 주제를 고른 이유를 적어보세요'},
+      {key:'step2', no:'2', title:'개념·원리·이론', refLabel:'저장된 내용', refText:(item.report&&item.report.concept)||'', blankLabel:'이 주제와 관련된 개념·원리·이론을 정리해보세요'},
+      {key:'step3', no:'3', title:'실사례', refLabel:'저장된 내용', refText:(item.report&&item.report.example)||'', blankLabel:'실제 사례나 예시를 찾아 적어보세요'},
+      {key:'step4', no:'4', title:'문제점·개선점', refLabel:'저장된 내용', refText:(item.report&&item.report.issue)||'', blankLabel:'문제점과 개선 아이디어를 적어보세요'},
+      {key:'step5', no:'5', title:'학교 연계 활동', refLabel:'저장된 내용', refText:(item.report&&item.report.activity)||'', blankLabel:'학교에서 연계해볼 수 있는 활동을 적어보세요'},
+      {key:'step6', no:'6', title:'🤖 심화·확장 주제', refLabel:'AI 추천 심화·확장 주제', refText: item.advancedTopicTitle ? (item.advancedTopicTitle+(item.advancedTopicDesc?(' — '+item.advancedTopicDesc):'')) : '', blankLabel:'AI 추천을 참고해서 내가 더 파고들고 싶은 부분을 적어보세요'},
+      {key:'step7', no:'7', title:'예상세특 확인', refLabel:'저장된 예상세특'+(item.expectedRecord&&item.expectedRecord.subject?(' ('+item.expectedRecord.subject+')'):''), refText:(item.expectedRecord&&item.expectedRecord.recordText)||'', blankLabel:'더 다듬고 싶은 표현이나 보완할 점을 메모해보세요'}
+    ];
+  }
+  if(type==='subject'){
+    const reasonLine = _xsubReasonSummaryText(item.reason||{});
+    const steps = [
+      {key:'step0', no:'0', title:'탐구 계기', refLabel:'저장된 계기', refText:reasonLine||'', blankLabel:'이 주제가 궁금해진 계기를 내 말로 다시 적어보세요'},
+      {key:'step1', no:'1', title:'개념·원리·이론', refLabel:'저장된 내용', refText:(item.report&&item.report.concept)||'', blankLabel:'관련된 개념·원리·이론을 정리해보세요'},
+      {key:'step2', no:'2', title:'실사례', refLabel:'저장된 내용', refText:(item.report&&item.report.example)||'', blankLabel:'실제 사례나 예시를 찾아 적어보세요'},
+      {key:'step3', no:'3', title:'문제점·개선점', refLabel:'저장된 내용', refText:(item.report&&item.report.issue)||'', blankLabel:'문제점과 개선 아이디어를 적어보세요'},
+      {key:'step4', no:'4', title:'배운점·느낀점', refLabel:'저장된 내용', refText:(item.report&&item.report.learned)||'', blankLabel:'배우고 느낀 점을 적어보세요'}
+    ];
+    if(item.report && item.report.reading){
+      steps.push({key:'step5', no:'5', title:'독서활동 기록', refLabel:'저장된 내용', refText:item.report.reading, blankLabel:'독서활동과 연결해서 더 적어볼 내용이 있다면 적어보세요'});
+    }
+    steps.push({key:'step6', no:'6', title:'🤖 심화·확장 주제', refLabel:'AI 추천/저장된 심화·확장 주제', refText:(item.report&&item.report.advanced)||'', blankLabel:'AI 추천을 참고해서 더 파고들고 싶은 부분을 적어보세요'});
+    steps.push({key:'step7', no:'7', title:'교과 예상세특 확인', refLabel:'저장된 예상세특'+(item.expectedRecord&&item.expectedRecord.subject?(' ('+item.expectedRecord.subject+')'):''), refText:(item.expectedRecord&&item.expectedRecord.recordText)||'', blankLabel:'더 다듬고 싶은 표현이나 보완할 점을 메모해보세요'});
+    return steps;
+  }
+  if(type==='final'){
+    const sectionLabels = [['motivation','주제 선정동기'],['concept','개념·원리·이론'],['example','실사례'],['issue','문제점·개선점'],['learned','배운점·느낀점·알게된점'],['reading','독서활동']];
+    let stepNo=1, steps=[];
+    sectionLabels.forEach(function(pair){
+      const sec = item.sections && item.sections[pair[0]];
+      if(!sec || sec.mode==='none' || !sec.text) return;
+      steps.push({key:pair[0], no:String(stepNo++), title:pair[1], refLabel:'저장된 내용', refText:sec.text, blankLabel:'내 말로 다시 정리해서 적어보세요'});
+    });
+    const laText = (item.linkedActivity && item.linkedActivity.mode!=='none') ? item.linkedActivity.text : '';
+    if(laText){
+      steps.push({key:'linkedActivity', no:String(stepNo++), title:'연계 활동 ('+_xfinResolvedLinkedType(item)+')', refLabel:'저장된 내용', refText:laText, blankLabel:'이 활동과 어떻게 연결되는지 적어보세요'});
+    }
+    steps.push({key:'finalPolish', no:String(stepNo++), title:'최종 다듬기', refLabel:'', refText:'', blankLabel:'위 내용을 참고해서, 최종예상세특에서 더 다듬고 싶은 표현이나 추가하고 싶은 내용을 적어보세요'});
+    return steps;
+  }
+  return [];
+}
+
+async function xwbSave(){
+  if(!_xwbCurrent || !_xwbType) return;
+  const coll = XWB_COLLECTIONS[_xwbType];
+  const steps = _xwbStepsFor(_xwbType, _xwbCurrent);
+  const wa = Object.assign({}, _xwbCurrent.workbookAnswers||{});
+  steps.forEach(function(st){
+    const el = document.getElementById('xwbAns_'+st.key);
+    if(el) wa[st.key] = el.value;
+  });
+  _xwbSaving = true; render();
+  try{
+    if(FB()) await window._fb.set(coll, _xwbCurrent.id, Object.assign({}, _xwbCurrent, {workbookAnswers: wa, workbookSavedAt: Date.now()}));
+    _xwbCurrent.workbookAnswers = wa;
+    _xwbCurrent.workbookSavedAt = Date.now();
+    toast('워크북이 저장되었습니다 💾');
+  }catch(e){
+    alert('저장 실패: '+e.message);
+  }
+  _xwbSaving = false; render();
+}
+
+function renderXwbTypePicker(){
+  const typeDefs = [['topic'],['subject'],['final']];
+  return `
+    <div style="font-size:12px;color:#888;margin-bottom:12px">디지털 워크북을 작성할 활동 유형을 선택하세요. 각 유형의 활동을 먼저 만들어둬야 선택할 수 있어요.</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${typeDefs.map(function(p){
+        const m = XWB_TYPE_META[p[0]];
+        return `<button onclick="xwbSelectType('${p[0]}')" style="padding:16px;background:#fff;border:1.5px solid #ddd;border-radius:12px;font-weight:800;font-size:14px;text-align:left">${m.icon} ${m.label}</button>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderXwbItemList(){
+  const m = XWB_TYPE_META[_xwbType];
+  return `
+    <button onclick="xwbBackToTypes()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:12px">← 유형 다시 선택</button>
+    <div style="font-weight:800;font-size:14px;margin-bottom:10px">${m.icon} ${m.label} — 워크북을 작성할 항목을 선택하세요</div>
+    ${!_xwbItems.length ? `<div style="text-align:center;color:#aaa;padding:30px;font-size:13px">등록된 ${m.label} 항목이 없습니다. 먼저 ${m.label} 탭에서 활동을 작성해주세요.</div>` :
+      _xwbItems.map(function(t){
+        const sub = _xwbType==='final' ? (_xfinResolvedSubjectArea(t)||'교과목 미선택')
+          : (_xwbType==='subject' ? (_xsubResolvedSubjectArea(t)||'교과목 미선택') : (t.subjectArea||'교과목 미선택'));
+        const monthLabel = t.month ? _xlabMonthLabel(t.month) : '';
+        return `<div onclick="xwbSelectItem('${t.id}')" style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">
+          <div style="font-size:11px;color:#888">${esc(monthLabel)}${monthLabel?' · ':''}${esc(sub)}</div>
+          <div style="font-weight:800;font-size:14px;margin-top:4px">${esc(t.topicTitle||'(제목 없음)')}</div>
+          ${t.workbookAnswers?'<div style="font-size:11px;color:#0f766e;margin-top:4px;font-weight:700">✅ 워크북 작성됨</div>':''}
+        </div>`;
+      }).join('')
+    }
+  `;
+}
+
+function renderXwbForm(t){
+  const m = XWB_TYPE_META[_xwbType];
+  const steps = _xwbStepsFor(_xwbType, t);
+  const wa = t.workbookAnswers || {};
+  return `
+    <button onclick="xwbBackToList()" style="background:none;border:none;color:#3b5bdb;font-weight:700;margin-bottom:12px">← 목록으로</button>
+    <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;color:#888">${m.icon} ${m.label}</div>
+      <div style="font-weight:800;font-size:15px;margin-top:4px">${esc(t.topicTitle||'')}</div>
+      ${t.topicDesc?`<div style="font-size:12px;color:#666;margin-top:6px">${esc(t.topicDesc)}</div>`:''}
+    </div>
+    ${(_xwbType==='final' && t.finalRecordText) ? `
+    <div style="background:#fffbe6;border:1.3px solid #f0d060;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;color:#b8860b;font-weight:800;margin-bottom:4px">🏆 저장된 최종 예상세특 (참고)</div>
+      <div style="font-size:12.5px;color:#333;white-space:pre-wrap">${esc(t.finalRecordText)}</div>
+    </div>` : ''}
+    <div style="font-size:11.5px;color:#888;margin-bottom:12px">저장된 내용(참고 박스)을 보며, 아래 칸에 내 말로 직접 작성해보세요.</div>
+    ${steps.map(function(st){
+      const val = wa[st.key]||'';
+      return `
+      <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;color:${m.accent};margin-bottom:8px">
+          <span style="width:20px;height:20px;border-radius:50%;background:${m.accent};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex:none">${esc(st.no)}</span>${esc(st.title)}
+        </div>
+        ${st.refText ? `
+        <div style="font-size:10px;color:${m.accent};font-weight:700;margin-bottom:3px">📌 ${esc(st.refLabel)} (참고 — 저장된 내용)</div>
+        <div style="background:#f8f9fc;border-left:3px solid ${m.accent};border-radius:6px;padding:8px 10px;font-size:11.5px;color:#555;white-space:pre-wrap;margin-bottom:8px">${esc(st.refText)}</div>` : ''}
+        <div style="font-size:11px;color:#888;margin-bottom:4px">✏️ ${esc(st.blankLabel)}</div>
+        <textarea id="xwbAns_${st.key}" rows="4" placeholder="내 생각을 적어보세요">${esc(val)}</textarea>
+      </div>`;
+    }).join('')}
+    <button onclick="xwbSave()" ${_xwbSaving?'disabled':''} style="width:100%;padding:14px;background:#3b5bdb;color:#fff;border:none;border-radius:12px;font-weight:800;font-size:14px;margin-bottom:24px">${_xwbSaving?'⏳ 저장 중...':'💾 워크북 저장'}</button>
+  `;
+}
+
+function renderXlabWorkbookTab(){
+  if(!CU) return '';
+  let inner;
+  if(!_xwbType){
+    inner = renderXwbTypePicker();
+  } else {
+    if(_xwbLoadedType!==_xwbType && !_xwbLoading) _xwbLoadItems(_xwbType);
+    if(_xwbLoading || _xwbLoadedType!==_xwbType){
+      inner = '<div style="text-align:center;color:#888;padding:30px">불러오는 중...</div>';
+    } else if(_xwbCurrent){
+      inner = renderXwbForm(_xwbCurrent);
+    } else {
+      inner = renderXwbItemList();
+    }
+  }
+  return `
+  <div>
+    ${_xlabTopModeBar()}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:18px;font-weight:800">📓 X-lab · 월별워크북</span>
+    </div>
+    ${inner}
+  </div>`;
 }
 
 function renderXlabList(){
