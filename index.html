@@ -3664,6 +3664,17 @@ function doLogout(){
   try{ firebase.auth().signOut(); }catch(e){}
   sessionStorage.removeItem('sg_session');
   ST.currentUser=null;ST.currentOrg=null;ST.sel=null;ST.adminSel=null;ST.page='main';
+  // ★ 457 수정: 기관별로 서버단 필터링되는(그래서 최종관리자 로그인 시엔 전체 기관의
+  // 비필터 데이터가 캐시되는) 지연로딩 플래그/캐시들이 로그아웃에서 초기화되지 않아,
+  // 최종관리자 로그아웃 → 다른 기관관리자 로그인 시 그 기관 화면에 이전 사용자(최종관리자)의
+  // 전체 기관 데이터가 그대로 남아 보이는 기관간 데이터 유출 문제가 있었다. 새로고침 전
+  // 페이지 최초 로드 시의 "아직 로드 안 됨" 상태(undefined, ||[] 기본값과 동일하게 동작)로
+  // 되돌린다.
+  ST._preSurveyLoaded=false; ST.preSurveySubmissions=null;
+  ST._cf70Loaded=false; ST.challengerF70Submissions=null; ST._cf70LoadError=null;
+  ST._programCatalogLoaded=false; ST.programCatalog=null;
+  ST._customSurveysMgmtLoaded=false; ST._customSurveysHubLoaded=false; ST._notifDataLoaded=false;
+  ST.customSurveys=null; ST.customSurveySubmissions=null;
   // ★ 2026-07-25 수정: 챌린저 iframe은 성능 최적화를 위해 스크롤/리사이즈/body 크기
   // 변화가 있을 때만 위치를 다시 계산하는 방식으로 되어 있는데, 로그아웃은 이런
   // 이벤트를 전혀 발생시키지 않는 경우가 많아서 iframe이 로그아웃 직전의 마지막
