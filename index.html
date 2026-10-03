@@ -19400,7 +19400,7 @@ function renderRoadmapSurveyHub(){
         <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#3b5bdb;font-weight:700">결과 확인 →</span></div>
         ${_rmSurveyHubLinkButtonsHtml('survey', orgId, isAdminRole)}
       </div>
-      <div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('cf70')">
+      ${isAdminRole?`<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('cf70')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="font-size:14px;font-weight:800;color:#1a1a2e">🏆 챌린저 FINAL70</div>
           ${newCf70Count?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newCf70Count+'</span>':''}
@@ -19408,19 +19408,22 @@ function renderRoadmapSurveyHub(){
         <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${cf70Total}건 제출됨 · 자체 대시보드·개인 리포트</div>
         <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#0f766e;font-weight:700">결과 확인 →</span></div>
         ${_rmSurveyHubLinkButtonsHtml('cf70', orgId, isAdminRole)}
-      </div>
+      </div>`:''}
       ${customCardsHtml}
     </div>
   </div>`;
 }
 function renderRoadmapSubNav(active){
+  const isAdminRole=ST.currentUser?.role==='admin';
   const newSurveyCount=(ST.preSurveySubmissions||[]).filter(_svIsUnread).length;
   const newCf70Count=(ST.challengerF70Submissions||[]).filter(_svIsUnread).length;
   // ★ 2026-09-16 추가: "사전조사 받은함"과 "챌린저 FINAL70"이 각각 독립 탭으로 나뉘어 있던 것을
   // "설문조사함" 하나로 통합(사용자 요청 — 앞으로 늘어날 설문 종류를 전부 여기 한 곳에서 확인하고,
   // 링크 생성도 여기서 기관관리자·선생님까지 볼 수 있게 하기 위함). 두 기능의 내부 로직
   // (renderRoadmapInbox/renderRoadmapCF70)은 전혀 건드리지 않고, 진입 화면(허브)만 새로 감싼다.
-  const newSurveyHubCount=newSurveyCount+newCf70Count;
+  // ★ CF70 카드는 isAdminRole(최종관리자)에게만 보이므로, 비관리자(기관관리자·선생님)에게는
+  // 클릭할 카드가 없는 CF70 미확인 건수를 뱃지에 섞지 않는다(renderRoadmapSurveyHub와 동일 기준).
+  const newSurveyHubCount=isAdminRole ? (newSurveyCount+newCf70Count) : newSurveyCount;
   const tabs=[
     {key:'basic',   icon:'📝', label:'기본상담'},
     {key:'consult', icon:'📁', label:'상담리포트'},
@@ -37074,6 +37077,16 @@ function _examcatToggleListOpen(){
   _examcatRenderList();
 }
 
+// ★ 시험 상태(status: 'active'=진행중/'ended'=종료/'archived'=보관) 필터 탭 — 기본은
+// "진행중"만 보이게 해서 목록이 길어져도 지금 응시 중인 시험을 바로 찾을 수 있게 한다.
+// 필드가 없는 기존 시험(24개)은 하위호환을 위해 항상 'active'로 취급한다.
+let _examcatStatusFilter = 'active';
+const EXAMCAT_STATUS_LABELS = {active:'진행중', ended:'종료', archived:'보관', all:'전체'};
+function _examcatSetStatusFilter(st){
+  _examcatStatusFilter = st;
+  _examcatRenderList();
+}
+
 function _examcatToggleFullscreen(){
   EXAMCAT_fullscreen = !EXAMCAT_fullscreen;
   const panel = document.getElementById('examcat-panel');
@@ -37150,7 +37163,10 @@ function _examcatRenderList(){
   // 모든 기관에 공개된 것으로 취급 — 기존에 등록된 시험과 호환).
   // ★ 2026-09-15(418) 수정: updatedAt → createdAt 기준 정렬(바로 위 _examcatSortKey 참고).
   const allList=(ST.examCatalog||[]).slice().sort((a,b)=>_examcatSortKey(b)-_examcatSortKey(a));
-  const list = isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
+  const scopedList = isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
+  // ★ 상태(status) 필터 탭 적용 — 필드가 없는 기존 시험은 'active'로 취급(하위호환).
+  // 'all'(전체) 탭은 상태 구분 없이 scopedList 전체를 그대로 보여준다.
+  const list = _examcatStatusFilter==='all' ? scopedList : scopedList.filter(function(e){ return (e.status||'active')===_examcatStatusFilter; });
   // ★ 452 추가: 문서 용량 문제로 일부 필드가 Storage로 분리 저장된 시험(examcatSaveEntry
   // 참고)은 목록에 보이는 "문항수/과목" 계산에 그 필드가 필요하다 — 아직 못 불러왔으면
   // 백그라운드로 조용히 불러온 뒤 목록만 다시 그린다(중복 요청은 _examcatEnsurePayloadLoaded
@@ -37163,7 +37179,7 @@ function _examcatRenderList(){
   // ★ 2026-09-15(417) 추가: 목록 접기/펼치기 헤더 — 실패 안내(_examCatLoadFailed)는 접혀
   // 있어도 놓치면 안 되는 경고라 접힌 상태에서도 항상 보여준다.
   const listHeader = `<div onclick="_examcatToggleListOpen()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:6px 4px;margin-bottom:${EXAMCAT_listOpen?'8':'0'}px;user-select:none">
-    <div style="font-size:13px;font-weight:800;color:#0f172a">📋 등록된 시험 목록 (총 ${list.length}개)</div>
+    <div style="font-size:13px;font-weight:800;color:#0f172a">📋 등록된 시험 목록 (${esc(EXAMCAT_STATUS_LABELS[_examcatStatusFilter]||_examcatStatusFilter)} ${list.length}개)</div>
     <span style="font-size:12px;color:#3b5bdb;font-weight:700">${EXAMCAT_listOpen?'▾ 접기':'▸ 펼치기'}</span>
   </div>`;
   if(ST._examCatLoadFailed){
@@ -37178,12 +37194,30 @@ function _examcatRenderList(){
     el.innerHTML = listHeader;
     return;
   }
+  // ★ 상태 필터 탭 — "진행중/종료/보관/전체" 각각의 개수를 보여주고, 클릭 시 해당
+  // 상태의 시험만 목록에 보이게 한다(기본 선택: 진행중). 탭 전체 전환은 기존 목록
+  // 재렌더 함수(_examcatRenderList)를 그대로 재사용한다.
+  const _statusCounts = {
+    active: scopedList.filter(function(e){ return (e.status||'active')==='active'; }).length,
+    ended: scopedList.filter(function(e){ return e.status==='ended'; }).length,
+    archived: scopedList.filter(function(e){ return e.status==='archived'; }).length
+  };
+  const _statusTabDefs = [
+    {key:'active', label:'진행중', count:_statusCounts.active},
+    {key:'ended', label:'종료', count:_statusCounts.ended},
+    {key:'archived', label:'보관', count:_statusCounts.archived},
+    {key:'all', label:'전체', count:scopedList.length}
+  ];
+  const statusTabsHtml = `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">` + _statusTabDefs.map(function(t){
+    const active = _examcatStatusFilter===t.key;
+    return `<button onclick="_examcatSetStatusFilter('${t.key}')" style="background:${active?'#3b5bdb':'#f1f5f9'};color:${active?'#fff':'#475569'};border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">${esc(t.label)} (${t.count}개)</button>`;
+  }).join('') + `</div>`;
   if(!list.length){
     // ★ 2026-08-29 추가: "진짜로 등록된 시험이 없는 것"과 "불러오다 실패한 것"을
     // 구분해서 보여준다 — 실패인데 "등록된 시험이 없다"고만 나오면, 이미 만들어둔
     // 카탈로그가 갑자기 사라진 것처럼 보여 당황스러울 수 있다(재로그인하면 다시 보이던
     // 증상이 바로 이거였다). 실패했을 땐 재로그인 없이 바로 다시 시도할 수 있게 한다.
-    el.innerHTML = listHeader + '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
+    el.innerHTML = listHeader + statusTabsHtml + '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 시험이 없습니다. 아래에서 새로 등록해주세요.</div>';
     return;
   }
   const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
@@ -37209,7 +37243,17 @@ function _examcatRenderList(){
   function hiddenBadge(e){
     return e.hiddenFromStudent ? '<span style="background:#f1f5f9;color:#475569;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🙈 학생 비공개</span>' : '';
   }
-  el.innerHTML=listHeader+`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
+  // ★ 상태 전환 버튼 — 현재 status에 따라 이동 가능한 다음 상태 2개만 보여준다.
+  function statusMoveButtons(e){
+    const st=e.status||'active';
+    const btn=function(label,newStatus){
+      return `<button onclick="examcatSetStatus('${e.id}','${newStatus}')" style="background:#f8fafc;color:#475569;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">${label}</button>`;
+    };
+    if(st==='active') return btn('⏸ 종료로 이동','ended')+btn('📦 보관으로 이동','archived');
+    if(st==='ended') return btn('▶ 진행중으로 복귀','active')+btn('📦 보관으로 이동','archived');
+    return btn('▶ 진행중으로 복귀','active')+btn('⏸ 종료로 이동','ended');
+  }
+  el.innerHTML=listHeader+statusTabsHtml+`<div style="display:flex;flex-direction:column;gap:8px">`+list.map(function(e){
     const qc=_examcatQuestionCount(e);
     const subj=_examcatSubjLabel(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
@@ -37218,6 +37262,7 @@ function _examcatRenderList(){
         <div style="font-size:11.5px;color:#64748b;margin-top:2px">기본 응시일 ${esc(e.defaultDate||'미지정')} · ${esc(subj)} · 문항 ${qc}개</div>
       </div>
       <button onclick="_examcatToggleHidden('${e.id}')" title="학생용 '시험 선택' 목록에서만 숨깁니다. 이미 채점된 결과·상담리포트·통계는 전혀 영향받지 않습니다." style="background:${e.hiddenFromStudent?'#eef2ff':'#f8fafc'};color:${e.hiddenFromStudent?'#3730a3':'#475569'};border:1px solid ${e.hiddenFromStudent?'#c7d2fe':'#cbd5e1'};border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">${e.hiddenFromStudent?'👁 학생 노출':'🙈 학생 숨김'}</button>
+      ${statusMoveButtons(e)}
       <button onclick="_examcatEdit('${e.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">✏ 수정</button>
       <button onclick="_examcatDelete('${e.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">🗑 삭제</button>
     </div>`;
@@ -37230,6 +37275,16 @@ async function _examcatToggleHidden(id){
   await examcatSaveEntry(e);
   _examcatRenderList();
   toast(e.hiddenFromStudent ? '🙈 학생용 "시험 선택" 목록에서 숨겼습니다. (이미 채점된 결과·상담리포트에는 영향 없습니다)' : '👁 다시 학생용 "시험 선택" 목록에 표시됩니다.');
+}
+// ★ 시험 상태(status) 전환 — 진행중/종료/보관 사이를 이동. hiddenFromStudent 토글과
+// 동일한 패턴(examcatSaveEntry로 영구저장+ST.examCatalog 캐시 갱신+목록 재렌더)을 그대로 따른다.
+async function examcatSetStatus(id,newStatus){
+  const e=(ST.examCatalog||[]).find(x=>x.id===id);
+  if(!e) return;
+  e.status = newStatus;
+  await examcatSaveEntry(e);
+  _examcatRenderList();
+  toast('✅ "'+(EXAMCAT_STATUS_LABELS[newStatus]||newStatus)+'" 상태로 이동했습니다.');
 }
 
 async function _examcatEdit(id){
@@ -38455,7 +38510,10 @@ async function _examcatSubmit(){
   if(!Object.keys(itemMeta).length && !Object.keys(answerKey).length){
     if(!confirm('문항 단원/유형이나 정답/해설을 아직 입력하지 않았습니다. 이대로(시험명만) 등록할까요?\n(나중에 "수정"으로 언제든 추가할 수 있습니다)')) return;
   }
-  const entry = EXAMCAT_editing ? Object.assign({}, EXAMCAT_editing) : {id:_examcatId(), createdAt:Date.now()};
+  // ★ status(진행중/종료/보관): 신규 등록 시에만 'active'로 기본값을 준다 — EXAMCAT_editing이
+  // 있는 수정 분기는 기존 객체를 그대로 복사하므로 이미 설정된 status(또는 구버전처럼 필드가
+  // 아예 없는 상태)를 그대로 보존하고, 여기서는 절대 덮어쓰지 않는다.
+  const entry = EXAMCAT_editing ? Object.assign({}, EXAMCAT_editing) : {id:_examcatId(), createdAt:Date.now(), status:'active'};
   entry.examName=name; entry.defaultDate=date; entry.itemMeta=itemMeta; entry.answerKey=answerKey;
   // ★ 2026-09-09(384) 추가: 기관별 공개범위 저장 — 최종관리자는 화면에서 고른 기관 목록을
   // 그대로 쓰고(하나도 안 골랐으면 전체공개 의미로 빈 배열), 기관관리자·선생님이 등록하는
