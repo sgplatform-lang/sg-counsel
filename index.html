@@ -4221,7 +4221,14 @@ function renderDetail(s){
   };
   // weekly 탭은 서브탭(ST.weekTab)에 따라 버튼 결정
   const _weekBtnKey = ST.tab==='weekly' ? (ST.weekTab||'tt') : ST.tab;
-  const curPrintBtn = printBtns[_weekBtnKey] || printBtns[ST.tab] || '';
+  let curPrintBtn = printBtns[_weekBtnKey] || printBtns[ST.tab] || '';
+  // ★ 교과분석 허브: 인쇄/엑셀 버튼은 '정보입력' 서브탭에서만 노출(결과리포트 탭은 자체 통합인쇄 버튼 사용)
+  // ★ 2026-10 개편: 교과분석 인쇄/엑셀 버튼은 '대학분석(result)' 서브탭에서만 노출(정보입력·결과리포트 탭에서는 숨김)
+  // ★ 2026-10 개편: 종합·논술분석도 동일 — 인쇄/엑셀 버튼은 '대학분석(result)' 서브탭에서만 노출
+  if(ST.tab==='gyogwa'||ST.tab==='jonghap'||ST.tab==='nulsul'){
+    const _gSub = SG_hubGetSub(ST.tab, s, false); // 학생이 바뀌면 허브가 'result'로 초기화함
+    if(_gSub!=='result') curPrintBtn = '';
+  }
 
   return`<div class="fade">
     <!-- 학생 헤더 -->
@@ -4284,7 +4291,7 @@ function renderDetail(s){
     <!-- ③ 성적·상담·개요: 인쇄 버튼만 우측에 -->
     ${!isSusiGroup&&!isWeekGroup&&curPrintBtn?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:6px">${curPrintBtn}</div>`:''}
 
-    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwa(s):ST.tab==='jonghap'?renderJonghap(s):ST.tab==='nulsul'?renderNulsul(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='xlab'?renderXlabAdmin(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
+    ${ST.tab==='overview'?renderOverview(s):ST.tab==='grade'?renderGrade(s):ST.tab==='susi'?renderSusi(s):ST.tab==='susi_print'?renderSusiPrint(s):ST.tab==='weekly'?renderWeekly(s):ST.tab==='jeongsi'?renderJeongsi(s):ST.tab==='apex'?renderApex(s):ST.tab==='gyogwa'?renderGyogwaHub(s):ST.tab==='jonghap'?renderJonghapHub(s):ST.tab==='nulsul'?renderNulsulHub(s):ST.tab==='challenger'?renderChallenger(s):ST.tab==='xlab'?renderXlabAdmin(s):ST.tab==='roadmap'?renderRoadmap(s):renderLearningStyle(s)}
   </div>`;
 }
 
@@ -27508,9 +27515,11 @@ function SG_switchStudentPicks(s){
   SG_updatePickBadge();
 }
 function SG_pickCount(){ return Object.keys(SG_crossPick.gyogwa).length+Object.keys(SG_crossPick.jonghap).length+Object.keys(SG_crossPick.nulsul).length; }
+// ★ 교과·종합·논술분석 탭은 결과리포트 서브탭이 플로팅 위젯(선택자료/저장 리포트)을 대체하므로 이 3개 탭에서는 숨긴다(그 외 탭은 선택 건수 기준 기존 동작).
+function SG_hideFloatingWidgets(){ return !!(typeof ST!=='undefined' && ST && (ST.tab==='gyogwa'||ST.tab==='jonghap'||ST.tab==='nulsul')); }
 function SG_updatePickBadge(){
   var b=document.getElementById('sg-pick-badge'); if(b) b.textContent=SG_pickCount();
-  var w=document.getElementById('sg-pick-btn-wrap'); if(w) w.style.display=SG_pickCount()>0?'flex':'none';
+  var w=document.getElementById('sg-pick-btn-wrap'); if(w) w.style.display=(SG_pickCount()>0&&!SG_hideFloatingWidgets())?'flex':'none';
   if(typeof SG_updateReportBadge==='function') SG_updateReportBadge();
 }
 // ★ 2026-09-30 추가: 우측 하단 "저장 리포트"·"선택자료/통합인쇄" 위젯이 화면 하단 버튼(저장/취소 등)을
@@ -27572,7 +27581,7 @@ function SG_updateReportBadge(){
   var s=SG_activeStudentRef;
   var n=(s&&Array.isArray(s.pickReports))?s.pickReports.length:0;
   var b=document.getElementById('sg-report-badge'); if(b) b.textContent=n;
-  var w=document.getElementById('sg-report-btn-wrap'); if(w) w.style.display=n>0?'flex':'none';
+  var w=document.getElementById('sg-report-btn-wrap'); if(w) w.style.display=(n>0&&!SG_hideFloatingWidgets())?'flex':'none';
 }
 function SG_openReportArchive(){
   var s=SG_activeStudentRef;
@@ -27701,6 +27710,13 @@ let gg_currentRegionFilter = 'all';
 let gg_selectedRegions = new Set();
 let gg_currentMajorFilter = '';
 let gg_currentStudentId = null;
+// ── 교과분석 정보입력 흐름 상태 (2026-10 개편) ──
+var gg_semGrid = {};        // {ko:['','','','',''],...} 학기별 그리드 원본 입력값(5등급제, 1학년1학기~3학년1학기)
+var gg_gridDriven = {};     // 학기별 그리드가 gg_grades를 채우고 있는 과목 key 집합
+var gg_userEdited = false;  // 이 탭에서 사용자가 직접 입력/수정했는지(false면 성적탭 값으로 렌더마다 다시 채움)
+var gg_inputLevel = 'HS5';  // 'MS'(성취도 A~E/점수) | 'HS5'(5등급제 숫자)
+window._ggSearchUniv = window._ggSearchUniv || '';   // 대학명 검색어(결과 화면에는 입력창이 없으므로 상태로 보관)
+window._ggSearchMajor = window._ggSearchMajor || ''; // 학과명 검색어
 
 // ── 지역 분류 ──
 function gg_getUnivRegion(univ){
@@ -27784,37 +27800,77 @@ function gg_classifyChance(myGrade, cut50, cut70){
   return '도전';
 }
 
+// ══ 성적탭 연동 (2026-10) ══
+//  교과분석의 내신 입력 원천 = 학생 '성적' 탭에 입력된 값(입시상담은 더 이상 원천이 아님).
+//  성적탭 저장 구조: s.gradeDetail[과목표시명][학기('1-1','1-2','2-1','2-2','3-1')] = {grade:9등급 숫자(1~9, 소수 가능), raw:원점수}
+//   (과목표시명 = getStudentSubjName(s,key) 학생별 커스텀 가능 / 추가 과목명은 s.extraSubjs), s.subjects[key] = 최신 학기 대표 등급(9등급).
+//  성적탭에는 단위수 입력이 없으므로 단위수는 GG_SUBJECTS 기본값을 쓴다.
+var GG_TAB_CORE={ko:'korean',ma:'math',en:'english',so1:'social',sc1:'science'};
+// 성적탭 '추가 과목' 이름 → 고급 표 과목 key (이름에 키워드가 들어 있을 때만 연동)
+var GG_TAB_EXTRA_KW=[['hs',/한국사/],['ho',/도덕|윤리/],['pe',/체육/],['ar',/음악|미술|예술/],['te',/기술|가정/]];
+function gg_tabValid(v){ var g=(typeof fmtGrade==='function')?fmtGrade(v):(v==null?null:+v); return (g!=null&&!isNaN(g)&&g>0&&g<=9)?+g:null; }
+// 성적탭 데이터 읽기 → {key:{label,sems:[5칸 숫자|null],vals:[숫자...],fromRep:bool}}
+function gg_collectGradeTabData(s){
+  var out={};
+  if(!s) return out;
+  var gd=s.gradeDetail||{}, subjs=s.subjects||{};
+  var sems=(typeof SEMS!=='undefined'&&Array.isArray(SEMS))?SEMS:['1-1','1-2','2-1','2-2','3-1'];
+  function readRow(lb){
+    var byTerm=gd[lb], row=[], vals=[];
+    sems.forEach(function(sm){
+      var g0=(byTerm&&typeof byTerm==='object')?gg_tabValid(byTerm[sm]):null;
+      row.push(g0); if(g0!==null) vals.push(g0);
+    });
+    return {sems:row,vals:vals};
+  }
+  Object.keys(GG_TAB_CORE).forEach(function(k){
+    var sKey=GG_TAB_CORE[k], lb=sKey;
+    try{ lb=(typeof getStudentSubjName==='function')?getStudentSubjName(s,sKey):sKey; }catch(e){}
+    var r=readRow(lb), fromRep=false;
+    if(!r.vals.length){ var rep=gg_tabValid(subjs[sKey]); if(rep!==null){ r.vals=[rep]; fromRep=true; } } // 학기별 세부 없이 대표 등급만 있는 경우
+    if(r.vals.length) out[k]={label:lb,sems:r.sems,vals:r.vals,fromRep:fromRep};
+  });
+  (Array.isArray(s.extraSubjs)?s.extraSubjs:[]).forEach(function(lb){
+    var hit=null;
+    for(var i=0;i<GG_TAB_EXTRA_KW.length;i++){ if(GG_TAB_EXTRA_KW[i][1].test(String(lb))){ hit=GG_TAB_EXTRA_KW[i][0]; break; } }
+    if(!hit||out[hit]) return;
+    var r=readRow(lb);
+    if(r.vals.length) out[hit]={label:String(lb),sems:r.sems,vals:r.vals,fromRep:false};
+  });
+  return out;
+}
+// 성적탭 값 → gg_grades(9등급 모델: {s1,s2,credit}). 학기 2개면 s1·s2, 3개 이상이면 평균을 s1에 담는다.
 function gg_loadStudentGrades(s){
   gg_grades={};
   if(!s) return;
-  var keyMap={ko:'korean',ma:'math',en:'english',so1:'social',sc1:'science'};
-  var gradeDetail=s.gradeDetail||{};
-  var subjs=s.subjects||{};
+  var data=gg_collectGradeTabData(s);
   GG_SUBJECTS.forEach(function(sk){
-    var sKey=keyMap[sk.key];
-    if(!sKey) return;
-    var vals=[];
-    if(gradeDetail&&typeof gradeDetail==='object'){
-      Object.values(gradeDetail).forEach(function(semData){
-        if(semData&&typeof semData==='object'){
-          var v=semData[sKey];
-          var grade=fmtGrade(v);
-          if(grade&&grade>0&&grade<=9) vals.push(grade);
-        }
-      });
-    }
-    if(!vals.length&&subjs[sKey]){
-      var v=fmtGrade(subjs[sKey]);
-      if(v&&v>0) vals.push(v);
-    }
-    if(vals.length>=2) gg_grades[sk.key]={s1:vals[0],s2:vals[1],credit:sk.credit};
-    else if(vals.length===1) gg_grades[sk.key]={s1:vals[0],s2:'',credit:sk.credit};
+    var d=data[sk.key];
+    if(!d) return;
+    var vals=d.vals;
+    if(vals.length===1) gg_grades[sk.key]={s1:vals[0],s2:'',credit:sk.credit};
+    else if(vals.length===2) gg_grades[sk.key]={s1:vals[0],s2:vals[1],credit:sk.credit};
+    else gg_grades[sk.key]={s1:+(vals.reduce(function(a,b){return a+b;},0)/vals.length).toFixed(2),s2:'',credit:sk.credit};
   });
 }
+// ── 분석 입력 서명(stale-result 감지용): 분석 결과에 실제로 영향을 주는 값만 포함 ──
+//  (지원경향·전형·지역·계열 필터와 검색어는 결과 표시 단계에서 즉시 적용되므로 서명에 넣지 않는다)
+var gg_analyzedSig='';
+function gg_inputSig(){
+  if(gg_quickMode&&gg_quickMode.active){
+    return JSON.stringify({q:[+gg_quickMode.all||0,+gg_quickMode.five||0,+gg_quickMode.sci||0,+gg_quickMode.hum||0]});
+  }
+  return JSON.stringify({g:GG_SUBJECTS.map(function(sk){
+    var g=gg_grades[sk.key]||{};
+    return [sk.key,parseFloat(g.s1)||0,parseFloat(g.s2)||0,+(g.credit||sk.credit)];
+  })});
+}
+function gg_isStale(){ return !!(gg_lastResults.length&&gg_analyzedSig&&gg_inputSig()!==gg_analyzedSig); }
 
 function gg_getFilteredResults(){
   var qEl=document.getElementById('gg-search-input');
-  var q=(qEl?qEl.value||'':'').toLowerCase();
+  // ★ 2026-10: 결과 화면에는 검색 입력창이 없으므로 DOM에 없으면 보관된 검색어(window._ggSearchUniv)를 사용
+  var q=(qEl?qEl.value||'':(window._ggSearchUniv||'')).toLowerCase();
   return gg_lastResults.filter(function(r){
     if(!_sg_majorMatch(r.major, gg_currentMajorFilter)) return false;
     if(gg_selectedChance.size>0&&!gg_selectedChance.has(r.chance)) return false;
@@ -27850,7 +27906,7 @@ function gg_getFilteredResults(){
     };
     var _qResolved=_univAliases[q]?_univAliases[q].toLowerCase():q;
     var dEl=document.getElementById('gg-search-dept');
-    var dq=(dEl?dEl.value||'':'').toLowerCase().trim();
+    var dq=(dEl?dEl.value||'':(window._ggSearchMajor||'')).toLowerCase().trim();
     if(q&&!r.univ.toLowerCase().includes(_qResolved)&&!r.univ.toLowerCase().includes(q)) return false;
     if(dq&&!r.dept.toLowerCase().includes(dq)) return false;
     return true;
@@ -27861,7 +27917,7 @@ function gg_analyze(){
   var hasQuick=gg_quickMode.active&&(gg_quickMode.all||gg_quickMode.five||gg_quickMode.sci||gg_quickMode.hum)>0;
   var hasDetail=false;
   GG_SUBJECTS.forEach(function(s){var g=gg_grades[s.key]||{};if(g.s1||g.s2)hasDetail=true;});
-  if(!hasQuick&&!hasDetail){alert('성적을 입력하고 분석 버튼을 눌러주세요.');return;}
+  if(!hasQuick&&!hasDetail){alert('성적을 입력하고 분석 버튼을 눌러주세요.');return false;}
   var ORDER={도전:0,상향:1,적정:2,안정:3,하향:4,'—':5,'참고':6};
   gg_lastResults=UNIV_DB.map(function(u){
     var myGrade=gg_getMyAvg(u.calcMode||'weighted',u.major||'');
@@ -27882,6 +27938,8 @@ function gg_analyze(){
   gg_lastResults.sort(function(a,b){return((ORDER[a.chance]||5)-(ORDER[b.chance]||5))||a.cut50-b.cut50;});
   gg_renderResult();
   gg_updateStats();
+  gg_analyzedSig=gg_inputSig(); // 이 시점의 입력 서명 저장(이후 성적이 바뀌면 결과 화면에 안내)
+  return true;
 }
 
 function gg_updateStats(){
@@ -27975,6 +28033,8 @@ function gg_setRegionFilter(val,el){
 }
 
 function gg_applyQuick(){
+  gg_userEdited=true;
+  if(typeof gg_refreshSourceBadge==='function') gg_refreshSourceBadge();
   var all=parseFloat(document.getElementById('gg-q-all')&&document.getElementById('gg-q-all').value)||0;
   var five=parseFloat(document.getElementById('gg-q-5')&&document.getElementById('gg-q-5').value)||0;
   var sci=parseFloat(document.getElementById('gg-q-sci')&&document.getElementById('gg-q-sci').value)||0;
@@ -28001,6 +28061,7 @@ function gg_applyQuick(){
 }
 
 function gg_updateAvgDisplay(){
+  if(typeof gg_refreshSourceBadge==='function') gg_refreshSourceBadge();
   var avg=gg_calcMyAvgFromGrades();
   var el=document.getElementById('gg-avg-display');
   var sub=document.getElementById('gg-avg-sub');
@@ -28008,181 +28069,376 @@ function gg_updateAvgDisplay(){
   if(sub) sub.textContent=gg_quickMode.active?'⚡ 빠른입력 우선 적용 중':avg>0?(avg<=1.5?'최상위권':avg<=2.5?'상위권':avg<=3.5?'중상위권':avg<=4.5?'중위권':'하위권'):'성적을 입력해주세요';
 }
 
-function renderGyogwa(s){
-  SG_switchStudentPicks(s);
-  if(gg_currentStudentId!==String(s.id)){
-    gg_currentStudentId=String(s.id);
-    gg_grades={};
-    gg_quickMode={active:false,all:0,five:0,sci:0,hum:0};
-    gg_lastResults=[];
-    gg_selectedChance.clear();gg_selectedTypes.clear();gg_selectedRegions.clear();
-    gg_currentMajorFilter='';
-    gg_loadStudentGrades(s);
+// ── 교과/종합/논술 허브 공용 헤더(2026-10): 헤더 카드 + [대학분석 | 정보입력 | 결과리포트(N)] 서브탭 ──
+//  kind: 'gyogwa'|'jonghap'|'nulsul' (상태키 ST[kind+'SubTab'], 결과리포트 건수 span id = gg|jh|ns + '-hub-rr-cnt')
+function SG_hubHeaderHtml(kind, tagText, title, sub, cnt){
+  var ids={gyogwa:'gg',jonghap:'jh',nulsul:'ns'};
+  var tabs=[
+    {key:'result', html:'🎯 대학분석'},
+    {key:'input',  html:'📝 정보입력'},
+    {key:'report', html:'📑 결과리포트 (<span id="'+(ids[kind]||'gg')+'-hub-rr-cnt">'+cnt+'</span>)'}
+  ];
+  var head='<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #3b5bdb;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">'
+    +'<div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(59,91,219,.05)"></div>'
+    +'<div style="position:relative;z-index:2">'
+    +'<div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(59,91,219,.30);color:#3b5bdb;background:rgba(59,91,219,.06);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;letter-spacing:1.2px;margin-bottom:12px">'+tagText+'</div>'
+    +'<h1 style="margin:0;font-size:24px;color:#1a2340;letter-spacing:-.8px;line-height:1.2">'+title+'</h1>'
+    +'<p style="margin:8px 0 0;color:#5b6478;font-size:13px;max-width:760px">성적을 입력해 지원 가능 대학을 분석하고, 선택한 대학의 리포트를 한 곳에서 확인·인쇄하세요.</p>'
+    +'</div></div>'
+    +'<div style="display:flex;gap:2px;flex-wrap:wrap;overflow-x:auto;background:#fff;border-bottom:2px solid #e5e7eb;margin-bottom:14px;min-height:56px">'
+    +tabs.map(function(t){
+      var isAct=sub===t.key;
+      return '<button onclick="ST.'+kind+'SubTab=\''+t.key+'\';render()" style="border:none;border-bottom:4px solid '+(isAct?'#3b5bdb':'transparent')+';background:transparent;color:'+(isAct?'#3b5bdb':'#64748b')+';border-radius:0;padding:18px 18px;font-weight:'+(isAct?'800':'700')+';font-size:14.5px;cursor:pointer;margin-bottom:-2px;white-space:nowrap">'+t.html+'</button>';
+    }).join('')
+    +'</div>';
+  return head;
+}
+// 허브 현재 서브탭 읽기. mutate=true면 학생이 바뀐 경우 'result'로 초기화(렌더용), false면 초기화될 값만 계산(renderDetail의 버튼 판단용)
+function SG_hubGetSub(kind, s, mutate){
+  var sidKey='_'+kind+'HubSid', subKey=kind+'SubTab';
+  var cur=ST[subKey];
+  if(ST[sidKey]!==String(s.id)){
+    if(mutate){ ST[sidKey]=String(s.id); ST[subKey]='result'; }
+    cur='result';
   }
-  setTimeout(function(){
-    if(gg_lastResults.length){gg_renderResult();gg_updateStats();}
-    gg_updateFilterBtnStyles();
-  },50);
-
-  var myAvg=gg_calcMyAvgFromGrades();
-  var avgDisp=myAvg>0?myAvg.toFixed(2):'—';
-  if(gg_quickMode.active){
-    var qv=gg_quickMode.all||gg_quickMode.five||gg_quickMode.sci||gg_quickMode.hum||0;
-    avgDisp=qv>0?qv.toFixed(2):'—';
+  return (cur==='report'||cur==='input')?cur:'result';
+}
+// 결과리포트 빈 상태 등에서 현재 탭의 '대학분석' 서브탭으로 이동
+function SG_hubGoResult(){
+  var k=ST.tab;
+  if(k!=='gyogwa'&&k!=='jonghap'&&k!=='nulsul') k='gyogwa';
+  ST[k+'SubTab']='result';
+  render();
+}
+// ══ 교과분석 허브 (2026-10): 헤더 카드 + [대학분석 | 정보입력 | 결과리포트] 서브탭 ══
+//  - 대학분석 = renderGyogwa(s) / 정보입력 = gg_renderInputFlowHtml(s) / 결과리포트 = SG_renderResultReportBody(s) (교과+종합+논술 통합, 공용)
+function renderGyogwaHub(s){
+  var sub=SG_hubGetSub('gyogwa', s, true); // 학생이 바뀌면 대학분석(결과) 화면으로 초기화
+  var head=SG_hubHeaderHtml('gyogwa','🎓 SUSI · 수시 교과분석','수시 교과분석',sub,SG_pickCount());
+  var body = sub==='input' ? gg_renderInputFlowHtml(s) : sub==='report' ? SG_renderResultReportBody(s) : renderGyogwa(s);
+  // ★ 2026-10: 학생 정보 확인 팝업(SG_openGyogwaInfoPopup)은 정보입력 상단의 '연결된 학생' 카드로 대체되어 자동 호출하지 않는다(함수는 보존).
+  return head+body;
+}
+function SG_openGyogwaInfoPopup(sid){
+  var s=(ST.students||[]).find(function(x){return String(x.id)===String(sid);});
+  if(!s) return;
+  document.querySelectorAll('.gg-info-overlay').forEach(function(e){e.remove();});
+  var gl=(typeof GRADE_LIST!=='undefined'&&Array.isArray(GRADE_LIST))?GRADE_LIST.slice():['고1','고2','고3'];
+  if(s.grade && gl.indexOf(s.grade)<0) gl.unshift(s.grade);
+  var lbl=function(t){return '<div style="font-size:11px;color:#777;font-weight:600;margin-bottom:4px">'+t+'</div>';};
+  var ov=document.createElement('div');
+  ov.className='overlay gg-info-overlay';
+  ov.innerHTML='<div class="modal" style="max-width:480px;max-height:90vh;overflow-y:auto">'
+    +'<div class="mhd"><span style="font-size:15px;font-weight:800">🎓 학생 정보 확인</span><button onclick="this.closest(\'.overlay\').remove()" style="background:transparent;border:none;color:#777;font-size:22px;cursor:pointer">×</button></div>'
+    +'<div style="padding:6px 18px 22px">'
+    +'<div style="font-size:12px;color:#5b6478;margin:4px 0 14px;line-height:1.5">교과분석을 시작하기 전에 학생 정보를 확인해 주세요. 수정하면 학생 정보에 바로 반영됩니다. 건너뛰어도 분석은 그대로 진행할 수 있습니다.</div>'
+    +'<div class="g2" style="margin-bottom:16px">'
+    +'<div>'+lbl('이름')+'<input id="gi_n" class="inp" value="'+esc(String(s.name||''))+'"></div>'
+    +'<div>'+lbl('학교')+'<input id="gi_s" class="inp" value="'+esc(String(s.school||''))+'"></div>'
+    +'<div>'+lbl('학년')+'<select id="gi_g" class="inp">'+gl.map(function(g){return '<option'+((s.grade||'고3')===g?' selected':'')+'>'+esc(String(g))+'</option>';}).join('')+'</select></div>'
+    +'<div>'+lbl('반')+'<input id="gi_cls" class="inp" placeholder="예) A반, 수학심화반" value="'+esc(String(s.className||''))+'"></div>'
+    +'<div>'+lbl('연락처')+'<input id="gi_p" class="inp" placeholder="010-0000-0000" value="'+esc(String(s.phone||''))+'"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button class="btn-g" onclick="this.closest(\'.overlay\').remove()">건너뛰기</button>'
+    +'<button class="btn-b" style="padding:9px 24px;border-radius:8px" onclick="SG_saveGyogwaInfoPopup(\''+String(s.id)+'\')">확인</button>'
+    +'</div></div></div>';
+  document.body.appendChild(ov);
+}
+function SG_saveGyogwaInfoPopup(sid){
+  var s=(ST.students||[]).find(function(x){return String(x.id)===String(sid);});
+  var ov=document.querySelector('.gg-info-overlay');
+  if(!s){ if(ov) ov.remove(); return; }
+  var gv=function(id){var e=document.getElementById(id);return e?String(e.value||'').trim():null;};
+  var n=gv('gi_n'), sc=gv('gi_s'), g=gv('gi_g'), cls=gv('gi_cls'), p=gv('gi_p');
+  if(n===''){ alert('이름을 입력해 주세요.'); return; }
+  var changed=false;
+  function setF(k,v){ if(v!==null && String(s[k]||'')!==v){ s[k]=v; changed=true; } }
+  var oldName=s.name;
+  setF('name',n); setF('school',sc); setF('grade',g); setF('className',cls); setF('phone',p);
+  if(s.name!==oldName && (!s.avatar || s.avatar===(oldName||'')[0])) s.avatar=s.name[0]||'?';
+  if(ov) ov.remove();
+  if(changed) upd(s); // 기존 학생 저장 헬퍼(save+Firebase+render)
+}
+// ── 결과리포트 공용 본문: 교과+종합+논술 선택자료를 한 화면에 (종합/논술 허브에서도 재사용) ──
+var SG_RR_TYPES=[
+  {k:'gyogwa', pre:'gg_', icon:'📘', label:'교과', color:'#1e3a8a', bg:'#eff6ff', bd:'#bfdbfe'},
+  {k:'jonghap',pre:'jh_', icon:'📗', label:'종합', color:'#6d28d9', bg:'#f5f3ff', bd:'#ddd6fe'},
+  {k:'nulsul', pre:'ns_', icon:'📕', label:'논술', color:'#991b1b', bg:'#fef2f2', bd:'#fecaca'}
+];
+function SG_rrCell(v){ return (v===undefined||v===null||v===''||v===0||v==='0')?'—':esc(String(v)); }
+function SG_rrNum(v){ var n=parseFloat(v); return (n>0)?n.toFixed(2):'—'; }
+function SG_renderResultReportBody(s){
+  return '<div id="sg-rr-root">'+SG_rrInner(s)+'</div>';
+}
+function SG_rrInner(s){
+  var cp=SG_crossPick||{gyogwa:{},jonghap:{},nulsul:{}};
+  var cnt={}; SG_RR_TYPES.forEach(function(t){ cnt[t.k]=Object.keys(cp[t.k]||{}).length; });
+  var total=cnt.gyogwa+cnt.jonghap+cnt.nulsul;
+  var CS={도전:['#7c3aed','#f5f3ff'],상향:['#dc2626','#fef2f2'],적정:['#d97706','#fffbeb'],안정:['#2563eb','#eff6ff'],하향:['#059669','#f0fdf4'],참고:['#64748b','#f8fafc']};
+  var card='background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:16px 18px;margin-bottom:14px';
+  var th='padding:8px 8px;font-size:11px;font-weight:700;color:#475569;background:#f8fafc;border-bottom:1.5px solid #e2e8f0;white-space:nowrap;text-align:center';
+  var td='padding:8px 8px;font-size:12px;border-bottom:1px solid #f1f5f9;text-align:center;vertical-align:middle';
+  // 액션바
+  var h='<div style="'+card+';display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:200px"><div style="font-size:14px;font-weight:800;color:#1a2340">선택 자료 '+total+'건</div>'
+    +'<div style="font-size:11.5px;color:#64748b;margin-top:2px">교과 '+cnt.gyogwa+' · 종합 '+cnt.jonghap+' · 논술 '+cnt.nulsul+'</div></div>'
+    +'<button onclick="SG_printCombined()"'+(total?'':' disabled')+' style="background:#3b5bdb;color:#fff;border:none;border-radius:20px;padding:10px 18px;font-size:12.5px;font-weight:800;cursor:pointer;opacity:'+(total?1:.45)+'">🖨 통합 인쇄 / PDF 저장</button>'
+    +'<button onclick="SG_clearPicks();SG_rrRefresh()"'+(total?'':' disabled')+' style="background:#fff;color:#dc2626;border:1.5px solid #fecaca;border-radius:20px;padding:10px 16px;font-size:12.5px;font-weight:700;cursor:pointer;opacity:'+(total?1:.45)+'">초기화</button>'
+    +'</div>';
+  if(!total){
+    h+='<div style="'+card+';text-align:center;padding:44px 18px"><div style="font-size:34px;margin-bottom:8px">📭</div>'
+      +'<div style="font-size:14px;font-weight:700;color:#475569">아직 선택한 대학이 없습니다. 대학분석 탭에서 대학을 체크해 주세요.</div>'
+      +'<button onclick="SG_hubGoResult()" style="margin-top:14px;background:#3b5bdb;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:12.5px;font-weight:800;cursor:pointer">🎯 대학분석으로 이동</button></div>';
   }
+  // 유형별 표
+  var colsBy={
+    gyogwa:[['대학','univ'],['학과','dept'],['전형','type'],['모집','recruit'],['경쟁률','comp'],['수능최저','csat'],['내신반영','method'],['입결 50%','cut50','n'],['입결 70%','cut70','n'],['환산점수 50%','score50','n'],['환산내신','myGrade','n'],['판정','chance','c']],
+    jonghap:[['대학','univ'],['학과','dept'],['전형','type'],['모집','recruit'],['경쟁률','comp'],['면접','interview'],['수능최저','csat'],['서류핵심요소','evalFocus'],['입결 50%','cut50','n'],['입결 70%','cut70','n'],['내신','myGrade','n'],['판정','chance','c']],
+    nulsul:[['대학','univ'],['학과','dept'],['전형','type'],['모집','recruit'],['경쟁률','comp'],['논술유형','nulsulType'],['수능최저','csat'],['출제유형/범위','nulsulSubject'],['논술일정','_sched'],['판정','chance','c']]
+  };
+  SG_RR_TYPES.forEach(function(t){
+    var keys=Object.keys(cp[t.k]||{}); if(!keys.length) return;
+    var cols=colsBy[t.k];
+    h+='<div style="'+card+';border-top:5px solid '+t.color+'">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:13px;font-weight:800;background:'+t.bg+';color:'+t.color+';border:1px solid '+t.bd+'">'+t.icon+' '+t.label+'</span><span style="font-size:12px;color:#64748b;font-weight:600">'+keys.length+'개</span></div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:760px"><thead><tr>'
+      +cols.map(function(c){return '<th style="'+th+'">'+c[0]+'</th>';}).join('')+'<th style="'+th+'">삭제</th></tr></thead><tbody>'
+      +keys.map(function(key){
+        var r=cp[t.k][key]||{};
+        return '<tr>'+cols.map(function(c){
+          var f=c[1], v;
+          if(f==='_sched') v=((r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+(r.interviewTime||''))||'';
+          else if(f==='comp') v=r.comp26||r.comp;
+          else v=r[f];
+          if(c[2]==='n') return '<td style="'+td+'">'+SG_rrNum(v)+'</td>';
+          if(c[2]==='c'){ var cc=CS[v]; return '<td style="'+td+'">'+(v?'<span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:800;color:'+(cc?cc[0]:'#64748b')+';background:'+(cc?cc[1]:'#f8fafc')+'">'+esc(String(v))+'</span>':'—')+'</td>'; }
+          if(f==='univ') return '<td style="'+td+';font-weight:800;text-align:left;white-space:nowrap">'+SG_rrCell(v)+'</td>';
+          if(f==='dept') return '<td style="'+td+';font-weight:600;text-align:left">'+SG_rrCell(v)+'</td>';
+          return '<td style="'+td+'">'+SG_rrCell(v)+'</td>';
+        }).join('')
+        +'<td style="'+td+'"><button title="선택 해제" onclick="SG_rrRemove(\''+t.k+'\',\''+String(key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')" style="background:#fff;color:#dc2626;border:1px solid #fecaca;border-radius:6px;width:24px;height:24px;font-size:11px;cursor:pointer">✕</button></td></tr>';
+      }).join('')
+      +'</tbody></table></div></div>';
+  });
+  // 저장된 리포트
+  var reps=(s&&Array.isArray(s.pickReports))?s.pickReports:[];
+  h+='<div style="'+card+'"><div style="font-size:14px;font-weight:800;color:#1a2340;margin-bottom:4px">📁 저장된 리포트 ('+reps.length+'건)</div>'
+    +'<div style="font-size:11.5px;color:#94a3b8;margin-bottom:10px">통합 인쇄를 누를 때마다 그 시점의 선택 자료가 자동 저장됩니다. (최근 20건)</div>';
+  if(!reps.length) h+='<div style="padding:18px;text-align:center;font-size:12.5px;color:#94a3b8">저장된 리포트가 없습니다.</div>';
+  else h+=reps.map(function(rpt,i){return {rpt:rpt,idx:i};}).reverse().map(function(o){
+    var rpt=o.rpt, a=Object.keys(rpt.gyogwa||{}).length, b=Object.keys(rpt.jonghap||{}).length, c=Object.keys(rpt.nulsul||{}).length;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 4px;border-top:1px solid #f1f5f9">'
+      +'<div><div style="font-size:13px;font-weight:700;color:#1e293b">'+esc(String(rpt.label||rpt.date||''))+'</div><div style="font-size:11px;color:#94a3b8">대학 '+(a+b+c)+'건 (교과 '+a+' · 종합 '+b+' · 논술 '+c+')</div></div>'
+      +'<div style="display:flex;gap:6px"><button onclick="SG_replayReport('+o.idx+')" style="background:#1e3a8a;color:#fff;border:none;border-radius:16px;padding:7px 13px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">🖨 다시 인쇄/PDF</button>'
+      +'<button onclick="SG_hubDeleteReport('+o.idx+')" style="background:#fff;color:#dc2626;border:1.5px solid #fecaca;border-radius:16px;padding:7px 11px;font-size:11.5px;cursor:pointer;white-space:nowrap">삭제</button></div></div>';
+  }).join('');
+  h+='</div>';
+  return h;
+}
+// 결과리포트 부분 갱신(전체 render() 없이 본문+서브탭 건수만 갱신)
+function SG_rrRefresh(){
+  var root=document.getElementById('sg-rr-root');
+  if(root) root.innerHTML=SG_rrInner(SG_activeStudentRef);
+  ['gg','jh','ns'].forEach(function(p){ var c=document.getElementById(p+'-hub-rr-cnt'); if(c) c.textContent=SG_pickCount(); });
+}
+function SG_rrRemove(type,key){
+  if(!SG_crossPick[type]) return;
+  delete SG_crossPick[type][key];
+  SG_savePicks(); SG_updatePickBadge(); SG_rrRefresh();
+}
+function SG_hubDeleteReport(idx){
+  var s=SG_activeStudentRef;
+  if(!s||!Array.isArray(s.pickReports)||!s.pickReports[idx]) return;
+  if(!confirm('이 리포트를 삭제하시겠습니까?')) return;
+  s.pickReports.splice(idx,1);
+  upd(s); // 저장 후 render()로 화면 갱신
+}
 
-  var panelOpen=window._ggPanelOpen!==false;
+// ══ 교과분석 정보입력 흐름 (2026-10 개편) ══
+//  - 대학분석(result): gg_renderResultsViewHtml()  / 정보입력(input): gg_renderInputFlowHtml(s)
+//  - 두 화면은 동시에 DOM에 존재하지 않으므로 요소 id 중복이 없다. 상태(gg_grades, gg_quickMode, 필터 Set, 검색어)는 전역에 보관.
+var GG_GRID_SUBJECTS=[
+  {key:'ko', rm:'kor',  label:'국어'},
+  {key:'en', rm:'eng',  label:'영어'},
+  {key:'ma', rm:'math', label:'수학'},
+  {key:'so1',rm:'soc',  label:'사회'},
+  {key:'sc1',rm:'sci',  label:'과학'}
+];
+var GG_SEM_LABELS=['1학년 1학기','1학년 2학기','2학년 1학기','2학년 2학기','3학년 1학기'];
+var GG_SEM_COUNT=5;
 
-  // 성적표 행 생성
-  var gradeRows='';
+function gg_emptySemGrid(){
+  var o={};
+  GG_GRID_SUBJECTS.forEach(function(g){ o[g.key]=['','','','','']; });
+  return o;
+}
+// 셀 1칸 → 1~5 등급 숫자(없으면 null). 중학생(MS)은 입시상담과 같이 A~E/점수를 RM_msCellToGrade로 환산.
+function gg_cellToGrade(raw, level){
+  var v=String(raw==null?'':raw).trim();
+  if(!v) return null;
+  if(level==='MS') return (typeof RM_msCellToGrade==='function')?RM_msCellToGrade(v):null;
+  var n=parseFloat(v);
+  if(isNaN(n)||n<1) return null;
+  return Math.min(5,n);
+}
+function gg_gradeToCell(n, level){
+  var r=Math.max(1,Math.min(5,Math.round(n)));
+  return level==='MS'?'ABCDE'.charAt(r-1):String(r);
+}
+function gg_subjectCredit(key){
+  var g=gg_grades[key];
+  if(g&&g.credit) return g.credit;
+  for(var i=0;i<GG_SUBJECTS.length;i++){ if(GG_SUBJECTS[i].key===key) return GG_SUBJECTS[i].credit; }
+  return 3;
+}
+// 한 과목 행의 평균(5등급제)과 9등급 환산값. 입력이 없으면 null.
+function gg_semRowStat(key){
+  var row=gg_semGrid[key]||[], vals=[];
+  for(var i=0;i<GG_SEM_COUNT;i++){ var g=gg_cellToGrade(row[i],gg_inputLevel); if(g!==null) vals.push(g); }
+  if(!vals.length) return null;
+  var mean=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+  return {mean:mean, nine:RM_convert5to9(mean), n:vals.length};
+}
+function gg_semAvgHtml(key){
+  var st=gg_semRowStat(key);
+  if(!st) return '—';
+  return '<b style="color:#3b5bdb">'+st.mean.toFixed(2)+'</b><div style="font-size:9px;color:#94a3b8;font-weight:600;white-space:nowrap">9등급 '+st.nine.toFixed(1)+'</div>';
+}
+// ★ 매핑: 과목별로 입력된 학기들의 5등급제 평균 → RM_convert5to9(입시상담과 동일한 공식 환산표)로 9등급 환산 →
+//   gg_grades[과목key] = {s1: 환산값, s2:'', credit: 기존/기본 단위수}. (UNIV_DB 입결이 9등급 기준이므로 환산 필요)
+function gg_syncGridToGrades(){
+  GG_GRID_SUBJECTS.forEach(function(sub){
+    var st=gg_semRowStat(sub.key);
+    if(st){
+      gg_grades[sub.key]={s1:st.nine, s2:'', credit:gg_subjectCredit(sub.key)};
+      gg_gridDriven[sub.key]=true;
+    } else if(gg_gridDriven[sub.key]){
+      gg_grades[sub.key]={s1:'', s2:'', credit:gg_subjectCredit(sub.key)};
+      delete gg_gridDriven[sub.key];
+    }
+  });
+}
+function gg_onSemInput(el){
+  var k=el.getAttribute('data-gk'), i=parseInt(el.getAttribute('data-gi'),10);
+  if(!gg_semGrid[k]) gg_semGrid[k]=['','','','',''];
+  gg_semGrid[k][i]=el.value;
+  gg_userEdited=true;
+  gg_syncGridToGrades();
+  var c=document.getElementById('gg-sg-avg-'+k); if(c) c.innerHTML=gg_semAvgHtml(k);
+  gg_refreshAdvTable();
+  gg_updateAvgDisplay();
+}
+// 고급(상세) 표에서 직접 수정 → 그 과목은 상세 값이 우선, 학기별 입력칸은 비움
+function gg_onAdvEdit(k, kind){
+  gg_userEdited=true;
+  if(kind!=='credit' && gg_gridDriven[k]){
+    delete gg_gridDriven[k];
+    gg_semGrid[k]=['','','','',''];
+    document.querySelectorAll('input[data-gk="'+k+'"]').forEach(function(inp){ inp.value=''; });
+    var c=document.getElementById('gg-sg-avg-'+k); if(c) c.innerHTML='—';
+  }
+  gg_updateAvgDisplay();
+}
+function gg_gradeRowsHtml(){
+  var rows='';
   GG_SUBJECTS.forEach(function(sk){
     var g=gg_grades[sk.key]||{};
     var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0;
     var cnt=(g.s1?1:0)+(g.s2?1:0);
     var avg=cnt===2?(v1+v2)/2:(cnt===1?(v1||v2):0);
-    gradeRows+='<tr>'
+    rows+='<tr>'
       +'<td style="padding:5px 8px;font-weight:500;font-size:11px;white-space:nowrap;background:#f8fafc;border-right:1px solid #e2e8f0">'+sk.name+'</td>'
       +'<td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0">'
-      +'<input type="number" min="1" max="9" step="0.01" value="'+(g.credit||sk.credit)+'" data-gkey="'+sk.key+'" style="width:38px;padding:3px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;text-align:center"'
-      +' onchange="var k=this.getAttribute(\'data-gkey\');if(!gg_grades[k])gg_grades[k]={};gg_grades[k].credit=+this.value;gg_updateAvgDisplay()">'
+      +'<input type="number" min="1" max="9" step="0.01" value="'+(g.credit||sk.credit)+'" data-gkey="'+sk.key+'" style="width:44px;padding:3px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;text-align:center"'
+      +' onchange="var k=this.getAttribute(\'data-gkey\');if(!gg_grades[k])gg_grades[k]={};gg_grades[k].credit=+this.value;gg_onAdvEdit(k,\'credit\')">'
       +'</td>'
       +'<td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0">'+gg_gradeSelect(sk.key,'s1',g.s1||'')+'</td>'
       +'<td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0">'+gg_gradeSelect(sk.key,'s2',g.s2||'')+'</td>'
       +'<td style="padding:4px;text-align:center;font-weight:700;color:#2563eb;font-size:11px">'+(avg>0?avg.toFixed(2):'—')+'</td>'
       +'</tr>';
   });
+  return rows;
+}
+function gg_refreshAdvTable(){
+  var tb=document.getElementById('gg-grade-tbody');
+  if(tb) tb.innerHTML=gg_gradeRowsHtml();
+}
 
-  // 통계 카운트
+// ── 성적탭 성적으로 채우기 ──
+// 우선순위: 이 탭에서 사용자가 직접 수정한 값(gg_userEdited) > 성적탭 값(s.gradeDetail 학기별 → 없으면 s.subjects 대표등급).
+// 입시상담(RM_LIVE_DRAFT/roadmapReports)은 참조하지 않는다.
+// 성적탭은 9등급이므로 gg_grades(9등급 모델)에 직접 넣고, 5등급제 학기 그리드(gg_semGrid)는 '직접 수정' 용도로 비워 둔다.
+function gg_loadPrefill(s){
+  gg_grades={}; gg_gridDriven={}; gg_semGrid=gg_emptySemGrid();
+  gg_inputLevel=(s&&typeof RM_guessSchoolLevel==='function')?RM_guessSchoolLevel(s):'HS5';
+  if(!s) return;
+  gg_loadStudentGrades(s);
+}
+function gg_ensureStudentLoaded(s){
+  SG_switchStudentPicks(s);
+  var sid=String(s.id);
+  if(gg_currentStudentId!==sid){
+    gg_currentStudentId=sid;
+    gg_quickMode={active:false,all:0,five:0,sci:0,hum:0};
+    gg_lastResults=[];
+    gg_selectedChance.clear();gg_selectedTypes.clear();gg_selectedRegions.clear();
+    gg_currentMajorFilter='';
+    window._ggSearchUniv=''; window._ggSearchMajor='';
+    gg_userEdited=false;
+    gg_analyzedSig='';
+    gg_loadPrefill(s);
+  } else if(!gg_userEdited && !gg_quickMode.active){
+    gg_loadPrefill(s); // 직접 수정 전이면 렌더마다 성적탭의 최신 값으로 다시 읽는다(성적탭 연동)
+  }
+}
+function gg_emptyRowHtml(){
+  return '<tr><td colspan="16" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">내신 성적을 입력하고 [지원 가능 대학 분석] 버튼을 누르세요'
+    +'<div style="margin-top:14px"><button onclick="ST.gyogwaSubTab=\'input\';render()" style="background:#3b5bdb;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:12.5px;font-weight:800;cursor:pointer">📝 정보입력으로 이동</button></div>'
+    +'</td></tr>';
+}
+function gg_filterSummaryHtml(){
+  var parts=[];
+  if(gg_selectedChance.size) parts.push('지원경향: '+Array.from(gg_selectedChance).join('·'));
+  if(gg_selectedTypes.size) parts.push('전형: '+Array.from(gg_selectedTypes).join('·'));
+  if(gg_selectedRegions.size) parts.push('지역: '+Array.from(gg_selectedRegions).join('·'));
+  if(gg_currentMajorFilter) parts.push('계열: '+gg_currentMajorFilter);
+  if(window._ggSearchUniv) parts.push('대학: '+window._ggSearchUniv);
+  if(window._ggSearchMajor) parts.push('학과: '+window._ggSearchMajor);
+  if(!parts.length) return '';
+  return '<div style="padding:8px 16px;border-bottom:1px solid #e8eaf6;background:#f8faff;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    +'<span style="font-size:10.5px;font-weight:700;color:#64748b">적용 중인 필터</span>'
+    +parts.map(function(p){ return '<span style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:12px;padding:2px 9px;font-size:10.5px;font-weight:700">'+esc(p)+'</span>'; }).join('')
+    +'<button onclick="ST.gyogwaSubTab=\'input\';render()" style="margin-left:auto;background:#fff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:14px;padding:3px 10px;font-size:10.5px;font-weight:700;cursor:pointer">필터 변경</button>'
+    +'</div>';
+}
+// ── 대학분석 결과 화면 ──
+function gg_renderResultsViewHtml(){
   var countMap={도전:0,상향:0,적정:0,안정:0,하향:0};
   gg_lastResults.forEach(function(r){if(countMap[r.chance]!==undefined)countMap[r.chance]++;});
   var statDisp=gg_lastResults.length?'flex':'none';
-
-  var html='<div id="gg-layout" style="display:flex;flex-direction:column;gap:12px">';
-
-  // ── 입력 패널 (접기/펼치기) ──
-  var qSummary='';
-  if(gg_quickMode.active){
-    var qv2=gg_quickMode.all||gg_quickMode.five||gg_quickMode.sci||gg_quickMode.hum||0;
-    qSummary='<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">⚡ 빠른입력: '+qv2.toFixed(2)+'등급</span>';
-  } else if(myAvg>0){
-    qSummary='<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">📊 환산내신: '+myAvg.toFixed(2)+'등급</span>';
-  } else {
-    qSummary='<span style="font-size:11px;color:#94a3b8">내신을 입력하세요</span>';
+  var html='<div id="gg-layout" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-direction:column;gap:10px">';
+  if(gg_isStale()){
+    html+='<div id="gg-stale-notice" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fef9c3;border:1px solid #facc15;border-radius:10px;padding:10px 14px">'
+      +'<span style="font-size:12.5px;font-weight:800;color:#854d0e;flex:1;min-width:220px">⚠ 성적이 변경되었습니다. 현재 결과는 이전 성적 기준입니다.</span>'
+      +'<button onclick="gg_analyzeAndShow()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer">🔍 다시 분석</button>'
+      +'</div>';
   }
-
-  html+='<div class="box" style="padding:0;overflow:hidden">'
-    +'<div onclick="window._ggPanelOpen=!window._ggPanelOpen;var b=document.getElementById(\'gg-panel-body\');var ic=document.getElementById(\'gg-panel-icon\');if(b)b.style.display=window._ggPanelOpen?\'block\':\'none\';if(ic)ic.textContent=window._ggPanelOpen?\'▲ 접기\':\'▼ 펼치기\';" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;background:#f8fafc;border-bottom:1px solid #e8eaf6;user-select:none">'
-    +'<span style="font-size:13px">⚡</span>'
-    +'<span style="font-size:12px;font-weight:700;color:#1a1a2e">성적 입력 패널</span>'
-    +'<div style="flex:1;display:flex;gap:8px;align-items:center">'+qSummary+'</div>'
-    +'<span id="gg-panel-icon" style="font-size:10px;color:#94a3b8;font-weight:600;white-space:nowrap">'+(panelOpen?'▲ 접기':'▼ 펼치기')+'</span>'
-    +'</div>'
-    +'<div id="gg-panel-body" style="display:'+(panelOpen?'block':'none')+';padding:14px 16px">'
-    +'<div style="display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start">'
-
-    // 왼쪽: 빠른입력 + 상세입력
-    +'<div style="display:flex;flex-direction:column;gap:10px">'
-    +'<div>'
-    +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px">⚡ 빠른 평균 입력 <span style="font-size:9px;color:#94a3b8;font-weight:400">(입력 시 상세입력보다 우선)</span></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px">'
-    +[['gg-q-all','전체 내신 평균'],['gg-q-5','국·영·수·사·과'],['gg-q-sci','국·영·수·과'],['gg-q-hum','국·영·수·사']].map(function(item){
-      var id=item[0],lbl=item[1];
-      var qval='';
-      if(gg_quickMode.active){
-        if(id==='gg-q-all') qval=gg_quickMode.all||'';
-        else if(id==='gg-q-5') qval=gg_quickMode.five||'';
-        else if(id==='gg-q-sci') qval=gg_quickMode.sci||'';
-        else if(id==='gg-q-hum') qval=gg_quickMode.hum||'';
-      }
-      return '<div>'
-        +'<div style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:2px">'+lbl+'</div>'
-        +'<div style="display:flex;align-items:center;gap:3px">'
-        +'<input id="'+id+'" type="number" min="1" max="9" step="0.01" placeholder="예) 2.35" value="'+qval+'"'
-        +' style="flex:1;padding:5px 7px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;font-weight:700" oninput="gg_applyQuick()">'
-        +'<span style="font-size:9px;color:#94a3b8">등급</span>'
-        +'</div></div>';
-    }).join('')
-    +'</div>'
-    +'<div id="gg-quick-active-box" style="display:'+(gg_quickMode.active?'block':'none')+';background:#eff6ff;border:1.5px solid #2563eb;border-radius:7px;padding:6px 10px;font-size:11px">'
-    +'<div style="font-weight:700;color:#2563eb">⚡ 빠른입력 활성 — 상세입력 무시</div>'
-    +'<div id="gg-quick-active-desc" style="font-size:10px;color:#64748b;margin-top:2px"></div>'
-    +'</div></div>'
-
-    // 상세 입력 테이블
-    +'<div>'
-    +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px">📝 과목별 상세 입력</div>'
-    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-    +'<thead><tr style="background:#f8fafc">'
-    +'<th style="padding:5px 8px;text-align:left;font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">과목</th>'
-    +'<th style="padding:5px 4px;text-align:center;font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">단위</th>'
-    +'<th style="padding:5px 4px;text-align:center;font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">1학기</th>'
-    +'<th style="padding:5px 4px;text-align:center;font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">2학기</th>'
-    +'<th style="padding:5px 4px;text-align:center;font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">평균</th>'
-    +'</tr></thead>'
-    +'<tbody id="gg-grade-tbody">'+gradeRows+'</tbody>'
-    +'</table></div></div>'
-    +'</div>'// 왼쪽 끝
-
-    // 오른쪽: 평균 + 계열 + 버튼
-    +'<div style="display:flex;flex-direction:column;gap:10px">'
-    +'<div style="background:#eff6ff;border:2px solid #2563eb;border-radius:10px;padding:12px 14px">'
-    +'<div style="font-size:10px;font-weight:700;color:#2563eb;margin-bottom:3px">📊 환산 내신 평균</div>'
-    +'<div id="gg-avg-display" style="font-size:28px;font-weight:900;color:#2563eb;line-height:1.1">'+avgDisp+'</div>'
-    +'<div id="gg-avg-sub" style="font-size:10px;color:#64748b;margin-top:2px">'+(gg_quickMode.active?'⚡ 빠른입력 우선 적용 중':myAvg>0?(myAvg<=1.5?'최상위권':myAvg<=2.5?'상위권':myAvg<=3.5?'중상위권':myAvg<=4.5?'중위권':'하위권'):'성적을 입력해주세요')+'</div>'
-    +'</div>'
-    +'<div>'
-    +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:5px">🎓 관심 계열</div>'
-    +'<select id="gg-major-filter" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px" onchange="gg_currentMajorFilter=this.value;gg_renderResult()">'
-    +'<option value="">전체</option><option>인문·사회</option><option>상경</option><option>자연·공학</option><option>의약학</option><option>교육</option><option>예체능</option><option value="통합">통합/자유전공</option>'
-    +'</select></div>'
-    +'<button onclick="gg_analyze()" style="padding:12px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.4)">🔍 지원 가능 대학 분석</button>'
-    +'<button onclick="gg_resetAll()" style="padding:7px;background:#fff;color:#94a3b8;border:1.5px solid #e2e8f0;border-radius:7px;font-size:11px;cursor:pointer">🗑 초기화</button>'
-    +'</div>'// 오른쪽 끝
-
-    +'</div>'// grid 끝
-    +'</div>'// panel-body 끝
-    +'</div>';// box 끝
-
-  // ── 결과 영역 ──
-  html+='<div style="display:flex;flex-direction:column;gap:10px">';
-
-  // 통계 카드
-  html+='<div id="gg-stat-grid" style="display:'+statDisp+';flex-direction:row;gap:6px">';
+  html+='<div id="gg-stat-grid" style="display:'+statDisp+';flex-direction:row;gap:6px;flex-wrap:wrap">';
   [['도전','#7c3aed','#f5f3ff','🔥'],['상향','#dc2626','#fef2f2','⬆'],['적정','#d97706','#fffbeb','✓'],['안정','#2563eb','#eff6ff','🛡'],['하향','#059669','#f0fdf4','⬇']].forEach(function(item){
-    html+='<div style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;background:'+item[2]+';border:1px solid '+item[1]+'30;white-space:nowrap">'
+    html+='<div style="flex:1;min-width:90px;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;background:'+item[2]+';border:1px solid '+item[1]+'30;white-space:nowrap">'
       +'<span id="gg-cnt-'+item[0]+'" style="font-size:18px;font-weight:900;color:'+item[1]+'">'+countMap[item[0]]+'</span>'
       +'<span style="font-size:11px;color:'+item[1]+';font-weight:700">'+item[3]+' '+item[0]+'</span>'
       +'</div>';
   });
   html+='</div>';
-
-  // 필터 바
-  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#fff;border-radius:10px;padding:10px 12px;border:1.5px solid #e8eaf6">';
-  html+='<span style="font-size:10px;font-weight:700;color:#64748b">지원경향</span>';
-  [['all','전체'],['도전','🔥 도전'],['상향','⬆ 상향'],['적정','✓ 적정'],['안정','🛡 안정'],['하향','⬇ 하향']].forEach(function(item){
-    html+='<button data-gg-filter="'+item[0]+'" onclick="gg_setFilter(this.getAttribute(\'data-gg-filter\'),this)" style="padding:4px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:'+(item[0]==='all'?'#2563eb':'#fff')+';color:'+(item[0]==='all'?'#fff':'#64748b')+';font-size:10px;font-weight:600;cursor:pointer">'+item[1]+'</button>';
-  });
-  html+='<div style="width:1px;height:16px;background:#e2e8f0;margin:0 2px"></div>';
-  html+='<span style="font-size:10px;font-weight:700;color:#64748b">전형</span>';
-  [['all','전체'],['지역균형','지역균형'],['학교장추천','학교장추천'],['일반','일반']].forEach(function(item){
-    html+='<button data-gg-ftype="'+item[0]+'" onclick="gg_setTypeFilter(this.getAttribute(\'data-gg-ftype\'),this)" style="padding:4px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:'+(item[0]==='all'?'#2563eb':'#fff')+';color:'+(item[0]==='all'?'#fff':'#64748b')+';font-size:10px;font-weight:600;cursor:pointer">'+item[1]+'</button>';
-  });
-  html+='<div style="width:1px;height:16px;background:#e2e8f0;margin:0 2px"></div>';
-  html+='<span style="font-size:10px;font-weight:700;color:#64748b">지역</span>';
-  [['all','전체'],['서울','서울'],['수도권','수도권'],['지방국립','지방국립'],['지방사립','지방사립']].forEach(function(item){
-    html+='<button data-gg-fregion="'+item[0]+'" onclick="gg_setRegionFilter(this.getAttribute(\'data-gg-fregion\'),this)" style="padding:4px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:'+(item[0]==='all'?'#2563eb':'#fff')+';color:'+(item[0]==='all'?'#fff':'#64748b')+';font-size:10px;font-weight:600;cursor:pointer">'+item[1]+'</button>';
-  });
-  html+='<input id="gg-search-input" type="text" placeholder="대학명 검색..." oninput="gg_renderResult()" style="padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:11px;width:110px;margin-left:4px">';
-  html+='<input id="gg-search-dept" type="text" placeholder="학과명 검색..." oninput="gg_renderResult()" style="padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:11px;width:110px">';
-  html+='</div>';
-
-  // 결과 테이블
   html+='<div class="box" style="overflow:hidden;padding:0">'
     +'<div style="padding:11px 16px;border-bottom:1px solid #e8eaf6;display:flex;align-items:center;gap:8px">'
     +'<span style="font-size:14px">🎯</span>'
     +'<span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span>'
     +'<span id="gg-result-count" style="font-size:11px;color:#94a3b8">'+(gg_lastResults.length?('('+gg_getFilteredResults().length+'개)'):'')+'</span>'
     +'</div>'
+    +gg_filterSummaryHtml()
     +'<div style="overflow-x:auto;max-height:580px;overflow-y:auto;overflow-anchor:none">'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
     +'<thead><tr style="background:#1e3a8a;position:sticky;top:0;z-index:2">'
@@ -28192,48 +28448,246 @@ function renderGyogwa(s){
     }).join('')
     +'</tr></thead>'
     +'<tbody id="gg-result-tbody">'
-    +'<tr><td colspan="16" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">'
-    +(gg_lastResults.length?'필터를 조정하거나 분석 버튼을 클릭하세요':'내신 성적을 입력하고 [지원 가능 대학 분석] 버튼을 누르세요')
-    +'</td></tr>'
+    +(gg_lastResults.length
+      ?'<tr><td colspan="16" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">결과를 불러오는 중...</td></tr>'
+      :gg_emptyRowHtml())
     +'</tbody></table></div></div>';
-
   html+='</div></div>';
   return html;
 }
+// renderGyogwa(s): 대학분석(결과) 화면. (이름은 기존 호출부 호환을 위해 유지)
+function renderGyogwa(s){
+  gg_ensureStudentLoaded(s);
+  setTimeout(function(){
+    if(gg_lastResults.length){gg_renderResult();gg_updateStats();}
+    gg_updateFilterBtnStyles();
+  },50);
+  return gg_renderResultsViewHtml();
+}
+
+// ── 성적탭 연동 상태 배지 / 연동 현황표 ──
+function gg_refreshSourceBadge(){
+  var tmp=document.createElement('div'); tmp.innerHTML=gg_sourceBadgeHtml();
+  var fresh=tmp.firstChild;
+  document.querySelectorAll('.gg-source-badge').forEach(function(el){ el.outerHTML=fresh.outerHTML; });
+}
+function gg_sourceBadgeHtml(){
+  var linked=!gg_userEdited;
+  return '<span class="gg-source-badge" title="'+(linked?'성적 탭에 입력된 내신을 그대로 사용 중입니다':'이 탭에서 직접 수정한 값을 사용 중입니다. \'성적탭 성적 다시 불러오기\'로 되돌릴 수 있습니다')+'" style="display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800;'
+    +(linked?'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0':'background:#fffbeb;color:#b45309;border:1px solid #fde68a')+'">'
+    +(linked?'🔗 성적탭 연동':'✏️ 직접 수정됨')+'</span>';
+}
+function gg_tabLinkTableHtml(s){
+  var data=gg_collectGradeTabData(s);
+  var keys=GG_SUBJECTS.filter(function(sk){ return data[sk.key]; });
+  if(!keys.length) return '<div style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 12px;margin-bottom:12px">성적 탭에 입력된 내신이 아직 없습니다. 학생의 [성적] 탭에서 내신을 입력하면 여기에 자동으로 나타납니다.</div>';
+  var semLbl=['1-1','1-2','2-1','2-2','3-1'];
+  var h='<div style="margin-bottom:12px"><div style="font-size:11.5px;font-weight:700;color:#047857;margin-bottom:5px">🔗 성적 탭 입력값 (9등급 · 읽기 전용)</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:420px"><thead><tr style="background:#f0fdf4">'
+    +'<th style="padding:4px 8px;text-align:left;font-size:10px;color:#64748b;font-weight:600">과목</th>'
+    +semLbl.map(function(l){ return '<th style="padding:4px;font-size:10px;color:#64748b;font-weight:600">'+l+'</th>'; }).join('')
+    +'<th style="padding:4px;font-size:10px;color:#64748b;font-weight:600">분석 반영</th></tr></thead><tbody>';
+  keys.forEach(function(sk){
+    var d=data[sk.key], g=gg_grades[sk.key]||{};
+    var v1=parseFloat(g.s1)||0, v2=parseFloat(g.s2)||0, c=(g.s1?1:0)+(g.s2?1:0);
+    var eff=c===2?(v1+v2)/2:(v1||v2);
+    var cells=d.sems.map(function(v){ return '<td style="padding:4px;text-align:center;border-top:1px solid #f1f5f9">'+(v===null?'<span style="color:#cbd5e1">-</span>':+(+v).toFixed(2).replace(/\.?0+$/,''))+'</td>'; }).join('');
+    if(d.fromRep) cells='<td colspan="5" style="padding:4px;text-align:center;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:10.5px">학기별 입력 없음 — 대표 등급 사용</td>';
+    h+='<tr><td style="padding:4px 8px;font-weight:700;border-top:1px solid #f1f5f9;white-space:nowrap">'+esc(d.label)+'</td>'+cells
+      +'<td style="padding:4px;text-align:center;font-weight:800;color:#2563eb;border-top:1px solid #f1f5f9">'+(eff>0?eff.toFixed(2):'—')+'</td></tr>';
+  });
+  h+='</tbody></table></div>'
+    +'<div style="font-size:10.5px;color:#94a3b8;margin-top:4px">성적 탭에는 단위수가 없어 과목별 기본 단위수로 가중평균합니다. 성적 탭에서 값을 바꾸면 직접 수정 전까지 자동 반영됩니다.</div></div>';
+  return h;
+}
+
+// ── 정보입력 카드 흐름 ──
+function gg_stepHead(num, title, note){
+  return '<div style="display:flex;align-items:center;gap:9px;border-bottom:1px solid #eee;padding-bottom:9px;margin-bottom:13px;flex-wrap:wrap">'
+    +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#3b5bdb;color:#fff;font-size:13px;font-weight:900;flex-shrink:0">'+num+'</span>'
+    +'<span style="font-size:14px;font-weight:800;color:#1a2340">'+title+'</span>'
+    +(note?'<span style="font-size:11px;color:#94a3b8;font-weight:500">'+note+'</span>':'')
+    +'</div>';
+}
+function gg_chipStyle(active,color){
+  return 'padding:5px 12px;border-radius:20px;border:1.5px solid '+(active?color:'#e2e8f0')+';background:'+(active?color:'#fff')+';color:'+(active?'#fff':'#64748b')+';font-size:11px;font-weight:600;cursor:pointer';
+}
+function gg_renderInputFlowHtml(s){
+  gg_ensureStudentLoaded(s);
+  setTimeout(function(){
+    gg_updateFilterBtnStyles();
+    gg_updateAvgDisplay();
+  },50);
+  var card='background:#fff;border:1px solid #e8eaf6;border-radius:16px;padding:18px 20px;margin-bottom:14px';
+  var field='width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;background:#f8fafc';
+  var lbl='display:block;font-size:11.5px;color:#888;margin-bottom:5px';
+  var isMS=gg_inputLevel==='MS';
+  var myAvg=gg_calcMyAvgFromGrades();
+  var avgDisp=myAvg>0?myAvg.toFixed(2):'—';
+  var h='<div id="gg-input-flow" style="max-width:none;padding-bottom:30px">';
+
+  // 0. 연결된 학생
+  h+='<div style="'+card+'">'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">연결된 학생 (좌측에서 선택한 학생 — 기본정보 수정은 학생 &#39;수정&#39; 화면에서)</div>'
+    +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
+    +'<div><span style="font-size:10.5px;color:#aaa">이름</span><br><b style="font-size:14px">'+esc(s.name||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">학교</span><br><b style="font-size:14px">'+esc(s.school||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">학년</span><br><b style="font-size:14px">'+esc(s.grade||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">내신 성적 출처</span><br>'+gg_sourceBadgeHtml()+'</div>'
+    +'</div></div>';
+
+  // ① 빠른 평균 입력
+  h+='<div style="'+card+'">'
+    +gg_stepHead('①','⚡ 빠른 평균 입력','입력 시 상세입력보다 우선')
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 14px;margin-bottom:12px">'
+    +[['gg-q-all','전체 내신 평균'],['gg-q-5','국·영·수·사·과'],['gg-q-sci','국·영·수·과'],['gg-q-hum','국·영·수·사']].map(function(item){
+      var id=item[0],qval='';
+      if(gg_quickMode.active){
+        if(id==='gg-q-all') qval=gg_quickMode.all||'';
+        else if(id==='gg-q-5') qval=gg_quickMode.five||'';
+        else if(id==='gg-q-sci') qval=gg_quickMode.sci||'';
+        else if(id==='gg-q-hum') qval=gg_quickMode.hum||'';
+      }
+      return '<div><label style="'+lbl+'">'+item[1]+' <span style="color:#bbb">(등급)</span></label>'
+        +'<input id="'+id+'" type="number" min="1" max="9" step="0.01" placeholder="예) 2.35" value="'+qval+'" style="'+field+';font-weight:700" oninput="gg_applyQuick()"></div>';
+    }).join('')
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:5px 14px">'
+    +'<span style="font-size:11px;font-weight:700;color:#2563eb">📊 환산내신 평균</span>'
+    +'<b id="gg-avg-display" style="font-size:15px;font-weight:900;color:#2563eb">'+avgDisp+'</b>'
+    +'<span id="gg-avg-sub" style="font-size:10px;color:#64748b">'+(gg_quickMode.active?'⚡ 빠른입력 우선 적용 중':myAvg>0?(myAvg<=1.5?'최상위권':myAvg<=2.5?'상위권':myAvg<=3.5?'중상위권':myAvg<=4.5?'중위권':'하위권'):'성적을 입력해주세요')+'</span>'
+    +'</div>'
+    +'<div id="gg-quick-active-box" style="display:'+(gg_quickMode.active?'block':'none')+';background:#eff6ff;border:1px solid #2563eb;border-radius:8px;padding:4px 10px;font-size:11px">'
+    +'<span style="font-weight:700;color:#2563eb">⚡ 빠른입력 활성 — 상세입력 무시</span> <span id="gg-quick-active-desc" style="font-size:10px;color:#64748b"></span>'
+    +'</div></div></div>';
+
+  // ② 과목별 상세 입력
+  var hint=isMS
+    ?'중학생 기준 — 학기별 성취도(A~E) 또는 점수를 입력하면 1~5등급으로 환산합니다.'
+    :'직접 수정이 필요할 때만 사용하세요 — 5등급제 학기 등급(1~5)을 입력한 과목은 이 분석에서 성적탭 값 대신 이 값을 씁니다.';
+  h+='<div style="'+card+'">'
+    +gg_stepHead('②','📝 과목별 상세 입력','성적 탭에 입력된 내신이 자동 연동됩니다')+'<span style="display:block;margin:-6px 0 10px">'+gg_sourceBadgeHtml()+'</span>'
+    +gg_tabLinkTableHtml(s)
+    +'<p style="font-size:11.5px;color:#888;margin:-4px 0 10px">'+hint+' 5등급제로 직접 입력한 값은 9등급 기준 입결표와 비교하기 위해 공식 환산표로 9등급 환산 후 분석에 반영됩니다.</p>'
+    +'<p style="font-size:11px;color:#4338ca;background:#eef2ff;border-radius:8px;padding:6px 10px;margin:0 0 10px">성적 탭에 입력된 내신과 연동됩니다 (여기서 수정하면 이 분석에만 적용)</p>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px;margin-bottom:12px"><thead><tr><th></th>'
+    +GG_SEM_LABELS.map(function(l){ return '<th style="font-size:10.5px;color:#888;font-weight:500;padding:0 3px 6px">'+l+'</th>'; }).join('')
+    +'<th style="font-size:10.5px;color:#888;font-weight:500;padding:0 3px 6px">평균</th></tr></thead><tbody>'
+    +GG_GRID_SUBJECTS.map(function(sub){
+      var row=gg_semGrid[sub.key]||[];
+      var cells='';
+      for(var i=0;i<GG_SEM_COUNT;i++){
+        cells+='<td style="padding:3px"><input data-gk="'+sub.key+'" data-gi="'+i+'" '+(isMS?'type="text" placeholder="A/90"':'type="number" min="1" max="5" step="1" placeholder="-"')
+          +' value="'+esc(String(row[i]==null?'':row[i]))+'" oninput="gg_onSemInput(this)" style="width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:8px;padding:6px 4px;font-size:12px;text-align:center;background:#f8fafc"></td>';
+      }
+      return '<tr><td style="font-weight:700;font-size:12px;color:#1a2340;padding:3px 6px 3px 0;white-space:nowrap">'+sub.label+'</td>'+cells
+        +'<td id="gg-sg-avg-'+sub.key+'" style="text-align:center;padding:3px;font-size:12px;min-width:56px">'+gg_semAvgHtml(sub.key)+'</td></tr>';
+    }).join('')
+    +'</tbody></table></div>';
+  var advHasData=GG_SUBJECTS.some(function(sk){ var g=gg_grades[sk.key]||{}; return (g.s1||g.s2)&&!gg_gridDriven[sk.key]; });
+  var advOpen=(window._ggAdvOpen===undefined)?advHasData:window._ggAdvOpen;
+  h+='<details id="gg-adv-details" '+(advOpen?'open':'')+' ontoggle="window._ggAdvOpen=this.open" style="border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;background:#fcfcfd">'
+    +'<summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:#475569">고급: 전체 과목·단위수 상세 입력 <span style="font-weight:400;color:#94a3b8;font-size:11px">(9등급 기준 · 성적탭 값이 채워져 있으며 여기서 수정하면 이 분석에만 적용)</span></summary>'
+    +'<p style="font-size:11px;color:#94a3b8;margin:8px 0">위 학기별 입력과 같은 과목을 이 표에서 직접 수정하면 그 과목은 이 표의 값이 우선되고 학기별 입력칸은 비워집니다. 학기별 입력이 있는 과목은 9등급 환산 평균이 1학기 칸에 표시됩니다.</p>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#f8fafc">'
+    +['과목','단위','1학기','2학기','평균'].map(function(t,i){ return '<th style="padding:5px '+(i===0?'8':'4')+'px;text-align:'+(i===0?'left':'center')+';font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">'+t+'</th>'; }).join('')
+    +'</tr></thead><tbody id="gg-grade-tbody">'+gg_gradeRowsHtml()+'</tbody></table></div>'
+    +'</details></div>';
+
+  // ③ 관심 계열
+  var majorOpts=[['','전체'],['인문·사회','인문·사회'],['상경','상경'],['자연·공학','자연·공학'],['의약학','의약학'],['교육','교육'],['예체능','예체능'],['통합','통합/자유전공']];
+  h+='<div style="'+card+'">'
+    +gg_stepHead('③','🎓 관심 계열','선택한 계열의 학과만 결과에 표시됩니다')
+    +'<div style="max-width:320px"><select id="gg-major-filter" style="'+field+'" onchange="gg_currentMajorFilter=this.value;gg_renderResult()">'
+    +majorOpts.map(function(o){ return '<option value="'+o[0]+'"'+(gg_currentMajorFilter===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')
+    +'</select></div></div>';
+
+  // ④ 지원경향 · 필터
+  var rowLbl='font-size:11px;font-weight:700;color:#64748b;min-width:56px';
+  var rowWrap='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:11px';
+  h+='<div style="'+card+'">'
+    +gg_stepHead('④','🎯 지원경향 · 필터 선택','여러 개 선택 가능 — 분석 결과 화면에 그대로 적용됩니다')
+    +'<div style="'+rowWrap+'"><span style="'+rowLbl+'">지원경향</span>'
+    +[['all','전체'],['도전','🔥 도전'],['상향','⬆ 상향'],['적정','✓ 적정'],['안정','🛡 안정'],['하향','⬇ 하향']].map(function(item){
+      var act=item[0]==='all'?gg_selectedChance.size===0:gg_selectedChance.has(item[0]);
+      return '<button data-gg-filter="'+item[0]+'" onclick="gg_setFilter(this.getAttribute(\'data-gg-filter\'),this)" style="'+gg_chipStyle(act,item[0]==='all'?'#2563eb':(GG_CHANCE_COLORS[item[0]]||'#2563eb'))+'">'+item[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div style="'+rowWrap+'"><span style="'+rowLbl+'">전형</span>'
+    +[['all','전체'],['지역균형','지역균형'],['학교장추천','학교장추천'],['일반','일반']].map(function(item){
+      var act=item[0]==='all'?gg_selectedTypes.size===0:gg_selectedTypes.has(item[0]);
+      return '<button data-gg-ftype="'+item[0]+'" onclick="gg_setTypeFilter(this.getAttribute(\'data-gg-ftype\'),this)" style="'+gg_chipStyle(act,'#2563eb')+'">'+item[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div style="'+rowWrap+'"><span style="'+rowLbl+'">지역</span>'
+    +[['all','전체'],['서울','서울'],['수도권','수도권'],['지방국립','지방국립'],['지방사립','지방사립']].map(function(item){
+      var act=item[0]==='all'?gg_selectedRegions.size===0:gg_selectedRegions.has(item[0]);
+      return '<button data-gg-fregion="'+item[0]+'" onclick="gg_setRegionFilter(this.getAttribute(\'data-gg-fregion\'),this)" style="'+gg_chipStyle(act,'#2563eb')+'">'+item[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 16px">'
+    +'<div><label style="'+lbl+'">대학명 검색</label><input id="gg-search-input" type="text" placeholder="예) 한양대, 외대" value="'+esc(window._ggSearchUniv||'')+'" oninput="window._ggSearchUniv=this.value;gg_renderResult()" style="'+field+'"></div>'
+    +'<div><label style="'+lbl+'">학과명 검색</label><input id="gg-search-dept" type="text" placeholder="예) 경영, 컴퓨터" value="'+esc(window._ggSearchMajor||'')+'" oninput="window._ggSearchMajor=this.value;gg_renderResult()" style="'+field+'"></div>'
+    +'</div></div>';
+
+  // 최종 버튼
+  h+='<div style="'+card+';display:flex;flex-direction:column;gap:10px">'
+    +'<button onclick="gg_analyzeAndShow()" style="padding:15px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.4)">🔍 지원 가능 대학 분석</button>'
+    +'<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+    +'<button onclick="gg_resetAll()" style="padding:6px 14px;background:#fff;color:#94a3b8;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;cursor:pointer">🗑 초기화</button>'
+    +'<button onclick="gg_reloadPrefill()" style="padding:6px 14px;background:#fff;color:#64748b;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;cursor:pointer">↺ 성적탭 성적 다시 불러오기</button>'
+    +'</div></div>';
+  h+='</div>';
+  return h;
+}
+function gg_analyzeAndShow(){
+  if(gg_analyze()){
+    ST.gyogwaSubTab='result';
+    render();
+    window.scrollTo(0,0);
+  }
+}
+function gg_reloadPrefill(){
+  var s=(ST.students||[]).find(function(x){return String(x.id)===String(gg_currentStudentId);});
+  if(!s) return;
+  gg_quickMode={active:false,all:0,five:0,sci:0,hum:0};
+  gg_userEdited=false;
+  gg_loadPrefill(s);
+  window._lastHTML=''; // 화면 HTML이 이전과 같아도 입력칸의 직접 입력값을 되돌리도록 강제 갱신
+  render();
+}
 
 function gg_gradeSelect(key,sem,val){
-  var opts=['','1','2','3','4','5','6','7','8','9'].map(function(v){
-    return '<option value="'+v+'" '+(val==v?'selected':'')+'>'+( v||'-')+'</option>';
-  }).join('');
-  var cr=3;
-  for(var i=0;i<GG_SUBJECTS.length;i++){if(GG_SUBJECTS[i].key===key){cr=GG_SUBJECTS[i].credit;break;}}
-  return '<select data-gkey="'+key+'" data-gsem="'+sem+'" style="width:50px;padding:3px 2px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;background:#fff;text-align:center;cursor:pointer"'
-    +' onchange="var k=this.getAttribute(\'data-gkey\'),sm=this.getAttribute(\'data-gsem\');if(!gg_grades[k])gg_grades[k]={};gg_grades[k][sm]=this.value;gg_updateAvgDisplay()">'+opts+'</select>';
+  var base=['1','2','3','4','5','6','7','8','9'];
+  var sv=(val===''||val==null)?'':String(+(+val).toFixed(2));
+  var opts=['<option value=""'+(sv===''?' selected':'')+'>-</option>'];
+  var found=sv==='';
+  base.forEach(function(v){
+    var sel=(sv!==''&&+sv===+v);
+    if(sel) found=true;
+    opts.push('<option value="'+v+'"'+(sel?' selected':'')+'>'+v+'</option>');
+  });
+  if(!found) opts.push('<option value="'+sv+'" selected>'+sv+'</option>'); // 9등급 환산 평균 등 정수가 아닌 값 표시
+  return '<select data-gkey="'+key+'" data-gsem="'+sem+'" style="width:56px;padding:3px 2px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;background:#fff;text-align:center;cursor:pointer"'
+    +' onchange="var k=this.getAttribute(\'data-gkey\'),sm=this.getAttribute(\'data-gsem\');if(!gg_grades[k])gg_grades[k]={};gg_grades[k][sm]=this.value;gg_onAdvEdit(k)">'+opts.join('')+'</select>';
 }
 
 function gg_resetAll(){
+  var sid=gg_currentStudentId;
   gg_grades={};
+  gg_semGrid=gg_emptySemGrid();
+  gg_gridDriven={};
   gg_quickMode={active:false,all:0,five:0,sci:0,hum:0};
   gg_lastResults=[];
+  gg_analyzedSig='';
   gg_selectedChance.clear();
   gg_selectedTypes.clear();
   gg_selectedRegions.clear();
   gg_currentMajorFilter='';
-  gg_currentStudentId=null;
-  gg_updateAvgDisplay();
-  var tb=document.getElementById('gg-grade-tbody');
-  if(tb) tb.innerHTML='';
-  var sg=document.getElementById('gg-stat-grid');
-  if(sg) sg.style.display='none';
-  var rb=document.getElementById('gg-result-tbody');
-  if(rb) rb.innerHTML='<tr><td colspan="15" style="text-align:center;padding:40px;color:#94a3b8">내신 성적을 입력하고 분석 버튼을 누르세요</td></tr>';
-  var rc=document.getElementById('gg-result-count');
-  if(rc) rc.textContent='';
-  ['gg-q-all','gg-q-5','gg-q-sci','gg-q-hum'].forEach(function(id){
-    var el=document.getElementById(id);if(el) el.value='';
-  });
-  var qb=document.getElementById('gg-quick-active-box');
-  if(qb) qb.style.display='none';
+  window._ggSearchUniv=''; window._ggSearchMajor='';
+  gg_currentStudentId=sid;  // 같은 학생 화면을 유지(비어 있는 상태 유지 — 저장된 성적은 '다시 불러오기'로 복원)
+  gg_userEdited=true;
+  window._lastHTML=''; // 입력칸의 직접 입력값까지 지우도록 강제 갱신
+  if(typeof render==='function') render(); // 현재 서브탭(정보입력/대학분석)을 그대로 다시 그림
 }
 function gyogwaPrint(sid){
   var s=ST.students.find(function(x){return String(x.id)===String(sid);});
@@ -30157,13 +30611,15 @@ function ns_analyze() {
   }).sort(function(a,b){ return ((ORD[a.chance]||5)-(ORD[b.chance]||5)); });
   ns_renderResult();
   ns_updateStats();
+  ns_analyzedSig = ns_inputSig(); // 이 시점의 입력 서명 저장(이후 성적이 바뀌면 결과 화면에 안내)
+  return true;
 }
 
 function ns_getFiltered() {
-  var q = ((document.getElementById('ns-search')||{}).value||'').toLowerCase().trim();
-  var dq = ((document.getElementById('ns-search-dept')||{}).value||'').toLowerCase().trim();
+  var q = (window._nsSearchUniv||'').toLowerCase().trim(); // 결과 화면에는 입력창이 없으므로 보관된 검색어 사용
+  var dq = (window._nsSearchMajor||'').toLowerCase().trim();
   var mf = ns_currentMajorFilter;
-  var tf = ((document.getElementById('ns-type-sel')||{}).value||'');
+  var tf = ns_typeFilter||'';
   var f = ns_lastResults.filter(function(r) {
     if (q && !r.univ.toLowerCase().includes(q)) return false;
     if (dq && !r.dept.toLowerCase().includes(dq)) return false;
@@ -30206,6 +30662,18 @@ function ns_updateFilterBtnStyles(){
     if(!b)return;
     b.style.background=ns_selectedChance.has(k)?CL[k]:'transparent';
     b.style.color=ns_selectedChance.has(k)?'#fff':CL[k];
+  });
+  // 정보입력 화면의 칩 버튼(지원경향·지역)
+  document.querySelectorAll('[data-ns-filter]').forEach(function(btn){
+    var v=btn.getAttribute('data-ns-filter');
+    var on=v==='all'?ns_selectedChance.size===0:ns_selectedChance.has(v);
+    var c=v==='all'?'#2563eb':(NS_CHANCE_COLORS[v]||'#2563eb');
+    btn.style.background=on?c:'#fff'; btn.style.color=on?'#fff':'#64748b'; btn.style.borderColor=on?c:'#e2e8f0';
+  });
+  document.querySelectorAll('[data-ns-fregion]').forEach(function(btn){
+    var v=btn.getAttribute('data-ns-fregion');
+    var on=v==='all'?ns_selectedRegions.size===0:ns_selectedRegions.has(v);
+    btn.style.background=on?'#2563eb':'#fff'; btn.style.color=on?'#fff':'#64748b'; btn.style.borderColor=on?'#2563eb':'#e2e8f0';
   });
 }
 
@@ -38593,7 +39061,8 @@ function openChallengerBulkReflect(){
   _ensureExamCatalogLoaded().then(function(){
     const _selEl2=document.getElementById('cbr-examcat-select');
     if(_selEl2){
-      const list2=_examcatScopedForCurrentOrg();
+      // 진행중인 시험만 불러오기 대상으로 노출(종료/보관 시험은 제외 — 상태 없는 기존 시험은 진행중으로 취급)
+      const list2=_examcatScopedForCurrentOrg().filter(e=>(e.status||'active')==='active');
       _selEl2.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
         + list2.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
     }
@@ -38771,7 +39240,8 @@ MATH	미적분	28	7		"></textarea>
   // (overlay div 자체는 최초 1회만 만들어지므로, 옵션 목록은 매번 갱신해야 함)
   const _selEl=document.getElementById('cbr-examcat-select');
   if(_selEl){
-    const list=_examcatScopedForCurrentOrg();
+    // 진행중인 시험만 불러오기 대상으로 노출(종료/보관 시험은 제외 — 상태 없는 기존 시험은 진행중으로 취급)
+    const list=_examcatScopedForCurrentOrg().filter(e=>(e.status||'active')==='active');
     _selEl.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
       + list.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
   }
@@ -40016,114 +40486,300 @@ function cbrConfirmApply(){
   render();
 }
 
-function renderNulsul(s) {
+// ══════════════════════════════════════════════════════════════
+// ★ 논술분석 허브 (2026-10 개편) — 교과·종합분석 허브와 동일한 구조
+//   헤더 + [🎯 대학분석 | 📝 정보입력 | 📑 결과리포트(N)] 서브탭 (ST.nulsulSubTab, 학생 변경 시 'result'로 초기화)
+//   - 대학분석(result): renderNulsul(s) → ns_renderResultsViewHtml()  (결과 영역만)
+//   - 정보입력(input) : ns_renderInputFlowHtml(s)  (연결된 학생 → ①내신 빠른 평균(성적탭 연동) → ②계열·논술유형 → ③지원경향·필터 → 분석)
+//   - 결과리포트(report): SG_renderResultReportBody(s) (교과+종합+논술 통합, 공용)
+//   논술은 과목별 상세 입력이 없다(운영자 요청) — 내신 평균 1칸(ns_quickGrade)만 입력하며, 직접 수정 전까지 성적 탭 값으로 자동 채운다.
+// ══════════════════════════════════════════════════════════════
+var ns_userEdited=false;   // 이 탭에서 내신 평균을 직접 입력/수정했는지(false면 성적탭 값으로 렌더마다 다시 채움)
+var ns_analyzedSig='';     // 마지막 분석 시점의 입력 서명(stale 감지)
+var NS_CHANCE_COLORS={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb',참고:'#64748b'};
+var ns_typeFilter='';      // 논술유형 필터('' | 인문 | 자연 | 통합형)
+var ns_tabInfo={avg:0,items:[]}; // 성적탭에서 읽은 국·영·수·사·과 평균 정보(표시용)
+window._nsSearchUniv=window._nsSearchUniv||'';   // 대학명 검색어(결과 화면에는 입력창이 없으므로 상태로 보관)
+window._nsSearchMajor=window._nsSearchMajor||''; // 학과명 검색어
+
+// ── 성적탭 연동: 국·영·수·사회·과학 5과목의 과목별 평균(학기 입력들의 평균, 없으면 대표 등급)을 기본 단위수로 가중평균 ──
+//   (교과분석 gg_loadStudentGrades 와 동일한 과목별 값 → gg_calcMyAvgFromGrades 와 동일한 가중평균 방식, 핵심 5과목만 사용)
+function ns_collectTabAvg(s){
+  var res={avg:0,items:[]};
+  if(!s) return res;
+  var data=gg_collectGradeTabData(s), tc=0, ts=0;
+  ['ko','en','ma','so1','sc1'].forEach(function(k){
+    var d=data[k]; if(!d||!d.vals.length) return;
+    var mean=d.vals.reduce(function(a,b){return a+b;},0)/d.vals.length;
+    var cr=3;
+    for(var i=0;i<GG_SUBJECTS.length;i++){ if(GG_SUBJECTS[i].key===k){ cr=GG_SUBJECTS[i].credit; break; } }
+    ts+=mean*cr; tc+=cr;
+    res.items.push({label:d.label,mean:mean,n:d.vals.length,fromRep:!!d.fromRep});
+  });
+  res.avg=tc?ts/tc:0;
+  return res;
+}
+function ns_loadPrefill(s){
+  ns_grades={};
+  ns_tabInfo=ns_collectTabAvg(s);
+  ns_quickGrade=ns_tabInfo.avg>0?+ns_tabInfo.avg.toFixed(2):0;
+}
+function ns_ensureStudentLoaded(s){
   SG_switchStudentPicks(s);
-  if (ns_currentStudentId !== String(s.id)) {
-    ns_currentStudentId = String(s.id);
-    ns_grades = {};
-    ns_quickGrade = 0;
-    ns_lastResults = [];
-    ns_selectedChance.clear(); ns_selectedRegions.clear();
-    ns_currentMajorFilter = '';
+  var sid=String(s.id);
+  if(ns_currentStudentId!==sid){
+    ns_currentStudentId=sid;
+    ns_lastResults=[];
+    ns_selectedChance.clear();ns_selectedRegions.clear();
+    ns_currentMajorFilter='';
+    ns_typeFilter='';
+    window._nsSearchUniv='';window._nsSearchMajor='';
+    ns_userEdited=false;
+    ns_analyzedSig='';
+    ns_loadPrefill(s);
+  } else if(!ns_userEdited){
+    ns_loadPrefill(s); // 직접 수정 전이면 렌더마다 성적탭의 최신 값으로 다시 읽는다(성적탭 연동)
   }
+}
+function ns_inputSig(){ return String(+(ns_getMyGrade()||0).toFixed(2)); }
+function ns_isStale(){ return !!(ns_lastResults.length&&ns_analyzedSig&&ns_inputSig()!==ns_analyzedSig); }
+function ns_avgText(g){ return g>0?g.toFixed(2)+'등급':'—'; }
+// 내신 빠른 입력창 oninput
+function ns_onQuickInput(el){
+  ns_userEdited=true;
+  ns_quickGrade=parseFloat(el.value)||0;
+  var d=document.getElementById('ns-avg-display'); if(d) d.textContent=ns_avgText(ns_quickGrade);
+  ns_refreshSourceBadge();
+}
+function ns_sourceBadgeHtml(){
+  var linked=!ns_userEdited;
+  return '<span class="ns-source-badge" title="'+(linked?'성적 탭에 입력된 내신을 그대로 사용 중입니다':'이 탭에서 직접 수정한 값을 사용 중입니다. \'성적탭 성적 다시 불러오기\'로 되돌릴 수 있습니다')+'" style="display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800;'
+    +(linked?'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0':'background:#fffbeb;color:#b45309;border:1px solid #fde68a')+'">'
+    +(linked?'🔗 성적탭 연동':'✏️ 직접 수정됨')+'</span>';
+}
+function ns_refreshSourceBadge(){
+  var tmp=document.createElement('div'); tmp.innerHTML=ns_sourceBadgeHtml();
+  var fresh=tmp.firstChild;
+  document.querySelectorAll('.ns-source-badge').forEach(function(el){ el.outerHTML=fresh.outerHTML; });
+}
+// 성적탭 연동 현황표(읽기 전용): 국·영·수·사·과 과목별 평균과 가중평균
+function ns_tabLinkTableHtml(){
+  var info=ns_tabInfo;
+  if(!info||!info.items.length) return '<div style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 12px;margin-top:12px">성적 탭에 입력된 내신이 아직 없습니다. 학생의 [성적] 탭에서 내신을 입력하면 이 칸에 국·영·수·사·과 평균이 자동으로 채워집니다. (지금은 직접 입력하세요)</div>';
+  return '<div style="margin-top:12px"><div style="font-size:11.5px;font-weight:700;color:#047857;margin-bottom:5px">🔗 성적 탭 입력값 (9등급 · 읽기 전용)</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +info.items.map(function(it){
+      return '<span style="display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:4px 10px;font-size:11.5px"><b>'+esc(it.label)+'</b><span style="color:#2563eb;font-weight:800">'+it.mean.toFixed(2)+'</span>'+(it.fromRep?'<span style="font-size:9.5px;color:#94a3b8">대표 등급</span>':'<span style="font-size:9.5px;color:#94a3b8">'+it.n+'개 학기</span>')+'</span>';
+    }).join('')
+    +'<span style="display:inline-flex;align-items:center;gap:5px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:4px 10px;font-size:11.5px"><b style="color:#991b1b">국·영·수·사·과 평균</b><span style="color:#dc2626;font-weight:900">'+info.avg.toFixed(2)+'</span></span>'
+    +'</div>'
+    +'<div style="font-size:10.5px;color:#94a3b8;margin-top:4px">성적 탭에는 단위수가 없어 과목별 기본 단위수(국·영·수 4, 사·과 3)로 가중평균합니다. 성적 탭에서 값을 바꾸면 직접 수정 전까지 자동 반영됩니다.</div></div>';
+}
+
+// ── 분석/필터 (기존 함수 보완) ──
+function ns_analyzeAndShow(){
+  if(ns_analyze()){
+    ST.nulsulSubTab='result';
+    render();
+    window.scrollTo(0,0);
+  }
+}
+function ns_reloadPrefill(){
+  var s=(ST.students||[]).find(function(x){return String(x.id)===String(ns_currentStudentId);});
+  if(!s) return;
+  ns_userEdited=false;
+  ns_loadPrefill(s);
+  window._lastHTML=''; // 화면 HTML이 이전과 같아도 입력칸의 직접 입력값을 되돌리도록 강제 갱신
+  render();
+}
+function ns_resetAll(){
+  var sid=ns_currentStudentId;
+  ns_grades={};
+  ns_quickGrade=0;
+  ns_tabInfo={avg:0,items:[]};
+  ns_lastResults=[];
+  ns_analyzedSig='';
+  ns_selectedChance.clear();ns_selectedRegions.clear();
+  ns_currentMajorFilter='';
+  ns_typeFilter='';
+  window._nsSearchUniv='';window._nsSearchMajor='';
+  ns_currentStudentId=sid; // 같은 학생 화면을 유지(비어 있는 상태 — 저장된 성적은 '다시 불러오기'로 복원)
+  ns_userEdited=true;
+  window._lastHTML=''; // 입력칸의 직접 입력값까지 지우도록 강제 갱신
+  if(typeof render==='function') render();
+}
+function ns_setChance(v){
+  if(v==='all') ns_selectedChance.clear();
+  else if(ns_selectedChance.has(v)) ns_selectedChance.delete(v); else ns_selectedChance.add(v);
+  ns_updateFilterBtnStyles(); ns_renderResult();
+}
+function ns_setRegion(v){
+  if(v==='all') ns_selectedRegions.clear();
+  else if(ns_selectedRegions.has(v)) ns_selectedRegions.delete(v); else ns_selectedRegions.add(v);
+  ns_updateFilterBtnStyles(); ns_renderResult();
+}
+
+// ── 대학분석 결과 화면 ──
+function ns_emptyRowHtml(){
+  return '<tr><td colspan="14" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">✏</div>내신 성적을 입력하고 [지원 가능 대학 분석] 버튼을 누르세요'
+    +'<div style="margin-top:14px"><button onclick="ST.nulsulSubTab=\'input\';render()" style="background:#3b5bdb;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:12.5px;font-weight:800;cursor:pointer">📝 정보입력으로 이동</button></div>'
+    +'</td></tr>';
+}
+function ns_filterSummaryHtml(){
+  var parts=[];
+  if(ns_selectedChance.size) parts.push('지원경향: '+Array.from(ns_selectedChance).join('·'));
+  if(ns_selectedRegions.size) parts.push('지역: '+Array.from(ns_selectedRegions).join('·'));
+  if(ns_currentMajorFilter) parts.push('계열: '+ns_currentMajorFilter);
+  if(ns_typeFilter) parts.push('논술유형: '+ns_typeFilter);
+  if(window._nsSearchUniv) parts.push('대학: '+window._nsSearchUniv);
+  if(window._nsSearchMajor) parts.push('학과: '+window._nsSearchMajor);
+  if(!parts.length) return '';
+  return '<div style="padding:8px 16px;border-bottom:1px solid #e8eaf6;background:#f8faff;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    +'<span style="font-size:10.5px;font-weight:700;color:#64748b">적용 중인 필터</span>'
+    +parts.map(function(p){ return '<span style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:12px;padding:2px 9px;font-size:10.5px;font-weight:700">'+esc(p)+'</span>'; }).join('')
+    +'<button onclick="ST.nulsulSubTab=\'input\';render()" style="margin-left:auto;background:#fff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:14px;padding:3px 10px;font-size:10.5px;font-weight:700;cursor:pointer">필터 변경</button>'
+    +'</div>';
+}
+function ns_renderResultsViewHtml(){
+  var h='<div id="ns-layout" style="display:flex;flex-direction:column;gap:12px">';
+  if(ns_isStale()){
+    h+='<div id="ns-stale-notice" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fef9c3;border:1px solid #facc15;border-radius:10px;padding:10px 14px">'
+      +'<span style="font-size:12.5px;font-weight:800;color:#854d0e;flex:1;min-width:220px">⚠ 성적이 변경되었습니다. 현재 결과는 이전 성적 기준입니다.</span>'
+      +'<button onclick="ns_analyzeAndShow()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer">🔍 다시 분석</button>'
+      +'</div>';
+  }
+  // 통계 배너(타일 클릭으로 지원경향 필터 토글)
+  h+='<div id="ns-stat-grid" style="display:'+(ns_lastResults.length?'grid':'none')+';gap:8px;grid-template-columns:repeat(5,1fr)">'
+    +[['도전','#7c3aed','#f5f3ff','🔥'],['상향','#dc2626','#fef2f2','⬆'],['적정','#d97706','#fffbeb','✓'],['안정','#2563eb','#eff6ff','🛡'],['참고','#64748b','#f8fafc','📌']].map(function(item){
+      var cnt=ns_lastResults.filter(function(r){return r.chance===item[0];}).length;
+      return '<div style="background:'+item[2]+';border:1.5px solid '+item[1]+'33;border-radius:10px;padding:10px;text-align:center;cursor:pointer" onclick="ns_toggleChance(\''+item[0]+'\')">'
+        +'<button id="ns-f-'+item[0]+'" onclick="event.stopPropagation();ns_toggleChance(\''+item[0]+'\')" style="border:1.5px solid '+item[1]+';color:'+item[1]+';background:transparent;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-bottom:4px">'+item[3]+' '+item[0]+'</button>'
+        +'<div id="ns-cnt-'+item[0]+'" style="font-size:22px;font-weight:900;color:'+item[1]+'">'+cnt+'</div>'
+        +'</div>';
+    }).join('')
+    +'</div>';
+  var thS='padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center';
+  h+='<div class="box" style="overflow:hidden;padding:0">'
+    +'<div style="padding:11px 16px;border-bottom:1px solid #e8eaf6;display:flex;align-items:center;gap:8px">'
+    +'<span style="font-size:14px">🎯</span><span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span>'
+    +'<span id="ns-result-count" style="font-size:11px;color:#94a3b8">'+(ns_lastResults.length?('('+ns_getFiltered().length+'개)'):'')+'</span>'
+    +'</div>'
+    +ns_filterSummaryHtml()
+    +'<div style="overflow-x:auto;max-height:600px;overflow-y:auto;overflow-anchor:none"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
+    +'<thead><tr style="background:#991b1b;position:sticky;top:0;z-index:2"><th style="'+thS+'">☑</th><th style="'+thS+';padding:9px 10px;text-align:left">대학명</th>'
+    +['모집단위','전형','모집인원','경쟁률(26)','논술유형','시험시간','출제유형/범위','논술반영','전형방법','수능최저','논술시험일/시간','지원경향'].map(function(t){ return '<th style="'+thS+'">'+t+'</th>'; }).join('')
+    +'</tr></thead><tbody id="ns-result-tbody">'
+    +(ns_lastResults.length?'<tr><td colspan="14" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">결과를 불러오는 중...</td></tr>':ns_emptyRowHtml())
+    +'</tbody></table></div></div>';
+  // 안내
+  h+='<div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 14px;font-size:11px;color:#713f12;line-height:1.7">'
+    +'<b>⚠ 논술전형 분석 안내</b><br>'
+    +'• 지원경향은 <b>내신 등급 기준</b>으로 산출되며, 실제 합격은 논술 성적이 결정적입니다.<br>'
+    +'• 수능 최저학력기준 충족 여부를 반드시 확인하세요.<br>'
+    +'• 각 대학 논술 기출문제를 통해 논술 준비 수준을 점검하시기 바랍니다.'
+    +'</div>';
+  h+='</div>';
+  return h;
+}
+// renderNulsul(s): 대학분석(결과) 화면. (이름은 기존 호출부 호환을 위해 유지)
+function renderNulsul(s){
+  ns_ensureStudentLoaded(s);
   setTimeout(function(){
     if(ns_lastResults.length){ ns_renderResult(); ns_updateStats(); }
     ns_updateFilterBtnStyles();
-  }, 50);
+  },50);
+  return ns_renderResultsViewHtml();
+}
 
-  var myGrade = ns_getMyGrade();
-  var avgDisp = myGrade > 0 ? myGrade.toFixed(2) : '—';
-  var panelOpen = window._nsPanelOpen !== false;
-  var countMap = {도전:0,상향:0,적정:0,안정:0,참고:0};
-  ns_lastResults.forEach(function(r){ if(countMap[r.chance]!==undefined) countMap[r.chance]++; });
-  var statDisp = ns_lastResults.length ? 'flex' : 'none';
+// ── 정보입력 카드 흐름 ──
+function ns_renderInputFlowHtml(s){
+  ns_ensureStudentLoaded(s);
+  setTimeout(function(){ ns_updateFilterBtnStyles(); },50);
+  var card='background:#fff;border:1px solid #e8eaf6;border-radius:16px;padding:18px 20px;margin-bottom:14px';
+  var field='width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;background:#f8fafc';
+  var lbl='display:block;font-size:11.5px;color:#888;margin-bottom:5px';
+  var myGrade=ns_getMyGrade();
+  var h='<div id="ns-input-flow" style="max-width:none;padding-bottom:30px">';
 
-  return '<div id="ns-layout" style="display:flex;flex-direction:column;gap:12px">'
+  // 0. 연결된 학생
+  h+='<div style="'+card+'">'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">연결된 학생 (좌측에서 선택한 학생 — 기본정보 수정은 학생 &#39;수정&#39; 화면에서)</div>'
+    +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
+    +'<div><span style="font-size:10.5px;color:#aaa">이름</span><br><b style="font-size:14px">'+esc(s.name||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">학교</span><br><b style="font-size:14px">'+esc(s.school||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">학년</span><br><b style="font-size:14px">'+esc(s.grade||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">내신 성적 출처</span><br>'+ns_sourceBadgeHtml()+'</div>'
+    +'</div></div>';
 
-  // ── 입력 패널 ──
-  +'<div class="box" style="padding:0;overflow:hidden">'
-  +'<div onclick="window._nsPanelOpen=!window._nsPanelOpen;var b=document.getElementById(\'ns-panel-body\');var ic=document.getElementById(\'ns-panel-icon\');if(b)b.style.display=window._nsPanelOpen?\'block\':\'none\';if(ic)ic.textContent=window._nsPanelOpen?\'▲ 접기\':\'▼ 펼치기\';" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;background:#fef2f2;border-bottom:1px solid #fecaca;user-select:none">'
-  +'<span style="font-size:13px">✏</span>'
-  +'<span style="font-size:12px;font-weight:700;color:#991b1b">성적 입력 패널</span>'
-  +'<div style="flex:1"></div>'
-  +(myGrade>0?'<span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">📊 내신평균: '+avgDisp+'등급</span>':'<span style="font-size:11px;color:#94a3b8">내신을 입력하세요</span>')
-  +'<span id="ns-panel-icon" style="font-size:10px;color:#94a3b8;font-weight:600;white-space:nowrap;margin-left:10px">'+(panelOpen?'▲ 접기':'▼ 펼치기')+'</span>'
-  +'</div>'
-  +'<div id="ns-panel-body" style="display:'+(panelOpen?'block':'none')+';padding:14px 16px">'
-  +'<div style="display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start">'
-  // 왼쪽: 빠른입력
-  +'<div>'
-  +'<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:6px">⚡ 내신 빠른 입력</div>'
-  +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-  +'<input type="number" id="ns-quick-grade" min="1" max="9" step="0.01" value="'+(ns_quickGrade||'')+'" placeholder="예) 3.5" style="width:90px;padding:6px 10px;border:1.5px solid #fca5a5;border-radius:8px;font-size:13px;font-weight:700;text-align:center;color:#dc2626"'
-  +' oninput="ns_quickGrade=parseFloat(this.value)||0;document.getElementById(\'ns-avg-display\').textContent=ns_quickGrade>0?ns_quickGrade.toFixed(2)+\'등급\':\'—\';">'
-  +'<span style="font-size:12px;color:#64748b">등급 입력 후 분석 클릭</span>'
-  +'</div>'
-  +'<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;font-size:11px;color:#92400e;line-height:1.6">'
-  +'<b>💡 논술전형 특징</b><br>'
-  +'• 내신 반영비율 낮음 (30~40%)<br>'
-  +'• 논술 실력이 합격의 핵심 요소<br>'
-  +'• 수능 최저학력기준 적용 여부 확인 필수<br>'
-  +'• 내신 4~6등급대도 논술 실력으로 합격 가능'
-  +'</div>'
-  +'</div>'
-  // 오른쪽: 내신 평균 표시 및 분석 버튼
-  +'<div style="display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center">'
-  +'<div style="text-align:center;padding:16px 24px;background:#fff;border:2px solid #fca5a5;border-radius:12px;min-width:140px">'
-  +'<div style="font-size:10px;color:#94a3b8;margin-bottom:4px">현재 내신 평균</div>'
-  +'<div id="ns-avg-display" style="font-size:24px;font-weight:900;color:#dc2626">'+(myGrade>0?myGrade.toFixed(2)+'등급':'—')+'</div>'
-  +'</div>'
-  +'<button onclick="ns_analyze()" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:13px;font-weight:800;cursor:pointer;width:100%">🔍 지원 가능 대학 분석</button>'
-  +'</div>'
-  +'</div>'
-  +'</div>'
-  +'</div>'
+  // ① 내신 빠른 평균 입력
+  h+='<div style="'+card+'">'
+    +gg_stepHead('①','⚡ 내신 빠른 평균 입력','성적 탭의 국·영·수·사·과 평균이 자동 입력됩니다 — 직접 수정 가능')
+    +'<span style="display:block;margin:-6px 0 10px">'+ns_sourceBadgeHtml()+'</span>'
+    +'<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">'
+    +'<div style="width:200px"><label style="'+lbl+'">국·영·수·사·과 평균 <span style="color:#bbb">(등급)</span></label>'
+    +'<input type="number" id="ns-quick-grade" min="1" max="9" step="0.01" value="'+(ns_quickGrade||'')+'" placeholder="예) 3.5" style="'+field+';font-weight:700;color:#dc2626" oninput="ns_onQuickInput(this)"></div>'
+    +'<div style="display:inline-flex;align-items:center;gap:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:20px;padding:5px 14px;margin-bottom:2px">'
+    +'<span style="font-size:11px;font-weight:700;color:#991b1b">📊 현재 내신 평균</span>'
+    +'<b id="ns-avg-display" style="font-size:15px;font-weight:900;color:#dc2626">'+ns_avgText(myGrade)+'</b></div>'
+    +'</div>'
+    +ns_tabLinkTableHtml()
+    +'<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;font-size:11px;color:#92400e;line-height:1.6;margin-top:12px">'
+    +'<b>💡 논술전형 특징</b><br>'
+    +'• 내신 반영비율 낮음 (30~40%)<br>'
+    +'• 논술 실력이 합격의 핵심 요소<br>'
+    +'• 수능 최저학력기준 적용 여부 확인 필수<br>'
+    +'• 내신 4~6등급대도 논술 실력으로 합격 가능'
+    +'</div></div>';
 
-  // ── 통계 배너 ──
-  +'<div id="ns-stat-grid" style="display:none;gap:8px;grid-template-columns:repeat(5,1fr)">'
-  +[['도전','#7c3aed','#f5f3ff','🔥'],['상향','#dc2626','#fef2f2','⬆'],['적정','#d97706','#fffbeb','✓'],['안정','#2563eb','#eff6ff','🛡'],['참고','#64748b','#f8fafc','📌']].map(function(item){
-    var cnt=ns_lastResults.filter(function(r){return r.chance===item[0];}).length;
-    return '<div style="background:'+item[2]+';border:1.5px solid '+item[1]+'33;border-radius:10px;padding:10px;text-align:center;cursor:pointer" onclick="ns_toggleChance(\''+item[0]+'\')">'
-      +'<button id="ns-f-'+item[0]+'" onclick="event.stopPropagation();ns_toggleChance(\''+item[0]+'\')" style="border:1.5px solid '+item[1]+';color:'+item[1]+';background:transparent;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-bottom:4px">'+item[3]+' '+item[0]+'</button>'
-      +'<div id="ns-cnt-'+item[0]+'" style="font-size:22px;font-weight:900;color:'+item[1]+'">'+cnt+'</div>'
-      +'</div>';
-  }).join('')
-  +'</div>'
+  // ② 관심 계열 · 논술유형
+  var majorOpts=[['','전체 계열'],['인문·사회','인문·사회'],['자연·공학','자연·공학'],['상경','상경'],['의약학','의약학'],['교육','교육'],['예체능','예체능'],['통합','통합/자유전공']];
+  var typeOpts=[['','전체'],['인문','인문'],['자연','자연'],['통합형','통합형']];
+  h+='<div style="'+card+'">'
+    +gg_stepHead('②','🎓 관심 계열 · 논술유형','선택한 조건의 학과만 결과에 표시됩니다')
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 16px;max-width:560px">'
+    +'<div><label style="'+lbl+'">관심 계열</label><select id="ns-major-sel" style="'+field+'" onchange="ns_setMajor(this.value)">'
+    +majorOpts.map(function(o){ return '<option value="'+o[0]+'"'+(ns_currentMajorFilter===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')
+    +'</select></div>'
+    +'<div><label style="'+lbl+'">논술유형</label><select id="ns-type-sel" style="'+field+'" onchange="ns_typeFilter=this.value;ns_renderResult()">'
+    +typeOpts.map(function(o){ return '<option value="'+o[0]+'"'+(ns_typeFilter===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')
+    +'</select></div></div></div>';
 
-  // ── 필터 바 ──
-  +'<div id="ns-filter-bar" style="display:none;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:10px;border:1px solid #fecaca">'
-  +'<span style="font-size:11px;font-weight:700;color:#991b1b">필터:</span>'
-  +[['','전체 계열'],['인문·사회','인문·사회'],['자연·공학','자연·공학'],['상경','상경'],['의약학','의약학'],['교육','교육'],['예체능','예체능'],['통합','통합/자유전공']].map(function(pair){
-    var v=pair[0],label=pair[1];
-    var active=ns_currentMajorFilter===v||(v===''&&!ns_currentMajorFilter);
-    return '<button onclick="ns_setMajor(\''+v+'\')" style="padding:3px 10px;border-radius:15px;font-size:10px;font-weight:600;border:1.5px solid #dc2626;cursor:pointer;background:'+(active?'#dc2626':'transparent')+';color:'+(active?'#fff':'#dc2626')+'">'+label+'</button>';
-  }).join('')
-  +'<span style="margin-left:8px;font-size:11px;font-weight:700;color:#991b1b">논술유형:</span>'
-  +'<select id="ns-type-sel" onchange="ns_renderResult()" style="font-size:11px;border:1px solid #fca5a5;border-radius:6px;padding:3px 6px;color:#dc2626">'
-  +'<option value="">전체</option><option value="인문">인문</option><option value="자연">자연</option><option value="통합형">통합형</option>'
-  +'</select>'
-  +'<span style="margin-left:8px;font-size:11px;font-weight:700;color:#991b1b">지역:</span>'
-  +['서울','수도권','지방'].map(function(v){
-    var a=ns_selectedRegions.has(v);
-    return '<button onclick="ns_toggleRegion(\''+v+'\')" style="padding:3px 10px;border-radius:15px;font-size:10px;font-weight:600;border:1.5px solid #94a3b8;cursor:pointer;background:'+(a?'#64748b':'transparent')+';color:'+(a?'#fff':'#64748b')+'">'+v+'</button>';
-  }).join('')
-  +'<input id="ns-search" type="text" placeholder="대학명 검색..." oninput="ns_renderResult()" style="margin-left:auto;font-size:11px;border:1px solid #fca5a5;border-radius:8px;padding:4px 10px;width:110px">'
-  +'<input id="ns-search-dept" type="text" placeholder="학과명 검색..." oninput="ns_renderResult()" style="font-size:11px;border:1px solid #fca5a5;border-radius:8px;padding:4px 10px;width:110px">'
-  +'</div>'
+  // ③ 지원경향 · 필터
+  var rowLbl='font-size:11px;font-weight:700;color:#64748b;min-width:56px';
+  var rowWrap='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:11px';
+  h+='<div style="'+card+'">'
+    +gg_stepHead('③','🎯 지원경향 · 필터 선택','여러 개 선택 가능 — 분석 결과 화면에 그대로 적용됩니다')
+    +'<div style="'+rowWrap+'"><span style="'+rowLbl+'">지원경향</span>'
+    +[['all','전체'],['도전','🔥 도전'],['상향','⬆ 상향'],['적정','✓ 적정'],['안정','🛡 안정'],['참고','📌 참고']].map(function(item){
+      var act=item[0]==='all'?ns_selectedChance.size===0:ns_selectedChance.has(item[0]);
+      return '<button data-ns-filter="'+item[0]+'" onclick="ns_setChance(this.getAttribute(\'data-ns-filter\'))" style="'+gg_chipStyle(act,item[0]==='all'?'#2563eb':(NS_CHANCE_COLORS[item[0]]||'#2563eb'))+'">'+item[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div style="'+rowWrap+'"><span style="'+rowLbl+'">지역</span>'
+    +[['all','전체'],['서울','서울'],['수도권','수도권'],['지방','지방']].map(function(item){
+      var act=item[0]==='all'?ns_selectedRegions.size===0:ns_selectedRegions.has(item[0]);
+      return '<button data-ns-fregion="'+item[0]+'" onclick="ns_setRegion(this.getAttribute(\'data-ns-fregion\'))" style="'+gg_chipStyle(act,'#2563eb')+'">'+item[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 16px">'
+    +'<div><label style="'+lbl+'">대학명 검색</label><input id="ns-search" type="text" placeholder="예) 한양대, 외대" value="'+esc(window._nsSearchUniv||'')+'" oninput="window._nsSearchUniv=this.value;ns_renderResult()" style="'+field+'"></div>'
+    +'<div><label style="'+lbl+'">학과명 검색</label><input id="ns-search-dept" type="text" placeholder="예) 경영, 컴퓨터" value="'+esc(window._nsSearchMajor||'')+'" oninput="window._nsSearchMajor=this.value;ns_renderResult()" style="'+field+'"></div>'
+    +'</div></div>';
 
-  // ── 결과 테이블 ──
-  +'<div style="overflow-x:auto;max-height:600px;overflow-y:auto;overflow-anchor:none"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
-  +'<thead><tr style="background:#991b1b"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:11px;text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집단위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">모집인원</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">경쟁률(26)</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술유형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">시험시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">출제유형/범위</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술반영</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">전형방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">논술시험일/시간</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:11px;text-align:center">지원경향 <span id="ns-result-count" style="font-size:9px;font-weight:400">(0개)</span></th></tr></thead>'
-  +'<tbody id="ns-result-tbody"><tr><td colspan="13" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">✏</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
-
-  // ── 안내 ──
-  +'<div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 14px;font-size:11px;color:#713f12;line-height:1.7">'
-  +'<b>⚠ 논술전형 분석 안내</b><br>'
-  +'• 지원경향은 <b>내신 등급 기준</b>으로 산출되며, 실제 합격은 논술 성적이 결정적입니다.<br>'
-  +'• 수능 최저학력기준 충족 여부를 반드시 확인하세요.<br>'
-  +'• 각 대학 논술 기출문제를 통해 논술 준비 수준을 점검하시기 바랍니다.'
-  +'</div>'
-  +'</div>';
+  // 최종 버튼
+  h+='<div style="'+card+';display:flex;flex-direction:column;gap:10px">'
+    +'<button onclick="ns_analyzeAndShow()" style="padding:15px;background:#dc2626;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(220,38,38,.35)">🔍 지원 가능 대학 분석</button>'
+    +'<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+    +'<button onclick="ns_resetAll()" style="padding:6px 14px;background:#fff;color:#94a3b8;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;cursor:pointer">🗑 초기화</button>'
+    +'<button onclick="ns_reloadPrefill()" style="padding:6px 14px;background:#fff;color:#64748b;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;cursor:pointer">↺ 성적탭 성적 다시 불러오기</button>'
+    +'</div></div>';
+  h+='</div>';
+  return h;
+}
+// ── 논술분석 허브 (헤더 + 서브탭 + 본문) ──
+function renderNulsulHub(s){
+  var sub=SG_hubGetSub('nulsul', s, true); // 학생이 바뀌면 대학분석(결과) 화면으로 초기화
+  var head=SG_hubHeaderHtml('nulsul','🎓 SUSI · 수시 논술분석','수시 논술분석',sub,SG_pickCount());
+  var body = sub==='input' ? ns_renderInputFlowHtml(s) : sub==='report' ? SG_renderResultReportBody(s) : renderNulsul(s);
+  return head+body;
 }
 
 // ── 논술분석 인쇄/PDF ──
@@ -45752,10 +46408,23 @@ var JH_UNIV_DB=[
 ];
 
 function jh_getRegion(u){if(u.includes('홍익대학교(세종)'))return '지방사립';if(u.includes('동국대학교(WISE)'))return '지방사립';if(u.includes('상명대학교(천안)'))return '지방사립';var s=['서울대','연세대','고려대','서강대','성균관대','한양대','중앙대','경희대','이화여대','숙명여대','홍익대','건국대','동국대','국민대','숭실대','세종대','광운대','한국외국어대'];var m=['인하대','아주대','가천대','단국대','경기대','인천대','가톨릭대','차의과학대','을지대학교','한국항공대학교','경인교육대학교','상명대학교'];var g=['경북대','부산대','전남대','전북대','충남대','충북대','강원대','제주대','경상국립대','공주교육대','광주교육대','대구교육대'];if(s.some(function(k){return u.includes(k.replace('대학교','').replace('대',''));}))return '서울';if(m.some(function(k){return u.includes(k.replace('대학교','').replace('대','').split('(')[0]);}))return '수도권';if(g.some(function(k){return u.includes(k.replace('대학교','').replace('대','').split('(')[0]);}))return '지방국립';return '지방사립';}
-function jh_getMyAvg(major){var t=0,cr=0,cnt=0;JH_SUBJECTS.forEach(function(s){var g=jh_grades[s.key]||{};var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0;var c=(g.s1?1:0)+(g.s2?1:0);if(!c)return;var avg=c===2?(v1+v2)/2:(v1||v2);t+=avg*(g.credit||s.credit);cr+=(g.credit||s.credit);cnt++;});if(cnt>=3)return cr?t/cr:0;if(jh_quickMode.active){var isSci=major&&(major.includes('자연')||major.includes('공학')||major.includes('의'));var isHum=major&&(major.includes('인문')||major.includes('상경')||major.includes('교육'));if(isSci&&jh_quickMode.sci)return jh_quickMode.sci;if(isHum&&jh_quickMode.hum)return jh_quickMode.hum;if(jh_quickMode.five)return jh_quickMode.five;return jh_quickMode.all||0;}return 0;}
+function jh_getMyAvg(major){
+  // ★ 2026-10: 빠른 평균 입력이 활성이면 항상 우선(교과분석과 동일). 상세 입력은 1과목 이상이면 단위수 가중평균.
+  if(jh_quickMode.active){
+    var isSci=major&&(major.includes('자연')||major.includes('공학')||major.includes('의'));
+    var isHum=major&&(major.includes('인문')||major.includes('상경')||major.includes('교육'));
+    if(isSci&&jh_quickMode.sci) return jh_quickMode.sci;
+    if(isHum&&jh_quickMode.hum) return jh_quickMode.hum;
+    if(jh_quickMode.five) return jh_quickMode.five;
+    return jh_quickMode.all||jh_quickMode.sci||jh_quickMode.hum||0;
+  }
+  var t0=0,cr=0,cnt=0;
+  JH_SUBJECTS.forEach(function(s){var g=jh_grades[s.key]||{};var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0;var c=(g.s1?1:0)+(g.s2?1:0);if(!c)return;var avg=c===2?(v1+v2)/2:(v1||v2);t0+=avg*(g.credit||s.credit);cr+=(g.credit||s.credit);cnt++;});
+  return (cnt>=1&&cr)?t0/cr:0;
+}
 function jh_classify(my,c50,c70){if(!c50||!c70)return '참고';var d=my-c50;if(d<-0.3)return '하향';if(d<0.05)return '안정';if(my<=c70+0.05)return '적정';if(my<=c70+0.25)return '상향';return '도전';}
 function jh_applyCorr(base,corr){if(!corr||base==='참고')return base;var i=JH_CORD.indexOf(base);if(i<0)return base;return JH_CORD[Math.max(0,Math.min(4,i+corr))];}
-function jh_analyze(){var hasQ=jh_quickMode.active&&(jh_quickMode.all||jh_quickMode.five||jh_quickMode.sci||jh_quickMode.hum)>0;var hasD=false;JH_SUBJECTS.forEach(function(s){var g=jh_grades[s.key]||{};if(g.s1||g.s2)hasD=true;});if(!hasQ&&!hasD){alert('성적을 입력해주세요.');return;}var corr=0;var ORD={도전:0,상향:1,적정:2,안정:3,하향:4,'—':5,참고:6};jh_lastResults=JH_UNIV_DB.map(function(u){
+function jh_analyze(){var hasQ=jh_quickMode.active&&(jh_quickMode.all||jh_quickMode.five||jh_quickMode.sci||jh_quickMode.hum)>0;var hasD=false;JH_SUBJECTS.forEach(function(s){var g=jh_grades[s.key]||{};if(g.s1||g.s2)hasD=true;});if(!hasQ&&!hasD){alert('성적을 입력해주세요.');return false;}var corr=0;var ORD={도전:0,상향:1,적정:2,안정:3,하향:4,'—':5,참고:6};jh_lastResults=JH_UNIV_DB.map(function(u){
   var my=jh_getMyAvg(u.major||'');
   var base=my>0?jh_classify(my,u.cut50,u.cut70):'—';
   var chance=jh_applyCorr(base,corr);
@@ -45779,11 +46448,11 @@ function jh_analyze(){var hasQ=jh_quickMode.active&&(jh_quickMode.all||jh_quickM
     interviewDate:u.interviewDate||'',
     interviewTime:u.interviewTime||''
   });
-}).sort(function(a,b){return((ORD[a.chance]||5)-(ORD[b.chance]||5))||a.cut50-b.cut50;});jh_renderResult();jh_updateStats();var sg=document.getElementById('jh-stat-grid');if(sg)sg.style.display='grid';}
+}).sort(function(a,b){return((ORD[a.chance]||5)-(ORD[b.chance]||5))||a.cut50-b.cut50;});jh_renderResult();jh_updateStats();var sg=document.getElementById('jh-stat-grid');if(sg)sg.style.display='grid';jh_analyzedSig=jh_inputSig();return true;}
 function jh_updateStats(){['도전','상향','적정','안정','하향'].forEach(function(k){var el=document.getElementById('jh-cnt-'+k);if(el)el.textContent=jh_lastResults.filter(function(r){return r.chance===k;}).length;});}
 function jh_getFiltered(){
-  var q=((document.getElementById('jh-search')||{}).value||'').toLowerCase().trim();
-  var mf=(document.getElementById('jh-major-sel')||{}).value||'';
+  var q=(window._jhSearchUniv||'').toLowerCase().trim(); // 결과 화면에는 입력창이 없으므로 보관된 검색어 사용
+  var mf=jh_currentMajorFilter||'';
   // 대학 약칭 → 정식명 매핑
   var _alias={'한국외대':'한국외국어대학교','외대':'한국외국어대학교','서울대':'서울대학교',
     '연대':'연세대학교','고대':'고려대학교','성대':'성균관대학교','성균관대':'성균관대학교',
@@ -45796,7 +46465,7 @@ function jh_getFiltered(){
     '강원대':'강원대학교','단국대':'단국대학교','한림대':'한림대학교',
     '서울과기대':'서울과학기술대학교','명지대':'명지대학교'};
   var _qR=(_alias[q]||q).toLowerCase();
-  var dq=((document.getElementById('jh-search-dept')||{}).value||'').toLowerCase().trim();
+  var dq=(window._jhSearchMajor||'').toLowerCase().trim();
   return jh_lastResults.filter(function(r){
     if(!_sg_majorMatch(r.major, mf))return false;
     if(jh_selectedChance.size>0&&!jh_selectedChance.has(r.chance))return false;
@@ -45812,16 +46481,8 @@ function jh_getFiltered(){
   });
 }
 function jh_renderResult(){var tbody=document.getElementById('jh-result-tbody');var cnt=document.getElementById('jh-result-count');if(!tbody)return;var f=jh_getFiltered();if(cnt)cnt.textContent='('+f.length+'개)';if(!f.length){tbody.innerHTML='<tr><td colspan="14" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">조건에 맞는 결과가 없습니다</td></tr>';return;}var CL={도전:'#7c3aed',상향:'#dc2626',적정:'#d97706',안정:'#2563eb',하향:'#059669',참고:'#64748b'};var BG={도전:'#f5f3ff',상향:'#fef2f2',적정:'#fffbeb',안정:'#eff6ff',하향:'#ecfdf5',참고:'#f8fafc'};tbody.innerHTML=f.map(function(r){var d50=r.myGrade>0?r.myGrade-r.cut50:null;var ds=d50===null?'—':(d50>0?'+'+d50.toFixed(2):d50.toFixed(2));var dc=d50===null?'#64748b':d50>0.1?'#dc2626':d50<-0.05?'#059669':'#d97706';var hc=r.csat&&r.csat!=='없음';var iP=r.intPct||0,dP=r.docPct||100;var fh=(r.evalFocus||'').split(',').map(function(f){return '<span style="display:inline-block;padding:1px 5px;background:#f5f3ff;color:#6d28d9;border-radius:4px;font-size:9px;font-weight:700;margin:1px">'+f.trim()+'</span>';}).join('');var cl=r.chance==='도전'?'🔥 도전':r.chance==='상향'?'⬆ 상향':r.chance==='적정'?'✓ 적정':r.chance==='안정'?'🛡 안정':r.chance==='하향'?'⬇ 하향':r.chance;return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:8px 6px;text-align:center"><input type="checkbox" onclick="SG_toggleJH(\''+r.id+'\')" '+(SG_isPickedJH(r.id)?'checked':'')+' style="width:15px;height:15px;cursor:pointer;accent-color:#4c1d95"></td><td style="padding:8px 10px;font-weight:800;font-size:12px;white-space:nowrap">'+r.univ+'<br><span style="font-size:9px;color:#94a3b8;font-weight:400">'+(r.major||'')+'</span></td><td style="padding:8px 6px;font-size:12px;font-weight:600">'+r.dept+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#ede9fe;color:#6d28d9">'+r.type+'</span></td><td style="padding:4px 6px;text-align:center;font-size:11px;font-weight:600">'+(r.recruit||'—')+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:10px;font-size:10px;font-weight:700;background:'+(r.interview==='있음'?'#fef3c7':'#f0fdf4')+';color:'+(r.interview==='있음'?'#92400e':'#065f46')+'">'+(r.interview==='있음'?'🎤 있음':'📄 없음')+'</span>'+((r.interviewDate||r.interviewTime)?'<div style="margin-top:3px"><span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">📅 '+(r.interviewDate||'')+(r.interviewDate&&r.interviewTime?' ':'')+( r.interviewTime||'')+'</span></div>':'')+'</td><td style="padding:4px 6px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;background:'+(hc?'#fff7ed':'#f0fdf4')+';color:'+(hc?'#9a3412':'#065f46')+'">'+(r.csat||'없음')+'</span></td><td style="padding:4px 6px;min-width:110px"><div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;height:5px;border-radius:3px;overflow:hidden"><div style="width:'+dP+'%;background:#7c3aed"></div>'+(iP?'<div style="width:'+iP+'%;background:#f59e0b"></div>':'')+'</div><div style="font-size:9px;color:#64748b">서류 '+dP+'%'+(iP?' · 면접 '+iP+'%':'')+'</div>'+(r.methodNote?'<div style="font-size:9px;color:#94a3b8;line-height:1.3">'+r.methodNote+'</div>':'')+'</div></td><td style="padding:4px 6px">'+fh+(r.note?'<div style="font-size:9px;color:#94a3b8;margin-top:2px">'+r.note+'</div>':'')+'</td><td style="padding:4px 6px;text-align:center;font-weight:700;font-size:12px">'+(r.cut50>0?r.cut50.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center;font-weight:600;font-size:12px;color:#64748b">'+(r.cut70>0?r.cut70.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center;font-weight:800;font-size:12px;color:#7c3aed">'+(r.myGrade>0?r.myGrade.toFixed(2):'—')+'</td><td style="padding:4px 6px;text-align:center"><span style="font-size:11px;font-weight:700;color:'+dc+'">'+ds+'</span></td><td style="padding:4px 8px;text-align:center"><span style="display:inline-block;padding:4px 9px;border-radius:10px;font-size:11px;font-weight:800;background:'+BG[r.chance]+';color:'+CL[r.chance]+'">'+cl+'</span>'+(r.corrected?'<div style="font-size:9px;color:#059669;font-weight:700">비교과보정</div>':'')+'</td></tr>';}).join('');}
-function jh_setFilter(v,el){if(v==='all'){jh_selectedChance.clear();document.querySelectorAll('[data-jhf]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');}else{var ab=document.querySelector('[data-jhf="all"]');if(ab)ab.classList.remove('act');if(jh_selectedChance.has(v)){jh_selectedChance.delete(v);el.classList.remove('act');}else{jh_selectedChance.add(v);el.classList.add('act');}if(!jh_selectedChance.size&&ab)ab.classList.add('act');}jh_renderResult();}
-function jh_setTypeFilter(v,el){if(v==='all'){jh_selectedTypes.clear();document.querySelectorAll('[data-jhft]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');}else{var ab=document.querySelector('[data-jhft="all"]');if(ab)ab.classList.remove('act');if(jh_selectedTypes.has(v)){jh_selectedTypes.delete(v);el.classList.remove('act');}else{jh_selectedTypes.add(v);el.classList.add('act');}if(!jh_selectedTypes.size&&ab)ab.classList.add('act');}jh_renderResult();}
-function jh_setCsatFilter(v,el){jh_selectedCsat=v;document.querySelectorAll('[data-jhfc]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');jh_renderResult();}
-function jh_setIntFilter(v,el){jh_selectedInterview=v;document.querySelectorAll('[data-jhfi]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');jh_renderResult();}
-function jh_setRegionFilter(v,el){if(v==='all'){jh_selectedRegions.clear();document.querySelectorAll('[data-jhfr]').forEach(function(b){b.classList.remove('act');});el.classList.add('act');}else{var ab=document.querySelector('[data-jhfr="all"]');if(ab)ab.classList.remove('act');if(jh_selectedRegions.has(v)){jh_selectedRegions.delete(v);el.classList.remove('act');}else{jh_selectedRegions.add(v);el.classList.add('act');}if(!jh_selectedRegions.size&&ab)ab.classList.add('act');}jh_renderResult();}
 
 function jh_togglePanel(id){try{var b=document.getElementById(id);if(b)b.style.display=b.style.display==='none'?'block':'none';}catch(e){console.warn('toggle err:',e);}}
-function jh_applyQuick(){var all=parseFloat((document.getElementById('jh-q-all')||{}).value)||0;var five=parseFloat((document.getElementById('jh-q-5')||{}).value)||0;var sci=parseFloat((document.getElementById('jh-q-sci')||{}).value)||0;var hum=parseFloat((document.getElementById('jh-q-hum')||{}).value)||0;jh_quickMode={active:(all||five||sci||hum)>0,all:all,five:five,sci:sci,hum:hum};var box=document.getElementById('jh-quick-box');if(jh_quickMode.active){var parts=[];if(all)parts.push('전체 '+all.toFixed(2));if(five)parts.push('5과목 '+five.toFixed(2));if(sci)parts.push('국영수과 '+sci.toFixed(2));if(hum)parts.push('국영수사 '+hum.toFixed(2));if(box){box.innerHTML='⚡ '+parts.join(' / ');box.style.display='block';}var dv=document.getElementById('jh-avg-display');if(dv)dv.textContent=(all||five||sci||hum).toFixed(2);}else{if(box)box.style.display='none';}}
-function jh_setGrade(key,sem,val){try{if(!jh_grades[key])jh_grades[key]={s1:'',s2:'',credit:(JH_SUBJECTS.find(function(s){return s.key===key;})||{credit:3}).credit};jh_grades[key][sem]=val;jh_updateAvg();}catch(e){console.warn('jh_setGrade err:',e);}}
-function jh_updateAvg(){try{var t=0,cr=0;JH_SUBJECTS.forEach(function(sk2){var g=jh_grades[sk2.key]||{};var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0;var cnt2=(g.s1?1:0)+(g.s2?1:0);if(!cnt2)return;var avg2=cnt2===2?(v1+v2)/2:(v1||v2);t+=avg2*(g.credit||sk2.credit);cr+=(g.credit||sk2.credit);});var avg=cr?t/cr:0;var el=document.getElementById('jh-avg-display');if(el)el.textContent=avg>0?avg.toFixed(2):'—';var sm=document.getElementById('jh-avg-sub');if(sm)sm.textContent=avg>0?(avg<=1.5?'최상위권':avg<=2.5?'상위권':avg<=3.5?'중상위권':avg<=4.5?'중위권':'하위권'):'성적을 입력해주세요';}catch(e){console.warn('jh_updateAvg err:',e);}}
 function jh_openDbModal(){jh_renderDbList();var m=document.getElementById('jh-db-modal');if(m)m.style.display='flex';}
 function jh_closeDbModal(){var m=document.getElementById('jh-db-modal');if(m)m.style.display='none';}
 function jh_renderDbList(){var cnt=document.getElementById('jh-db-count');var list=document.getElementById('jh-db-list');if(cnt)cnt.textContent=JH_UNIV_DB.length+'개';if(!list)return;list.innerHTML=JH_UNIV_DB.map(function(u){return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:4px"><div style="flex:1"><span style="font-weight:700;font-size:12px">'+u.univ+'</span> <span style="color:#64748b;font-size:11px">'+u.dept+'</span> <span style="color:#94a3b8;font-size:10px">'+u.type+'</span>'+(u.interview==='있음'?'<span style="margin-left:5px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:4px">면접</span>':'<span style="margin-left:5px;font-size:9px;background:#f0fdf4;color:#065f46;padding:1px 5px;border-radius:4px">서류</span>')+'</div><span style="font-size:11px;color:#64748b">50%: <b>'+u.cut50+'</b> / 70%: <b>'+u.cut70+'</b></span><button onclick="jh_deleteUniv('+u.id+')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer">삭제</button></div>';}).join('')||'<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px">등록된 대학이 없습니다</div>';}
@@ -45834,47 +46495,380 @@ function jh_exportXls(sid){var s=ST.students.find(function(x){return String(x.id
   var f=jh_lastResults.length?jh_lastResults:jh_getFiltered();
   var rows=[['대학명','학과','전형명','모집인원','경쟁률','면접','면접일','면접시간','수능최저','서류비중','면접비중','서류핵심요소','선발방법','전형특징','합격50%','합격70%','내신평균','50%대비','지원경향']];
   f.forEach(function(r){var d50=r.myGrade>0?(r.myGrade-r.cut50).toFixed(2):'—';rows.push([r.univ,r.dept,r.type,r.recruit||'',r.comp26||'',r.interview||'없음',r.interviewDate||'',r.interviewTime||'',r.csat||'없음',(r.docPct||100)+'%',(r.intPct||0)+'%',r.evalFocus||'',r.methodNote||'',r.note||'',r.cut50>0?r.cut50:'',r.cut70>0?r.cut70:'',r.myGrade>0?r.myGrade.toFixed(2):'',d50,r.chance]);});var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[14,18,12,8,8,8,12,10,14,7,7,20,28,18,8,8,8,8,10].map(function(w){return{wch:w};});XLSX.utils.book_append_sheet(wb,ws,'종합전형분석');XLSX.writeFile(wb,(s?s.name:'학생')+'_수시종합전형분석_'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.xlsx');}if(typeof XLSX!=='undefined')doExport();else{var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=doExport;document.head.appendChild(sc);}}
-function jh_loadStudentGrades(s){jh_grades={};if(!s||!s.subjects)return;var sub=s.subjects;var km={korean:'국어',math:'수학',english:'영어',history:'한국사',social:'사회',science:'과학'};Object.keys(km).forEach(function(sk){var jk=km[sk];var sv=sub[sk];if(!sv)return;jh_grades[jk]={s1:String(sv.s1||sv.grade||''),s2:String(sv.s2||''),credit:sv.credit||(JH_SUBJECTS.find(function(x){return x.key===jk;})||{credit:3}).credit};});}
 
-function renderJonghap(s){
+// ══════════════════════════════════════════════════════════════
+// ★ 종합분석 허브 (2026-10 개편) — 교과분석 허브와 동일한 구조
+//   헤더 + [🎯 대학분석 | 📝 정보입력 | 📑 결과리포트(N)] 서브탭 (ST.jonghapSubTab, 학생 변경 시 'result'로 초기화)
+//   - 대학분석(result): renderJonghap(s) → jh_renderResultsViewHtml()  (결과 영역만, 입력 패널·필터 바 없음)
+//   - 정보입력(input) : jh_renderInputFlowHtml(s)  (연결된 학생 → ①빠른 평균 → ②과목별 상세(성적탭 연동) → ③관심 계열 → ④필터 → 분석)
+//   - 결과리포트(report): SG_renderResultReportBody(s) (교과+종합+논술 통합, 공용)
+//   상태(jh_grades, jh_quickMode, 필터 Set, 검색어)는 전역에 보관 → 두 화면이 동시에 DOM에 존재하지 않아 요소 id 중복 없음.
+// ══════════════════════════════════════════════════════════════
+var jh_currentMajorFilter='';
+var jh_semGrid={};         // {국어:['','','','',''],...} 학기별 그리드 원본 입력값(5등급제, 1학년1학기~3학년1학기)
+var jh_gridDriven={};      // 학기별 그리드가 jh_grades를 채우고 있는 과목 key 집합
+var jh_userEdited=false;   // 이 탭에서 직접 입력/수정했는지(false면 성적탭 값으로 렌더마다 다시 채움)
+var jh_inputLevel='HS5';   // 'MS'(성취도 A~E/점수) | 'HS5'(5등급제 숫자)
+var jh_analyzedSig='';     // 마지막 분석 시점의 입력 서명(stale 감지)
+window._jhSearchUniv=window._jhSearchUniv||'';   // 대학명 검색어(결과 화면에는 입력창이 없으므로 상태로 보관)
+window._jhSearchMajor=window._jhSearchMajor||''; // 학과명 검색어
+var JH_GRID_SUBJECTS=[
+  {key:'국어',label:'국어'},{key:'영어',label:'영어'},{key:'수학',label:'수학'},{key:'사회',label:'사회'},{key:'과학',label:'과학'}
+];
+// 종합 과목 key → gg_collectGradeTabData() 의 핵심 5과목 key
+var JH_TAB_CORE={'국어':'ko','수학':'ma','영어':'en','사회':'so1','과학':'sc1'};
+// 성적탭 '추가 과목' 이름 → 종합 과목 key (이름에 키워드가 들어 있을 때만 연동)
+var JH_TAB_EXTRA_KW=[['한국사',/한국사/],['도덕',/도덕|윤리/],['체육',/체육/],['음악',/음악/],['미술',/미술/],['기술',/기술|가정/],['정보',/정보/],['역사',/한국역사|^역사/]];
+
+// ── 성적탭 연동: s.gradeDetail[과목][학기] (9등급) → 종합 과목 key별 {label,sems,vals,fromRep} ──
+function jh_collectGradeTabData(s){
+  var out={};
+  if(!s) return out;
+  var core=gg_collectGradeTabData(s); // 핵심 5과목(국·수·영·사회·과학)은 교과분석과 동일한 읽기 로직 재사용
+  Object.keys(JH_TAB_CORE).forEach(function(jk){ var d=core[JH_TAB_CORE[jk]]; if(d) out[jk]=d; });
+  var gd=s.gradeDetail||{};
+  var sems=(typeof SEMS!=='undefined'&&Array.isArray(SEMS))?SEMS:['1-1','1-2','2-1','2-2','3-1'];
+  (Array.isArray(s.extraSubjs)?s.extraSubjs:[]).forEach(function(lb){
+    var hit=null;
+    for(var i=0;i<JH_TAB_EXTRA_KW.length;i++){ if(JH_TAB_EXTRA_KW[i][1].test(String(lb))){ hit=JH_TAB_EXTRA_KW[i][0]; break; } }
+    if(!hit||out[hit]) return;
+    var byTerm=gd[lb], row=[], vals=[];
+    sems.forEach(function(sm){
+      var g0=(byTerm&&typeof byTerm==='object')?gg_tabValid(byTerm[sm]):null;
+      row.push(g0); if(g0!==null) vals.push(g0);
+    });
+    if(vals.length) out[hit]={label:String(lb),sems:row,vals:vals,fromRep:false};
+  });
+  return out;
+}
+// 성적탭 값 → jh_grades(9등급 모델 {s1,s2,credit}). 학기 2개면 s1·s2, 3개 이상이면 평균을 s1에 담는다.
+function jh_loadStudentGrades(s){
+  jh_grades={};
+  if(!s) return;
+  var data=jh_collectGradeTabData(s);
+  JH_SUBJECTS.forEach(function(sk){
+    var d=data[sk.key];
+    if(!d) return;
+    var vals=d.vals;
+    if(vals.length===1) jh_grades[sk.key]={s1:vals[0],s2:'',credit:sk.credit};
+    else if(vals.length===2) jh_grades[sk.key]={s1:vals[0],s2:vals[1],credit:sk.credit};
+    else jh_grades[sk.key]={s1:+(vals.reduce(function(a,b){return a+b;},0)/vals.length).toFixed(2),s2:'',credit:sk.credit};
+  });
+}
+function jh_loadPrefill(s){
+  jh_grades={}; jh_gridDriven={}; jh_semGrid=jh_emptySemGrid();
+  jh_inputLevel=(s&&typeof RM_guessSchoolLevel==='function')?RM_guessSchoolLevel(s):'HS5';
+  if(!s) return;
+  jh_loadStudentGrades(s);
+}
+function jh_ensureStudentLoaded(s){
   SG_switchStudentPicks(s);
-  if(jh_currentStudentId!==String(s.id)){jh_currentStudentId=String(s.id);jh_grades={};jh_quickMode={active:false,all:0,five:0,sci:0,hum:0};jh_lastResults=[];jh_selectedChance.clear();jh_selectedTypes.clear();jh_selectedRegions.clear();jh_selectedCsat='all';jh_selectedInterview='all';jh_loadStudentGrades(s);}
-  setTimeout(function(){if(jh_lastResults.length){jh_renderResult();jh_updateStats();}jh_updateAvg();},50);
-  var gr='';
-  JH_SUBJECTS.forEach(function(sk){var g=jh_grades[sk.key]||{};var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0;var cnt=(g.s1?1:0)+(g.s2?1:0);var avg=cnt===2?(v1+v2)/2:(cnt===1?(v1||v2):0);var o1=['','1','2','3','4','5','6','7','8','9'].map(function(v){return '<option value="'+v+'"'+(String(g.s1||'')==v?' selected':'')+'>'+(v||'-')+'</option>';}).join('');var o2=['','1','2','3','4','5','6','7','8','9'].map(function(v){return '<option value="'+v+'"'+(String(g.s2||'')==v?' selected':'')+'>'+(v||'-')+'</option>';}).join('');gr+='<tr><td style="padding:5px 8px;font-size:11px;font-weight:500;background:#f8fafc;border-right:1px solid #e2e8f0">'+sk.name+'</td><td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0"><input type="number" min="1" max="8" value="'+(g.credit||sk.credit)+'" style="width:38px;padding:3px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;text-align:center" onchange="if(!jh_grades[\''+sk.key+'\'])jh_grades[\''+sk.key+'\']={}; jh_grades[\''+sk.key+'\'].credit=+this.value;jh_updateAvg()"></td><td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0"><select style="width:52px;padding:3px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px" onchange="jh_setGrade(\''+sk.key+'\',\'s1\',this.value)">'+o1+'</select></td><td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0"><select style="width:52px;padding:3px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px" onchange="jh_setGrade(\''+sk.key+'\',\'s2\',this.value)">'+o2+'</select></td><td style="padding:4px;text-align:center;font-weight:700;color:#7c3aed;font-size:11px">'+(avg>0?avg.toFixed(2):'—')+'</td></tr>';});
+  var sid=String(s.id);
+  if(jh_currentStudentId!==sid){
+    jh_currentStudentId=sid;
+    jh_quickMode={active:false,all:0,five:0,sci:0,hum:0};
+    jh_lastResults=[];
+    jh_selectedChance.clear();jh_selectedTypes.clear();jh_selectedRegions.clear();
+    jh_selectedCsat='all';jh_selectedInterview='all';
+    jh_currentMajorFilter='';
+    window._jhSearchUniv='';window._jhSearchMajor='';
+    jh_userEdited=false;
+    jh_analyzedSig='';
+    jh_loadPrefill(s);
+  } else if(!jh_userEdited && !jh_quickMode.active){
+    jh_loadPrefill(s); // 직접 수정 전이면 렌더마다 성적탭의 최신 값으로 다시 읽는다(성적탭 연동)
+  }
+}
 
-  var cm={도전:0,상향:0,적정:0,안정:0,하향:0};jh_lastResults.forEach(function(r){if(cm[r.chance]!==undefined)cm[r.chance]++;});
-  var sd=jh_lastResults.length?'grid':'none';
-  var ma=jh_getMyAvg('');if(jh_quickMode.active){var qv=jh_quickMode.all||jh_quickMode.five||jh_quickMode.sci||jh_quickMode.hum;ma=qv||ma;}
-  return '<div style="display:flex;flex-direction:column;gap:14px">'
-  +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start">'
-  +'<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">'
-    +'<div style="padding:11px 13px 7px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:700">📝 내신 성적</span><button onclick="jh_togglePanel(\'jh-grade-tbl\')" style="background:#f1f5f9;color:#64748b;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer">접기/펼치기</button></div>'
-    +'<div id="jh-grade-tbl" style="padding:8px 10px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:5px 8px;font-size:10px;color:#64748b;text-align:left;background:#f8fafc;border-bottom:1px solid #e2e8f0">과목</th><th style="padding:5px;font-size:10px;color:#64748b;text-align:center;background:#f8fafc;border-bottom:1px solid #e2e8f0">단위</th><th style="padding:5px;font-size:10px;color:#64748b;text-align:center;background:#f8fafc;border-bottom:1px solid #e2e8f0">1학기</th><th style="padding:5px;font-size:10px;color:#64748b;text-align:center;background:#f8fafc;border-bottom:1px solid #e2e8f0">2학기</th><th style="padding:5px;font-size:10px;color:#64748b;text-align:center;background:#f8fafc;border-bottom:1px solid #e2e8f0">평균</th></tr></thead><tbody>'+gr+'</tbody></table></div>'
-    +'<div style="padding:8px 12px;border-top:1px solid #e2e8f0"><div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:5px">⚡ 빠른 평균 입력</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><div><div style="font-size:9px;color:#94a3b8;margin-bottom:2px">전 과목</div><input id="jh-q-all" type="number" step="0.01" min="1" max="9" placeholder="예: 2.45" value="'+(jh_quickMode.all||'')+'" oninput="jh_applyQuick()" style="width:100%;padding:5px 7px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;text-align:center"></div><div><div style="font-size:9px;color:#94a3b8;margin-bottom:2px">국·영·수·사·과</div><input id="jh-q-5" type="number" step="0.01" min="1" max="9" placeholder="예: 2.20" value="'+(jh_quickMode.five||'')+'" oninput="jh_applyQuick()" style="width:100%;padding:5px 7px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;text-align:center"></div><div><div style="font-size:9px;color:#94a3b8;margin-bottom:2px">국·영·수·과(자연)</div><input id="jh-q-sci" type="number" step="0.01" min="1" max="9" placeholder="예: 2.10" value="'+(jh_quickMode.sci||'')+'" oninput="jh_applyQuick()" style="width:100%;padding:5px 7px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;text-align:center"></div><div><div style="font-size:9px;color:#94a3b8;margin-bottom:2px">국·영·수·사(인문)</div><input id="jh-q-hum" type="number" step="0.01" min="1" max="9" placeholder="예: 2.30" value="'+(jh_quickMode.hum||'')+'" oninput="jh_applyQuick()" style="width:100%;padding:5px 7px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;text-align:center"></div></div><div id="jh-quick-box" style="display:'+(jh_quickMode.active?'block':'none')+';margin-top:5px;font-size:10px;color:#7c3aed;font-weight:600;background:#f5f3ff;border-radius:5px;padding:4px 8px">'+(jh_quickMode.active?('⚡ '+[jh_quickMode.all?'전체 '+(+jh_quickMode.all).toFixed(2):'',jh_quickMode.five?'5과목 '+(+jh_quickMode.five).toFixed(2):'',jh_quickMode.sci?'국영수과 '+(+jh_quickMode.sci).toFixed(2):'',jh_quickMode.hum?'국영수사 '+(+jh_quickMode.hum).toFixed(2):''].filter(Boolean).join(' / ')):'')+'</div></div>'
-    +'<div style="padding:9px 12px;border-top:1px solid #e2e8f0;background:#f5f3ff"><div style="font-size:10px;font-weight:600;color:#7c3aed">내신 평균 등급</div><div id="jh-avg-display" style="font-size:24px;font-weight:900;color:#7c3aed">'+(ma>0?ma.toFixed(2):'—')+'</div><div id="jh-avg-sub" style="font-size:10px;color:#64748b">'+(ma>0?(ma<=1.5?'최상위권':ma<=2.5?'상위권':ma<=3.5?'중상위권':ma<=4.5?'중위권':'하위권'):'성적을 입력해주세요')+'</div></div>'
-  +'</div>'
-  +'<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:12px 13px"><div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">관심 계열</div><select id="jh-major-sel" onchange="jh_renderResult()" style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;margin-bottom:10px"><option value="">전체 계열</option><option value="인문·사회">인문·사회</option><option value="자연·공학">자연·공학</option><option value="상경">상경</option><option value="의약학">의약학</option><option value="교육">교육</option><option value="예체능">예체능</option><option value="통합">통합/자유전공</option></select><button onclick="jh_analyze()" style="width:100%;padding:11px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer">🔍 지원 가능 대학 분석</button></div>'
-  +'</div>'
-  +'<div style="display:flex;flex-direction:column;gap:12px;width:100%">'
-  +'<div id="jh-stat-grid" style="display:'+sd+';grid-template-columns:repeat(5,1fr);gap:8px">'+['도전','상향','적정','안정','하향'].map(function(k){var cl=k==='도전'?'#7c3aed':k==='상향'?'#dc2626':k==='적정'?'#d97706':k==='안정'?'#2563eb':'#059669';var bg=k==='도전'?'#f5f3ff':k==='상향'?'#fef2f2':k==='적정'?'#fffbeb':k==='안정'?'#eff6ff':'#ecfdf5';return '<div style="background:'+bg+';border:1.5px solid '+cl+'40;border-radius:10px;padding:10px;text-align:center"><div id="jh-cnt-'+k+'" style="font-size:22px;font-weight:900;color:'+cl+'">'+(cm[k]||0)+'</div><div style="font-size:10px;font-weight:700;color:'+cl+'">'+(k==='도전'?'🔥 도전':k==='상향'?'⬆ 상향':k==='적정'?'✓ 적정':k==='안정'?'🛡 안정':'⬇ 하향')+'</div></div>';}).join('')+'</div>'
-  +'<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:9px 11px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'
-    +'<span style="font-size:10px;font-weight:700;color:#64748b">경향</span>'+['all','도전','상향','적정','안정','하향'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhf="'+v+'" onclick="jh_setFilter(\''+v+'\',this)">'+(v==='all'?'전체':v==='도전'?'🔥도전':v==='상향'?'⬆상향':v==='적정'?'✓적정':v==='안정'?'🛡안정':'⬇하향')+'</button>';}).join('')
-    +'<span style="width:1px;height:14px;background:#e2e8f0"></span><span style="font-size:10px;font-weight:700;color:#64748b">전형</span>'+['all','서류100','면접'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhft="'+v+'" onclick="jh_setTypeFilter(\''+v+'\',this)">'+(v==='all'?'전체':v==='서류100'?'서류100%':'서류+면접')+'</button>';}).join('')
-    +'<span style="width:1px;height:14px;background:#e2e8f0"></span><span style="font-size:10px;font-weight:700;color:#64748b">최저</span>'+['all','없음','있음'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhfc="'+v+'" onclick="jh_setCsatFilter(\''+v+'\',this)">'+(v==='all'?'전체':v==='없음'?'없음':'있음')+'</button>';}).join('')
-    +'<span style="width:1px;height:14px;background:#e2e8f0"></span><span style="font-size:10px;font-weight:700;color:#64748b">면접</span>'+['all','없음','있음'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhfi="'+v+'" onclick="jh_setIntFilter(\''+v+'\',this)">'+(v==='all'?'전체':v==='없음'?'없음':'있음')+'</button>';}).join('')
-    +'<span style="width:1px;height:14px;background:#e2e8f0"></span><span style="font-size:10px;font-weight:700;color:#64748b">지역</span>'+['all','서울','수도권','지방국립','지방사립'].map(function(v){return '<button class="tab'+(v==='all'?' act':'')+'" data-jhfr="'+v+'" onclick="jh_setRegionFilter(\''+v+'\',this)">'+(v==='all'?'전체':v)+'</button>';}).join('')
-    +'<span style="width:1px;height:14px;background:#e2e8f0"></span>'
-    +'<input id="jh-search" type="text" placeholder="대학명 검색 (예: 한국외대)" oninput="jh_renderResult()" style="padding:4px 9px;border:1.5px solid #e2e8f0;border-radius:14px;font-size:11px;width:110px">'
-    +'<input id="jh-search-dept" type="text" placeholder="학과명 검색" oninput="jh_renderResult()" style="padding:4px 9px;border:1.5px solid #e2e8f0;border-radius:14px;font-size:11px;width:100px">'
+// ── 평균/서명/stale ──
+function jh_calcMyAvgFromGrades(){
+  if(jh_quickMode.active) return jh_quickMode.all||jh_quickMode.five||jh_quickMode.sci||jh_quickMode.hum||0;
+  var tc=0,ts=0;
+  JH_SUBJECTS.forEach(function(sk){
+    var g=jh_grades[sk.key]||{};
+    var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0,c=(g.s1?1:0)+(g.s2?1:0);
+    if(!c) return;
+    var avg=c===2?(v1+v2)/2:(v1||v2), cr=g.credit||sk.credit;
+    ts+=avg*cr; tc+=cr;
+  });
+  return tc?ts/tc:0;
+}
+function jh_inputSig(){
+  if(jh_quickMode&&jh_quickMode.active){
+    return JSON.stringify({q:[+jh_quickMode.all||0,+jh_quickMode.five||0,+jh_quickMode.sci||0,+jh_quickMode.hum||0]});
+  }
+  return JSON.stringify({g:JH_SUBJECTS.map(function(sk){
+    var g=jh_grades[sk.key]||{};
+    return [sk.key,parseFloat(g.s1)||0,parseFloat(g.s2)||0,+(g.credit||sk.credit)];
+  })});
+}
+function jh_isStale(){ return !!(jh_lastResults.length&&jh_analyzedSig&&jh_inputSig()!==jh_analyzedSig); }
+
+// ── 5등급제 학기 그리드(직접 수정용) ──
+function jh_emptySemGrid(){
+  var o={};
+  JH_GRID_SUBJECTS.forEach(function(g){ o[g.key]=['','','','','']; });
+  return o;
+}
+function jh_subjectCredit(key){
+  var g=jh_grades[key];
+  if(g&&g.credit) return g.credit;
+  for(var i=0;i<JH_SUBJECTS.length;i++){ if(JH_SUBJECTS[i].key===key) return JH_SUBJECTS[i].credit; }
+  return 3;
+}
+function jh_semRowStat(key){
+  var row=jh_semGrid[key]||[], vals=[];
+  for(var i=0;i<GG_SEM_COUNT;i++){ var g=gg_cellToGrade(row[i],jh_inputLevel); if(g!==null) vals.push(g); }
+  if(!vals.length) return null;
+  var mean=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+  return {mean:mean, nine:RM_convert5to9(mean), n:vals.length};
+}
+function jh_semAvgHtml(key){
+  var st=jh_semRowStat(key);
+  if(!st) return '—';
+  return '<b style="color:#3b5bdb">'+st.mean.toFixed(2)+'</b><div style="font-size:9px;color:#94a3b8;font-weight:600;white-space:nowrap">9등급 '+st.nine.toFixed(1)+'</div>';
+}
+// 과목별 5등급제 평균 → RM_convert5to9(입시상담과 동일한 공식 환산표)로 9등급 환산 → jh_grades[과목key]={s1:환산값,s2:'',credit}
+function jh_syncGridToGrades(){
+  JH_GRID_SUBJECTS.forEach(function(sub){
+    var st=jh_semRowStat(sub.key);
+    if(st){
+      jh_grades[sub.key]={s1:st.nine, s2:'', credit:jh_subjectCredit(sub.key)};
+      jh_gridDriven[sub.key]=true;
+    } else if(jh_gridDriven[sub.key]){
+      jh_grades[sub.key]={s1:'', s2:'', credit:jh_subjectCredit(sub.key)};
+      delete jh_gridDriven[sub.key];
+    }
+  });
+}
+function jh_onSemInput(el){
+  var k=el.getAttribute('data-gk'), i=parseInt(el.getAttribute('data-gi'),10);
+  if(!jh_semGrid[k]) jh_semGrid[k]=['','','','',''];
+  jh_semGrid[k][i]=el.value;
+  jh_userEdited=true;
+  jh_syncGridToGrades();
+  var c=document.getElementById('jh-sg-avg-'+k); if(c) c.innerHTML=jh_semAvgHtml(k);
+  jh_refreshAdvTable();
+  jh_updateAvg();
+}
+// 고급(상세) 표에서 직접 수정 → 그 과목은 상세 값이 우선, 학기별 입력칸은 비움
+function jh_onAdvEdit(k, kind){
+  jh_userEdited=true;
+  if(kind!=='credit' && jh_gridDriven[k]){
+    delete jh_gridDriven[k];
+    jh_semGrid[k]=['','','','',''];
+    document.querySelectorAll('input[data-gk]').forEach(function(inp){ if(inp.getAttribute('data-gk')===k) inp.value=''; });
+    var c=document.getElementById('jh-sg-avg-'+k); if(c) c.innerHTML='—';
+  }
+  jh_updateAvg();
+}
+function jh_gradeSelect(key,sem,val){
+  var base=['1','2','3','4','5','6','7','8','9'];
+  var sv=(val===''||val==null)?'':String(+(+val).toFixed(2));
+  var opts=['<option value=""'+(sv===''?' selected':'')+'>-</option>'];
+  var found=sv==='';
+  base.forEach(function(v){
+    var sel=(sv!==''&&+sv===+v);
+    if(sel) found=true;
+    opts.push('<option value="'+v+'"'+(sel?' selected':'')+'>'+v+'</option>');
+  });
+  if(!found) opts.push('<option value="'+sv+'" selected>'+sv+'</option>'); // 9등급 환산 평균 등 정수가 아닌 값 표시
+  return '<select data-jkey="'+esc(key)+'" data-gsem="'+sem+'" style="width:56px;padding:3px 2px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;background:#fff;text-align:center;cursor:pointer"'
+    +' onchange="jh_setGrade(this.getAttribute(\'data-jkey\'),this.getAttribute(\'data-gsem\'),this.value)">'+opts.join('')+'</select>';
+}
+function jh_gradeRowsHtml(){
+  var rows='';
+  JH_SUBJECTS.forEach(function(sk){
+    var g=jh_grades[sk.key]||{};
+    var v1=parseFloat(g.s1)||0,v2=parseFloat(g.s2)||0;
+    var cnt=(g.s1?1:0)+(g.s2?1:0);
+    var avg=cnt===2?(v1+v2)/2:(cnt===1?(v1||v2):0);
+    rows+='<tr>'
+      +'<td style="padding:5px 8px;font-weight:500;font-size:11px;white-space:nowrap;background:#f8fafc;border-right:1px solid #e2e8f0">'+esc(sk.name)+'</td>'
+      +'<td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0">'
+      +'<input type="number" min="1" max="9" step="0.01" value="'+(g.credit||sk.credit)+'" data-jkey="'+esc(sk.key)+'" style="width:44px;padding:3px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;text-align:center"'
+      +' onchange="var k=this.getAttribute(\'data-jkey\');if(!jh_grades[k])jh_grades[k]={s1:\'\',s2:\'\'};jh_grades[k].credit=+this.value;jh_onAdvEdit(k,\'credit\')">'
+      +'</td>'
+      +'<td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0">'+jh_gradeSelect(sk.key,'s1',g.s1||'')+'</td>'
+      +'<td style="padding:4px;text-align:center;border-right:1px solid #e2e8f0">'+jh_gradeSelect(sk.key,'s2',g.s2||'')+'</td>'
+      +'<td style="padding:4px;text-align:center;font-weight:700;color:#2563eb;font-size:11px">'+(avg>0?avg.toFixed(2):'—')+'</td>'
+      +'</tr>';
+  });
+  return rows;
+}
+function jh_refreshAdvTable(){
+  var tb=document.getElementById('jh-grade-tbody');
+  if(tb) tb.innerHTML=jh_gradeRowsHtml();
+}
+// 고급 표 1·2학기 select 변경 (기존 jh_setGrade 재사용)
+function jh_setGrade(key,sem,val){
+  try{
+    if(!jh_grades[key]) jh_grades[key]={s1:'',s2:'',credit:jh_subjectCredit(key)};
+    jh_grades[key][sem]=val;
+    jh_onAdvEdit(key);
+  }catch(e){ console.warn('jh_setGrade err:',e); }
+}
+function jh_updateAvg(){
+  try{
+    if(typeof jh_refreshSourceBadge==='function') jh_refreshSourceBadge();
+    var avg=jh_calcMyAvgFromGrades();
+    var el=document.getElementById('jh-avg-display');
+    var sm=document.getElementById('jh-avg-sub');
+    if(el) el.textContent=avg>0?avg.toFixed(2):'—';
+    if(sm) sm.textContent=jh_quickMode.active?'⚡ 빠른입력 우선 적용 중':avg>0?(avg<=1.5?'최상위권':avg<=2.5?'상위권':avg<=3.5?'중상위권':avg<=4.5?'중위권':'하위권'):'성적을 입력해주세요';
+  }catch(e){ console.warn('jh_updateAvg err:',e); }
+}
+function jh_applyQuick(){
+  jh_userEdited=true;
+  var gv=function(id){ var e=document.getElementById(id); return parseFloat(e&&e.value)||0; };
+  var all=gv('jh-q-all'), five=gv('jh-q-5'), sci=gv('jh-q-sci'), hum=gv('jh-q-hum');
+  jh_quickMode={active:(all||five||sci||hum)>0,all:all,five:five,sci:sci,hum:hum};
+  var box=document.getElementById('jh-quick-box');
+  if(box){
+    if(jh_quickMode.active){
+      var parts=[];
+      if(all) parts.push('전체 '+all.toFixed(2));
+      if(five) parts.push('5과목 '+five.toFixed(2));
+      if(sci) parts.push('국영수과 '+sci.toFixed(2));
+      if(hum) parts.push('국영수사 '+hum.toFixed(2));
+      box.innerHTML='⚡ 빠른입력 활성 — 상세입력 무시 <span style="font-size:10px;color:#64748b;font-weight:500">'+parts.join(' / ')+' → 분석 버튼 클릭</span>';
+      box.style.display='block';
+    } else box.style.display='none';
+  }
+  jh_updateAvg();
+}
+
+// ── 성적탭 연동 상태 배지 / 연동 현황표 ──
+function jh_sourceBadgeHtml(){
+  var linked=!jh_userEdited;
+  return '<span class="jh-source-badge" title="'+(linked?'성적 탭에 입력된 내신을 그대로 사용 중입니다':'이 탭에서 직접 수정한 값을 사용 중입니다. \'성적탭 성적 다시 불러오기\'로 되돌릴 수 있습니다')+'" style="display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800;'
+    +(linked?'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0':'background:#fffbeb;color:#b45309;border:1px solid #fde68a')+'">'
+    +(linked?'🔗 성적탭 연동':'✏️ 직접 수정됨')+'</span>';
+}
+function jh_refreshSourceBadge(){
+  var tmp=document.createElement('div'); tmp.innerHTML=jh_sourceBadgeHtml();
+  var fresh=tmp.firstChild;
+  document.querySelectorAll('.jh-source-badge').forEach(function(el){ el.outerHTML=fresh.outerHTML; });
+}
+function jh_tabLinkTableHtml(s){
+  var data=jh_collectGradeTabData(s);
+  var keys=JH_SUBJECTS.filter(function(sk){ return data[sk.key]; });
+  if(!keys.length) return '<div style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 12px;margin-bottom:12px">성적 탭에 입력된 내신이 아직 없습니다. 학생의 [성적] 탭에서 내신을 입력하면 여기에 자동으로 나타납니다.</div>';
+  var semLbl=['1-1','1-2','2-1','2-2','3-1'];
+  var h='<div style="margin-bottom:12px"><div style="font-size:11.5px;font-weight:700;color:#047857;margin-bottom:5px">🔗 성적 탭 입력값 (9등급 · 읽기 전용)</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:420px"><thead><tr style="background:#f0fdf4">'
+    +'<th style="padding:4px 8px;text-align:left;font-size:10px;color:#64748b;font-weight:600">과목</th>'
+    +semLbl.map(function(l){ return '<th style="padding:4px;font-size:10px;color:#64748b;font-weight:600">'+l+'</th>'; }).join('')
+    +'<th style="padding:4px;font-size:10px;color:#64748b;font-weight:600">분석 반영</th></tr></thead><tbody>';
+  keys.forEach(function(sk){
+    var d=data[sk.key], g=jh_grades[sk.key]||{};
+    var v1=parseFloat(g.s1)||0, v2=parseFloat(g.s2)||0, c=(g.s1?1:0)+(g.s2?1:0);
+    var eff=c===2?(v1+v2)/2:(v1||v2);
+    var cells=d.sems.map(function(v){ return '<td style="padding:4px;text-align:center;border-top:1px solid #f1f5f9">'+(v===null?'<span style="color:#cbd5e1">-</span>':+(+v).toFixed(2).replace(/\.?0+$/,''))+'</td>'; }).join('');
+    if(d.fromRep) cells='<td colspan="5" style="padding:4px;text-align:center;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:10.5px">학기별 입력 없음 — 대표 등급 사용</td>';
+    h+='<tr><td style="padding:4px 8px;font-weight:700;border-top:1px solid #f1f5f9;white-space:nowrap">'+esc(d.label)+'</td>'+cells
+      +'<td style="padding:4px;text-align:center;font-weight:800;color:#2563eb;border-top:1px solid #f1f5f9">'+(eff>0?eff.toFixed(2):'—')+'</td></tr>';
+  });
+  h+='</tbody></table></div>'
+    +'<div style="font-size:10.5px;color:#94a3b8;margin-top:4px">성적 탭에는 단위수가 없어 과목별 기본 단위수로 가중평균합니다. 성적 탭에서 값을 바꾸면 직접 수정 전까지 자동 반영됩니다.</div></div>';
+  return h;
+}
+
+// ── 필터 칩 상태 → 스타일 (정보입력 화면의 칩 버튼) ──
+function jh_updateFilterBtnStyles(){
+  function paint(sel,attr,isOn,colorOf){
+    document.querySelectorAll(sel).forEach(function(btn){
+      var v=btn.getAttribute(attr), on=isOn(v), c=colorOf(v);
+      btn.style.background=on?c:'#fff';
+      btn.style.color=on?'#fff':'#64748b';
+      btn.style.borderColor=on?c:'#e2e8f0';
+    });
+  }
+  paint('[data-jhf]','data-jhf',function(v){return v==='all'?jh_selectedChance.size===0:jh_selectedChance.has(v);},function(v){return v==='all'?'#2563eb':(GG_CHANCE_COLORS[v]||'#2563eb');});
+  paint('[data-jhft]','data-jhft',function(v){return v==='all'?jh_selectedTypes.size===0:jh_selectedTypes.has(v);},function(){return '#2563eb';});
+  paint('[data-jhfc]','data-jhfc',function(v){return jh_selectedCsat===v;},function(){return '#2563eb';});
+  paint('[data-jhfi]','data-jhfi',function(v){return jh_selectedInterview===v;},function(){return '#2563eb';});
+  paint('[data-jhfr]','data-jhfr',function(v){return v==='all'?jh_selectedRegions.size===0:jh_selectedRegions.has(v);},function(){return '#2563eb';});
+}
+function jh_toggleInSet(set,v){
+  if(v==='all') set.clear();
+  else if(set.has(v)) set.delete(v); else set.add(v);
+}
+function jh_setFilter(v,el){ jh_toggleInSet(jh_selectedChance,v); jh_updateFilterBtnStyles(); jh_renderResult(); }
+function jh_setTypeFilter(v,el){ jh_toggleInSet(jh_selectedTypes,v); jh_updateFilterBtnStyles(); jh_renderResult(); }
+function jh_setCsatFilter(v,el){ jh_selectedCsat=v; jh_updateFilterBtnStyles(); jh_renderResult(); }
+function jh_setIntFilter(v,el){ jh_selectedInterview=v; jh_updateFilterBtnStyles(); jh_renderResult(); }
+function jh_setRegionFilter(v,el){ jh_toggleInSet(jh_selectedRegions,v); jh_updateFilterBtnStyles(); jh_renderResult(); }
+
+// ── 대학분석 결과 화면 ──
+function jh_emptyRowHtml(){
+  return '<tr><td colspan="14" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">📚</div>내신 성적을 입력하고 [지원 가능 대학 분석] 버튼을 누르세요'
+    +'<div style="margin-top:14px"><button onclick="ST.jonghapSubTab=\'input\';render()" style="background:#3b5bdb;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:12.5px;font-weight:800;cursor:pointer">📝 정보입력으로 이동</button></div>'
+    +'</td></tr>';
+}
+function jh_filterSummaryHtml(){
+  var parts=[];
+  if(jh_selectedChance.size) parts.push('지원경향: '+Array.from(jh_selectedChance).join('·'));
+  if(jh_selectedTypes.size) parts.push('전형: '+Array.from(jh_selectedTypes).map(function(t){return t==='서류100'?'서류100%':t==='면접'?'서류+면접':t;}).join('·'));
+  if(jh_selectedCsat!=='all') parts.push('수능최저: '+jh_selectedCsat);
+  if(jh_selectedInterview!=='all') parts.push('면접: '+jh_selectedInterview);
+  if(jh_selectedRegions.size) parts.push('지역: '+Array.from(jh_selectedRegions).join('·'));
+  if(jh_currentMajorFilter) parts.push('계열: '+jh_currentMajorFilter);
+  if(window._jhSearchUniv) parts.push('대학: '+window._jhSearchUniv);
+  if(window._jhSearchMajor) parts.push('학과: '+window._jhSearchMajor);
+  if(!parts.length) return '';
+  return '<div style="padding:8px 16px;border-bottom:1px solid #e8eaf6;background:#f8faff;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    +'<span style="font-size:10.5px;font-weight:700;color:#64748b">적용 중인 필터</span>'
+    +parts.map(function(p){ return '<span style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:12px;padding:2px 9px;font-size:10.5px;font-weight:700">'+esc(p)+'</span>'; }).join('')
+    +'<button onclick="ST.jonghapSubTab=\'input\';render()" style="margin-left:auto;background:#fff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:14px;padding:3px 10px;font-size:10.5px;font-weight:700;cursor:pointer">필터 변경</button>'
+    +'</div>';
+}
+function jh_renderResultsViewHtml(){
+  var cm={도전:0,상향:0,적정:0,안정:0,하향:0};
+  jh_lastResults.forEach(function(r){ if(cm[r.chance]!==undefined) cm[r.chance]++; });
+  var h='<div id="jh-layout" style="display:flex;flex-direction:column;gap:12px">';
+  if(jh_isStale()){
+    h+='<div id="jh-stale-notice" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fef9c3;border:1px solid #facc15;border-radius:10px;padding:10px 14px">'
+      +'<span style="font-size:12.5px;font-weight:800;color:#854d0e;flex:1;min-width:220px">⚠ 성적이 변경되었습니다. 현재 결과는 이전 성적 기준입니다.</span>'
+      +'<button onclick="jh_analyzeAndShow()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer">🔍 다시 분석</button>'
+      +'</div>';
+  }
+  h+='<div id="jh-stat-grid" style="display:'+(jh_lastResults.length?'grid':'none')+';grid-template-columns:repeat(5,1fr);gap:8px">'
+    +['도전','상향','적정','안정','하향'].map(function(k){
+      var cl=k==='도전'?'#7c3aed':k==='상향'?'#dc2626':k==='적정'?'#d97706':k==='안정'?'#2563eb':'#059669';
+      var bg=k==='도전'?'#f5f3ff':k==='상향'?'#fef2f2':k==='적정'?'#fffbeb':k==='안정'?'#eff6ff':'#ecfdf5';
+      return '<div style="background:'+bg+';border:1.5px solid '+cl+'40;border-radius:10px;padding:10px;text-align:center"><div id="jh-cnt-'+k+'" style="font-size:22px;font-weight:900;color:'+cl+'">'+(cm[k]||0)+'</div><div style="font-size:10px;font-weight:700;color:'+cl+'">'+(k==='도전'?'🔥 도전':k==='상향'?'⬆ 상향':k==='적정'?'✓ 적정':k==='안정'?'🛡 안정':'⬇ 하향')+'</div></div>';
+    }).join('')+'</div>';
+  var thS='padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center';
+  h+='<div class="box" style="overflow:hidden;padding:0">'
+    +'<div style="padding:11px 16px;border-bottom:1px solid #e8eaf6;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:14px">🎯</span><span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span>'
+    +'<span id="jh-result-count" style="font-size:11px;color:#94a3b8">'+(jh_lastResults.length?('('+jh_getFiltered().length+'개)'):'')+'</span>'
     +'<button onclick="jh_openDbModal()" style="margin-left:auto;background:#f5f3ff;color:#7c3aed;border:1.5px solid #c4b5fd;border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">+ 대학 관리</button>'
-  +'</div>'
-  +'<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">'
-    +'<div style="padding:11px 16px;border-bottom:1px solid #e8eaf6;display:flex;align-items:center;gap:8px"><span style="font-size:14px">🎯</span><span style="font-size:13px;font-weight:700">지원 가능 대학 분석 결과</span><span id="jh-result-count" style="font-size:11px;color:#94a3b8"></span></div>'
-    +'<div style="overflow-x:auto;overflow-y:auto;min-height:400px;overflow-anchor:none"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px"><thead><tr style="background:#4c1d95;position:sticky;top:0;z-index:2"><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;text-align:center;border-right:1px solid rgba(255,255,255,.1)">☑</th><th style="padding:9px 10px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:left">대학명</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">학과</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">전형</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">모집</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">면접</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">수능최저</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">선발방법</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">서류핵심요소</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">50%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">70%컷</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">내신</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1);text-align:center">대비</th><th style="padding:9px 6px;color:#fff;font-weight:600;font-size:10px;white-space:nowrap;text-align:center">지원경향</th></tr></thead><tbody id="jh-result-tbody"><tr><td colspan="14" style="text-align:center;padding:50px;color:#94a3b8;font-size:13px"><div style="font-size:36px;margin-bottom:12px">📚</div>내신 성적 입력 후 [지원 가능 대학 분석] 버튼을 누르세요</td></tr></tbody></table></div>'
-  +'</div>'
-  +'</div>'
-  +'</div>'
+    +'</div>'
+    +jh_filterSummaryHtml()
+    +'<div style="overflow-x:auto;overflow-y:auto;min-height:400px;overflow-anchor:none"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px"><thead><tr style="background:#4c1d95;position:sticky;top:0;z-index:2">'
+    +'<th style="'+thS+'">☑</th><th style="'+thS+';text-align:left;padding:9px 10px">대학명</th>'
+    +['학과','전형','모집','면접','수능최저','선발방법','서류핵심요소','50%컷','70%컷','내신','대비','지원경향'].map(function(t,i,a){ return '<th style="'+thS+(i===a.length-1?';border-right:none':'')+'">'+t+'</th>'; }).join('')
+    +'</tr></thead><tbody id="jh-result-tbody">'
+    +(jh_lastResults.length?'<tr><td colspan="14" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">결과를 불러오는 중...</td></tr>':jh_emptyRowHtml())
+    +'</tbody></table></div></div>';
+  h+='</div>';
+  h+=jh_dbModalHtml();
+  return h;
+}
+// renderJonghap(s): 대학분석(결과) 화면. (이름은 기존 호출부 호환을 위해 유지)
+function renderJonghap(s){
+  jh_ensureStudentLoaded(s);
+  setTimeout(function(){
+    if(jh_lastResults.length){ jh_renderResult(); jh_updateStats(); }
+  },50);
+  return jh_renderResultsViewHtml();
+}
+
+// 종합전형 대학 DB 관리 모달(대학분석 화면에 포함)
+function jh_dbModalHtml(){
+  return ''
   +'<div id="jh-db-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)jh_closeDbModal()">'
     +'<div style="background:#fff;border-radius:14px;width:min(840px,95vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden">'
       +'<div style="padding:13px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span style="font-size:14px;font-weight:800">⚙ 종합전형 대학 DB 관리</span><div style="display:flex;gap:6px"><label style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;color:#059669">📂 CSV 업로드<input type="file" accept=".csv" style="display:none" onchange="jh_importCsv(this)"></label><button onclick="jh_exportCsv()" style="padding:5px 10px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer">💾 CSV 내보내기</button></div><button onclick="jh_closeDbModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#94a3b8">✕</button></div>'
@@ -45888,6 +46882,175 @@ function renderJonghap(s){
   +'</div>';
 }
 
+// ── 정보입력 카드 흐름 ──
+function jh_renderInputFlowHtml(s){
+  jh_ensureStudentLoaded(s);
+  setTimeout(function(){
+    jh_updateFilterBtnStyles();
+    jh_updateAvg();
+  },50);
+  var card='background:#fff;border:1px solid #e8eaf6;border-radius:16px;padding:18px 20px;margin-bottom:14px';
+  var field='width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;background:#f8fafc';
+  var lbl='display:block;font-size:11.5px;color:#888;margin-bottom:5px';
+  var isMS=jh_inputLevel==='MS';
+  var myAvg=jh_calcMyAvgFromGrades();
+  var avgDisp=myAvg>0?myAvg.toFixed(2):'—';
+  var h='<div id="jh-input-flow" style="max-width:none;padding-bottom:30px">';
+
+  // 0. 연결된 학생
+  h+='<div style="'+card+'">'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">연결된 학생 (좌측에서 선택한 학생 — 기본정보 수정은 학생 &#39;수정&#39; 화면에서)</div>'
+    +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
+    +'<div><span style="font-size:10.5px;color:#aaa">이름</span><br><b style="font-size:14px">'+esc(s.name||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">학교</span><br><b style="font-size:14px">'+esc(s.school||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">학년</span><br><b style="font-size:14px">'+esc(s.grade||'-')+'</b></div>'
+    +'<div><span style="font-size:10.5px;color:#aaa">내신 성적 출처</span><br>'+jh_sourceBadgeHtml()+'</div>'
+    +'</div></div>';
+
+  // ① 빠른 평균 입력
+  h+='<div style="'+card+'">'
+    +gg_stepHead('①','⚡ 빠른 평균 입력','입력 시 상세입력보다 우선')
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 14px;margin-bottom:12px">'
+    +[['jh-q-all','전과목 평균'],['jh-q-5','국·영·수·사·과'],['jh-q-sci','국·영·수·과 (자연)'],['jh-q-hum','국·영·수·사 (인문)']].map(function(item){
+      var id=item[0],qval='';
+      if(jh_quickMode.active){
+        if(id==='jh-q-all') qval=jh_quickMode.all||'';
+        else if(id==='jh-q-5') qval=jh_quickMode.five||'';
+        else if(id==='jh-q-sci') qval=jh_quickMode.sci||'';
+        else if(id==='jh-q-hum') qval=jh_quickMode.hum||'';
+      }
+      return '<div><label style="'+lbl+'">'+item[1]+' <span style="color:#bbb">(등급)</span></label>'
+        +'<input id="'+id+'" type="number" min="1" max="9" step="0.01" placeholder="예) 2.35" value="'+qval+'" style="'+field+';font-weight:700" oninput="jh_applyQuick()"></div>';
+    }).join('')
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="display:inline-flex;align-items:center;gap:8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:20px;padding:5px 14px">'
+    +'<span style="font-size:11px;font-weight:700;color:#7c3aed">📊 환산내신 평균</span>'
+    +'<b id="jh-avg-display" style="font-size:15px;font-weight:900;color:#7c3aed">'+avgDisp+'</b>'
+    +'<span id="jh-avg-sub" style="font-size:10px;color:#64748b">'+(jh_quickMode.active?'⚡ 빠른입력 우선 적용 중':myAvg>0?(myAvg<=1.5?'최상위권':myAvg<=2.5?'상위권':myAvg<=3.5?'중상위권':myAvg<=4.5?'중위권':'하위권'):'성적을 입력해주세요')+'</span>'
+    +'</div>'
+    +'<div id="jh-quick-box" style="display:'+(jh_quickMode.active?'block':'none')+';background:#f5f3ff;border:1px solid #7c3aed;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:#7c3aed">'
+    +(jh_quickMode.active?('⚡ 빠른입력 활성 — 상세입력 무시 <span style="font-size:10px;color:#64748b;font-weight:500">'+[jh_quickMode.all?'전체 '+(+jh_quickMode.all).toFixed(2):'',jh_quickMode.five?'5과목 '+(+jh_quickMode.five).toFixed(2):'',jh_quickMode.sci?'국영수과 '+(+jh_quickMode.sci).toFixed(2):'',jh_quickMode.hum?'국영수사 '+(+jh_quickMode.hum).toFixed(2):''].filter(Boolean).join(' / ')+' → 분석 버튼 클릭</span>'):'')
+    +'</div></div></div>';
+
+  // ② 과목별 상세 입력
+  var hint=isMS
+    ?'중학생 기준 — 학기별 성취도(A~E) 또는 점수를 입력하면 1~5등급으로 환산합니다.'
+    :'직접 수정이 필요할 때만 사용하세요 — 5등급제 학기 등급(1~5)을 입력한 과목은 이 분석에서 성적탭 값 대신 이 값을 씁니다.';
+  h+='<div style="'+card+'">'
+    +gg_stepHead('②','📝 과목별 상세 입력','성적 탭에 입력된 내신이 자동 연동됩니다')+'<span style="display:block;margin:-6px 0 10px">'+jh_sourceBadgeHtml()+'</span>'
+    +jh_tabLinkTableHtml(s)
+    +'<p style="font-size:11.5px;color:#888;margin:-4px 0 10px">'+hint+' 5등급제로 직접 입력한 값은 9등급 기준 입결표와 비교하기 위해 공식 환산표로 9등급 환산 후 분석에 반영됩니다.</p>'
+    +'<p style="font-size:11px;color:#4338ca;background:#eef2ff;border-radius:8px;padding:6px 10px;margin:0 0 10px">성적 탭에 입력된 내신과 연동됩니다 (여기서 수정하면 이 분석에만 적용)</p>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px;margin-bottom:12px"><thead><tr><th></th>'
+    +GG_SEM_LABELS.map(function(l){ return '<th style="font-size:10.5px;color:#888;font-weight:500;padding:0 3px 6px">'+l+'</th>'; }).join('')
+    +'<th style="font-size:10.5px;color:#888;font-weight:500;padding:0 3px 6px">평균</th></tr></thead><tbody>'
+    +JH_GRID_SUBJECTS.map(function(sub){
+      var row=jh_semGrid[sub.key]||[];
+      var cells='';
+      for(var i=0;i<GG_SEM_COUNT;i++){
+        cells+='<td style="padding:3px"><input data-gk="'+esc(sub.key)+'" data-gi="'+i+'" '+(isMS?'type="text" placeholder="A/90"':'type="number" min="1" max="5" step="1" placeholder="-"')
+          +' value="'+esc(String(row[i]==null?'':row[i]))+'" oninput="jh_onSemInput(this)" style="width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:8px;padding:6px 4px;font-size:12px;text-align:center;background:#f8fafc"></td>';
+      }
+      return '<tr><td style="font-weight:700;font-size:12px;color:#1a2340;padding:3px 6px 3px 0;white-space:nowrap">'+esc(sub.label)+'</td>'+cells
+        +'<td id="jh-sg-avg-'+esc(sub.key)+'" style="text-align:center;padding:3px;font-size:12px;min-width:56px">'+jh_semAvgHtml(sub.key)+'</td></tr>';
+    }).join('')
+    +'</tbody></table></div>';
+  var advHasData=JH_SUBJECTS.some(function(sk){ var g=jh_grades[sk.key]||{}; return (g.s1||g.s2)&&!jh_gridDriven[sk.key]; });
+  var advOpen=(window._jhAdvOpen===undefined)?advHasData:window._jhAdvOpen;
+  h+='<details id="jh-adv-details" '+(advOpen?'open':'')+' ontoggle="window._jhAdvOpen=this.open" style="border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;background:#fcfcfd">'
+    +'<summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:#475569">고급: 전체 과목·단위수 상세 입력 <span style="font-weight:400;color:#94a3b8;font-size:11px">(9등급 기준 · 성적탭 값이 채워져 있으며 여기서 수정하면 이 분석에만 적용)</span></summary>'
+    +'<p style="font-size:11px;color:#94a3b8;margin:8px 0">위 학기별 입력과 같은 과목을 이 표에서 직접 수정하면 그 과목은 이 표의 값이 우선되고 학기별 입력칸은 비워집니다. 학기별 입력이 있는 과목은 9등급 환산 평균이 1학기 칸에 표시됩니다.</p>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#f8fafc">'
+    +['과목','단위','1학기','2학기','평균'].map(function(t,i){ return '<th style="padding:5px '+(i===0?'8':'4')+'px;text-align:'+(i===0?'left':'center')+';font-size:10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">'+t+'</th>'; }).join('')
+    +'</tr></thead><tbody id="jh-grade-tbody">'+jh_gradeRowsHtml()+'</tbody></table></div>'
+    +'</details></div>';
+
+  // ③ 관심 계열
+  var majorOpts=[['','전체'],['인문·사회','인문·사회'],['상경','상경'],['자연·공학','자연·공학'],['의약학','의약학'],['교육','교육'],['예체능','예체능'],['통합','통합/자유전공']];
+  h+='<div style="'+card+'">'
+    +gg_stepHead('③','🎓 관심 계열','선택한 계열의 학과만 결과에 표시됩니다')
+    +'<div style="max-width:320px"><select id="jh-major-sel" style="'+field+'" onchange="jh_currentMajorFilter=this.value;jh_renderResult()">'
+    +majorOpts.map(function(o){ return '<option value="'+o[0]+'"'+(jh_currentMajorFilter===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')
+    +'</select></div></div>';
+
+  // ④ 지원경향 · 필터 (종합 전용: 전형(서류/면접)·수능최저·면접 유무)
+  var rowLbl='font-size:11px;font-weight:700;color:#64748b;min-width:56px';
+  var rowWrap='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:11px';
+  function chipRow(label,attr,handler,items,isOn,colorOf){
+    return '<div style="'+rowWrap+'"><span style="'+rowLbl+'">'+label+'</span>'
+      +items.map(function(it){
+        return '<button '+attr+'="'+it[0]+'" onclick="'+handler+'(this.getAttribute(\''+attr+'\'),this)" style="'+gg_chipStyle(isOn(it[0]),colorOf(it[0]))+'">'+it[1]+'</button>';
+      }).join('')+'</div>';
+  }
+  var blue=function(){return '#2563eb';};
+  h+='<div style="'+card+'">'
+    +gg_stepHead('④','🎯 지원경향 · 필터 선택','여러 개 선택 가능 — 분석 결과 화면에 그대로 적용됩니다')
+    +chipRow('지원경향','data-jhf','jh_setFilter',[['all','전체'],['도전','🔥 도전'],['상향','⬆ 상향'],['적정','✓ 적정'],['안정','🛡 안정'],['하향','⬇ 하향']],
+      function(v){return v==='all'?jh_selectedChance.size===0:jh_selectedChance.has(v);},function(v){return v==='all'?'#2563eb':(GG_CHANCE_COLORS[v]||'#2563eb');})
+    +chipRow('전형','data-jhft','jh_setTypeFilter',[['all','전체'],['서류100','서류100%'],['면접','서류+면접']],
+      function(v){return v==='all'?jh_selectedTypes.size===0:jh_selectedTypes.has(v);},blue)
+    +chipRow('수능최저','data-jhfc','jh_setCsatFilter',[['all','전체'],['없음','없음'],['있음','있음']],function(v){return jh_selectedCsat===v;},blue)
+    +chipRow('면접','data-jhfi','jh_setIntFilter',[['all','전체'],['없음','없음'],['있음','있음']],function(v){return jh_selectedInterview===v;},blue)
+    +chipRow('지역','data-jhfr','jh_setRegionFilter',[['all','전체'],['서울','서울'],['수도권','수도권'],['지방국립','지방국립'],['지방사립','지방사립']],
+      function(v){return v==='all'?jh_selectedRegions.size===0:jh_selectedRegions.has(v);},blue)
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 16px">'
+    +'<div><label style="'+lbl+'">대학명 검색</label><input id="jh-search" type="text" placeholder="예) 한양대, 외대" value="'+esc(window._jhSearchUniv||'')+'" oninput="window._jhSearchUniv=this.value;jh_renderResult()" style="'+field+'"></div>'
+    +'<div><label style="'+lbl+'">학과명 검색</label><input id="jh-search-dept" type="text" placeholder="예) 경영, 컴퓨터" value="'+esc(window._jhSearchMajor||'')+'" oninput="window._jhSearchMajor=this.value;jh_renderResult()" style="'+field+'"></div>'
+    +'</div></div>';
+
+  // 최종 버튼
+  h+='<div style="'+card+';display:flex;flex-direction:column;gap:10px">'
+    +'<button onclick="jh_analyzeAndShow()" style="padding:15px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.4)">🔍 지원 가능 대학 분석</button>'
+    +'<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+    +'<button onclick="jh_resetAll()" style="padding:6px 14px;background:#fff;color:#94a3b8;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;cursor:pointer">🗑 초기화</button>'
+    +'<button onclick="jh_reloadPrefill()" style="padding:6px 14px;background:#fff;color:#64748b;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;cursor:pointer">↺ 성적탭 성적 다시 불러오기</button>'
+    +'</div></div>';
+  h+='</div>';
+  return h;
+}
+function jh_analyzeAndShow(){
+  if(jh_analyze()){
+    ST.jonghapSubTab='result';
+    render();
+    window.scrollTo(0,0);
+  }
+}
+function jh_reloadPrefill(){
+  var s=(ST.students||[]).find(function(x){return String(x.id)===String(jh_currentStudentId);});
+  if(!s) return;
+  jh_quickMode={active:false,all:0,five:0,sci:0,hum:0};
+  jh_userEdited=false;
+  jh_loadPrefill(s);
+  window._lastHTML=''; // 화면 HTML이 이전과 같아도 입력칸의 직접 입력값을 되돌리도록 강제 갱신
+  render();
+}
+function jh_resetAll(){
+  var sid=jh_currentStudentId;
+  jh_grades={};
+  jh_semGrid=jh_emptySemGrid();
+  jh_gridDriven={};
+  jh_quickMode={active:false,all:0,five:0,sci:0,hum:0};
+  jh_lastResults=[];
+  jh_analyzedSig='';
+  jh_selectedChance.clear();jh_selectedTypes.clear();jh_selectedRegions.clear();
+  jh_selectedCsat='all';jh_selectedInterview='all';
+  jh_currentMajorFilter='';
+  window._jhSearchUniv='';window._jhSearchMajor='';
+  jh_currentStudentId=sid; // 같은 학생 화면을 유지(비어 있는 상태 유지 — 저장된 성적은 '다시 불러오기'로 복원)
+  jh_userEdited=true;
+  window._lastHTML=''; // 입력칸의 직접 입력값까지 지우도록 강제 갱신
+  if(typeof render==='function') render(); // 현재 서브탭(정보입력/대학분석)을 그대로 다시 그림
+}
+// ── 종합분석 허브 (헤더 + 서브탭 + 본문) ──
+function renderJonghapHub(s){
+  var sub=SG_hubGetSub('jonghap', s, true); // 학생이 바뀌면 대학분석(결과) 화면으로 초기화
+  var head=SG_hubHeaderHtml('jonghap','🎓 SUSI · 수시 종합분석','수시 종합분석',sub,SG_pickCount());
+  var body = sub==='input' ? jh_renderInputFlowHtml(s) : sub==='report' ? SG_renderResultReportBody(s) : renderJonghap(s);
+  return head+body;
+}
+
 function SG_printCombined(_skipSnapshot){
   var all=[].concat(
     Object.keys(SG_crossPick.gyogwa).map(function(k){return {src:'교과',r:SG_crossPick.gyogwa[k]};}),
@@ -45895,7 +47058,7 @@ function SG_printCombined(_skipSnapshot){
     Object.keys(SG_crossPick.nulsul).map(function(k){return {src:'논술',r:SG_crossPick.nulsul[k]};})
   );
   if(!all.length){alert('선택된 자료가 없습니다. 교과분석/종합분석/논술분석에서 체크박스로 대학을 선택해주세요.');return;}
-  var sid=jh_currentStudentId||gg_currentStudentId||ns_currentStudentId||null;
+  var sid=((ST.tab==='gyogwa'||ST.tab==='jonghap'||ST.tab==='nulsul')&&SG_activeStudentId)||jh_currentStudentId||gg_currentStudentId||ns_currentStudentId||null; // 교과·종합·논술 허브(결과리포트)에서는 현재 학생 우선
   var s=sid?ST.students.find(function(x){return String(x.id)===String(sid);}):null;
   // ★ 2026-08 추가: 통합 인쇄 시점의 선택자료를 학생별 리포트 저장소(pickReports)에 자동 스냅샷 저장.
   //   현재 crossPick(작업중 바구니)과 별개로, "이 날짜에 인쇄한 리포트"를 여러 건 누적 보관해
