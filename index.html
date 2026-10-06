@@ -49442,7 +49442,13 @@ function generateReport() {
       var result = await window._fb.getExamPeerSubjects({testName: examName});
       return (result && result.students) || [];
     }catch(e){
-      console.warn('[SG] 전체 기관 회차 조회 실패:', e.message);
+      console.warn('[SG] 전체 기관 회차 조회 실패:', (e&&e.code)||'', (e&&e.message)||e);
+      // ★ 다른 기관에서 아직 아무도 응시하지 않은 회차라 서버가 '없음' 계열 오류(not-found 등)를
+      // 돌려주는 경우는 오류가 아니라 "다른 기관 응시자 0명"으로 처리한다(알림창 방지).
+      var _code=String((e&&e.code)||'').toLowerCase(), _msg=String((e&&e.message)||'').toLowerCase();
+      if(_code.indexOf('not-found')>=0 || _code.indexOf('not_found')>=0 || _msg.indexOf('no data')>=0 || _msg.indexOf('not found')>=0 || _msg.indexOf('no students')>=0 || _msg.indexOf('no exam')>=0){
+        return [];
+      }
       return null;
     }
   }
@@ -49570,7 +49576,9 @@ function generateReport() {
         var _loadingToastEl=document.getElementById('admin-toast');
         if(_loadingToastEl) _loadingToastEl.style.display='none';
         if(_fetched===null){
-          alert('다른 기관 학생 데이터를 불러오는 중 오류가 발생했습니다. 우리 기관 학생만으로 통계표를 만듭니다.');
+          // 차단형 alert 대신 토스트로 안내(통계표 생성은 그대로 진행)
+          if(typeof toast==='function') toast('ℹ️ 다른 기관 데이터를 가져오지 못해 우리 기관 학생만으로 통계표를 만듭니다.', 4000);
+          else console.warn('다른 기관 데이터 조회 실패 — 우리 기관만으로 생성');
           orgScope='org'; scopeLabel=' (우리 기관만)';
         } else {
           extraStudents=_fetched;
