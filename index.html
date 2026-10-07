@@ -20673,10 +20673,12 @@ function copyOrgLinkGeneric(orgId, fileName, kindLabel){
   }
 }
 function copyOrgSurveyLink(orgId){ if(!RM_svLinkGuard(orgId,'presurvey')) return; copyOrgLinkGeneric(orgId, '사전상담설문지_웹폼.html', '사전조사 웹폼'); }
-function copyOrgMsLink(orgId){ if(!RM_svLinkGuard(orgId,'msstrategy')) return; copyOrgLinkGeneric(orgId, '중학생_전략진단지_웹폼.html', '중학생 전략진단지'); }
+// 중학생 전략진단지 웹폼 파일명(GitHub에 올리는 이름). 이 이름을 바꾸면 복사한 링크·카톡파일이 모두 이 이름을 가리키므로 여기와 파일명을 함께 바꿔야 한다.
+const RM_MS_FILE='중학생입시·학습설문.html';
+function copyOrgMsLink(orgId){ if(!RM_svLinkGuard(orgId,'msstrategy')) return; copyOrgLinkGeneric(orgId, RM_MS_FILE, '중학생 전략진단지'); }
 function downloadOrgMsRedirectPage(orgId, orgName){
   if(!RM_svLinkGuard(orgId,'msstrategy')) return;
-  downloadOrgRedirectPageGeneric(orgId, orgName, '중학생_전략진단지_웹폼.html', '중학생 전략진단지', '전략진단지');
+  downloadOrgRedirectPageGeneric(orgId, orgName, RM_MS_FILE, '중학생 전략진단지', '중학생입시·학습설문');
 }
 function copyOrgCf70Link(orgId){ if(!RM_svLinkGuard(orgId,'cf70')) return; copyOrgLinkGeneric(orgId, '챌린저_FINAL70_설문.html', '챌린저 FINAL70 설문'); }
 // ★ 2026-09-07(354) 추가: 카카오톡 등 메신저 링크 미리보기는 og:title 같은 정적 meta
