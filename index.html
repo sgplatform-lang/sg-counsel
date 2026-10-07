@@ -56191,7 +56191,7 @@ function xcaUnivPrintGo(){
      +(o.qs?'<h2>기출 문항</h2>'+(qs.length?qs.map(function(q,i){ return '<div class="sec" style="padding:6px 10px"><div class="m">'+(i+1)+'.'+(q.track?' · '+_xcaE(q.track):'')+(q.area?' · '+_xcaE(q.area):'')+(q.subj?' · '+_xcaE(q.subj):'')+(o.types&&(q.types||[]).length?' · 🏷 '+q.types.map(_xcaE).join(', '):'')+'</div><div style="white-space:pre-wrap">'+_xcaE(q.q)+'</div>'+(o.blank?'<div class="lab">유형 태깅: □ '+XCL_TYPES.map(_xcaE).join('  □ ')+'</div><div class="lab">숨은 세특 문장</div><div class="ln"></div><div class="ln"></div>':'')+'</div>'; }).join(''):'<div class="m">문항이 없습니다.</div>'):'')
      +(idx<univs.length-1?'<div class="pb"></div>':'');
   }).join('');
-  xcaModalClose(); xcaPrintHtml('대학 기출',body);
+  xcaModalClose(); xcaPrintHtml(univs.length===1?univs[0].name+' 기출문제':univs.length<=3?univs.map(function(u){return u.name;}).join('·')+' 기출문제':univs[0].name+' 외 '+(univs.length-1)+'개 대학 기출문제',body);
 }
 
 
