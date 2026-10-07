@@ -1200,24 +1200,39 @@ function _sgszRender(){
   const color=r.total>LIM?'#dc2626':(r.total>LIM*0.85?'#f59e0b':'#16a34a');
   const status=r.total>LIM?'🚨 1MB 초과 — 저장 불가':(r.total>LIM*0.85?'⚠️ 한계 임박':'✅ 정상');
   const maxB=r.rows[0]?r.rows[0].b:1;
+  const _sub=(f,v)=>{ // 큰 항목의 내부 상세(상위 5개)
+    let ents=[];
+    if(f==='challengerData'&&v&&typeof v==='object'){
+      Object.keys(v).forEach(k=>{
+        if(k==='history'&&Array.isArray(v.history)){ v.history.forEach((h,i)=>ents.push(['history['+i+'] '+(h&&h.date||'')+' '+(h&&h.test||'')+(h&&h.archived?' (보관됨)':''),_sgszBytes(h)])); }
+        else ents.push([k,_sgszBytes(v[k])]);
+      });
+    } else if(v&&typeof v==='object'&&!Array.isArray(v)){ ents=Object.keys(v).map(k=>[k,_sgszBytes(v[k])]); }
+    else if(Array.isArray(v)){ ents=v.map((x,i)=>['['+i+']',_sgszBytes(x)]); }
+    ents.sort((x,y)=>y[1]-x[1]);
+    return ents.slice(0,5).map(e=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:1px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">└ '+esc(e[0])+'</span><span style="white-space:nowrap">'+_sgszFmt(e[1])+'</span></div>').join('');
+  };
   const rowsHtml=r.rows.slice(0,14).map(x=>{
     const oldK=x.prunable?_sgszOldKeys(c.doc[x.f],cut):[];
     const freed=oldK.reduce((a,k)=>a+_sgszBytes(c.doc[x.f][k])+k.length+4,0);
-    return '<tr><td style="padding:5px 6px;white-space:nowrap">'+(x.prunable?'<input type="checkbox" class="sgsz-ck" data-f="'+esc(x.f)+'" '+(oldK.length?'checked':'disabled')+'> ':'')+esc(SGSZ_FIELD_LABEL[x.f]||x.f)+'<span style="color:#94a3b8;font-size:11px"> '+esc(x.f)+'</span></td>'
-      +'<td style="padding:5px 6px;width:34%"><div style="background:#eef2f7;border-radius:4px;height:10px"><div style="width:'+(x.b/maxB*100).toFixed(1)+'%;background:#6366f1;height:10px;border-radius:4px"></div></div></td>'
-      +'<td style="padding:5px 6px;text-align:right;white-space:nowrap;font-weight:700">'+_sgszFmt(x.b)+'</td>'
-      +'<td style="padding:5px 6px;font-size:11px;color:#64748b">'+(x.prunable?(oldK.length?oldK.length+'건 정리가능 (-'+_sgszFmt(freed)+')':'정리할 옛 기록 없음'):(Array.isArray(c.doc[x.f])?x.n+'건':''))+'</td></tr>';
+    const note=x.prunable?(oldK.length?oldK.length+'건 정리가능 (-'+_sgszFmt(freed)+')':'옛 기록 없음'):(Array.isArray(c.doc[x.f])?x.n+'건':'');
+    const detail=(x.b>30000)?'<div style="margin:2px 0 0 0;padding:6px 8px;background:#f8fafc;border-radius:6px;font-size:11px;color:#64748b">'+_sub(x.f,c.doc[x.f])+'</div>':'';
+    return '<div style="padding:8px 0;border-bottom:1px solid #eef2f7"><div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="flex:0 0 190px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(x.prunable?'<input type="checkbox" class="sgsz-ck" data-f="'+esc(x.f)+'" '+(oldK.length?'checked':'disabled')+' style="width:auto;margin:0 6px 0 0;vertical-align:middle">':'')+'<span style="font-weight:600">'+esc(SGSZ_FIELD_LABEL[x.f]||x.f)+'</span> <span style="color:#94a3b8;font-size:11px">'+(SGSZ_FIELD_LABEL[x.f]?esc(x.f):'')+'</span></div>'
+      +'<div style="flex:1 1 auto;min-width:40px;background:#eef2f7;border-radius:4px;height:10px"><div style="width:'+(x.b/maxB*100).toFixed(1)+'%;background:#6366f1;height:10px;border-radius:4px"></div></div>'
+      +'<div style="flex:0 0 78px;text-align:right;font-weight:700;white-space:nowrap">'+_sgszFmt(x.b)+'</div>'
+      +'<div style="flex:0 0 130px;font-size:11px;color:#64748b">'+note+'</div></div>'+detail+'</div>';
   }).join('');
   const bigHtml=r.big.length?'<div style="margin-top:12px;padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px"><b>용량이 큰 단일 값 (사진/이미지 등)</b><br>'+r.big.slice(0,6).map(b=>esc(b.path)+' — '+_sgszFmt(b.bytes)+(b.img?' (이미지)':'')).join('<br>')+'<br><span style="color:#9a3412">※ 자동 삭제하지 않습니다. 필요 시 해당 기록을 직접 삭제해 주세요.</span></div>':'';
   ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
    +'<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:17px;font-weight:800">💾 저장 용량 — '+esc(c.doc.name||'')+' <span style="font-weight:500;color:#64748b;font-size:12px">'+esc((c.doc.school||'')+' '+(c.doc.grade||''))+'</span></div><button onclick="document.getElementById(\'sgsz-ov\').remove()" style="border:none;background:none;font-size:20px;cursor:pointer">✕</button></div>'
    +'<div style="margin:12px 0 4px;font-weight:700;color:'+color+'">'+status+' · '+_sgszFmt(r.total)+' / 1.00 MB</div>'
    +'<div style="background:#eef2f7;border-radius:6px;height:14px"><div style="width:'+pct.toFixed(1)+'%;background:'+color+';height:14px;border-radius:6px"></div></div>'
-   +'<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px">'+rowsHtml+'</table>'+bigHtml
-   +'<div style="margin-top:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:13px"><b>🤖 자동 정리 (권장)</b><div style="color:#475569;font-size:12px;margin:6px 0">6개월 이전 주간 기록(학습전략·시간표·플랜점검) → 그래도 크면 오래된 챌린저 회차의 문항 지문·해설 순으로 <b>서버 보관함에 이동</b>합니다. 삭제가 아니며 아래에서 복원할 수 있습니다. 저장 시 용량이 900KB를 넘거나 한도 초과 오류가 나면 <b>자동으로 실행</b>되도록 켜져 있습니다.</div>'
+   +'<div style="margin-top:14px;font-size:13px">'+rowsHtml+'</div>'+bigHtml
+   +'<div style="margin-top:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:13px"><b>🤖 자동 정리 (권장)</b><div style="color:#475569;font-size:12px;margin:6px 0">6개월 이전 주간 기록(학습전략·시간표·플랜점검) → 그래도 크면 <b>최근 4회차를 제외한</b> 오래된 챌린저 회차의 문항 지문·해설 원문 순으로 <b>서버 보관함에 이동</b>합니다. 삭제가 아니며 아래에서 복원할 수 있습니다. 저장 시 용량이 900KB를 넘거나 한도 초과 오류가 나면 <b>자동으로 실행</b>되도록 켜져 있습니다.</div>'
    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="SGSZ_autoOne()" style="padding:8px 14px;border-radius:8px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer">🤖 이 학생 지금 자동정리</button><button onclick="SGSZ_autoAll()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #16a34a;background:#fff;color:#15803d;font-weight:700;cursor:pointer">전체 학생 점검·자동정리</button></div></div>'
    +'<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px;font-size:13px">'
-   +'<b>수동 정리</b> (체크된 주간 항목만) — 최근 <select id="sgsz-mo" onchange="_sgszCtx.months=+this.value;_sgszRender()" style="padding:2px 6px">'+[1,2,3,4,6,9,12].map(m=>'<option value="'+m+'"'+(m===c.months?' selected':'')+'>'+m+'개월</option>').join('')+'</select> 이전 기록을 보관함으로 이동'
+   +'<b>수동 정리</b> (체크된 주간 항목만) — 최근 <select id="sgsz-mo" onchange="_sgszCtx.months=+this.value;_sgszRender()" style="padding:2px 6px;width:auto;display:inline-block">'+[1,2,3,4,6,9,12].map(m=>'<option value="'+m+'"'+(m===c.months?' selected':'')+'>'+m+'개월</option>').join('')+'</select> 이전 기록을 보관함으로 이동'
    +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="SGSZ_backup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">📥 전체 백업 파일 받기</button>'
    +'<button onclick="SGSZ_prune()" style="padding:8px 14px;border-radius:8px;border:none;background:#475569;color:#fff;font-weight:700;cursor:pointer">선택 항목 보관함으로 이동</button></div></div>'
    +'<div style="margin-top:12px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px"><b>🗄️ 보관함 / 복원</b> <button onclick="SGSZ_loadArch()" style="margin-left:8px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer">불러오기</button><div id="sgsz-arch" style="margin-top:8px;font-size:12px;color:#475569">'+_sgszArchHtml(c)+'</div></div></div>';
@@ -1309,17 +1324,18 @@ async function SGSZ_autoCompact(id, data, opt){
     dels.forEach(p=>{ if(data[p[0]]) delete data[p[0]][p[1]]; if(stu&&stu[p[0]]) delete stu[p[0]][p[1]]; if(server&&server[p[0]]) delete server[p[0]][p[1]]; });
     return dels.length;
   }
-  async function challStage(mode){ // mode 'old': 6개월 이전 / 'all': 최근 3회차 제외 전부
+  async function challStage(mode){ // mode 'old': 6개월 이전 / 'all': 최근 4회차 제외 전부
     const cd=data.challengerData; if(!cd||!Array.isArray(cd.history)) return 0;
     const cut=_sgszCutoff(6);
     const sorted=cd.history.map((h,i)=>({h:h,i:i})).sort((a,b)=>String(b.h.date||'').localeCompare(String(a.h.date||'')));
-    const keepRecent=new Set(sorted.slice(0,3).map(x=>x.i));
+    const keepRecent=new Set(sorted.slice(0,4).map(x=>x.i)); // 최근 4회차(+현재 회차 lastSubjects)는 문항 지문·해설 원문을 항상 보존
     const arch=[]; let n=0;
     cd.history.forEach((h,i)=>{
       if(!h||h.archived) return;
       const m=SGSZ_MONTHKEY.exec(String(h.date||''));
       const isOld=m && (+m[1]*100+ +m[2])<cut;
-      if(mode==='old' ? !isOld : keepRecent.has(i)) return;
+      if(keepRecent.has(i)) return;
+      if(mode==='old' && !isOld) return;
       const heavy=_sgszBytes(h.fullSubjects)+_sgszBytes(h.subjects);
       if(heavy<20000) return; // 이미 가벼운 회차는 건드리지 않음
       const j=JSON.stringify({subjects:h.subjects,fullSubjects:h.fullSubjects});
