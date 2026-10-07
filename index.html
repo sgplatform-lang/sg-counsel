@@ -1149,6 +1149,254 @@ function _diagStudentSize(name){
 }
 window._diagStudentSize = _diagStudentSize;
 
+// ★ 학생 저장 용량 진단/정리 도구 (남윤재 학생 1MB 초과 저장 실패 대응)
+// - 서버 문서 기준으로 항목별 용량을 보여주고, 월 단위 오래된 기록을 백업(JSON 다운로드) 후 선택 정리한다.
+// - 정리는 FieldPath 삭제로 직접 수행(fbSave의 서버병합이 지운 기록을 되살리지 않도록).
+const SGSZ_FIELD_LABEL={weeklyInspect:'플랜점검',weeklyPlan:'주간 시간표',weeklyBookMap:'주간 교재 매핑',weeklyStrategyPeriod:'학습전략 기간',weeklySubjPlans:'과목별 플랜',weeklyAchieve:'주간 성취',weeklyNextInspectDate:'다음 점검일',consultations:'상담기록',challengerData:'챌린저 데이터',crossPick:'크로스픽',pickReports:'저장 리포트'};
+const SGSZ_MONTHKEY=/^(\d{4})-(\d{2})(?:-|$)/;
+function _sgszBytes(v){ try{ return new Blob([JSON.stringify(v===undefined?null:v)]).size; }catch(e){ return 0; } }
+function _sgszFmt(n){ return n>=1048576?(n/1048576).toFixed(2)+' MB':(n/1024).toFixed(1)+' KB'; }
+function _sgszFindBig(v,path,out,depth){
+  if(typeof v==='string'){ if(v.length>30000) out.push({path:path,bytes:v.length,img:/^data:/.test(v)}); return; }
+  if(depth>6||!v||typeof v!=='object') return;
+  Object.keys(v).forEach(k=>_sgszFindBig(v[k],path+'.'+k,out,depth+1));
+}
+async function _sgszLoad(id){
+  let doc=null;
+  if(FB_USE()){ const snap=await window._fb.db.collection('students').doc(String(id)).get(); if(snap.exists) doc=snap.data(); }
+  if(!doc) doc=(ST.students||[]).find(x=>String(x.id)===String(id))||null;
+  return doc;
+}
+function _sgszBuild(doc){
+  const total=_sgszBytes(doc);
+  const rows=Object.keys(doc).map(f=>{
+    const v=doc[f]; const b=_sgszBytes(v)+f.length+4;
+    const isMap=v&&typeof v==='object'&&!Array.isArray(v);
+    const keys=isMap?Object.keys(v):[];
+    const monthKeys=keys.filter(k=>SGSZ_MONTHKEY.test(k));
+    return {f:f,b:b,isMap:isMap,n:Array.isArray(v)?v.length:keys.length,prunable:isMap&&monthKeys.length>0&&monthKeys.length>=keys.length*0.5};
+  }).sort((a,b)=>b.b-a.b);
+  const big=[]; _sgszFindBig(doc,'',big,0); big.sort((a,b)=>b.bytes-a.bytes);
+  return {total:total,rows:rows,big:big};
+}
+function _sgszCutoff(months){ const d=new Date(); d.setMonth(d.getMonth()-months); return d.getFullYear()*100+(d.getMonth()+1); }
+function _sgszOldKeys(v,cut){ return Object.keys(v||{}).filter(k=>{ const m=SGSZ_MONTHKEY.exec(k); return m && (+m[1]*100+ +m[2])<cut; }); }
+async function SGSZ_open(id){
+  const old=document.getElementById('sgsz-ov'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='sgsz-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;font-size:14px">용량 확인 중…</div>';
+  document.body.appendChild(ov);
+  let doc;
+  try{ doc=await _sgszLoad(id); }catch(e){ ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px">불러오기 실패: '+esc(e.message)+'<br><br><button onclick="document.getElementById(\'sgsz-ov\').remove()">닫기</button></div>'; return; }
+  if(!doc){ ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px">학생 데이터를 찾을 수 없습니다.<br><br><button onclick="document.getElementById(\'sgsz-ov\').remove()">닫기</button></div>'; return; }
+  window._sgszCtx={id:id,doc:doc,months:6};
+  _sgszRender();
+}
+function _sgszRender(){
+  const c=window._sgszCtx, ov=document.getElementById('sgsz-ov'); if(!c||!ov) return;
+  const r=_sgszBuild(c.doc), LIM=1048576, pct=Math.min(100,r.total/LIM*100);
+  const cut=_sgszCutoff(c.months);
+  const color=r.total>LIM?'#dc2626':(r.total>LIM*0.85?'#f59e0b':'#16a34a');
+  const status=r.total>LIM?'🚨 1MB 초과 — 저장 불가':(r.total>LIM*0.85?'⚠️ 한계 임박':'✅ 정상');
+  const maxB=r.rows[0]?r.rows[0].b:1;
+  const rowsHtml=r.rows.slice(0,14).map(x=>{
+    const oldK=x.prunable?_sgszOldKeys(c.doc[x.f],cut):[];
+    const freed=oldK.reduce((a,k)=>a+_sgszBytes(c.doc[x.f][k])+k.length+4,0);
+    return '<tr><td style="padding:5px 6px;white-space:nowrap">'+(x.prunable?'<input type="checkbox" class="sgsz-ck" data-f="'+esc(x.f)+'" '+(oldK.length?'checked':'disabled')+'> ':'')+esc(SGSZ_FIELD_LABEL[x.f]||x.f)+'<span style="color:#94a3b8;font-size:11px"> '+esc(x.f)+'</span></td>'
+      +'<td style="padding:5px 6px;width:34%"><div style="background:#eef2f7;border-radius:4px;height:10px"><div style="width:'+(x.b/maxB*100).toFixed(1)+'%;background:#6366f1;height:10px;border-radius:4px"></div></div></td>'
+      +'<td style="padding:5px 6px;text-align:right;white-space:nowrap;font-weight:700">'+_sgszFmt(x.b)+'</td>'
+      +'<td style="padding:5px 6px;font-size:11px;color:#64748b">'+(x.prunable?(oldK.length?oldK.length+'건 정리가능 (-'+_sgszFmt(freed)+')':'정리할 옛 기록 없음'):(Array.isArray(c.doc[x.f])?x.n+'건':''))+'</td></tr>';
+  }).join('');
+  const bigHtml=r.big.length?'<div style="margin-top:12px;padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px"><b>용량이 큰 단일 값 (사진/이미지 등)</b><br>'+r.big.slice(0,6).map(b=>esc(b.path)+' — '+_sgszFmt(b.bytes)+(b.img?' (이미지)':'')).join('<br>')+'<br><span style="color:#9a3412">※ 자동 삭제하지 않습니다. 필요 시 해당 기록을 직접 삭제해 주세요.</span></div>':'';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:17px;font-weight:800">💾 저장 용량 — '+esc(c.doc.name||'')+' <span style="font-weight:500;color:#64748b;font-size:12px">'+esc((c.doc.school||'')+' '+(c.doc.grade||''))+'</span></div><button onclick="document.getElementById(\'sgsz-ov\').remove()" style="border:none;background:none;font-size:20px;cursor:pointer">✕</button></div>'
+   +'<div style="margin:12px 0 4px;font-weight:700;color:'+color+'">'+status+' · '+_sgszFmt(r.total)+' / 1.00 MB</div>'
+   +'<div style="background:#eef2f7;border-radius:6px;height:14px"><div style="width:'+pct.toFixed(1)+'%;background:'+color+';height:14px;border-radius:6px"></div></div>'
+   +'<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px">'+rowsHtml+'</table>'+bigHtml
+   +'<div style="margin-top:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:13px"><b>🤖 자동 정리 (권장)</b><div style="color:#475569;font-size:12px;margin:6px 0">6개월 이전 주간 기록(학습전략·시간표·플랜점검) → 그래도 크면 오래된 챌린저 회차의 문항 지문·해설 순으로 <b>서버 보관함에 이동</b>합니다. 삭제가 아니며 아래에서 복원할 수 있습니다. 저장 시 용량이 900KB를 넘거나 한도 초과 오류가 나면 <b>자동으로 실행</b>되도록 켜져 있습니다.</div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button onclick="SGSZ_autoOne()" style="padding:8px 14px;border-radius:8px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer">🤖 이 학생 지금 자동정리</button><button onclick="SGSZ_autoAll()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #16a34a;background:#fff;color:#15803d;font-weight:700;cursor:pointer">전체 학생 점검·자동정리</button></div></div>'
+   +'<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px;font-size:13px">'
+   +'<b>수동 정리</b> (체크된 주간 항목만) — 최근 <select id="sgsz-mo" onchange="_sgszCtx.months=+this.value;_sgszRender()" style="padding:2px 6px">'+[1,2,3,4,6,9,12].map(m=>'<option value="'+m+'"'+(m===c.months?' selected':'')+'>'+m+'개월</option>').join('')+'</select> 이전 기록을 보관함으로 이동'
+   +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="SGSZ_backup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">📥 전체 백업 파일 받기</button>'
+   +'<button onclick="SGSZ_prune()" style="padding:8px 14px;border-radius:8px;border:none;background:#475569;color:#fff;font-weight:700;cursor:pointer">선택 항목 보관함으로 이동</button></div></div>'
+   +'<div style="margin-top:12px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px"><b>🗄️ 보관함 / 복원</b> <button onclick="SGSZ_loadArch()" style="margin-left:8px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer">불러오기</button><div id="sgsz-arch" style="margin-top:8px;font-size:12px;color:#475569">'+_sgszArchHtml(c)+'</div></div></div>';
+}
+function _sgszArchHtml(c){
+  if(!c.arch) return '「불러오기」를 누르면 이 학생의 보관 기록을 확인합니다.';
+  if(!c.arch.length) return '보관된 기록이 없습니다.';
+  const wk={}; let ch=0; c.arch.forEach(a=>{ if(a.kind==='weekly'){ const m=String(a.key).slice(0,7); wk[m]=(wk[m]||0)+1; } else ch++; });
+  const rows=Object.keys(wk).sort().reverse().map(m=>'<div>'+m+' 주간 기록 '+wk[m]+'건 <button onclick="SGSZ_restore(\'weekly\',\''+m+'\')" style="margin-left:6px;padding:2px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer">복원</button></div>').join('');
+  return rows+(ch?'<div>챌린저 회차 '+ch+'건 (문항 지문·해설 원본) <button onclick="SGSZ_restore(\'chhist\')" style="margin-left:6px;padding:2px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer">전체 복원</button></div>':'');
+}
+async function SGSZ_loadArch(){ try{ await SGSZ_restoreList(); _sgszRender(); }catch(e){ alert('불러오기 실패: '+e.message); } }
+async function SGSZ_autoOne(){
+  const c=window._sgszCtx; if(!c) return;
+  if(!confirm('이 학생을 자동 정리합니다. (삭제 아님 — 서버 보관함으로 이동)\n계속할까요?')) return;
+  try{
+    const r=await SGSZ_autoCompact(c.id,c.doc,{force:true});
+    // 챌린저 단계는 data만 수정되므로 서버 반영
+    if(FB_USE()&&r.chall){ /* challStage가 persist 처리 */ }
+    alert('✅ 완료\n주간 기록 '+r.weekly+'건, 챌린저 회차 '+r.chall+'건 이동\n용량: '+_sgszFmt(r.before)+' → '+_sgszFmt(r.after)+(r.after>SGSZ_LIMIT?'\n\n⚠️ 아직 1MB를 넘습니다. 다른 항목(상담기록/이미지 등)을 확인하세요.':''));
+    _sgszRender(); try{ render(); }catch(e){}
+  }catch(e){ alert('자동정리 오류: '+e.message+'\n(보관 저장 실패 시 원본은 삭제되지 않습니다.)'); }
+}
+function _sgszDownload(name,obj){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function SGSZ_backup(){
+  const c=window._sgszCtx; if(!c) return;
+  _sgszDownload('백업_'+(c.doc.name||c.id)+'_전체_'+new Date().toISOString().slice(0,10)+'.json',c.doc);
+}
+
+// ───────── 자동 정리(삭제 없이 서버 보관함 studentArchive 로 이동) ─────────
+const SGSZ_LIMIT=1048576, SGSZ_SOFT=900000, SGSZ_TARGET=800000;
+function _sgszHash(str){ let h=0; for(let i=0;i<str.length;i++){ h=((h<<5)-h+str.charCodeAt(i))|0; } return (h>>>0).toString(36); }
+function _sgszSlimSubj(sub){ // 문항 지문/해설 원문만 제거(점수·오답·과목코드 구조는 유지)
+  if(!sub||typeof sub!=='object') return sub;
+  const o=Object.assign({},sub);
+  if(Array.isArray(o.items)) o.items=o.items.map(it=>{ const x=Object.assign({},it); delete x.question; delete x.explanation; return x; });
+  return o;
+}
+async function _sgszArchiveWrite(items){ // items:[{id,doc}]
+  if(!FB_USE()) return;
+  const db=window._fb.db;
+  for(let i=0;i<items.length;i+=400){
+    const batch=db.batch();
+    items.slice(i,i+400).forEach(x=>batch.set(db.collection('studentArchive').doc(x.id),x.doc));
+    await batch.commit();
+  }
+}
+// data: 저장하려는(또는 로컬) 학생 객체 — 제자리 수정. 반환 {freed, weekly, chall, before, after}
+async function SGSZ_autoCompact(id, data, opt){
+  opt=opt||{};
+  const res={freed:0,weekly:0,chall:0,before:_sgszBytes(data),after:0,fields:opt.fields||null};
+  const ref=FB_USE()?window._fb.db.collection('students').doc(String(id)):null;
+  let server=null;
+  if(ref){ try{ const sn=await ref.get(); if(sn.exists) server=sn.data(); }catch(e){} }
+  const stu=(typeof ST!=='undefined'&&ST.students||[]).find(x=>String(x.id)===String(id));
+  const name=data.name||(server&&server.name)||'';
+  const fieldsOf=d=>Object.keys(d||{}).filter(f=>/^weekly/.test(f)&&d[f]&&typeof d[f]==='object'&&!Array.isArray(d[f]));
+  const months=opt.months||6;
+  async function weeklyStage(m){
+    const cut=_sgszCutoff(m), arch=[], dels=[]; // dels: [field,key]
+    const seen=new Set();
+    const fl=new Set([...fieldsOf(data),...fieldsOf(server)]);
+    fl.forEach(f=>{
+      if(res.fields && !res.fields.includes(f)) return;
+      const keys=new Set([...Object.keys(data[f]||{}),...Object.keys((server&&server[f])||{})]);
+      const mk=[...keys].filter(k=>SGSZ_MONTHKEY.test(k));
+      if(mk.length<keys.size*0.5) return; // 주차/날짜 키 중심 필드만
+      _sgszOldKeys(Object.fromEntries(mk.map(k=>[k,1])),cut).forEach(k=>{
+        const v=(server&&server[f]&&server[f][k]!==undefined)?server[f][k]:(data[f]||{})[k];
+        const j=JSON.stringify(v); if(j===undefined||j.length>900000) return;
+        const id2=String(id)+'__'+f+'__'+k;
+        if(!seen.has(id2)){ seen.add(id2); arch.push({id:id2,doc:{studentId:String(id),studentName:name,kind:'weekly',field:f,key:k,json:j,archivedAt:Date.now()}}); }
+        dels.push([f,k]);
+      });
+    });
+    if(!dels.length) return 0;
+    await _sgszArchiveWrite(arch);                       // 1) 보관함에 먼저 저장
+    if(ref){                                              // 2) 서버 원본에서 제거(보관 성공 후에만)
+      const FV=firebase.firestore.FieldValue, FP=firebase.firestore.FieldPath;
+      const sdel=dels.filter(p=>server&&server[p[0]]&&server[p[0]][p[1]]!==undefined);
+      for(let i=0;i<sdel.length;i+=100){
+        const args=[]; sdel.slice(i,i+100).forEach(p=>args.push(new FP(p[0],p[1]),FV.delete()));
+        await ref.update.apply(ref,args);
+      }
+    }
+    dels.forEach(p=>{ if(data[p[0]]) delete data[p[0]][p[1]]; if(stu&&stu[p[0]]) delete stu[p[0]][p[1]]; if(server&&server[p[0]]) delete server[p[0]][p[1]]; });
+    return dels.length;
+  }
+  async function challStage(mode){ // mode 'old': 6개월 이전 / 'all': 최근 3회차 제외 전부
+    const cd=data.challengerData; if(!cd||!Array.isArray(cd.history)) return 0;
+    const cut=_sgszCutoff(6);
+    const sorted=cd.history.map((h,i)=>({h:h,i:i})).sort((a,b)=>String(b.h.date||'').localeCompare(String(a.h.date||'')));
+    const keepRecent=new Set(sorted.slice(0,3).map(x=>x.i));
+    const arch=[]; let n=0;
+    cd.history.forEach((h,i)=>{
+      if(!h||h.archived) return;
+      const m=SGSZ_MONTHKEY.exec(String(h.date||''));
+      const isOld=m && (+m[1]*100+ +m[2])<cut;
+      if(mode==='old' ? !isOld : keepRecent.has(i)) return;
+      const heavy=_sgszBytes(h.fullSubjects)+_sgszBytes(h.subjects);
+      if(heavy<20000) return; // 이미 가벼운 회차는 건드리지 않음
+      const j=JSON.stringify({subjects:h.subjects,fullSubjects:h.fullSubjects});
+      if(j.length>900000) return;
+      arch.push({id:String(id)+'__chhist__'+_sgszHash(String(h.date)+'|'+String(h.test)),
+        doc:{studentId:String(id),studentName:name,kind:'chhist',date:h.date||'',test:h.test||'',json:j,archivedAt:Date.now()}});
+      h.__slim=true; n++;
+    });
+    if(!n) return 0;
+    await _sgszArchiveWrite(arch);                       // 보관 성공 후에만 본문 축소
+    cd.history.forEach(h=>{ if(h&&h.__slim){ delete h.__slim;
+      const base=Array.isArray(h.fullSubjects)&&h.fullSubjects.length?h.fullSubjects:(h.subjects||[]);
+      h.subjects=base.map(_sgszSlimSubj); delete h.fullSubjects; h.archived=true; h.archivedAt=Date.now(); } });
+    if(stu&&stu.challengerData&&stu.challengerData!==cd) stu.challengerData.history=cd.history;
+    if(ref && opt.persist!==false){ await ref.update({'challengerData.history':cd.history}); }
+    return n;
+  }
+  const over=()=>_sgszBytes(data)>SGSZ_TARGET;
+  res.weekly+=await weeklyStage(months);
+  if(opt.force||over()){
+    if(over()&&!opt.fields){ res.weekly+=await weeklyStage(3); }
+    if(over()&&!opt.fields){ res.chall+=await challStage('old'); }
+    if(over()&&!opt.fields){ res.chall+=await challStage('all'); }
+  }
+  res.after=_sgszBytes(data); res.freed=Math.max(0,res.before-res.after);
+  return res;
+}
+async function SGSZ_prune(){
+  const c=window._sgszCtx; if(!c) return;
+  const fields=[...document.querySelectorAll('.sgsz-ck:checked')].map(e=>e.dataset.f);
+  if(!fields.length){ alert('정리할 항목이 선택되지 않았습니다.'); return; }
+  if(!confirm('최근 '+c.months+'개월 이전 기록을 서버 보관함으로 이동합니다.\n(삭제가 아니라 이동이며 나중에 복원할 수 있습니다)\n\n계속할까요?')) return;
+  try{
+    const r=await SGSZ_autoCompact(c.id,c.doc,{months:c.months,fields:fields});
+    alert('✅ '+r.weekly+'건을 보관함으로 이동했습니다.\n용량: '+_sgszFmt(r.before)+' → '+_sgszFmt(r.after));
+    _sgszRender(); try{ render(); }catch(e){}
+  }catch(e){ alert('정리 중 오류: '+e.message+'\n(보관 저장이 실패하면 원본은 삭제되지 않습니다.)'); }
+}
+async function SGSZ_autoAll(){
+  const c=window._sgszCtx;
+  const list=(ST.students||[]).filter(x=>_sgszBytes(x)>SGSZ_SOFT*0.9);
+  if(!list.length){ alert('용량이 큰(약 810KB 이상) 학생이 없습니다.'); return; }
+  if(!confirm('용량이 큰 학생 '+list.length+'명을 자동 정리합니다.\n(6개월 이전 주간 기록 → 부족하면 오래된 챌린저 회차의 문항 지문·해설 순으로 보관함 이동, 삭제 아님)\n\n계속할까요?')) return;
+  let ok=0,fail=0,lines=[];
+  for(const x of list){
+    try{ const r=await SGSZ_autoCompact(x.id,x,{force:true}); ok++; lines.push(x.name+': '+_sgszFmt(r.before)+' → '+_sgszFmt(r.after)); }
+    catch(e){ fail++; lines.push(x.name+': 실패 ('+e.message+')'); }
+  }
+  alert('완료 — 성공 '+ok+'명 / 실패 '+fail+'명\n\n'+lines.join('\n')); try{ render(); }catch(e){}
+}
+async function SGSZ_restoreList(){
+  const c=window._sgszCtx; if(!c||!FB_USE()) return;
+  const sn=await window._fb.db.collection('studentArchive').where('studentId','==',String(c.id)).get();
+  c.arch=sn.docs.map(d=>Object.assign({_id:d.id},d.data()));
+  return c.arch;
+}
+async function SGSZ_restore(kind,month){
+  const c=window._sgszCtx; if(!c) return;
+  const list=(c.arch||[]).filter(a=>a.kind===kind&&(kind!=='weekly'||String(a.key).slice(0,7)===month));
+  if(!list.length){ alert('복원할 기록이 없습니다.'); return; }
+  const add=list.reduce((n,a)=>n+a.json.length,0);
+  if(_sgszBytes(c.doc)+add>SGSZ_LIMIT*0.95 && !confirm('복원하면 용량이 한도에 가까워져 저장이 다시 막힐 수 있습니다.\n복원 후 용량 예상: '+_sgszFmt(_sgszBytes(c.doc)+add)+'\n그래도 복원할까요?')) return;
+  const ref=window._fb.db.collection('students').doc(String(c.id));
+  if(kind==='weekly'){
+    const FP=firebase.firestore.FieldPath;
+    for(const a of list){ await ref.update(new FP(a.field,a.key),JSON.parse(a.json)); (c.doc[a.field]=c.doc[a.field]||{})[a.key]=JSON.parse(a.json); }
+  }else{
+    const cd=c.doc.challengerData||{}; const hist=Array.isArray(cd.history)?cd.history:[];
+    for(const a of list){ const o=JSON.parse(a.json); const h=hist.find(x=>String(x.date)===String(a.date)&&String(x.test)===String(a.test)); if(h){ h.subjects=o.subjects; h.fullSubjects=o.fullSubjects; delete h.archived; } }
+    await ref.update({'challengerData.history':hist});
+  }
+  const st=(ST.students||[]).find(x=>String(x.id)===String(c.id)); if(st&&st!==c.doc){ try{ Object.assign(st,JSON.parse(JSON.stringify(c.doc))); }catch(e){} }
+  alert('✅ '+list.length+'건 복원했습니다.'); await SGSZ_restoreList(); _sgszRender(); try{ render(); }catch(e){}
+}
+window.SGSZ_autoOne=SGSZ_autoOne; window.SGSZ_loadArch=SGSZ_loadArch; window.SGSZ_autoCompact=SGSZ_autoCompact; window.SGSZ_autoAll=SGSZ_autoAll; window.SGSZ_restore=SGSZ_restore;
+window.SGSZ_open=SGSZ_open; window.SGSZ_backup=SGSZ_backup; window.SGSZ_prune=SGSZ_prune; window._sgszRender=_sgszRender;
+
 // ★ 데이터 내보내기: localStorage 전체를 JSON 파일로 다운로드
 function _gg_exportData(){
   try{
@@ -1242,6 +1490,20 @@ async function fbSave(col, id, data){
     const ref = window._fb.db.collection(col).doc(String(id));
     // ★ set()으로 문서 전체 교체 (update()의 부분 교체로 인한 데이터 불일치 방지)
     let saveData = {...data, _updatedAt: Date.now()};
+
+    // ★ 용량 자동관리: 저장 직전 문서가 900KB를 넘으면 6개월 이전 주간기록 등을 서버 보관함(studentArchive)으로
+    // 자동 이동(삭제 아님)해 1MB 한도 초과로 저장이 막히는 것을 예방한다.
+    if(col === 'students' && window.SGSZ_autoCompact && !fbSave._busy){
+      try{
+        if(_sgszBytes(data) > SGSZ_SOFT){
+          fbSave._busy = true;
+          const _r = await SGSZ_autoCompact(id, data, {});
+          saveData = {...data, _updatedAt: Date.now()};
+          if(_r.freed>0 && typeof toast==='function') toast('💾 용량 확보를 위해 오래된 기록을 보관함으로 이동했습니다 ('+_sgszFmt(_r.before)+' → '+_sgszFmt(_r.after)+')', 4000);
+        }
+      }catch(e){ console.warn('용량 자동정리 실패(저장은 계속 진행):', e.message); }
+      finally{ fbSave._busy = false; }
+    }
 
     if(col === 'students'){
       const _counselors = Array.isArray(data.counselors) ? data.counselors : [];
@@ -1342,7 +1604,23 @@ async function fbSave(col, id, data){
     //       아무 경고가 없어서, 다음에 열어보면 예전 데이터로 보여 "리셋된 것처럼" 보임.
     const msg = e.message || '';
     const sizeIssue = /longer than|exceeds the maximum|1048576|maximum.*size/i.test(msg);
-    alert(
+    if(sizeIssue && col==='students' && window.SGSZ_autoCompact && !fbSave._retrying){
+      fbSave._retrying = true;
+      try{
+        const _r = await SGSZ_autoCompact(id, data, {force:true});
+        if(_r.freed>0 && _r.after < SGSZ_LIMIT*0.97){
+          fbSave._busy = true;
+          try{ await fbSave(col, id, data); } finally{ fbSave._busy = false; }
+          alert('✅ 용량이 커서 오래된 기록을 서버 보관함으로 자동 이동한 뒤 저장했습니다.\n(삭제가 아니며 💾 저장용량 화면에서 복원할 수 있습니다)\n용량: '+_sgszFmt(_r.before)+' → '+_sgszFmt(_r.after));
+          try{ render(); }catch(_e){}
+          return;
+        }
+      }catch(e2){ console.warn('자동정리 재시도 실패:', e2.message); }
+      finally{ fbSave._retrying = false; }
+    }
+    if(sizeIssue && col==='students' && window.SGSZ_open){
+      if(confirm('⚠️ 저장되지 않았습니다.\n\n이 학생의 누적 데이터 용량이 너무 커서(1MB 제한 초과) 저장하지 못했습니다.\n\n[확인]을 누르면 항목별 용량 확인 및 오래된 기록 정리 화면이 열립니다.\n(정리 전 백업 파일이 자동으로 다운로드됩니다)')) SGSZ_open(id);
+    } else alert(
       '⚠️ 저장 중 오류가 발생해 실제로 저장되지 못했습니다.\n\n'
       + (sizeIssue
           ? '이 학생의 누적 데이터 용량이 너무 커서(1MB 제한 초과) 저장하지 못했습니다.\n오래된 회차 기록을 정리해야 계속 저장할 수 있습니다.'
@@ -4397,7 +4675,7 @@ function renderDetail(s){
       <span style="font-size:9px;color:#aaa;font-weight:600;white-space:nowrap">📅 주간플랜</span>
       <span style="color:#e0e3ef;font-size:12px">›</span>
       <span style="font-size:10px;color:#bbb;font-style:italic">아래에서 세부 탭 선택</span>
-      ${curPrintBtn?`<div style="margin-left:auto">${curPrintBtn}</div>`:''}
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center"><button onclick="SGSZ_open('${s.id}')" title="이 학생의 저장 용량 확인/정리" style="background:#64748b18;color:#475569;border:1.5px solid #64748b40;border-radius:8px;padding:6px 13px;font-size:11px;font-weight:700">💾 저장용량</button>${curPrintBtn||''}</div>
     </div>`:''}
 
     <!-- ③ 성적·상담·개요: 인쇄 버튼만 우측에 -->
