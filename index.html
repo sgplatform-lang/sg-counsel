@@ -2185,6 +2185,85 @@ function _csfParseSurveyText(text){
     questions: questions
   };
 }
+
+// ★ 2026-10-07 추가: .html 설문지 가져오기. 학원에서 따로 만든 입력폼형 HTML(예: 전략진단지)을
+// 올리면 폼 안의 입력칸을 DOM에서 직접 읽어 문항으로 바꾼다. 텍스트/전화/숫자 입력→단답형,
+// textarea→장문형, select→객관식(단일), 같은 name의 checkbox/radio 묶음→체크박스/객관식,
+// 성적표(table) 입력칸→과목(행)별 단답형, 학년 선택 버튼(.grade-btn)→객관식. 읽기전용 칸은 제외.
+function _csfParseSurveyHtml(htmlStr){
+  const doc = new DOMParser().parseFromString(String(htmlStr||''), 'text/html');
+  const T = function(el){ return el ? (el.textContent||'').replace(/\s+/g,' ').trim() : ''; };
+  const questions = [];
+  const uid = function(){ return 'q_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)+questions.length; };
+  const clean = function(l){ return String(l||'').replace(/\s*\*+\s*$/,'').replace(/\s*\*\s*/g,' ').trim(); };
+  const add = function(label, type, required, options, hint){
+    label = clean(label); if(!label) return;
+    if(hint) label += ' ('+hint+')';
+    questions.push({ id:uid(), label:label, type:type, required:!!required, options:options||[] });
+  };
+  const title = T(doc.querySelector('h1')) || T(doc.querySelector('title')) || '가져온 설문';
+  const description = T(doc.querySelector('.lede, .lead, .desc, .subtitle'));
+
+  // 학년 선택 버튼(탭)
+  const gb = Array.prototype.slice.call(doc.querySelectorAll('.grade-btn, [data-grade]')).filter(function(b){ return b.tagName==='BUTTON'; });
+  if(gb.length>=2) add('학년', 'radio', true, gb.map(function(b){ return T(b); }).filter(Boolean));
+
+  const root = doc.querySelector('form') || doc.body;
+  const blocks = Array.prototype.slice.call(root.querySelectorAll('.field, table.score, table, .checklist, .priority'));
+  const seen = new Set();
+  blocks.forEach(function(el){
+    // 이미 처리한 블록 안쪽(중첩)은 건너뜀
+    for(const d of seen){ if(d!==el && d.contains(el)) return; }
+    const section = el.closest('section, .section');
+    const secTitle = section ? T(section.querySelector('.title, .section-title, h2, h3')) : '';
+    const secHint = section ? T(section.querySelector('.hint')) : '';
+    if(el.matches('.field')){
+      const inp = el.querySelector('input, select, textarea'); if(!inp) return;
+      seen.add(el);
+      if(inp.tagName==='INPUT' && (inp.readOnly || inp.disabled || /^(hidden|button|submit|file)$/i.test(inp.type))) return;
+      const lab = T(el.querySelector('label'));
+      const req = /\*/.test(lab) || inp.required;
+      if(inp.tagName==='SELECT'){
+        const opts = Array.prototype.slice.call(inp.querySelectorAll('option')).map(function(o){ return T(o); }).filter(Boolean);
+        add(lab, 'radio', req, opts);
+      } else if(inp.tagName==='TEXTAREA'){
+        add(lab, 'textarea', req, [], inp.placeholder?('예: '+inp.placeholder.replace(/^예[:)]?\s*/,'')):'');
+      } else if(inp.type==='checkbox' || inp.type==='radio'){
+        const group = Array.prototype.slice.call(el.querySelectorAll('input[type=checkbox],input[type=radio]'));
+        add(lab, inp.type==='checkbox'?'checkbox':'radio', req, group.map(function(g){ return T(g.closest('label')) || g.value; }).filter(Boolean));
+      } else {
+        add(lab, 'text', req, [], inp.placeholder?('예: '+inp.placeholder.replace(/^예[:)]?\s*/,'')):'');
+      }
+      return;
+    }
+    if(el.tagName==='TABLE'){
+      const rows = Array.prototype.slice.call(el.querySelectorAll('tr'));
+      const heads = rows.length ? Array.prototype.slice.call(rows[0].children).map(function(c){ return T(c); }) : [];
+      let any=false;
+      rows.forEach(function(r){
+        const cells = Array.prototype.slice.call(r.children);
+        if(!cells.length || !r.querySelector('input, textarea, select')) return;
+        any=true;
+        const rowName = T(cells[0]);
+        const cols = heads.slice(1).filter(Boolean).join(', ');
+        const ph = (r.querySelector('input')||{}).placeholder;
+        add((secTitle?secTitle+' - ':'')+rowName, 'text', false, [], (cols?cols+' 순서로 입력':'') + (ph?(cols?' / ':'')+'예: '+ph:''));
+      });
+      if(any) seen.add(el);
+      return;
+    }
+    // 체크박스/라디오 묶음
+    const boxes = Array.prototype.slice.call(el.querySelectorAll('input[type=checkbox], input[type=radio]'));
+    if(!boxes.length) return;
+    seen.add(el);
+    const card = el.closest('.card');
+    let lab = card ? T(card.querySelector('.card-title')) : '';
+    if(!lab) lab = secTitle + (secHint?' ('+secHint+')':'');
+    const isRadio = boxes[0].type==='radio';
+    add(lab, isRadio?'radio':'checkbox', false, boxes.map(function(b){ return T(b.closest('label')) || b.value; }).filter(Boolean));
+  });
+  return { title:title, description:description, questions:questions };
+}
 // ★ 2026-09-16 추가: 커스텀 설문 만들기/수정 모달. 질문 목록은 모달이 열려있는 동안
 // 로컬 배열(questions)로만 들고 있다가 "저장" 눌렀을 때만 ST.customSurveys/Firestore에 반영한다.
 // 질문 행 버튼들은 innerHTML로 매번 새로 그려지는 구조라 onclick에서 전역 함수(window._csf*)를
@@ -2257,10 +2336,10 @@ function openCustomSurveyForm(orgId, existing){
   ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:24px">
     <div style="font-size:16px;font-weight:900;margin-bottom:14px">${existing?'✏ 설문 수정':'+ 새 설문 만들기'}</div>
     ${existing?'':`<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:6px">📄 기존 설문 파일(.docx/.txt)에서 가져오기</div>
+      <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:6px">📄 기존 설문 파일(.docx/.txt/.html)에서 가져오기</div>
       <div style="font-size:10.5px;color:#64748b;margin-bottom:8px">질문은 굵게 "1. 질문내용", 선택지는 글머리기호, 응답유형은 [단답형]/[복수 선택 가능]/[선택 서술형] 같은 대괄호 표기로 쓴 문서를 올리면 문항을 자동으로 채워줍니다. 서식이 다르면 일부만 인식될 수 있으니, 가져온 뒤 꼭 검수해주세요.</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <input type="file" id="csf_import_file" accept=".docx,.txt" style="font-size:11px">
+        <input type="file" id="csf_import_file" accept=".docx,.txt,.html,.htm" style="font-size:11px">
         <button type="button" id="csf_import_btn" style="background:#0369a1;color:#fff;border:none;border-radius:7px;padding:6px 13px;font-size:11.5px;font-weight:700;cursor:pointer">가져오기</button>
       </div>
       <div style="margin-top:8px">
@@ -2305,7 +2384,8 @@ function openCustomSurveyForm(orgId, existing){
           text = (textEl && textEl.value) || '';
         }
         if(!text.trim()){ alert('가져올 파일을 선택하거나 텍스트를 붙여넣어주세요.'); return; }
-        const parsed = _csfParseSurveyText(text);
+        const isHtml = (file && /\.html?$/i.test(file.name)) || /^\s*(<!doctype html|<html[\s>]|<form[\s>])/i.test(text);
+        const parsed = isHtml ? _csfParseSurveyHtml(text) : _csfParseSurveyText(text);
         if(!parsed.questions.length){
           alert('문항을 자동으로 인식하지 못했습니다. 문서 서식이 예상과 다를 수 있습니다.\n제목("'+parsed.title+'")만 채워드렸으니, 문항은 "+ 문항 추가"로 직접 입력해주세요.');
         } else {
@@ -56183,12 +56263,12 @@ function xcaUnivPrintGo(){
   const o={info:g('info'),qs:g('qs'),types:g('types'),blank:g('blank'),filt:g('filt')};
   if(!o.info&&!o.qs){ alert('대학 정보나 기출 문항 중 하나는 선택해주세요.'); return; }
   const univs=window._xcaPrintIds.map(function(i){return _xcaUniv.find(function(x){return x.id===i;});}).filter(Boolean);
-  const row=function(k,v){ return v?'<tr><th style="width:105px;background:#f1f5f9;text-align:left">'+k+'</th><td style="white-space:pre-wrap">'+_xcaE(v)+'</td></tr>':''; };
+  const row=function(k,v){ return v?'<tr'+(String(v).length>250?' style="page-break-inside:auto;break-inside:auto"':'')+'><th style="width:105px;background:#f1f5f9;text-align:left">'+k+'</th><td style="white-space:pre-wrap">'+_xcaE(v)+'</td></tr>':''; };
   const body=univs.map(function(u,idx){
     let qs=(u.questions||[]); if(o.filt&&_xcaFType) qs=qs.filter(function(q){return (q.types||[]).indexOf(_xcaFType)>=0;});
     return '<h1>🏛 '+_xcaE(u.name)+' <span class="m">면접 기출'+(o.qs?' '+qs.length+'문항':'')+'</span></h1>'
      +(o.info?'<table>'+row('면접 시간',u.time)+row('선발방법',u.selection)+row('평가방법',u.method)+row('면접 형식',u.format)+row('특징',u.features)+row('유의사항',u.etc)+'</table>':'')
-     +(o.qs?'<h2>기출 문항</h2>'+(qs.length?qs.map(function(q,i){ return '<div class="sec" style="padding:6px 10px"><div class="m">'+(i+1)+'.'+(q.track?' · '+_xcaE(q.track):'')+(q.area?' · '+_xcaE(q.area):'')+(q.subj?' · '+_xcaE(q.subj):'')+(o.types&&(q.types||[]).length?' · 🏷 '+q.types.map(_xcaE).join(', '):'')+'</div><div style="white-space:pre-wrap">'+_xcaE(q.q)+'</div>'+(o.blank?'<div class="lab">유형 태깅: □ '+XCL_TYPES.map(_xcaE).join('  □ ')+'</div><div class="lab">숨은 세특 문장</div><div class="ln"></div><div class="ln"></div>':'')+'</div>'; }).join(''):'<div class="m">문항이 없습니다.</div>'):'')
+     +(o.qs?'<h2 style="page-break-after:avoid;break-after:avoid">기출 문항</h2>'+(qs.length?qs.map(function(q,i){ return '<div class="sec" style="padding:6px 10px'+(String(q.q||'').length>350?';page-break-inside:auto;break-inside:auto':'')+'"><div class="m">'+(i+1)+'.'+(q.track?' · '+_xcaE(q.track):'')+(q.area?' · '+_xcaE(q.area):'')+(q.subj?' · '+_xcaE(q.subj):'')+(o.types&&(q.types||[]).length?' · 🏷 '+q.types.map(_xcaE).join(', '):'')+'</div><div style="white-space:pre-wrap">'+_xcaE(q.q)+'</div>'+(o.blank?'<div class="lab">유형 태깅: □ '+XCL_TYPES.map(_xcaE).join('  □ ')+'</div><div class="lab">숨은 세특 문장</div><div class="ln"></div><div class="ln"></div>':'')+'</div>'; }).join(''):'<div class="m">문항이 없습니다.</div>'):'')
      +(idx<univs.length-1?'<div class="pb"></div>':'');
   }).join('');
   xcaModalClose(); xcaPrintHtml(univs.length===1?univs[0].name+' 기출문제':univs.length<=3?univs.map(function(u){return u.name;}).join('·')+' 기출문제':univs[0].name+' 외 '+(univs.length-1)+'개 대학 기출문제',body);
