@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX 사전조사서 (초5·6 · 중1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
+<style>
+  :root{
+    --bg:#F7F7F4;
+    --surface:#FFFFFF;
+    --ink:#1E2A44;
+    --body-text:#33394A;
+    --muted:#7A8093;
+    --line:#DADCE2;
+    --accent:#8B3A3A;
+    --accent-soft:#F3E7E7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--body-text);
+    font-family:'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    line-height:1.6;
+  }
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--body-text)}
+  .sheet{
+    max-width:760px;
+    margin:0 auto;
+    background:var(--surface);
+    padding:56px 64px 72px;
+  }
+  @media (max-width:600px){
+    .sheet{padding:32px 22px 48px;}
+  }
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:8px;
+  }
+  .masthead .org{
+    font-size:13px;
+    letter-spacing:0.02em;
+    color:var(--muted);
+  }
+  .masthead .date-field{
+    font-size:13px;
+    color:var(--muted);
+    text-align:right;
+  }
+  h1{
+    font-family:'Noto Serif KR', serif;
+    font-weight:700;
+    font-size:28px;
+    color:var(--ink);
+    margin:26px 0 6px;
+  }
+  .lede{
+    font-size:14.5px;
+    color:var(--muted);
+    max-width:56ch;
+    margin-bottom:24px;
+  }
+  .level-toggle{
+    display:flex;
+    gap:8px;
+    margin-bottom:38px;
+  }
+  .level-btn{
+    flex:1;
+    text-align:center;
+    padding:12px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    font-size:14px;
+    font-weight:600;
+    color:var(--muted);
+    cursor:pointer;
+    background:#fff;
+    transition:all .15s;
+  }
+  .level-btn.active{
+    border-color:var(--ink);
+    background:var(--ink);
+    color:#fff;
+  }
+  .section{
+    margin-bottom:38px;
+  }
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:8px;
+    margin-bottom:18px;
+  }
+  .section-num{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--accent);
+    min-width:20px;
+  }
+  .section-title{
+    font-family:'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:18px;
+    color:var(--ink);
+  }
+  .section-hint{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-left:auto;
+  }
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px 24px;
+  }
+  .grid3{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:16px 20px;
+  }
+  @media (max-width:600px){
+    .grid2, .grid3{grid-template-columns:1fr;}
+  }
+  .field label{
+    display:block;
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    border:none;
+    border-bottom:1px solid var(--line);
+    padding:4px 2px 6px;
+    background:transparent;
+    outline:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    border-bottom-color:var(--accent);
+  }
+  .field textarea{resize:vertical;min-height:30px;line-height:1.6}
+  .score-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13.5px;
+    margin-top:6px;
+  }
+  .score-table th, .score-table td{
+    border:1px solid var(--line);
+    padding:6px 6px;
+    text-align:center;
+  }
+  .score-table th{
+    background:#FAFAF8;
+    color:var(--muted);
+    font-weight:500;
+    font-size:12.5px;
+  }
+  .score-table td{
+    height:34px;
+  }
+  .score-table td select, .score-table td input{
+    width:100%;
+    border:none;
+    text-align:center;
+    background:transparent;
+    outline:none;
+    font-size:13px;
+  }
+  .checklist{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 22px;
+  }
+  .check-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .check-item input[type=checkbox]{
+    width:16px;height:16px;flex-shrink:0;accent-color:var(--ink);cursor:pointer;
+  }
+  .curiosity-grid{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .note-box{
+    background:var(--accent-soft);
+    border-left:3px solid var(--accent);
+    padding:14px 18px;
+    font-size:13px;
+    color:#5A2E2E;
+    margin-top:6px;
+  }
+  .field-highlight{
+    background:var(--accent-soft);
+    border:1px solid var(--accent);
+    border-radius:8px;
+    padding:12px 14px 10px;
+  }
+  .field-highlight label{
+    color:var(--accent);
+    font-weight:700;
+  }
+  .field-highlight input{
+    border-bottom-color:var(--accent);
+  }
+  .submit-btn{
+    width:100%;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:18px;
+    font-size:16px;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+    margin-top:10px;
+  }
+  .submit-btn:active{ opacity:.85; }
+  .submit-btn:disabled{ background:#aab; cursor:default; }
+  footer{
+    margin-top:24px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    justify-content:space-between;
+  }
+  .done-screen{
+    display:none;
+    text-align:center;
+    padding:80px 20px;
+  }
+  .done-screen .mark{ font-size:52px; margin-bottom:18px; }
+  .done-screen h2{ font-family:'Noto Serif KR', serif; font-size:22px; color:var(--ink); margin-bottom:10px; }
+  .done-screen p{ color:var(--muted); font-size:14px; }
+  .err-box{
+    display:none;
+    background:#fdecea;
+    border-left:3px solid #c0392b;
+    padding:12px 16px;
+    font-size:13px;
+    color:#7a2c22;
+    margin-bottom:20px;
+  }
+  @media print{
+    body{background:#fff; line-height:1.35;}
+    .sheet{padding:8px 8px;}
+    .submit-btn, .level-toggle, #printBtn{display:none;}
+    .section{page-break-inside:avoid; break-inside:avoid; margin-bottom:10px;}
+    .page-break-print{ page-break-before: always; break-before: page; }
+    h1{font-size:19px; margin:8px 0 2px;}
+    .lede{font-size:10.5px; margin-bottom:6px; line-height:1.4;}
+    .masthead{padding-bottom:5px; margin-bottom:2px;}
+    .masthead .org, .masthead .date-field{font-size:11px;}
+    .level-toggle{margin-bottom:10px;}
+    .section-head{padding-bottom:3px; margin-bottom:7px;}
+    .section-num{font-size:13px; min-width:16px;}
+    .section-title{font-size:14.5px;}
+    .section-hint{font-size:10.5px;}
+    .grid2, .grid3{gap:8px 12px;}
+    .field label{font-size:10.5px; margin-bottom:3px;}
+    .field input, .field select, .field textarea{font-size:11px; padding:5px 0 4px;}
+    .checklist{gap:5px 12px;}
+    .check-item{font-size:11.5px;}
+    .curiosity-grid{gap:4px;}
+    .score-table{font-size:11px; margin-top:3px;}
+    .score-table th, .score-table td{padding:3px 4px;}
+    .score-table td{height:22px;}
+    .note-box{padding:7px 10px; font-size:10.5px; margin-top:3px;}
+    footer{margin-top:8px; padding-top:6px; font-size:9.5px;}
+  }
+
+  .subj-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  .subj-table th,.subj-table td{border:1px solid var(--line);padding:8px 6px;vertical-align:middle}
+  .subj-table th{background:#FAFAF8;color:var(--muted);font-weight:500;font-size:12.5px}
+  .subj-table td.s{font-weight:700;text-align:center;white-space:nowrap;width:64px}
+  .subj-table select{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 4px;background:#fff;font-size:12.5px}
+  .radio-row{display:flex;flex-wrap:wrap;gap:10px 18px}
+  .radio-row label{display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer}
+  .info-note{background:#F4F7FB;border-left:3px solid #3b5bdb;padding:12px 16px;font-size:13px;color:#2a3a5c;margin:6px 0 14px;line-height:1.7}
+  @media (max-width:600px){.subj-table,.subj-table tbody,.subj-table tr,.subj-table td,.subj-table th,.subj-table thead{display:block;width:100%}.subj-table thead{display:none}.subj-table tr{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;padding:8px}.subj-table td{border:none;padding:4px 2px}.subj-table td.s{width:auto;text-align:left;font-size:15px}.subj-table td[data-l]::before{content:attr(data-l);display:block;font-size:11.5px;color:var(--muted);margin-bottom:2px}}
+  @media print{.subj-table select{border:none;font-size:11px}.info-note{padding:6px 10px;font-size:10.5px}}
+</style>
+</head>
+<body>
+<div class="sheet" id="formSheet">
+
+  <div class="masthead">
+    <div class="org">SG상담플랫폼 · APEX 학업역량 정밀진단</div>
+    <div class="date-field" id="todayField"></div>
+  </div>
+
+  <h1>APEX 사전조사서 <span style="font-size:17px;color:var(--muted);font-weight:600">초5·6 · 중1</span></h1>
+  <p class="lede">초등 5·6학년과 중1은 학교 성적이 아직 없거나 적은 경우가 많습니다. 그래서 성적 대신 <b>현재 학업 기반 · 문제해결 수준 · 심화 경험 · 학생의 경험과 관심</b>을 중심으로 여쭙니다. 알고 계신 만큼만, 예상하지 말고 있는 그대로 작성해 주세요.</p>
+
+  <div class="err-box" id="errBox"></div>
+
+  <form id="surveyForm" onsubmit="return submitSurvey(event)">
+
+  <div class="section">
+    <div class="section-head"><span class="section-num">1</span><span class="section-title">학생 기본 정보</span></div>
+    <div class="grid3">
+      <div class="field"><label>학생 이름 *</label><input id="f_name" required></div>
+      <div class="field"><label>학교명</label><input id="f_school" placeholder="예: 스파르타초등학교"></div>
+      <div class="field"><label>학년 *</label><select id="f_grade" onchange="onGradeChange()"><option value="초5">초5</option><option value="초6">초6</option><option value="중1">중1</option></select></div>
+      <div class="field"><label>작성자</label><select id="f_writer"><option value="학부모">학부모</option><option value="학생">학생</option><option value="학부모와 학생 함께">학부모와 학생 함께</option></select></div>
+      <div class="field"><label>학부모 연락처</label><input id="f_parentPhone" type="tel" placeholder="예: 010-1234-5678"></div>
+      <div class="field"><label>학생 연락처 (선택)</label><input id="f_studentPhone" type="tel" placeholder="예: 010-1234-5678"></div>
+    </div>
+  </div>
+
+  <div class="section" id="secState" style="display:none">
+    <div class="section-head"><span class="section-num">2</span><span class="section-title">현재 학교 성적 상태</span><span class="section-hint">중1</span></div>
+    <div class="radio-row">
+      <label><input type="radio" name="acadState" value="none" checked onchange="onStateChange()">학교 시험 전 / 아직 성적 없음</label>
+      <label><input type="radio" name="acadState" value="has" onchange="onStateChange()">실제 학교 성적이 있음</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-num">3</span><span class="section-title">현재 학업 기반 · 문제해결 · 심화</span><span class="section-hint">과목별로 가장 가까운 것 선택</span></div>
+    <div class="info-note"><b>작성 원칙</b> · 성적을 예상해서 적지 않습니다. 선행을 많이 했는지 자체를 높게 보지 않고, <b>현재 학년 내용을 안정적으로 이해하는지 · 실제 문제를 해결하는지 · 스스로 질문하고 확장하는지</b>를 봅니다. 확인된 자료가 없으면 “관찰 자료 없음 / 자료 없음”을 선택하세요.</div>
+    <table class="subj-table">
+      <thead><tr><th>과목</th><th>현재 교과 기반</th><th>객관 문제해결 자료<br><span style="font-weight:400">(전국·기관 테스트 등)</span></th><th>심화·확장 / 선행·심화</th></tr></thead>
+      <tbody id="subjBody"></tbody>
+    </table>
+  </div>
+
+  <div class="section" id="secAch" style="display:none">
+    <div class="section-head"><span class="section-num">4</span><span class="section-title">학교 교과 성취도 (실제 나온 성적만)</span></div>
+    <div class="info-note">아직 나오지 않은 학기는 “아직 없음”으로 둡니다. 없는 성적을 추정하지 않습니다.</div>
+    <table class="score-table">
+      <thead><tr><th></th><th>중1 1학기</th><th>중1 2학기</th></tr></thead>
+      <tbody id="achBody"></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-num">5</span><span class="section-title">진학 환경 탐색에 필요한 추가 경험</span><span class="section-hint">중복 선택 가능</span></div>
+    <div class="checklist" id="extraExp"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-num">6</span><span class="section-title">학생의 경험 · 강점 · 관심</span></div>
+    <div class="grid2">
+      <div class="field"><label>내가(우리 아이가) 잘한다고 느끼는 것 / 특기</label><input id="f_talent" placeholder="예: 축구, 피아노, 코딩, 발표"></div>
+      <div class="field"><label>시간 가는 줄 모르고 하는 취미·몰입 활동</label><input id="f_hobby" placeholder="예: 레고, 그림 그리기, 책 읽기"></div>
+      <div class="field"><label>1년 이상 오래 해온 활동·경험</label><input id="f_longExp" placeholder="예: 농구 5년, 과학 실험 3년"></div>
+      <div class="field"><label>주변에서 자주 잘한다고 말하는 것</label><input id="f_praise" placeholder="예: 설명을 잘한다, 끈기가 있다"></div>
+    </div>
+    <div class="field" style="margin-top:16px"><label>최근 관심 분야</label><textarea id="f_interest" rows="2" placeholder="예: 우주, 공룡, 로봇, 역사 이야기"></textarea></div>
+    <div class="field" style="margin-top:16px"><label>현재 진학·진로에 대한 생각</label>
+      <div class="radio-row" style="margin-top:6px" id="dirRow"></div>
+    </div>
+    <div class="note-box">이 선택 자체로 진학 방향을 결정하지 않습니다. APEX는 실제 학업 기반·경험·성장 패턴과 함께 해석합니다.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><span class="section-num">7</span><span class="section-title">상담에서 꼭 알려주고 싶은 점</span></div>
+    <div class="field"><label>자유 메모</label><textarea id="f_memo" rows="4" placeholder="학습 습관, 걱정되는 점, 궁금한 점 등 자유롭게 적어주세요"></textarea></div>
+  </div>
+
+  <button type="submit" class="submit-btn" id="submitBtn">사전조사서 제출하기</button>
+  <footer><span>작성해 주신 내용은 APEX 진단과 맞춤 분석 준비 용도로만 사용됩니다.</span><span>SG상담플랫폼</span></footer>
+  </form>
+</div>
+
+<div class="sheet done-screen" id="doneScreen">
+  <div class="mark">✅</div>
+  <h2>제출이 완료되었습니다</h2>
+  <p>작성해 주셔서 감사합니다. 선생님이 확인한 뒤 APEX 진단과 상담을 준비하겠습니다.</p>
+</div>
+
+<script>
+let _db=null;
+const SG_RECAPTCHA_SITE_KEY = '6LcoRrEtAAAAAG2W-Q8g-rhXW7j53hB6peh2DOFZ';
+try{
+  firebase.initializeApp({
+    apiKey: "AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
+    authDomain: "sg-counsel.firebaseapp.com",
+    projectId: "sg-counsel",
+    storageBucket: "sg-counsel.firebasestorage.app",
+    messagingSenderId: "134794459070",
+    appId: "1:134794459070:web:a636cac4df344bd26e2bef"
+  });
+  function _sgActivateAppCheck(){
+    try{
+      firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY), true);
+    }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):', e.message); }
+  }
+  if(document.body){ _sgActivateAppCheck(); } else { document.addEventListener('DOMContentLoaded', _sgActivateAppCheck); }
+  _db = firebase.firestore();
+  _db.settings({ experimentalAutoDetectLongPolling: true });
+}catch(e){ console.warn('Firebase 초기화 실패:', e.message); }
+
+function $(id){ return document.getElementById(id); }
+(function(){ const d=new Date(); $('todayField').textContent='작성일  '+d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일'; })();
+
+const SUBJECTS=[{k:'kor',n:'국어'},{k:'math',n:'수학'},{k:'eng',n:'영어'},{k:'sci',n:'과학'}];
+const BASE=['매우 안정','안정','기본 확보','일부 보완 필요','관찰 자료 없음'];
+const OBJ=['상위 1%','상위 4%','상위 11%','상위 23%','그 이하','미응시/자료 없음'];
+const EXP_ELEM={
+  kor:['상위학년 장문·비문학 분석','학년 수준 장문 독해·요약 안정','현 학년 독해·서술 안정','독해·서술 확장 중','기초 독해·표현 보완','자료 없음'],
+  math:['상위학년·고난도 개념 적용','현 학년 최상위 심화 안정','현 학년 개념·응용 안정','심화 시작 단계','핵심 개념 보완','자료 없음'],
+  eng:['상위학년 원문 독해·설명','학년 이상 독해·어휘 안정','현 학년 독해·문법 안정','독해·어휘 확장 중','기초 어휘·문장 보완','자료 없음'],
+  sci:['교과 밖 질문·실험·설명','심화 탐구 꾸준히 수행','현 학년 개념·관찰 안정','탐구 경험 확장 중','기초 개념·설명 보완','자료 없음']
+};
+const EXP_MID={
+  kor:['고1 수준 장문·비문학 분석','중등 고난도·예비고 확장','중등 현행 독해·서술 안정','심화 중','기초 독해·서술 보완','자료 없음'],
+  math:['고등 공통수학 이상+중등 최상위 안정','고등 선행/중등 최상위 심화','중등 현행 심화·응용 안정','심화 시작','현행 핵심 개념 보완','자료 없음'],
+  eng:['고1 수준 독해·구문 안정','중등 고난도·예비고 확장','중등 현행 독해·문법 안정','심화 중','기초 어휘·문법 보완','자료 없음'],
+  sci:['통합과학 이상+중등 심화 안정','통합과학 선행/중등 최상위 심화','중등 현행 개념·심화 안정','심화 탐구 시작','현행 핵심 개념 보완','자료 없음']
+};
+const ACH_SUBJ=['국어','영어','수학','과학','사회','역사'];
+const ACH=['A','B','C','D/E'];
+const EXTRA=['수학·과학 고난도 문제/탐구','독서·비문학·글쓰기','토론·발표·사회/시사','장기 프로젝트·제작','경시·영재원·기관 진단','아직 없음'];
+const DIR=['과학·영재 탐구','자사고·고강도 학업','외국어·국제 탐구','균형 성장','아직 잘 모르겠음'];
+
+function opts(arr,withBlank){ return (withBlank?'<option value="">선택</option>':'')+arr.map(function(t,i){ return '<option value="'+i+'">'+t+'</option>'; }).join(''); }
+function isMid(){ return $('f_grade').value==='중1'; }
+function renderSubj(){
+  const exp=isMid()?EXP_MID:EXP_ELEM;
+  const prev={};
+  SUBJECTS.forEach(function(s){ ['b','o','e'].forEach(function(p){ const el=$(p+'_'+s.k); if(el) prev[p+'_'+s.k]=el.value; }); });
+  $('subjBody').innerHTML=SUBJECTS.map(function(s){
+    return '<tr><td class="s">'+s.n+'</td>'
+     +'<td data-l="현재 교과 기반"><select id="b_'+s.k+'">'+opts(BASE,true)+'</select></td>'
+     +'<td data-l="객관 문제해결 자료"><select id="o_'+s.k+'">'+opts(OBJ,true)+'</select></td>'
+     +'<td data-l="심화·확장 / 선행·심화"><select id="e_'+s.k+'">'+opts(exp[s.k],true)+'</select></td></tr>';
+  }).join('');
+  Object.keys(prev).forEach(function(k){ if(prev[k]!==undefined && $(k)) $(k).value=prev[k]; });
+}
+function renderAch(){
+  $('achBody').innerHTML=ACH_SUBJ.map(function(n,i){
+    return '<tr><td style="text-align:left;font-weight:600">'+n+'</td>'+[1,2].map(function(t){
+      return '<td><select id="a_'+i+'_'+t+'"><option value="">아직 없음</option>'+ACH.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('')+'</select></td>';
+    }).join('')+'</tr>';
+  }).join('');
+}
+function onGradeChange(){
+  const mid=isMid();
+  $('secState').style.display=mid?'':'none';
+  renderSubj();
+  onStateChange();
+}
+function onStateChange(){
+  const has=isMid() && document.querySelector('input[name="acadState"]:checked').value==='has';
+  $('secAch').style.display=has?'':'none';
+}
+$('extraExp').innerHTML=EXTRA.map(function(t){ return '<label class="check-item"><input type="checkbox" name="extra" value="'+t+'">'+t+'</label>'; }).join('');
+$('dirRow').innerHTML=DIR.map(function(t,i){ return '<label><input type="radio" name="dir" value="'+t+'"'+(i===DIR.length-1?' checked':'')+'>'+t+'</label>'; }).join('');
+renderSubj(); renderAch(); onGradeChange();
+
+function pick(prefix,k,arr){
+  const v=$(prefix+'_'+k).value;
+  if(v==='') return {i:null,t:''};
+  return {i:+v,t:arr[+v]};
+}
+function submitSurvey(ev){
+  ev.preventDefault();
+  const errBox=$('errBox'); errBox.style.display='none';
+  const name=$('f_name').value.trim();
+  if(!name){ errBox.textContent='학생 이름을 입력해주세요.'; errBox.style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); return false; }
+  const params=new URLSearchParams(location.search);
+  const orgId=params.get('org')||null;
+  const exp=isMid()?EXP_MID:EXP_ELEM;
+  const base={},obj={},ex={};
+  SUBJECTS.forEach(function(s){ base[s.k]=pick('b',s.k,BASE); obj[s.k]=pick('o',s.k,OBJ); ex[s.k]=pick('e',s.k,exp[s.k]); });
+  const hasGrades=isMid() && document.querySelector('input[name="acadState"]:checked').value==='has';
+  const ach={};
+  if(hasGrades){ ACH_SUBJ.forEach(function(n,i){ ach[n]=[$('a_'+i+'_1').value,$('a_'+i+'_2').value]; }); }
+  const data={
+    submittedAt:new Date().toISOString(), status:'new', orgId:orgId, formType:'apexLow',
+    name:name, school:$('f_school').value.trim(), grade:$('f_grade').value, writer:$('f_writer').value,
+    parentPhone:$('f_parentPhone').value.trim(), studentPhone:$('f_studentPhone').value.trim(),
+    acadState: hasGrades?'has':'none',
+    base:base, obj:obj, exp:ex, achievement:ach,
+    extraExp:Array.from(document.querySelectorAll('input[name="extra"]:checked')).map(function(e){return e.value;}),
+    talent:$('f_talent').value.trim(), hobby:$('f_hobby').value.trim(), longExp:$('f_longExp').value.trim(), praise:$('f_praise').value.trim(),
+    interest:$('f_interest').value.trim(), direction:(document.querySelector('input[name="dir"]:checked')||{}).value||'',
+    memo:$('f_memo').value.trim()
+  };
+  const btn=$('submitBtn'); btn.disabled=true; btn.textContent='제출 중...';
+  if(!_db){
+    errBox.textContent='온라인 제출 기능을 불러오지 못했습니다(네트워크 상태를 확인해주세요).';
+    errBox.style.display='block'; btn.disabled=false; btn.textContent='사전조사서 제출하기';
+    window.scrollTo({top:0,behavior:'smooth'}); return false;
+  }
+  const id='aps_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  _db.collection('apexPreSurveySubmissions').doc(id).set(Object.assign({id:id},data))
+    .then(function(){ $('formSheet').style.display='none'; $('doneScreen').style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); })
+    .catch(function(e){
+      errBox.textContent='제출 중 오류가 발생했습니다: '+e.message+' (네트워크 상태를 확인하고 다시 시도해주세요.)';
+      errBox.style.display='block'; btn.disabled=false; btn.textContent='사전조사서 제출하기';
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  return false;
+}
+</script>
+</body>
+</html>
