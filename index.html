@@ -1502,8 +1502,14 @@ function RM_onProgramOrgFilterChange(){
 // ★ 2026-09-05 추가: preSurveySubmissions(사전조사 웹폼 제출함) — 로그인 없는 학생/학부모용
 // 별도 웹폼(사전상담설문지)에서 Firestore로 직접 저장되는 데이터다. programCatalog와 같은
 // 패턴으로 기관별로 지연로딩한다(최종관리자는 전체, 그 외에는 자기 기관만 서버단에서 필터).
+// ★ 2026-10-07: 중학생 전략진단지(formType BTOP_MS_STRATEGY_2026)는 같은 컬렉션에 저장되지만
+// 사전조사서와 "독립된 설문"으로 취급 — 로드 시 ST.msStrategySubs(전략진단지)와
+// ST.preSurveySubmissions(그 외 사전조사서)로 나눠 담는다. 둘 다 찾을 땐 RM_findPre(id).
+function RM_findPre(id){
+  return (ST.preSurveySubmissions||[]).concat(ST.msStrategySubs||[]).find(function(x){ return String(x.id)===String(id); });
+}
 async function _ensurePreSurveyLoaded(forceRefresh){
-  if(!forceRefresh && ST.preSurveySubmissions && ST.preSurveySubmissions.length) return ST.preSurveySubmissions;
+  if(!forceRefresh && ST._preSurveyFetched) return ST.preSurveySubmissions||[];
   if(!FB_USE()) return ST.preSurveySubmissions||[];
   const _role=ST.currentUser?.role;
   const _orgId=ST.currentOrg?.id || ST.currentUser?.orgId || null;
@@ -1515,14 +1521,14 @@ async function _ensurePreSurveyLoaded(forceRefresh){
   } else {
     list = await fbLoadAll('preSurveySubmissions');
   }
-  if(list) ST.preSurveySubmissions=list;
+  if(list){ list.forEach(RM_normPre); ST.msStrategySubs=list.filter(RM_isMsStrategy); ST.preSurveySubmissions=list.filter(function(x){ return !RM_isMsStrategy(x); }); ST._preSurveyFetched=true; }
   return ST.preSurveySubmissions||[];
 }
 function RM_refreshPreSurvey(){
   _ensurePreSurveyLoaded(true).then(function(){ render(); });
 }
 function RM_markSurveyReviewed(id){
-  const p=(ST.preSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  const p=RM_findPre(id);
   if(!p) return;
   _svApplyReadPatch(p, !_svIsRead(p));
   if(FB_USE()) window._fb.set('preSurveySubmissions', p.id, p);
@@ -1531,6 +1537,7 @@ function RM_markSurveyReviewed(id){
 function RM_deleteSurveySubmission(id){
   if(!confirm('이 사전조사 제출 내용을 삭제하시겠습니까?')) return;
   ST.preSurveySubmissions=(ST.preSurveySubmissions||[]).filter(function(x){ return String(x.id)!==String(id); });
+  ST.msStrategySubs=(ST.msStrategySubs||[]).filter(function(x){ return String(x.id)!==String(id); });
   if(FB_USE()) window._fb.delete('preSurveySubmissions', id);
   render();
 }
@@ -1746,9 +1753,12 @@ function _sgBuildNotifications(){
       list.push({type:'challenger', key:'chg:'+s.id, studentId:s.id, label:(s.name||''), count:_chgUnreadCount(s)});
     }
   });
-  const presurveyCount=(ST.preSurveySubmissions||[]).filter(_svIsUnread).length;
+  const _nsAdmin=ST.currentUser?.role==='admin';
+  const presurveyCount=(_nsAdmin||RM_surveyAllowed('presurvey'))?(ST.preSurveySubmissions||[]).filter(_svIsUnread).length:0;
   if(presurveyCount) list.push({type:'presurvey', key:'presurvey', label:'사전조사서', count:presurveyCount});
-  const apexLowCount=(ST.apexLowSubs||[]).filter(_svIsUnread).length;
+  const msCount=(_nsAdmin||RM_surveyAllowed('msstrategy'))?(ST.msStrategySubs||[]).filter(_svIsUnread).length:0;
+  if(msCount) list.push({type:'msstrategy', key:'msstrategy', label:'중학생 전략진단지', count:msCount});
+  const apexLowCount=(_nsAdmin||RM_surveyAllowed('apexlow'))?(ST.apexLowSubs||[]).filter(_svIsUnread).length:0;
   if(apexLowCount) list.push({type:'apexlow', key:'apexlow', label:'APEX 사전조사서(초5·6·중1)', count:apexLowCount});
   const _parNew=(ST.apexParentNew||[]);
   const _parBy={}; _parNew.forEach(function(d){ (_parBy[d.studentId]=_parBy[d.studentId]||[]).push(d); });
@@ -1757,7 +1767,7 @@ function _sgBuildNotifications(){
     if(!_visIds.has(String(sid))) return;
     list.push({type:'apexparent', key:'apexparent:'+sid, studentId:sid, label:(_parBy[sid][0].studentName||'학생'), count:_parBy[sid].length});
   });
-  const cf70Count=(ST.challengerF70Submissions||[]).filter(_svIsUnread).length;
+  const cf70Count=(_nsAdmin||RM_surveyAllowed('cf70'))?(ST.challengerF70Submissions||[]).filter(_svIsUnread).length:0;
   if(cf70Count) list.push({type:'cf70', key:'cf70', label:'챌린저FINAL70', count:cf70Count});
   (ST.customSurveys||[]).forEach(function(sv){
     const c=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(sv.id) && _svIsUnread(x); }).length;
@@ -1779,6 +1789,7 @@ async function _sgNotifMarkChallengerReadInner(studentId){
 async function _sgNotifMarkTypeReviewedInner(type, surveyId){
   let arr, col;
   if(type==='presurvey'){ arr=ST.preSurveySubmissions||[]; col='preSurveySubmissions'; }
+  else if(type==='msstrategy'){ arr=ST.msStrategySubs||[]; col='preSurveySubmissions'; }
   else if(type==='cf70'){ arr=ST.challengerF70Submissions||[]; col='challengerFinal70Submissions'; }
   else if(type==='customSurvey'){ arr=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); }); col='customSurveySubmissions'; }
   else if(type==='apexlow'){ arr=ST.apexLowSubs||[]; col='apexPreSurveySubmissions'; }
@@ -1865,6 +1876,7 @@ function _sgNotifOpenSurvey(type, surveyId){
   if(type==='presurvey') ST._surveyHubView='presurvey';
   else if(type==='cf70') ST._surveyHubView='cf70';
   else if(type==='apexlow') ST._surveyHubView='apexlow';
+  else if(type==='msstrategy') ST._surveyHubView='msstrategy';
   else if(type==='customSurvey') ST._surveyHubView='custom:'+surveyId;
   ST._notifOpen=false;
   _sgNotifMarkTypeReviewedInner(type, surveyId).then(render);
@@ -3770,7 +3782,7 @@ function doLogout(){
   // 전체 기관 데이터가 그대로 남아 보이는 기관간 데이터 유출 문제가 있었다. 새로고침 전
   // 페이지 최초 로드 시의 "아직 로드 안 됨" 상태(undefined, ||[] 기본값과 동일하게 동작)로
   // 되돌린다.
-  ST._preSurveyLoaded=false; ST.preSurveySubmissions=null;
+  ST._preSurveyLoaded=false; ST.preSurveySubmissions=null; ST.msStrategySubs=null; ST._preSurveyFetched=false;
   ST._cf70Loaded=false; ST.challengerF70Submissions=null; ST._cf70LoadError=null;
   ST._programCatalogLoaded=false; ST.programCatalog=null;
   ST._customSurveysMgmtLoaded=false; ST._customSurveysHubLoaded=false; ST._notifDataLoaded=false;
@@ -7402,8 +7414,9 @@ async function apexSaveParentFromTool(result){
 const APEX_LOW_FILE='APEX_초등중1_사전조사서_웹폼.html';
 const APEX_PARENT_FILE='APEX_학부모_성장관찰_웹폼.html';
 
-function copyOrgApexLowLink(orgId){ copyOrgLinkGeneric(orgId, APEX_LOW_FILE, 'APEX 사전조사서(초5·6·중1)'); }
+function copyOrgApexLowLink(orgId){ if(!RM_svLinkGuard(orgId,'apexlow')) return; copyOrgLinkGeneric(orgId, APEX_LOW_FILE, 'APEX 사전조사서(초5·6·중1)'); }
 function downloadOrgApexLowRedirectPage(orgId, orgName){
+  if(!RM_svLinkGuard(orgId,'apexlow')) return;
   downloadOrgRedirectPageGeneric(orgId, orgName, APEX_LOW_FILE, 'APEX 사전조사서 (초5·6·중1)', 'APEX사전조사');
 }
 
@@ -18924,6 +18937,50 @@ function RM_surveyMatchHtml(p){
     +(matches.length>5?'<span style="font-size:10.5px;color:#aaa;align-self:center">외 '+(matches.length-5)+'명 더 있음 — 이름을 좀 더 구체적으로 구분해주세요</span>':'')
     +'</div>';
 }
+function renderRoadmapMsInbox(){
+  if(!ST._preSurveyLoaded){
+    ST._preSurveyLoaded=true;
+    _ensurePreSurveyLoaded(true).then(function(){ render(); });
+    return '<div style="padding:48px;text-align:center;color:#888">제출 내역을 불러오는 중...</div>';
+  }
+  if(ST._surveyView==='report') return RM_surveyReportHtml(ST._surveyReportId);
+  const isAdminRole=ST.currentUser?.role==='admin';
+  const orgs=isAdminRole ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
+  const orgNameById={}; orgs.forEach(function(o){ orgNameById[String(o.id)]=o.name; });
+  const filterVal=isAdminRole ? (ST._rmSurveyOrgFilter||'') : '';
+  const allList=(ST.msStrategySubs||[]).slice().sort(function(a,b){ return (b.submittedAt||'').localeCompare(a.submittedAt||''); });
+  const list=(isAdminRole && filterVal) ? allList.filter(function(x){ return String(x.orgId||'')===String(filterVal); }) : allList;
+  const unreadCount=list.filter(_svIsUnread).length;
+  const btn=function(oc,bg,fg,bd,t){ return '<button onclick="event.stopPropagation();'+oc+'" style="background:'+bg+';color:'+fg+';border:1px solid '+bd+';border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">'+t+'</button>'; };
+  const rows=list.map(function(p){
+    const isNew=_svIsUnread(p);
+    const expanded=!!(ST._surveyExpanded||{})[p.id];
+    const orgLabel=isAdminRole ? ' <span style="color:#888;font-size:10.5px;font-weight:400">· '+esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))+'</span>' : '';
+    return '<div style="background:#fff;border:1px solid '+(isNew?'#c7d2fe':'#e8eaf6')+';border-left:4px solid '+(isNew?'#3b5bdb':'#cbd5e1')+';border-radius:10px;padding:14px 16px;margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="RM_toggleSurveyExpand(\''+p.id+'\')">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+(isNew?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">NEW</span>':'')
+      +'<span style="font-size:13.5px;font-weight:800;color:#1a1a2e">'+esc(p.name||'이름 미입력')+'</span>'
+      +'<span style="font-size:11.5px;color:#888">'+esc(p.school||'')+' · '+esc(p.grade||'')+' · 중학생'+orgLabel+'</span></div>'
+      +'<div style="font-size:11px;color:#aaa">'+esc((p.submittedAt||'').slice(0,16).replace('T',' '))+'</div></div>'
+      +RM_surveyMatchHtml(p)
+      +(expanded?RM_surveyDetailHtml(p):'')
+      +'<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:'+(expanded?'12px':'8px')+'">'
+      +btn("ST._surveyView='report';ST._surveyReportId='"+p.id+"';render()",'#eef2ff','#4338ca','#c7d2fe','📄 리포트 보기')
+      +btn("RM_applySurveyToBasic('"+p.id+"')",'#eefaf0','#10b981','#b7ecd2','📝 기본상담으로 반영')
+      +btn("RM_markSurveyReviewed('"+p.id+"')",isNew?'#eef1ff':'#f4f6fb',isNew?'#3b5bdb':'#888',isNew?'#c5cae9':'#ddd',isNew?'✓ 확인함으로 표시':'○ 다시 새 항목으로')
+      +btn("RM_deleteSurveySubmission('"+p.id+"')",'#fff','#dc2626','#fecaca','삭제')
+      +'</div></div>';
+  }).join('');
+  return '<div style="max-width:none;padding-bottom:40px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div>'
+    +'<div style="font-size:15px;font-weight:900;color:#1a1a2e">🎓 중학생 전략진단지 받은함</div>'
+    +'<div style="font-size:11px;color:#777;margin-top:2px">총 '+list.length+'건 (미확인 '+unreadCount+'건) — 학생·학부모가 전략진단지 링크로 제출한 내용입니다. "📄 리포트 보기"에서 상담용 리포트(성적 환산·상담 포인트)를 확인·인쇄하고, "📝 기본상담으로 반영"으로 기본상담 입력폼에 옮길 수 있습니다.</div>'
+    +'<div style="font-size:11.5px;color:#3b5bdb;font-weight:700;margin-top:4px">👤 현재 선택된 학생: '+(RM_STUDENT_REF?esc(RM_STUDENT_REF.name)+(RM_STUDENT_REF.school?' ('+esc(RM_STUDENT_REF.school)+')':''):'없음 — 카드 안의 "🔎 선택하기" 버튼이나 좌측 목록에서 먼저 선택해주세요')+'</div></div>'
+    +'<button onclick="RM_refreshPreSurvey()" style="background:none;border:1px solid #ddd;color:#555;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer">🔄 새로고침</button></div>'
+    +(isAdminRole?'<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택:</span><select id="rmSurveyOrgFilter" onchange="RM_onSurveyOrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:200px"><option value="">전체 기관</option>'+orgs.map(function(o){ return '<option value="'+esc(o.id)+'"'+(String(o.id)===String(filterVal)?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')+'</select></div>':'')
+    +(list.length?rows:'<div style="text-align:center;padding:48px;color:#888"><div style="font-size:40px;margin-bottom:12px">🎓</div><div style="font-size:15px;font-weight:700;margin-bottom:8px">아직 제출된 전략진단지가 없습니다</div><div style="font-size:12px;color:#aaa">설문조사함에서 "🔗 링크복사"로 이 기관의 링크를 공유해보세요</div></div>')
+    +'</div>';
+}
 function renderRoadmapInbox(){
   if(!ST._preSurveyLoaded){
     ST._preSurveyLoaded=true;
@@ -18939,6 +18996,7 @@ function renderRoadmapInbox(){
   const list=(isAdminRole && filterVal) ? allList.filter(function(x){ return String(x.orgId||'')===String(filterVal); }) : allList;
   const unreadCount=list.filter(_svIsUnread).length;
   const rows=list.map(function(p){
+    RM_normPre(p);
     const isNew=_svIsUnread(p);
     const expanded=!!(ST._surveyExpanded||{})[p.id];
     const orgLabel=isAdminRole ? ` <span style="color:#888;font-size:10.5px;font-weight:400">· ${esc(orgNameById[String(p.orgId)]||(p.orgId?'기관 미상':'기관 미지정'))}${RM_orgReassignSelectHtml('preSurveySubmissions','preSurveySubmissions',p)}</span>` : '';
@@ -18984,6 +19042,10 @@ function RM_toggleSurveyExpand(id){
   render();
 }
 function RM_surveyDetailHtml(p){
+  RM_normPre(p);
+  if(RM_isMsStrategy(p)){
+    return '<div style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:6px">'+[['학생 연락처',p.studentPhone],['학부모 연락처',p.parentPhone],['과목별 학기 성적',RM_surveyGridSummary(p).semGridText]].concat(RM_msStrategyRows(p)).map(function(r){ return '<div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #f1f5f9;font-size:12px"><div style="width:130px;flex-shrink:0;color:#888;font-weight:700">'+esc(r[0])+'</div><div style="color:#333;white-space:pre-wrap">'+(r[1]&&String(r[1]).trim()&&r[1]!=='- / -'?esc(r[1]):'—')+'</div></div>'; }).join('')+'</div>';
+  }
   function row(label,val){ return '<div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #f1f5f9;font-size:12px"><div style="width:130px;flex-shrink:0;color:#888;font-weight:700">'+esc(label)+'</div><div style="color:#333;white-space:pre-wrap">'+(val?esc(val):'—')+'</div></div>'; }
   // ★ 340: 설문지도 과목별(국/영/수/사/과) × 6학기 그리드로 바뀌어 p.grid로 들어온다.
   // 예전 제출분(semAll/semMain 2행 요약)은 그대로 폴백 표시한다.
@@ -19023,6 +19085,171 @@ function RM_surveyDetailHtml(p){
     +row('특이사항/메모', p.memo)
     +'</div>';
 }
+// ★ 2026-10-07 추가: 학원에서 별도로 만든 "중학생 1:1 입시·학습 전략진단지"(formType
+// BTOP_MS_STRATEGY_2026) 제출분을 사전조사 받은함에서 기존 사전조사서와 똑같이 쓰기 위한 변환.
+// 이 폼은 항목 이름이 달라(scoreGrid/strong/weak/targetHs …) 그대로는 받은함 카드·기본상담 반영이
+// 비어 보였다. 로드 직후 기존 사전조사서 필드(grid/strongSubj/weakSubj/track/dept1/targetHighSchool/
+// interestKeyword/memo/curiosities/schoolLevel)로 "없는 것만" 채워 주므로(원본 필드는 그대로 유지)
+// 카드·상세·리포트·기본상담 반영이 모두 기존 흐름대로 동작한다.
+function RM_isMsStrategy(p){ return !!(p && p.formType==='BTOP_MS_STRATEGY_2026'); }
+function RM_normPre(p){
+  if(!RM_isMsStrategy(p) || p._msNorm) return p;
+  p._msNorm=true;
+  if(!p.schoolLevel) p.schoolLevel='MS';
+  if(!p.grid && p.scoreGrid){
+    const g={};
+    Object.keys(p.scoreGrid).forEach(function(k){
+      g[k]=(p.scoreGrid[k]||[]).map(function(v){
+        v=String(v||'').trim(); if(!v) return '';
+        const m=v.match(/^([A-Ea-e])\s*[\/,\s]\s*(\d{1,3})/);   // "A/90" → 점수 우선
+        if(m) return m[2];
+        const m2=v.match(/^([A-Ea-e])\b/); if(m2) return m2[1].toUpperCase();
+        return v;
+      });
+    });
+    p.grid=g;
+  }
+  if(!p.strongSubj) p.strongSubj=p.strong||'';
+  if(!p.weakSubj) p.weakSubj=p.weak||'';
+  if(!p.targetHighSchool) p.targetHighSchool=p.targetHs||'';
+  const trackMap={'인문·사회':'인문·사회','상경·경제':'상경','자연·공학':'자연·공학','의약학·생명':'의약학','교육':'교육','예체능':'예체능'};
+  if(!p.track) p.track=trackMap[p.interestField]||'';
+  if(!p.dept1) p.dept1=p.career||'';
+  if(!p.interestKeyword) p.interestKeyword=[p.activity, (p.activityExp||[]).length?('활동경험: '+p.activityExp.join(', ')):''].filter(Boolean).join('\n');
+  if(!p.curiosities) p.curiosities=(p.consultGoal||[]).slice();
+  if(!p.memo) p.memo=[p.memo, p.parentMemo?('[학부모 고민] '+p.parentMemo):''].filter(Boolean).join('\n');
+  return p;
+}
+// 전략진단지 전용 상세 내용(학습체력·선행·학부모 걱정 등) — 카드 상세/리포트 공용
+function RM_msStrategyRows(p){
+  const J=function(a){ return (a||[]).join(', '); };
+  return [
+    ['상담 참여', p.participants],
+    ['영어 진도/수준', p.engLevel], ['수학 진도/수준', p.mathLevel], ['국어 학습', p.korLevel],
+    ['평일 / 주말 자기주도 학습', (p.weekdayStudy||'-')+' / '+(p.weekendStudy||'-')],
+    ['현재 학습 모습', J(p.studyState)],
+    ['관심 계열', p.interestField], ['희망 직업·학과', p.career],
+    ['관심 주제·활동', p.activity], ['활동 경험', J(p.activityExp)],
+    ['고교 선택 상태', p.hsDecision], ['생각 중인 고등학교', p.targetHs],
+    ['고교 선택 기준', J(p.hsFactor)],
+    ['학부모 걱정', J(p.parentConcern)], ['학부모 추가 고민', p.parentMemo],
+    ['상담 목표', J(p.consultGoal)], ['상담자가 알아둘 내용', p.memo&&p.memo!==p.parentMemo?p.memo:'']
+  ];
+}
+// 성적표(과목×학기) + 1~5등급 환산 평균. 중학교는 A~E·점수를 RM_msCellToGrade로 환산한다.
+function RM_msScoreTableHtml(p){
+  const subj=[['kor','국어'],['eng','영어'],['math','수학'],['soc','사회'],['sci','과학']];
+  const sem=['1-1','1-2','2-1','2-2','3-1','3-2'];
+  const raw=p.scoreGrid||p.grid||{};
+  let all=[];
+  const body=subj.map(function(sb){
+    const vals=(raw[sb[0]]||[]); const gr=[];
+    const tds=sem.map(function(_,i){
+      const v=String(vals[i]||'').trim(); const g=RM_msCellToGrade((p.grid&&p.grid[sb[0]]||[])[i]||v);
+      if(g!==null){ gr.push(g); all.push(g); }
+      return '<td style="border:1px solid #ddd;padding:6px;text-align:center;font-size:12px">'+(v?esc(v):'<span style="color:#ccc">-</span>')+'</td>';
+    }).join('');
+    const avg=gr.length?(gr.reduce(function(a,b){return a+b;},0)/gr.length):null;
+    let trend='';
+    if(gr.length>=2){ const d=gr[gr.length-1]-gr[0]; trend=d<0?'<span style="color:#059669"> ▲</span>':d>0?'<span style="color:#dc2626"> ▼</span>':'<span style="color:#888"> ―</span>'; }
+    return '<tr><td style="border:1px solid #ddd;padding:6px;font-weight:700;background:#fafaf8;font-size:12px;text-align:center">'+sb[1]+'</td>'+tds
+      +'<td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:800;font-size:12px">'+(avg===null?'-':avg.toFixed(2))+trend+'</td></tr>';
+  }).join('');
+  const total=all.length?(all.reduce(function(a,b){return a+b;},0)/all.length):null;
+  return '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="border:1px solid #ddd;padding:6px;background:#f1f5f9;font-size:11.5px">과목</th>'
+    +sem.map(function(x){ return '<th style="border:1px solid #ddd;padding:6px;background:#f1f5f9;font-size:11.5px">'+x+'</th>'; }).join('')
+    +'<th style="border:1px solid #ddd;padding:6px;background:#fef3c7;font-size:11.5px">평균(1~5등급 환산)</th></tr></thead><tbody>'+body+'</tbody></table>'
+    +'<div style="font-size:11px;color:#888;margin-top:5px">전체 평균(환산): <b style="color:#1a1a2e">'+(total===null?'-':total.toFixed(2)+'등급')+'</b> · A~E·점수를 1~5등급으로 환산한 참고값이며 ▲ 향상 / ▼ 하락은 첫 학기 대비 마지막 입력 학기 기준입니다.</div>';
+}
+// 입력 내용에서 규칙으로 뽑은 "상담에서 먼저 짚을 점" (AI 아님 — 체크한 항목·학습시간·성적 변화 기준)
+function RM_msFocusPoints(p){
+  const pts=[]; const has=function(a,t){ return (a||[]).indexOf(t)>=0; };
+  const gfocus={'중1':'성적보다 학습 습관과 과목별 기초체력 확인','중2':'성적·선행·진로를 함께 점검하고 중3까지 만들 것을 정하기','중3':'고교 선택 · 예비고1 선행 · 첫 내신 대비를 연결해 우선순위 정하기'};
+  if(gfocus[p.grade]) pts.push(p.grade+' 상담 초점: '+gfocus[p.grade]);
+  const wk=String(p.weekdayStudy||'');
+  if(/미만|1~2시간/.test(wk)) pts.push('평일 자기주도 학습시간이 짧음('+wk+') — 학습 루틴·시간 확보부터 점검');
+  if(has(p.studyState,'계획은 세우지만 실천이 흔들림')) pts.push('계획은 세우지만 실천이 흔들림 — 주간 실행 점검 방식 제안');
+  if(has(p.studyState,'과목별 편차가 큼')||(p.weakSubj)) pts.push('과목별 편차'+(p.weakSubj?' (불안 과목: '+p.weakSubj+')':'')+' — 과목별 학습 우선순위 정리');
+  if(has(p.studyState,'선행은 했지만 이해가 불안')||has(p.parentConcern,'선행은 했지만 실력이 불안')) pts.push('선행 진도 대비 이해도가 불안 — 선행 범위보다 이해 점검(진단) 우선');
+  if(has(p.parentConcern,'수학/영어 선행이 부족할까 걱정')) pts.push('수학·영어 선행 부족 우려 — 현재 수준 진단 후 예비고1 로드맵 제시');
+  if(has(p.parentConcern,'고등학교 가서 내신 하락 우려')) pts.push('고교 진학 후 내신 하락 우려 — 첫 내신 대비 계획 포함');
+  if(has(p.parentConcern,'학생부/탐구 준비가 부족')) pts.push('학생부·탐구 준비 우려 — 관심 분야 기반 탐구/활동 설계');
+  if(p.hsDecision==='아직 전혀 정하지 못함') pts.push('고교 선택 미정 — 일반고/특목·자사고 유형별 비교부터');
+  else if(p.hsDecision) pts.push('고교 선택 상태: '+p.hsDecision);
+  const sem=['1-1','1-2','2-1','2-2','3-1','3-2'];
+  const drop=[]; [['kor','국어'],['eng','영어'],['math','수학'],['soc','사회'],['sci','과학']].forEach(function(sb){
+    const gr=((p.grid||{})[sb[0]]||[]).map(RM_msCellToGrade).filter(function(x){return x!==null;});
+    if(gr.length>=2 && gr[gr.length-1]>gr[0]) drop.push(sb[1]);
+  });
+  if(drop.length) pts.push('성적이 하락한 과목: '+drop.join(', ')+' — 원인 확인(범위·학습법·시험유형)');
+  return pts;
+}
+function RM_msStrategyReportBody(p){
+  const orgs=ST.currentUser?.role==='admin' ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
+  const orgName=(orgs.find(function(o){ return String(o.id)===String(p.orgId); })||{}).name;
+  const H=function(t){ return '<div style="font-weight:800;font-size:13px;color:#8B3A3A;border-bottom:1px solid #ddd;padding-bottom:4px;margin:18px 0 8px">'+t+'</div>'; };
+  const R=function(a){ return a.filter(function(r){ return r[1]&&String(r[1]).trim()&&r[1]!=='-'; }).map(function(r){
+    return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:150px;background:#fafaf8;font-size:12px;vertical-align:top">'+esc(r[0])+'</td><td style="border:1px solid #ddd;padding:8px;font-size:12.5px;white-space:pre-wrap">'+esc(r[1])+'</td></tr>'; }).join(''); };
+  const rows=RM_msStrategyRows(p);
+  const pick=function(from,to){ return rows.filter(function(r){ return from.indexOf(r[0])>=0; }); };
+  const chip=function(a,bg,fg){ return (a||[]).length?(a||[]).map(function(t){ return '<span style="display:inline-block;background:'+bg+';color:'+fg+';border-radius:12px;padding:3px 10px;font-size:11.5px;font-weight:700;margin:2px 3px 2px 0">'+esc(t)+'</span>'; }).join(''):'<span style="color:#aaa;font-size:12px">선택 없음</span>'; };
+  const pts=RM_msFocusPoints(p);
+  return '<div style="text-align:center;margin-bottom:14px">'
+    +'<div style="font-size:11px;color:#888;letter-spacing:1px">중학생 1:1 입시·학습 전략진단 · 상담용 리포트</div>'
+    +'<div style="font-size:21px;font-weight:900;color:#1a1a2e;margin-top:4px">'+esc(p.name||'이름 미입력')+' <span style="font-size:14px;color:#555;font-weight:600">('+esc(p.grade||'')+')</span>'+(orgName?' <span style="font-size:13px;color:#888;font-weight:500">'+esc(orgName)+'</span>':'')+'</div>'
+    +'<div style="font-size:11px;color:#aaa;margin-top:2px">'+esc(p.school||'')+' · 제출일시 '+esc((p.submittedAt||'').slice(0,16).replace('T',' '))+'</div></div>'
+    +'<div style="background:#fffaf7;border:1px solid #ead5c6;border-radius:10px;padding:12px 15px;margin-bottom:6px"><div style="font-weight:800;font-size:12.5px;color:#7f3135;margin-bottom:6px">🎯 상담에서 먼저 짚을 점 <span style="font-weight:400;color:#999;font-size:10.5px">(입력 내용 기준 자동 정리 · 참고용)</span></div>'
+    +(pts.length?'<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.75">'+pts.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>':'<div style="font-size:12px;color:#aaa">입력된 내용이 적어 자동 정리할 항목이 없습니다.</div>')+'</div>'
+    +H('1. 학생 기본정보')
+    +'<table style="width:100%;border-collapse:collapse">'+R([['학생 연락처',p.studentPhone],['학부모 연락처',p.parentPhone]].concat(pick(['상담 참여'])))+'</table>'
+    +H('2. 학교 성적 현황')+RM_msScoreTableHtml(p)
+    +'<table style="width:100%;border-collapse:collapse;margin-top:10px">'+R([['자신 있는 과목',p.strongSubj],['불안한 과목',p.weakSubj]])+'</table>'
+    +H('3. 현재 학습 체력 · 선행 정도')
+    +'<table style="width:100%;border-collapse:collapse">'+R(pick(['영어 진도/수준','수학 진도/수준','국어 학습','평일 / 주말 자기주도 학습']))+'</table>'
+    +'<div style="margin-top:8px"><span style="font-size:11.5px;color:#888;font-weight:700">현재 학습 모습</span><br>'+chip(p.studyState,'#eef2f7','#17243d')+'</div>'
+    +H('4. 진로 · 관심 분야 · 활동 경험')
+    +'<table style="width:100%;border-collapse:collapse">'+R(pick(['관심 계열','희망 직업·학과','관심 주제·활동']))+'</table>'
+    +'<div style="margin-top:8px"><span style="font-size:11.5px;color:#888;font-weight:700">활동 경험</span><br>'+chip(p.activityExp,'#eef2f7','#17243d')+'</div>'
+    +H('5. 고등학교 선택과 준비')
+    +'<table style="width:100%;border-collapse:collapse">'+R(pick(['고교 선택 상태','생각 중인 고등학교']))+'</table>'
+    +'<div style="margin-top:8px"><span style="font-size:11.5px;color:#888;font-weight:700">고교 선택에서 중요하게 보는 것</span><br>'+chip(p.hsFactor,'#eef2f7','#17243d')+'</div>'
+    +H('6. 학부모님이 가장 걱정하는 부분')
+    +'<div>'+chip(p.parentConcern,'#f6eaea','#7f3135')+'</div>'
+    +(p.parentMemo?'<div style="margin-top:8px;border:1px solid #ddd;border-radius:8px;padding:10px 12px;font-size:12.5px;white-space:pre-wrap"><b style="font-size:11.5px;color:#888">추가 고민</b><br>'+esc(p.parentMemo)+'</div>':'')
+    +H('7. 이번 상담에서 얻고 싶은 것')
+    +'<div>'+chip(p.consultGoal,'#e8f3ec','#315f4a')+'</div>'
+    +(p.memo&&p.memo!==p.parentMemo&&!/^\[학부모 고민\]/.test(p.memo)?'<div style="margin-top:8px;border:1px solid #ddd;border-radius:8px;padding:10px 12px;font-size:12.5px;white-space:pre-wrap"><b style="font-size:11.5px;color:#888">상담자가 미리 알아두면 좋은 내용</b><br>'+esc(p.memo)+'</div>':'');
+}
+// 새 설문 만들기로 받은 응답 1건을 학생별 리포트로 인쇄/PDF
+function RM_customSubmissionReportHtml(p){
+  const survey=(ST.customSurveys||[]).find(function(x){ return String(x.id)===String(p.surveyId); })||{};
+  const rows=(p.answers||[]).map(function(a){
+    return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:34%;background:#fafaf8;font-size:12px;vertical-align:top">'+esc(a.label||'')+'</td><td style="border:1px solid #ddd;padding:8px;font-size:12.5px;white-space:pre-wrap">'+(String(a.value||'').trim()?esc(a.value):'<span style="color:#bbb">—</span>')+'</td></tr>'; }).join('');
+  return '<div style="text-align:center;margin-bottom:16px"><div style="font-size:11px;color:#888;letter-spacing:1px">'+esc(survey.title||'설문')+' · 개인 리포트</div>'
+    +'<div style="font-size:20px;font-weight:900;color:#1a1a2e;margin-top:4px">'+esc(p.name||'이름 미입력')+'</div>'
+    +'<div style="font-size:11px;color:#aaa;margin-top:2px">'+(p.phone?esc(p.phone)+' · ':'')+'제출일시 '+esc((p.submittedAt||'').slice(0,16).replace('T',' '))+'</div></div>'
+    +'<table style="width:100%;border-collapse:collapse">'+rows+'</table>';
+}
+function RM_printCustomAll(surveyId){
+  const survey=(ST.customSurveys||[]).find(function(x){ return String(x.id)===String(surveyId); })||{};
+  const list=(ST.customSurveySubmissions||[]).filter(function(x){ return String(x.surveyId)===String(surveyId); }).sort(function(a,b){ return (a.submittedAt||'').localeCompare(b.submittedAt||''); });
+  if(!list.length){ alert('아직 제출된 응답이 없어 출력할 리포트가 없습니다.'); return; }
+  const w=window.open('','_blank','width=900,height=1000');
+  if(!w){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+  const title=(survey.title||'설문')+'_학생별리포트_'+new Date().toISOString().slice(0,10).replace(/-/g,'');
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(title)+'</title>'+RM_PRINT_STYLE_TAG+'</head><body>'+list.map(function(p,i){ return '<div'+(i<list.length-1?' style="page-break-after:always"':'')+'>'+RM_customSubmissionReportHtml(p)+'</div>'; }).join('')+'</body></html>');
+  w.document.close(); setTimeout(function(){ w.focus(); w.print(); },300);
+}
+function RM_printCustomSubmission(id){
+  const p=(ST.customSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  if(!p) return;
+  const survey=(ST.customSurveys||[]).find(function(x){ return String(x.id)===String(p.surveyId); })||{};
+  const w=window.open('','_blank','width=900,height=1000');
+  if(!w){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+  const title=(p.name||'학생')+'_'+(survey.title||'설문')+'_리포트_'+new Date().toISOString().slice(0,10).replace(/-/g,'');
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(title)+'</title>'+RM_PRINT_STYLE_TAG+'</head><body>'+RM_customSubmissionReportHtml(p)+'</body></html>');
+  w.document.close(); setTimeout(function(){ w.focus(); w.print(); },300);
+}
 // ★ 2026-09-08(360) 추가: 사전조사 받은함도 챌린저FINAL70처럼 별도 "리포트" 화면(인쇄/PDF +
 // 전달사항 저장)을 지원한다. 학기성적/모의고사 요약 로직은 RM_surveyDetailHtml과
 // 동일해야 해서 공용 헬퍼로 뽑아 둘 다 재사용한다.
@@ -19045,7 +19272,7 @@ function RM_surveyGridSummary(p){
   return {semGridText:semGridText, mockText:mockText};
 }
 function RM_saveSurveyNote(id){
-  const p=(ST.preSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  const p=RM_findPre(id);
   const ta=document.getElementById('surveyNoteArea');
   if(!p || !ta) return;
   p.counselorNote=ta.value;
@@ -19057,7 +19284,7 @@ function RM_saveSurveyNote(id){
   });
 }
 function RM_printSurveyReport(id){
-  const p=(ST.preSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  const p=RM_findPre(id);
   if(!p) return;
   const noteEl=document.getElementById('surveyNoteArea');
   const noteText=noteEl?noteEl.value:(p.counselorNote||'');
@@ -19065,7 +19292,7 @@ function RM_printSurveyReport(id){
   if(!reportEl) return;
   const printWin=window.open('','_blank','width=900,height=1000');
   if(!printWin){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
-  const printTitle=(p.name||'학생')+'_사전조사리포트_'+new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const printTitle=(p.name||'학생')+(RM_isMsStrategy(p)?'_전략진단리포트_':'_사전조사리포트_')+new Date().toISOString().slice(0,10).replace(/-/g,'');
   printWin.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+esc(printTitle)+'</title>'
     +RM_PRINT_STYLE_TAG
     +'</head><body>'+reportEl.innerHTML
@@ -19076,16 +19303,17 @@ function RM_printSurveyReport(id){
   setTimeout(function(){ printWin.focus(); printWin.print(); }, 300);
 }
 function RM_surveyReportHtml(id){
-  const p=(ST.preSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  const p=RM_findPre(id);
   if(!p){
     return `<div style="max-width:960px;margin:0 auto;padding:48px;text-align:center;color:#888">해당 제출 내역을 찾을 수 없습니다.<br><button onclick="ST._surveyView='list';render()" style="margin-top:14px;background:#0f2540;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer">← 목록으로</button></div>`;
   }
   const isAdminRole=ST.currentUser?.role==='admin';
   const orgs=isAdminRole ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
   const orgName=(orgs.find(function(o){ return String(o.id)===String(p.orgId); })||{}).name;
+  RM_normPre(p);
   const g=RM_surveyGridSummary(p);
   function row(label,val){ return '<tr><td style="border:1px solid #ddd;padding:8px;font-weight:700;width:150px;background:#fafaf8;font-size:12px">'+esc(label)+'</td><td style="border:1px solid #ddd;padding:8px;font-size:12.5px;white-space:pre-wrap">'+(val?esc(val):'—')+'</td></tr>'; }
-  const html=`<div id="surveyReportPrintArea">
+  const html=RM_isMsStrategy(p) ? '<div id="surveyReportPrintArea">'+RM_msStrategyReportBody(p)+'</div>' : `<div id="surveyReportPrintArea">
     <div style="text-align:center;margin-bottom:18px">
       <div style="font-size:11px;color:#888;letter-spacing:1px">상담 사전 설문 · 개인 리포트</div>
       <div style="font-size:20px;font-weight:900;color:#1a1a2e;margin-top:4px">${esc(p.name||'이름 미입력')}${orgName?' <span style="font-size:13px;color:#888;font-weight:500">('+esc(orgName)+')</span>':''}</div>
@@ -19396,7 +19624,7 @@ const RM_SEDUK5_TO_LEVEL={'매우우수':'veryhigh','매우 우수':'veryhigh','
 const RM_CLUBEVAL4_TO_KEY={'매우 만족':'strong','만족':'strong','보통':'mid','아쉬움':'watch'};
 const RM_HOPE_LABEL_TO_KEY={'학생부종합전형':'jonghap','학생부교과전형':'gyogwa','논술전형':'nonsul','정시(수능)':'jeongsi'};
 function RM_applySurveyToBasic(id){
-  const p=(ST.preSurveySubmissions||[]).find(function(x){ return String(x.id)===String(id); });
+  const p=RM_findPre(id);
   if(!p) return;
   const s=RM_STUDENT_REF;
   if(!s){ alert('먼저 좌측 목록에서 반영할 학생을 선택해주세요.'); return; }
@@ -19418,6 +19646,7 @@ function RM_applySurveyToBasic(id){
 // 점·자유메모)이 있다 — 자동 매핑이 애매하거나 안 되는 내용은 모두 "특이사항" 칸에
 // 원문 그대로 정리해 넣어 상담원이 직접 확인·판단하게 한다.
 function RM_applySurveyDataToForm(p){
+  RM_normPre(p);
   function setv(id,val){ const el=document.getElementById(id); if(el && val!==undefined && val!==null && val!=='') el.value=val; }
   function setc(id,val){ const el=document.getElementById(id); if(el) el.checked=!!val; }
   // ★ 340: 학교급이 이제 MS/HS5 두 가지뿐이므로, 설문이 중학생이면 MS, 고등학생이면
@@ -19484,6 +19713,7 @@ function RM_applySurveyDataToForm(p){
   if(p.interviewStatus && p.interviewStatus!=='기본 대비 필요') noteParts.push('면접 준비 현황(설문): '+p.interviewStatus);
   if(Array.isArray(p.curiosities) && p.curiosities.length) noteParts.push('가장 궁금한 점: '+p.curiosities.join(', '));
   if(p.memo) noteParts.push('사전조사 메모: '+p.memo);
+  if(RM_isMsStrategy(p)){ RM_msStrategyRows(p).forEach(function(r){ if(['영어 진도/수준','수학 진도/수준','국어 학습','평일 / 주말 자기주도 학습','현재 학습 모습','고교 선택 상태','학부모 걱정','학부모 추가 고민'].indexOf(r[0])>=0 && r[1] && r[1]!=='- / -') noteParts.push(r[0]+'(전략진단지): '+r[1]); }); }
   return noteParts.length ? noteParts.join('\n') : '';
 }
 function RM_toggleRegionCheck(el){
@@ -19641,12 +19871,41 @@ function RM_surveyHubBack(){
   ST._surveyHubView = null;
   render();
 }
+// ★ 2026-10-07 추가: 기관별 "기본 설문" 사용 권한. 최종관리자가 기관 관리(기관 수정)에서
+// 사전조사서 / APEX 사전조사서(초5·6·중1) / 챌린저 FINAL70 을 기관마다 켜고 끌 수 있다.
+// org.surveyPerms = {presurvey,apexlow,cf70}. 값이 없으면 presurvey·apexlow는 허용(기존 동작 유지),
+// cf70은 기존대로 최종관리자 전용(기관에서 켠 경우에만 기관관리자·선생님에게 노출).
+const RM_SV_DEFS=[{key:'presurvey',label:'📋 사전조사서',def:true},{key:'msstrategy',label:'🎓 중학생 전략진단지',def:true},{key:'apexlow',label:'🏆 APEX 사전조사서 (초5·6·중1)',def:true},{key:'cf70',label:'🏆 챌린저 FINAL70',def:true}];
+function RM_orgSvOk(org,key){
+  const sp=(org&&org.surveyPerms)||{}; const d=RM_SV_DEFS.find(function(x){return x.key===key;});
+  return sp[key]===undefined ? !!(d&&d.def) : !!sp[key];
+}
+function RM_surveyAllowed(key, orgId){
+  const isAdmin=ST.currentUser?.role==='admin';
+  if(isAdmin && !orgId) return true;                        // 기관을 고르지 않은 최종관리자 화면은 전부 표시
+  const id=orgId || ST.currentOrg?.id || ST.currentUser?.orgId;
+  let org=null; try{ org=(JSON.parse(localStorage.getItem(SK_ORGS)||'[]')).find(function(o){ return String(o.id)===String(id); }); }catch(e){}
+  if(!org) return isAdmin || key!=='cf70';
+  if(isAdmin) return true;                                   // 최종관리자는 화면 접근 유지(링크·기관 사용자 노출만 기관 권한 적용)
+  if(key==='cf70') return !!(org.surveyPerms && org.surveyPerms.cf70===true); // 기관 사용자는 명시 허용된 경우에만 CF70 노출(기존 동작 유지)
+  return RM_orgSvOk(org,key);
+}
+function RM_svLinkGuard(orgId,key){
+  let org=null; try{ org=(JSON.parse(localStorage.getItem(SK_ORGS)||'[]')).find(function(o){ return String(o.id)===String(orgId); }); }catch(e){}
+  const ok = org ? RM_orgSvOk(org,key) : true;
+  if(!ok) alert('이 기관은 해당 설문 사용이 허용되지 않았습니다.\n기관 관리 > 수정 > "사용 가능한 설문"에서 허용해주세요.');
+  return ok;
+}
 function _rmSurveyHubLinkButtonsHtml(kind, orgId, isAdminRole){
   if(!orgId){
     return '<div style="font-size:11px;color:#aaa;margin-top:8px">'+(isAdminRole?'↑ 기관을 먼저 선택해주세요':'기관 정보를 확인할 수 없습니다')+'</div>';
   }
-  const copyFn = kind==='survey' ? 'copyOrgSurveyLink' : kind==='apexlow' ? 'copyOrgApexLowLink' : 'copyOrgCf70Link';
-  const dlFn   = kind==='survey' ? 'downloadOrgSurveyRedirectPage' : kind==='apexlow' ? 'downloadOrgApexLowRedirectPage' : 'downloadOrgCf70RedirectPage';
+  const _k = kind==='survey' ? 'presurvey' : kind;
+  { let _o=null; try{ _o=(JSON.parse(localStorage.getItem(SK_ORGS)||'[]')).find(function(o){ return String(o.id)===String(orgId); }); }catch(e){}
+    const _ok=_o ? RM_orgSvOk(_o,_k) : true;
+    if(!_ok) return '<div style="font-size:11px;color:#b91c1c;margin-top:8px">🚫 이 기관은 사용 안 함 (기관 관리에서 허용)</div>'; }
+  const copyFn = kind==='survey' ? 'copyOrgSurveyLink' : kind==='apexlow' ? 'copyOrgApexLowLink' : kind==='msstrategy' ? 'copyOrgMsLink' : 'copyOrgCf70Link';
+  const dlFn   = kind==='survey' ? 'downloadOrgSurveyRedirectPage' : kind==='apexlow' ? 'downloadOrgApexLowRedirectPage' : kind==='msstrategy' ? 'downloadOrgMsRedirectPage' : 'downloadOrgCf70RedirectPage';
   const orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
   const orgName=(orgs.find(function(o){ return String(o.id)===String(orgId); })||{}).name||'';
   return '<div style="display:flex;gap:6px;margin-top:8px">'
@@ -19744,6 +20003,7 @@ function RM_customSurveyRespondentTableHtml(survey, list){
     }).join('');
     return `<tr>
       <td style="padding:6px 8px;border:1px solid #eef0f6;font-size:11.5px;color:#888;text-align:center">${i+1}</td>
+      <td style="padding:4px 6px;border:1px solid #eef0f6;text-align:center;white-space:nowrap"><button type="button" onclick="RM_printCustomSubmission('${p.id}')" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">📄 리포트</button></td>
       <td style="padding:6px 8px;border:1px solid #eef0f6;font-size:12px;font-weight:700;white-space:nowrap">${esc(p.name||'이름 미입력')}</td>
       <td style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#999;white-space:nowrap">${esc((p.submittedAt||'').slice(0,16).replace('T',' '))}</td>
       ${cells}
@@ -19752,11 +20012,12 @@ function RM_customSurveyRespondentTableHtml(survey, list){
   // ★ 430(18차): 응답이 0건이어도(아직 아무도 제출 안 한 새 설문) 표 자체는 항상 보여주고,
   // 본문에만 안내 문구를 표시한다 — 예전엔 총 응답 0건이면 표 섹션 자체가 통째로 사라져서
   // "표가 아예 안 만들어진 것"처럼 보였다.
-  const emptyRow=`<tr><td colspan="${3+qs.length}" style="padding:20px 8px;text-align:center;color:#aaa;font-size:12px;border:1px solid #eef0f6">아직 제출된 응답이 없습니다</td></tr>`;
+  const emptyRow=`<tr><td colspan="${4+qs.length}" style="padding:20px 8px;text-align:center;color:#aaa;font-size:12px;border:1px solid #eef0f6">아직 제출된 응답이 없습니다</td></tr>`;
   return `<div style="overflow-x:auto;border:1px solid #eef0f6;border-radius:10px">
-      <table style="border-collapse:collapse;width:100%;min-width:${480+qs.length*140}px">
+      <table style="border-collapse:collapse;width:100%;min-width:${560+qs.length*140}px">
         <thead><tr style="background:#f7f8fc">
           <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666">#</th>
+          <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#4338ca;white-space:nowrap">학생별 리포트</th>
           <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666">이름</th>
           <th style="padding:6px 8px;border:1px solid #eef0f6;font-size:11px;color:#666">제출일시</th>
           ${theadCols}
@@ -19780,10 +20041,12 @@ function RM_customSurveyRespondentBlockHtml(survey, list){
         <div style="font-size:11px;color:#888">(제출 순서) · 총 ${list.length}건</div>
       </div>
       <div style="display:flex;gap:6px">
+        <button type="button" onclick="RM_printCustomAll('${survey.id}')" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">📄 학생별 리포트 전체 인쇄/PDF</button>
         <button type="button" onclick="RM_printSurveyRespondents('${survey.id}')" style="background:#fff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">🖨 인쇄/PDF</button>
         <button type="button" onclick="RM_exportSurveyRespondentsExcel('${survey.id}')" style="background:#fff;color:#16a34a;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer">📊 엑셀 다운로드</button>
       </div>
     </div>
+    <div style="font-size:11px;color:#64748b;margin:-4px 0 8px">💡 응답이 들어오면 아래 표의 각 행과 "개별 응답" 카드에 <b>📄 리포트</b> 버튼이 생깁니다. 학생 1명씩 리포트(질문·답 표)로 인쇄/PDF 저장할 수 있고, 위 "학생별 리포트 전체 인쇄/PDF"는 모든 학생을 한 번에(학생마다 새 페이지) 출력합니다.</div>
     ${RM_customSurveyRespondentTableHtml(survey, list)}
   </div>`;
 }
@@ -19989,6 +20252,7 @@ function RM_customSurveySubmissionsHtml(surveyId){
       </div>
       ${expanded?RM_customSurveyDetailHtml(p):''}
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:${expanded?'12px':'8px'}">
+        <button onclick="event.stopPropagation();RM_printCustomSubmission('${p.id}')" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">📄 리포트 인쇄/PDF</button>
         <button onclick="event.stopPropagation();RM_markCustomSurveyReviewed('${p.id}')" style="background:${isNew?'#eef1ff':'#f4f6fb'};color:${isNew?'#3b5bdb':'#888'};border:1px solid ${isNew?'#c5cae9':'#ddd'};border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">${isNew?'✓ 확인함으로 표시':'○ 다시 새 항목으로'}</button>
         <button onclick="event.stopPropagation();RM_deleteCustomSurveySubmission('${p.id}')" style="background:#fff;color:#dc2626;border:1px solid #fecaca;border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer">삭제</button>
       </div>
@@ -20013,9 +20277,13 @@ function renderRoadmapSurveyHub(){
     ST._customSurveysHubLoaded=true;
     Promise.all([_ensureCustomSurveysLoaded(), _ensureCustomSurveySubmissionsLoaded()]).then(function(){ render(); });
   }
-  const view=ST._surveyHubView||null;
+  let view=ST._surveyHubView||null;
+  if(view==='presurvey'||view==='apexlow'||view==='cf70'||view==='msstrategy'){ if(!(ST.currentUser?.role==='admin') && !RM_surveyAllowed(view, _rmSurveyHubMyOrgId())){ ST._surveyHubView=null; view=null; } }
   if(view==='presurvey'){
     return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+renderRoadmapInbox();
+  }
+  if(view==='msstrategy'){
+    return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+renderRoadmapMsInbox();
   }
   if(view==='apexlow'){
     return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+renderApexLowInbox();
@@ -20035,6 +20303,8 @@ function renderRoadmapSurveyHub(){
   const newApexLowCount=(ST.apexLowSubs||[]).filter(_svIsUnread).length;
   const apexLowTotal=(ST.apexLowSubs||[]).length;
   const surveyTotal=(ST.preSurveySubmissions||[]).length;
+  const newMsCount=(ST.msStrategySubs||[]).filter(_svIsUnread).length;
+  const msTotal=(ST.msStrategySubs||[]).length;
   const cf70Total=(ST.challengerF70Submissions||[]).length;
   // ★ 2026-09-16(430 11차) 수정: 커스텀 설문 카드 목록은 "링크 생성용 기관 선택"과는 별개로
   // 봐야 한다 — 최종관리자는 기관을 선택하지 않아도(또는 무엇을 선택했든) 항상 전체 기관의
@@ -20063,7 +20333,7 @@ function renderRoadmapSurveyHub(){
     </div>
     ${isAdminRole?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#777;font-weight:600">🏫 기관 선택 (링크 생성용):</span><select id="rmSurveyHubOrgFilter" onchange="RM_onSurveyHubOrgFilterChange()" style="font-size:12.5px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;min-width:160px">${RM_surveyHubOrgFilterOptionsHtml()}</select></div>`:''}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
-      <div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('presurvey')">
+      ${RM_surveyAllowed('presurvey', isAdminRole?'':orgId)?`<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('presurvey')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="font-size:14px;font-weight:800;color:#1a1a2e">📋 사전조사서</div>
           ${newSurveyCount?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newSurveyCount+'</span>':''}
@@ -20071,8 +20341,17 @@ function renderRoadmapSurveyHub(){
         <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${surveyTotal}건 제출됨 · 기본상담·상담리포트와 연동</div>
         <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#3b5bdb;font-weight:700">결과 확인 →</span></div>
         ${_rmSurveyHubLinkButtonsHtml('survey', orgId, isAdminRole)}
-      </div>
-      <div style="background:#fff;border:1.5px solid #c5cae9;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('apexlow')">
+      </div>`:''}
+      ${RM_surveyAllowed('msstrategy', isAdminRole?'':orgId)?`<div style="background:#fff;border:1.5px solid #ead5c6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('msstrategy')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-size:14px;font-weight:800;color:#7f3135">🎓 중학생 전략진단지 <span style="font-size:10.5px;color:#b9787b;font-weight:700">중1~3</span></div>
+          ${newMsCount?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newMsCount+'</span>':''}
+        </div>
+        <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${msTotal}건 제출됨 · 성적표·학습체력·고교선택 · 상담용 리포트 · 기본상담 연동</div>
+        <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#7f3135;font-weight:700">결과 확인 →</span></div>
+        ${_rmSurveyHubLinkButtonsHtml('msstrategy', orgId, isAdminRole)}
+      </div>`:''}
+      ${RM_surveyAllowed('apexlow', isAdminRole?'':orgId)?`<div style="background:#fff;border:1.5px solid #c5cae9;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('apexlow')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="font-size:14px;font-weight:800;color:#1A237E">🏆 APEX 사전조사서 <span style="font-size:10.5px;color:#7986cb;font-weight:700">초5·6·중1</span></div>
           ${newApexLowCount?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newApexLowCount+'</span>':''}
@@ -20080,8 +20359,8 @@ function renderRoadmapSurveyHub(){
         <div style="font-size:11.5px;color:#888;margin-top:6px">총 ${apexLowTotal}건 제출됨 · 성적이 없는 초5·6·중1 전용 · APEX 진단에 불러오기</div>
         <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#1A237E;font-weight:700">결과 확인 →</span></div>
         ${_rmSurveyHubLinkButtonsHtml('apexlow', orgId, isAdminRole)}
-      </div>
-      ${isAdminRole?`<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('cf70')">
+      </div>`:''}
+      ${(isAdminRole||RM_surveyAllowed('cf70',orgId))?`<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen('cf70')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="font-size:14px;font-weight:800;color:#1a1a2e">🏆 챌린저 FINAL70</div>
           ${newCf70Count?'<span style="background:#3b5bdb;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">미확인 '+newCf70Count+'</span>':''}
@@ -20105,7 +20384,7 @@ function renderRoadmapSubNav(active){
   // ★ CF70 카드는 isAdminRole(최종관리자)에게만 보이므로, 비관리자(기관관리자·선생님)에게는
   // 클릭할 카드가 없는 CF70 미확인 건수를 뱃지에 섞지 않는다(renderRoadmapSurveyHub와 동일 기준).
   const newApexLowN=(ST.apexLowSubs||[]).filter(_svIsUnread).length;
-  const newSurveyHubCount=(isAdminRole ? (newSurveyCount+newCf70Count) : newSurveyCount)+newApexLowN;
+  const newSurveyHubCount=(isAdminRole ? (newSurveyCount+newCf70Count) : ((RM_surveyAllowed('presurvey')?newSurveyCount:0)+(RM_surveyAllowed('cf70')?newCf70Count:0)))+((isAdminRole||RM_surveyAllowed('apexlow'))?newApexLowN:0)+((isAdminRole||RM_surveyAllowed('msstrategy'))?(ST.msStrategySubs||[]).filter(_svIsUnread).length:0);
   const tabs=[
     {key:'basic',   icon:'📝', label:'기본상담'},
     {key:'consult', icon:'📁', label:'상담리포트'},
@@ -20393,8 +20672,13 @@ function copyOrgLinkGeneric(orgId, fileName, kindLabel){
     prompt('아래 링크를 복사해서 사용해주세요:', url);
   }
 }
-function copyOrgSurveyLink(orgId){ copyOrgLinkGeneric(orgId, '사전상담설문지_웹폼.html', '사전조사 웹폼'); }
-function copyOrgCf70Link(orgId){ copyOrgLinkGeneric(orgId, '챌린저_FINAL70_설문.html', '챌린저 FINAL70 설문'); }
+function copyOrgSurveyLink(orgId){ if(!RM_svLinkGuard(orgId,'presurvey')) return; copyOrgLinkGeneric(orgId, '사전상담설문지_웹폼.html', '사전조사 웹폼'); }
+function copyOrgMsLink(orgId){ if(!RM_svLinkGuard(orgId,'msstrategy')) return; copyOrgLinkGeneric(orgId, '중학생_전략진단지_웹폼.html', '중학생 전략진단지'); }
+function downloadOrgMsRedirectPage(orgId, orgName){
+  if(!RM_svLinkGuard(orgId,'msstrategy')) return;
+  downloadOrgRedirectPageGeneric(orgId, orgName, '중학생_전략진단지_웹폼.html', '중학생 전략진단지', '전략진단지');
+}
+function copyOrgCf70Link(orgId){ if(!RM_svLinkGuard(orgId,'cf70')) return; copyOrgLinkGeneric(orgId, '챌린저_FINAL70_설문.html', '챌린저 FINAL70 설문'); }
 // ★ 2026-09-07(354) 추가: 카카오톡 등 메신저 링크 미리보기는 og:title 같은 정적 meta
 // 태그만 읽고 자바스크립트는 실행하지 않아서, "?org=" 쿼리로 기관을 구분하는 방식으로는
 // 미리보기에 기관명을 표시할 방법이 없다(정적 호스팅의 근본적 한계). 대신 기관별로 아주
@@ -20428,9 +20712,11 @@ function downloadOrgRedirectPageGeneric(orgId, orgName, fileName, docTitle, down
   alert('"'+downloadPrefix+'_'+safeName+'.html" 파일을 다운로드했습니다.\n\n1) 이 파일을 GitHub 저장소에 다른 파일들과 같은 방식(Add file → Upload files)으로 올려주세요.\n2) 그 다음 이 기관에는 방금 만든 링크복사 대신, 지금 올린 이 파일의 주소를 공유해주세요.\n(카카오톡 등으로 공유하면 이제 미리보기 제목에 "'+orgName+'"이 표시됩니다)');
 }
 function downloadOrgSurveyRedirectPage(orgId, orgName){
+  if(!RM_svLinkGuard(orgId,'presurvey')) return;
   downloadOrgRedirectPageGeneric(orgId, orgName, '사전상담설문지_웹폼.html', '상담 사전 설문지', '사전조사');
 }
 function downloadOrgCf70RedirectPage(orgId, orgName){
+  if(!RM_svLinkGuard(orgId,'cf70')) return;
   downloadOrgRedirectPageGeneric(orgId, orgName, '챌린저_FINAL70_설문.html', 'CHALLENGER FINAL 70 사전진단', '챌린저FINAL70');
 }
 function renderOrgMgmt(){
@@ -20463,17 +20749,28 @@ function renderOrgMgmt(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;padding:12px;background:#fafbfc;border-radius:10px;border:1px solid #eef0f5">
           <div>
             <div style="font-size:10px;font-weight:800;color:#0f9d58;margin-bottom:6px">📋 사전조사</div>
-            <div style="display:flex;flex-direction:column;gap:5px">
+            ${RM_orgSvOk(org,'presurvey')?`<div style="display:flex;flex-direction:column;gap:5px">
               <button onclick="copyOrgSurveyLink('${org.id}')" style="background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%">🔗 링크복사</button>
               <button onclick="downloadOrgSurveyRedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%" title="카카오톡 등에 공유했을 때 미리보기 제목에 기관명이 나오는 링크용 파일을 만듭니다">📇 카톡파일</button>
-            </div>
+            </div>`:'<div style="font-size:11px;color:#b91c1c;padding:10px 0">🚫 사용 안 함</div>'}
           </div>
           <div>
             <div style="font-size:10px;font-weight:800;color:#0f766e;margin-bottom:6px">🏆 챌린저 FINAL70</div>
-            <div style="display:flex;flex-direction:column;gap:5px">
+            ${RM_orgSvOk(org,'cf70')?`<div style="display:flex;flex-direction:column;gap:5px">
               <button onclick="copyOrgCf70Link('${org.id}')" style="background:#eefaf0;color:#0f766e;border:1px solid #99f6e4;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%">🔗 링크복사</button>
               <button onclick="downloadOrgCf70RedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;width:100%" title="카카오톡 등에 공유했을 때 미리보기 제목에 기관명이 나오는 링크용 파일을 만듭니다">📇 카톡파일</button>
-            </div>
+            </div>`:'<div style="font-size:11px;color:#b91c1c;padding:10px 0">🚫 사용 안 함</div>'}
+          </div>
+          <div style="grid-column:1/-1">
+            <div style="font-size:10px;font-weight:800;color:#7f3135;margin-bottom:6px">🎓 중학생 전략진단지 <span style="font-weight:600;color:#b9787b">중1~3</span></div>
+            ${RM_orgSvOk(org,'msstrategy')?`<div style="display:flex;gap:5px"><button onclick="copyOrgMsLink('${org.id}')" style="flex:1;background:#fdf2f2;color:#7f3135;border:1px solid #ead5c6;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer">🔗 링크복사</button><button onclick="downloadOrgMsRedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="flex:1;background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer">📇 카톡파일</button></div>`:'<div style="font-size:11px;color:#b91c1c;padding:4px 0">🚫 사용 안 함</div>'}
+          </div>
+          <div style="grid-column:1/-1">
+            <div style="font-size:10px;font-weight:800;color:#1A237E;margin-bottom:6px">🏆 APEX 사전조사서 <span style="font-weight:600;color:#7986cb">초5·6·중1</span></div>
+            ${RM_orgSvOk(org,'apexlow')?`<div style="display:flex;gap:5px">
+              <button onclick="copyOrgApexLowLink('${org.id}')" style="flex:1;background:#eef2ff;color:#1A237E;border:1px solid #c5cae9;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer">🔗 링크복사</button>
+              <button onclick="downloadOrgApexLowRedirectPage('${org.id}', '${esc(org.name).replace(/'/g,"\\'")}')" style="flex:1;background:#fffbeb;color:#b45309;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer">📇 카톡파일</button>
+            </div>`:'<div style="font-size:11px;color:#b91c1c;padding:4px 0">🚫 사용 안 함</div>'}
           </div>
         </div>
         <div style="font-size:11px;color:#777;line-height:1.8">
@@ -20652,6 +20949,16 @@ function openOrgForm(orgData){
         </label>`).join('')}
       </div>
 
+      <hr style="border:none;border-top:1.5px solid #e8eaf6;margin:4px 0">
+      <div style="font-size:12px;font-weight:700;color:#1e3a8a;margin-bottom:4px">📥 이 기관에서 사용 가능한 설문 (입시상담 · 설문조사함)</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px">체크 해제하면 이 기관에서는 해당 설문의 링크 복사·카톡파일, 받은함, 알림이 보이지 않고 막힙니다. (설문조사 관리에서 직접 만든 설문은 영향 없음)</div>
+      <div style="display:grid;grid-template-columns:1fr;gap:6px">
+        ${RM_SV_DEFS.map(d=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-radius:8px;border:1.5px solid #e8eaf6;cursor:pointer">
+          <input type="checkbox" id="org_sv_${d.key}" ${RM_orgSvOk(org,d.key)?'checked':''} style="width:15px;height:15px;accent-color:#3b5bdb">
+          <span style="font-size:12px;font-weight:600;color:#333">${d.label}</span>
+        </label>`).join('')}
+      </div>
+
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
         <button id="of_cancel" class="btn-g">취소</button>
         <button id="of_save" class="btn-b">💾 저장</button>
@@ -20682,7 +20989,8 @@ function openOrgForm(orgData){
       mobile: ov.querySelector('#of_mobile').value.trim(),
       email:  ov.querySelector('#of_email').value.trim(),
       createdAt: org?.createdAt||Date.now(),
-      permissions: ['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','xlab','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked)
+      permissions: ['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','xlab','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked),
+      surveyPerms: {presurvey:!!ov.querySelector('#org_sv_presurvey')?.checked, apexlow:!!ov.querySelector('#org_sv_apexlow')?.checked, cf70:!!ov.querySelector('#org_sv_cf70')?.checked}
     };
 
     const idx=orgs.findIndex(o=>o.id===org?.id);
