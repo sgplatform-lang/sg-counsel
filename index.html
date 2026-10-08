@@ -411,6 +411,8 @@ try{
     // ★ 2026-10-08 추가: 워크북·예상세특 텍스트 AI 첨삭 / 학점 AI 제안(서버가 최고 18점으로 제한)
     xlabReviewText: (payload)=>firebase.functions().httpsCallable('xlabReviewText', {timeout: 300000})(payload).then(r=>r.data),
     xlabSuggestGrade: (payload)=>firebase.functions().httpsCallable('xlabSuggestGrade', {timeout: 540000})(payload).then(r=>r.data),
+    // ★ 2026-10-08: 브라우저 직접 AI 호출을 서버로 이전한 범용 함수
+    xlabAskClaude: (payload)=>firebase.functions().httpsCallable('xlabAskClaude', {timeout: 120000})(payload).then(r=>r.data),
     // ★ 2026-09-30 추가: X-lab AAR 카드관리(개념·자료 카드) — 교과명/파일/링크만 주면
     // 나머지 칸을 AI가 채워주는 두 서버 함수. 자료 분량이 많을 수 있어 5분 타임아웃.
     xaarAnalyzeConceptCards: (payload)=>firebase.functions().httpsCallable('xaarAnalyzeConceptCards', {timeout: 300000})(payload).then(r=>r.data),
@@ -2986,7 +2988,7 @@ async function fbLoadAll_all(){
       if(gs?.subjs) GRADE_SUBJS = gs.subjs;
       // 최종관리자가 등록한 API 키 → 모든 계정 공유
       const ak = config.find(c=>c.id==='api_key');
-      if(ak?.value){
+      if(false && ak?.value){
         window._sharedApiKey = ak.value; // 항상 갱신
         // ANTHROPIC_API_KEY가 비어있으면 공유키로 채움
         if(!(window.ANTHROPIC_API_KEY||'').trim()){
@@ -22540,7 +22542,7 @@ function bindEvents(){
 
 // ══ 초기화 ══
 
-function openApiModal(){
+function _openApiModalOld(){
   const cur = (window.ANTHROPIC_API_KEY||window._sharedApiKey||'').trim();
   const isSet = cur.length > 10;
   const ov=document.createElement('div');ov.className='overlay';
@@ -22713,7 +22715,7 @@ function init(){
         // API 키 로드
         const cfgData = cfgSnap.docs.map(d=>({...d.data(),id:d.id}));
         const ak = cfgData.find(c=>c.id==='api_key');
-        if(ak?.value){
+        if(false && ak?.value){
           window._sharedApiKey = ak.value;
           if(!(window.ANTHROPIC_API_KEY||'').trim()) window.ANTHROPIC_API_KEY = ak.value;
           console.log('✅ API 키 선로드 완료');
@@ -57711,6 +57713,22 @@ function _xgTargets(it){
   return T;
 }
 function _xgRvState(it){ const key=it.kind+'|'+it.ref; if(_xgRv.key!==key){ const T=_xgTargets(it); const def=T.find(function(t){return t.key==='rec';})||T[0]; _xgRv={key:key,target:def?def.key:'',gl:'',busy:false}; } return _xgRv; }
+const _xgPub={};
+function _xgPubDoc(id){ if(!id) return null; if(_xgPub[id]===undefined){ _xgPub[id]=null; (async function(){ try{ const sn=await window._fb.collection('xlabReviewPub').doc(id).get(); _xgPub[id]=sn.exists?sn.data():null; }catch(e){ console.warn('공유 상태 확인 실패:',e.message); } render(); })(); } return _xgPub[id]; }
+async function xgRvShare(){
+  const d=_xgDraft; if(!d) return; const rv=_xgRvEnsure();
+  const items=(rv.items||[]).filter(function(x){return x.keep!==false&&x.q;}).map(function(x){return {sym:x.sym,quote:x.quote||'',q:x.q};});
+  if(!items.length){ alert('공유할 질문이 없어요. (“사용”이 체크된 질문이 필요합니다)'); return; }
+  if(!confirm('이 첨삭 질문 '+items.length+'개를 학생에게 공개합니다.\n학생은 “내 학점” 메뉴에서 볼 수 있어요. 계속할까요?\n(비공개 총평·점수는 함께 공개되지 않습니다)')) return;
+  try{ await xgRvSave(true);
+    const doc={id:d.id,studentId:String(d.studentId),studentName:d.studentName||'',kind:d.kind,refId:d.refId,title:d.title||'',itemDate:d.itemDate||0,targetLabel:rv.targetLabel||'',items:items,sharedAt:Date.now(),ack:false,ackAt:0};
+    await window._fb.set('xlabReviewPub',d.id,doc); _xgPub[d.id]=doc; render(); _xgRvMsg('✅ 학생에게 공유했어요','#16a34a');
+  }catch(e){ alert('공유 실패: '+e.message+(/permission/i.test(e.message)?'\n(Firestore 규칙에 xlabReviewPub 블록을 추가했는지 확인하세요)':'')); }
+}
+async function xgRvUnshare(){
+  const d=_xgDraft; if(!d||!confirm('학생에게 공개한 첨삭 질문을 비공개로 되돌립니다.')) return;
+  try{ await window._fb.delete('xlabReviewPub',d.id); _xgPub[d.id]=null; render(); }catch(e){ alert('공유 취소 실패: '+e.message); }
+}
 function _xgRvHtml(it){
   const E=_xcaE, st=_xgRvState(it), T=_xgTargets(it), d=_xgDraft, rv=(d&&d.review)||null;
   if(!T.length) return '<div style="background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:11px 13px;margin-bottom:10px;font-size:12.5px;color:#94a3b8">🤖 AI 첨삭: 학생이 작성한 내용이 아직 충분하지 않아요.</div>';
@@ -57720,7 +57738,8 @@ function _xgRvHtml(it){
    +(T.some(function(t){return t.key==='rec';})&&!T.some(function(t){return t.key==='recAi';})?'<div style="font-size:11px;color:#94a3b8;margin-top:3px">※ AI 생성 원본이 학생 수정본과 같거나 저장돼 있지 않으면 “AI 원본” 선택지가 나타나지 않습니다. (학생용 12부터 새로 만드는 예상세특은 원본이 함께 저장됩니다)</div>':'')
    +'<textarea rows="2" oninput="_xgRv.gl=this.value" placeholder="추가 안내(선택) — 예: 이 활동은 진로(의대) 연결을 특히 점검" style="'+XCA_I+'margin-top:6px">'+E(st.gl)+'</textarea>'
    +'<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button onclick="xgRvRun()" '+(st.busy?'disabled':'')+' style="'+XCA_B+'background:#7c3aed;color:#fff">'+(st.busy?'⏳ AI가 읽는 중…':(items.length?'🔄 AI 초안 다시 만들기':'✨ AI 첨삭 초안 만들기'))+'</button>'
-   +(items.length?'<button onclick="xgRvAdd()" style="'+XCA_B+'background:#e2e8f0;color:#334155">＋ 직접 추가</button><button onclick="xgRvSave()" style="'+XCA_B+'background:#1d4ed8;color:#fff">💾 저장</button><button onclick="xgRvPrint()" style="'+XCA_B+'background:#1a1a1a;color:#fff">🖨 인쇄</button><button onclick="xgRvCopy()" style="'+XCA_B+'background:#e2e8f0;color:#334155">📋 복사</button>':'')+'<span id="xgRvMsg" style="font-size:12px;color:#64748b"></span></div>';
+   +(items.length?'<button onclick="xgRvAdd()" style="'+XCA_B+'background:#e2e8f0;color:#334155">＋ 직접 추가</button><button onclick="xgRvSave()" style="'+XCA_B+'background:#1d4ed8;color:#fff">💾 저장</button><button onclick="xgRvPrint()" style="'+XCA_B+'background:#1a1a1a;color:#fff">🖨 인쇄</button><button onclick="xgRvCopy()" style="'+XCA_B+'background:#e2e8f0;color:#334155">📋 복사</button><button onclick="xgRvShare()" style="'+XCA_B+'background:#0d9488;color:#fff">'+(_xgPubDoc(d&&d.id)?'📤 수정해서 다시 공유':'📤 학생에게 공유')+'</button>'+(_xgPubDoc(d&&d.id)?'<button onclick="xgRvUnshare()" style="'+XCA_B+'background:#fee2e2;color:#b91c1c">🔒 공유 취소</button>':''):'')+'<span id="xgRvMsg" style="font-size:12px;color:#64748b"></span></div>';
+  { const pd=_xgPubDoc(d&&d.id); if(pd) h+='<div style="margin-top:8px;font-size:12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:6px 10px">📤 학생에게 공유됨 ('+_xgDate(pd.sharedAt)+') · '+(pd.ack?'<b style="color:#16a34a">✅ 학생이 “반영했어요” 체크 ('+_xgDate(pd.ackAt)+')</b>':'<span style="color:#b45309">아직 학생 확인 전</span>')+'</div>'; }
   if(rv&&rv.targetLabel) h+='<div style="font-size:11.5px;color:#94a3b8;margin-top:6px">마지막 첨삭 대상: '+E(rv.targetLabel)+(rv.aiAt?' · '+_xgDate(rv.aiAt):'')+(rv.dropped?' · (문장 대체형·원문 불일치 등 '+rv.dropped+'개 자동 제외)':'')+'</div>';
   items.forEach(function(x,i){
     h+='<div style="border:1.5px solid '+(x.keep===false?'#e2e8f0':xclSym(x.sym).color)+';border-radius:10px;padding:8px 10px;margin-top:7px;opacity:'+(x.keep===false?.5:1)+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select onchange="xgRvSet('+i+',\'sym\',this.value)" style="'+XCA_I+'width:auto">'+XCL_SYMS.map(function(s2){ return '<option value="'+s2.k+'" '+(s2.k===x.sym?'selected':'')+'>['+s2.k+'] '+E(s2.def)+'</option>'; }).join('')+'</select>'
@@ -58027,6 +58046,44 @@ function renderBookingAdmin(){
 function _bkHubCardHtml(){
   const org=_bkOrg(); if(org&&_bk.loaded!==org&&!_bk.loading) bkLoad(); const n=(_bk.loaded===org)?_bk.books.filter(function(b){return b.status!=='done'&&b.start>Date.now();}).length:0;
   return '<div style="background:#fff;border:1.5px solid #c7e9d4;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen(\'booking\')"><div style="display:flex;justify-content:space-between"><div style="font-size:14px;font-weight:800;color:#166534">📅 상담 예약</div>'+(n?'<span style="background:#16a34a;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">예정 '+n+'</span>':'')+'</div><div style="font-size:11.5px;color:#888;margin-top:6px">가능 시간을 등록하고 링크를 보내면 학부모가 직접 예약</div><div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#166534;font-weight:700">예약 관리 →</span></div></div>';
+}
+
+/* ===== AI 호출 서버 이전 (2026-10-08) =====
+   화면에서 api.anthropic.com 으로 직접 보내던 7곳(상담 AI·학습계획·서술형 채점·총평·발전주제·생기부 면접질문 등)을
+   코드를 하나하나 바꾸지 않고, 그 주소로 가는 요청만 서버 함수(xlabAskClaude)로 돌려 보낸다.
+   → API 키는 더 이상 화면·DB(config)에 필요 없고, 서버 비밀값에만 있다. */
+window._sharedApiKey='server-managed';
+window.ANTHROPIC_API_KEY='server-managed';
+(function(){
+  if(window.__sgAiShim) return; window.__sgAiShim=1;
+  const orig=window.fetch.bind(window);
+  function mk(body){ return {ok:!body.error,status:body.error?500:200,json:async function(){return body;},text:async function(){return JSON.stringify(body);}}; }
+  window.fetch=async function(url,opt){
+    if(typeof url==='string'&&url.indexOf('https://api.anthropic.com/v1/messages')===0){
+      let b={}; try{ b=JSON.parse((opt&&opt.body)||'{}'); }catch(e){}
+      const m=(b.messages&&b.messages[0])||{};
+      const prompt=typeof m.content==='string'?m.content:JSON.stringify(m.content||'');
+      try{
+        if(!(window._fb&&window._fb.xlabAskClaude)) throw new Error('서버 연결 준비 중입니다. 잠시 후 다시 시도하세요.');
+        const r=await window._fb.xlabAskClaude({prompt:prompt,maxTokens:b.max_tokens||1024,system:b.system||''});
+        if(r&&r.ok) return mk({content:[{type:'text',text:r.text}]});
+        return mk({error:{type:'api_error',message:(r&&r.reason)||'AI 호출에 실패했습니다.'}});
+      }catch(e){
+        const msg=String((e&&e.message)||e);
+        return mk({error:{type:'api_error',message:'AI 서버 호출 실패: '+msg+(/^internal$/i.test(msg)?' (서버 함수 xlabAskClaude 배포 여부를 확인하세요)':'')}});
+      }
+    }
+    return orig(url,opt);
+  };
+})();
+function openApiModal(){
+  const ov=document.createElement('div'); ov.className='overlay';
+  ov.innerHTML='<div class="modal" style="max-width:460px"><div class="mhd"><span style="font-size:15px;font-weight:800;color:#1a1a2e">⚙ AI 분석 설정</span><button onclick="this.closest(\'.overlay\').remove()" style="background:transparent;border:none;color:#aaa;font-size:22px;cursor:pointer">×</button></div>'
+   +'<div style="padding:20px 22px 26px;font-size:13px;line-height:1.8;color:#334155"><div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-weight:700;color:#166534">✅ AI 기능은 서버에서 안전하게 처리됩니다</div>'
+   +'API 키를 화면에 입력할 필요가 없습니다. 키는 서버 비밀값으로만 보관되며, 교체가 필요하면 관리자(개발 담당)가 서버에서 바꿉니다.<br><span style="color:#94a3b8;font-size:12px">AI가 응답하지 않으면 로그인 상태와 인터넷 연결을 확인한 뒤 다시 시도해 주세요.</span>'
+   +'<div style="text-align:right;margin-top:16px"><button class="btn-g" onclick="this.closest(\'.overlay\').remove()">닫기</button></div></div></div>';
+  if(typeof bindOverlayClose==='function') bindOverlayClose(ov);
+  document.body.appendChild(ov);
 }
 
 let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final' | 'buildup' | 'activity' | 'aar' | 'mockapply'
