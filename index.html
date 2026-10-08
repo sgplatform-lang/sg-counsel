@@ -57814,9 +57814,13 @@ async function bkSaveLink(){
   const id=e.id||('bk'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
   const d={id:id,orgId:String(org),orgName:_bkOrgName(org),title:title,desc:g('bkDesc').slice(0,500),method:g('bkMethod').slice(0,100),contact:g('bkContact').slice(0,100),
     durationMin:Math.max(5,Math.min(240,parseInt(g('bkDur'),10)||30)),leadMin:Math.max(0,Math.min(10080,parseInt(g('bkLead'),10)||0)),active:!!(document.getElementById('bkActive')||{}).checked,createdAt:e.createdAt||Date.now()};
+  let nw=null;
+  if(!e.id){ const hasG=(document.getElementById('bkG1')||{}).value||(document.getElementById('bkG2')||{}).value; if(hasG){ nw=_bkGenCollect(d); if(!nw) return; } }
   try{ await window._fb.set('counselBookingLinks',id,d); }catch(er){ alert('저장 실패: '+(er.message||er)); return; }
   const i=_bk.links.findIndex(function(x){return x.id===id;}); if(i>=0) _bk.links[i]=d; else _bk.links.unshift(d);
-  _bk.edit=null; _bk.sel=id; render();
+  _bk.edit=null; _bk.sel=id;
+  if(nw&&nw.length){ await _bkAddSlots(d,nw); alert('예약 링크를 만들고 상담 시간 '+nw.length+'개를 등록했습니다.\n아래 화면에서 🔗 링크복사로 링크를 보내세요.'); return; }
+  render();
 }
 async function bkDelLink(id){
   const n=_bk.slots.filter(function(s){return s.linkId===id;}).length;
@@ -57833,17 +57837,16 @@ async function bkToggleActive(id){
   l.active=l.active===false; try{ await window._fb.set('counselBookingLinks',id,{active:l.active}); }catch(er){alert('실패: '+(er.message||er));} render();
 }
 function bkGenSet(k,v){ _bk.gen[k]=v; }
-async function bkGenerate(){
-  const L=_bk.sel; const link=_bk.links.find(function(x){return x.id===L;}); if(!link) return;
+function _bkGenCollect(link){
   const g=function(i){const e=document.getElementById(i);return e?e.value:'';};
   const d1=g('bkG1'),d2=g('bkG2'),t1=g('bkGs'),t2=g('bkGe'); const dur=parseInt(g('bkGd'),10)||link.durationMin||30; const gap=parseInt(g('bkGg'),10)||0;
   const ls=g('bkGls'),le=g('bkGle');
   const wd=[0,1,2,3,4,5,6].filter(function(w){const e=document.getElementById('bkW'+w);return e&&e.checked;});
-  if(!d1||!d2||!t1||!t2){alert('날짜 범위와 시간 범위를 입력해주세요.');return;}
-  if(!wd.length){alert('요일을 하나 이상 선택해주세요.');return;}
+  if(!d1||!d2||!t1||!t2){alert('날짜 범위와 시간 범위를 입력해주세요.');return null;}
+  if(!wd.length){alert('요일을 하나 이상 선택해주세요.');return null;}
   const out=[]; const a=d1.split('-').map(Number), b=d2.split('-').map(Number);
   const dA=Date.UTC(a[0],a[1]-1,a[2]), dB=Date.UTC(b[0],b[1]-1,b[2]);
-  if(dB<dA||(dB-dA)/86400000>92){alert('날짜 범위는 최대 3개월입니다.');return;}
+  if(dB<dA||(dB-dA)/86400000>92){alert('날짜 범위는 최대 3개월입니다. (시작일이 종료일보다 늦지 않은지도 확인해주세요)');return null;}
   for(let t=dA;t<=dB;t+=86400000){
     const dt=new Date(t); if(wd.indexOf(dt.getUTCDay())<0) continue;
     const ds=dt.getUTCFullYear()+'-'+_bkP(dt.getUTCMonth()+1)+'-'+_bkP(dt.getUTCDate());
@@ -57855,13 +57858,26 @@ async function bkGenerate(){
       out.push({start:s,end:e});
     }
   }
-  if(!out.length){alert('생성될 시간이 없습니다. 시간 범위와 상담 시간을 확인해주세요.');return;}
-  if(out.length>400){alert('한 번에 400개까지 만들 수 있습니다. 범위를 줄여주세요.');return;}
+  if(!out.length){alert('생성될 시간이 없습니다. 시간 범위와 상담 시간을 확인해주세요.');return null;}
+  if(out.length>400){alert('한 번에 400개까지 만들 수 있습니다. 범위를 줄여주세요.');return null;}
+  return out;
+}
+async function bkGenerate(){
+  const link=_bk.links.find(function(x){return x.id===_bk.sel;}); if(!link) return;
+  const out=_bkGenCollect(link); if(!out) return;
   const have={}; _bk.slots.forEach(function(s){have[s.id]=1;});
-  const nw=out.filter(function(o){return !have[L+'_'+o.start];});
+  const nw=out.filter(function(o){return !have[link.id+'_'+o.start];});
   if(!nw.length){alert('이미 모두 등록된 시간입니다.');return;}
   if(!confirm(nw.length+'개의 상담 시간을 추가합니다. (이미 있는 '+(out.length-nw.length)+'개는 건너뜁니다)')) return;
   await _bkAddSlots(link,nw);
+}
+function _bkGenFormHtml(dur,title){
+  const inp='style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12.5px"';
+  const wdH=[1,2,3,4,5,6,0].map(function(w){return '<label style="margin-right:8px;font-size:12.5px"><input type="checkbox" id="bkW'+w+'" '+(w>=1&&w<=5?'checked':'')+'> '+'일월화수목금토'[w]+'</label>';}).join('');
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">날짜 <input type="date" id="bkG1" '+inp+'> ~ <input type="date" id="bkG2" '+inp+'></div>'
+   +'<div style="margin:8px 0">'+wdH+'</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">시간 <input type="time" id="bkGs" value="14:00" '+inp+'> ~ <input type="time" id="bkGe" value="20:00" '+inp+'> · 상담 <input type="number" id="bkGd" value="'+dur+'" style="width:60px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분 · 사이 간격 <input type="number" id="bkGg" value="0" style="width:50px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;margin-top:8px">제외(식사·휴식) <input type="time" id="bkGls" '+inp+'> ~ <input type="time" id="bkGle" '+inp+'> <span style="color:#999">(선택)</span></div>';
 }
 async function _bkAddSlots(link,list){
   const db=window._fb.db; const org=String(link.orgId);
@@ -57929,6 +57945,7 @@ function _bkEditHtml(){
    +row('상담 방식·장소','<input id="bkMethod" '+inp+' placeholder="예: 학원 방문 / 전화 / 화상" value="'+_bkE(e.method)+'">')
    +row('문의 연락처 (일정 변경·취소용)','<input id="bkContact" '+inp+' placeholder="예: 02-000-0000" value="'+_bkE(e.contact)+'">')
    +'<div style="display:flex;gap:10px">'+row('상담 시간(분)','<input id="bkDur" type="number" '+inp+' value="'+_bkE(e.durationMin)+'">')+row('예약 마감(상담 몇 분 전까지)','<input id="bkLead" type="number" '+inp+' value="'+_bkE(e.leadMin)+'">')+'</div>'
+   +(e.id?'':'<div style="background:#f8faff;border:1px solid #dbe4ff;border-radius:12px;padding:12px;margin:4px 0 12px"><div style="font-size:13px;font-weight:800;margin-bottom:8px">📅 상담 가능 날짜·시간 (저장하면 함께 만들어집니다)</div>'+_bkGenFormHtml(e.durationMin||30)+'<div style="font-size:11px;color:#777;margin-top:8px">비워두고 저장하면 링크만 만들어지고, 시간은 저장 후 화면에서 추가할 수 있습니다.</div></div>')
    +'<label style="font-size:12.5px;display:block;margin-bottom:12px"><input type="checkbox" id="bkActive" '+(e.active!==false?'checked':'')+'> 예약 받는 중</label>'
    +'<button onclick="bkSaveLink()" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;cursor:pointer">저장</button> '
    +'<button onclick="bkCancelEdit()" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:9px 16px;cursor:pointer">취소</button></div>';
@@ -57965,10 +57982,7 @@ function _bkDetailHtml(){
    +'<button onclick="bkCsv(\''+l.id+'\')" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">⬇ 엑셀(CSV)</button>'
    +'<button onclick="bkDelLink(\''+l.id+'\')" style="border:1px solid #fca5a5;color:#b91c1c;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">🗑 삭제</button></div></div></div>'
    +'<div style="background:#f8faff;border:1px solid #dbe4ff;border-radius:14px;padding:14px;margin-bottom:14px"><div style="font-size:13px;font-weight:800;margin-bottom:8px">⏱ 상담 시간 한꺼번에 만들기</div>'
-   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">날짜 <input type="date" id="bkG1" '+inp+'> ~ <input type="date" id="bkG2" '+inp+'></div>'
-   +'<div style="margin:8px 0">'+wdH+'</div>'
-   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">시간 <input type="time" id="bkGs" value="14:00" '+inp+'> ~ <input type="time" id="bkGe" value="20:00" '+inp+'> · 상담 <input type="number" id="bkGd" value="'+l.durationMin+'" style="width:60px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분 · 사이 간격 <input type="number" id="bkGg" value="0" style="width:50px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분</div>'
-   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;margin-top:8px">제외(식사·휴식) <input type="time" id="bkGls" '+inp+'> ~ <input type="time" id="bkGle" '+inp+'> <span style="color:#999">(선택)</span></div>'
+   +_bkGenFormHtml(l.durationMin,'')
    +'<button onclick="bkGenerate()" style="margin-top:10px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;cursor:pointer">시간 만들기</button>'
    +'<div style="margin-top:12px;font-size:12.5px;border-top:1px dashed #cbd5e1;padding-top:10px">하나만 추가: <input type="date" id="bkOd" '+inp+'> <input type="time" id="bkOt" '+inp+'> <button onclick="bkAddOne()" style="border:1px solid #3b5bdb;color:#3b5bdb;background:#fff;border-radius:6px;padding:6px 12px;cursor:pointer">추가</button></div></div>'
    +dayH;
