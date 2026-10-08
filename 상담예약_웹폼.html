@@ -27,6 +27,9 @@
   .date.on{border-color:var(--accent);background:var(--accent);color:#fff}.date.on span{color:#dbe4ff}
   .times{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:10px}
   .time{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:10px 4px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;color:var(--ink)}
+  .time small{display:block;font-size:11px;font-weight:600;margin-top:2px;color:#6b9a7e}
+  .time.full{background:#f1ecf6;border-color:#e4daee;color:#a99bb8;cursor:not-allowed}.time.full small{color:#b7a9c6}
+  .time.on small{color:var(--accent)}
   .time.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
   label.f{display:block;font-size:13px;color:var(--muted);font-weight:700;margin:12px 0 4px}
   input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;color:var(--ink);background:#fff}
@@ -92,12 +95,13 @@ async function init(){
   draw();
 }
 async function loadSlots(){
-  const q=await _db.collection('counselSlots').where('linkId','==',LINK).where('booked','==',false).get();
+  const q=await _db.collection('counselSlots').where('linkId','==',LINK).get();
   const lead=(link.leadMin==null?120:Number(link.leadMin))*60000, now=Date.now();
   slots=q.docs.map(function(d){return d.data();}).filter(function(s){return Number(s.start)>now+lead;}).sort(function(a,b){return a.start-b.start;});
   const days=Array.from(new Set(slots.map(function(s){return dkey(s.start);})));
-  if(!selDate||days.indexOf(selDate)<0) selDate=days[0]||'';
-  if(selSlot&&!slots.some(function(s){return s.id===selSlot;})) selSlot=null;
+  const freeDays=days.filter(function(k){return slots.some(function(s){return dkey(s.start)===k&&!s.booked;});});
+  if(!selDate||days.indexOf(selDate)<0) selDate=freeDays[0]||days[0]||'';
+  if(selSlot&&!slots.some(function(s){return s.id===selSlot&&!s.booked;})) selSlot=null;
 }
 function closed(t){ $('app').innerHTML='<div class="card"><div class="center" style="white-space:pre-wrap">'+esc(t)+'</div></div>'; }
 function header(){
@@ -111,9 +115,9 @@ function draw(){
   let h=header();
   if(notice){ h+='<div class="msg err" style="margin:0 0 12px">'+esc(notice)+'</div>'; }
   if(!slots.length){ $('app').innerHTML=h+'<div class="card"><div class="center">현재 예약 가능한 시간이 없습니다.<br>'+(link.contact?'문의: '+esc(link.contact):'학원으로 문의해 주세요.')+'</div></div>'; return; }
-  h+='<div class="card"><h2>① 날짜와 시간을 선택하세요</h2><div class="dates">'+days.map(function(k){ const ms=slots.find(function(s){return dkey(s.start)===k;}).start; const d=kst(ms); const n=slots.filter(function(s){return dkey(s.start)===k;}).length;
-    return '<button class="date '+(k===selDate?'on':'')+'" onclick="pickDate(\''+k+'\')"><span>'+WD[d.getUTCDay()]+'</span><b>'+(d.getUTCMonth()+1)+'/'+d.getUTCDate()+'</b><span>'+n+'개</span></button>'; }).join('')+'</div>'
-   +'<div class="times">'+slots.filter(function(s){return dkey(s.start)===selDate;}).map(function(s){ return '<button class="time '+(s.id===selSlot?'on':'')+'" onclick="pickSlot(\''+esc(s.id)+'\')">'+hhmm(s.start)+'</button>'; }).join('')+'</div></div>';
+  h+='<div class="card"><h2>① 날짜와 시간을 선택하세요</h2><div class="dates">'+days.map(function(k){ const ms=slots.find(function(s){return dkey(s.start)===k;}).start; const d=kst(ms); const n=slots.filter(function(s){return dkey(s.start)===k&&!s.booked;}).length;
+    return '<button class="date '+(k===selDate?'on':'')+'" onclick="pickDate(\''+k+'\')"><span>'+WD[d.getUTCDay()]+'</span><b>'+(d.getUTCMonth()+1)+'/'+d.getUTCDate()+'</b><span>'+(n?n+'개 가능':'마감')+'</span></button>'; }).join('')+'</div>'
+   +'<div class="times">'+slots.filter(function(s){return dkey(s.start)===selDate;}).map(function(s){ if(s.booked) return '<button class="time full" disabled>'+hhmm(s.start)+'<small>예약완료</small></button>'; return '<button class="time '+(s.id===selSlot?'on':'')+'" onclick="pickSlot(\''+esc(s.id)+'\')">'+hhmm(s.start)+'<small>예약가능</small></button>'; }).join('')+'</div></div>';
   if(selSlot){ const s=slots.find(function(x){return x.id===selSlot;});
     h+='<div class="card"><h2>② 예약 정보를 입력하세요</h2><div class="sum">선택한 일정: <b>'+dlabel(s.start)+' '+hhmm(s.start)+(s.end?' ~ '+hhmm(s.end):'')+'</b></div>'
      +'<label class="f">보호자(학부모) 성함 <span class="req">*</span></label><input id="f_parent" value="'+esc(bkf.parent)+'" oninput="bkf.parent=this.value" maxlength="30" autocomplete="name">'
