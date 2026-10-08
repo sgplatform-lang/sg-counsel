@@ -6150,11 +6150,23 @@ function xcsUploadOpen(taskId,prevId){
 function _xcsUploadDraw(){
   const u=_xcsUp; const t=(_xcsPerf.tasks||[]).find(function(x){return x.id===u.taskId;})||{}; const ver=/v2|수정/.test(u.stage)?'v2':'v1';
   const hint=CU.name+'_'+(t.subject||'과목')+'_'+(t.title||'수행평가명')+'_'+ver+'_학생';
-  xcsModal('<b style="font-size:16px">⬆ 파일 올리기</b><div style="font-size:12px;color:#64748b;margin:4px 0 10px;line-height:1.5">용량 제한 없이 올릴 수 있고, 끊겨도 이어서 올라가요. 여러 파일도 가능해요.<br>권장 파일명: <b>'+_xcsE(hint)+'</b></div>'
+  xcsModal('<b style="font-size:16px">⬆ 파일 올리기</b><div style="font-size:12px;color:#64748b;margin:4px 0 10px;line-height:1.5">용량 제한 없이 올릴 수 있고, 끊겨도 이어서 올라가요. 여러 파일도 가능해요.</div>'
+   +'<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:12.5px;line-height:1.65;color:#134e4a"><b>📝 파일명 이렇게 지어 주세요</b><br>형식: <b>이름_과목_수행평가명_v1_학생</b><br>예) <b style="color:#0f766e">'+_xcsE(hint)+'</b>'+(t.id?'':' <span style="color:#64748b">(위에서 수행평가를 고르면 자동으로 맞춰져요)</span>')+'<br><span style="color:#475569">· 초안은 <b>v1</b>, 선생님 첨삭 후 고친 것은 <b>v2</b>, 최종은 <b>v3</b><br>· 파일 형식은 <b>PDF</b>를 가장 권장해요. 한글(.hwp)은 PDF로 저장해서 올려 주세요 (hwpx·docx·사진도 가능)<br>· 파일명을 못 맞춰도 올릴 수는 있어요. 다만 선생님이 찾기 쉽도록 꼭 이름·과목을 넣어 주세요.</span></div>'
    +'<select id="xcsU_task" onchange="_xcsUp.taskId=this.value;_xcsUp.title=_xcsUp.title||this.options[this.selectedIndex].text" style="'+XCS_I+'margin-bottom:7px"><option value="">연결할 수행평가 (선택)</option>'+_xcsTasks().map(function(x){return '<option value="'+x.id+'" '+(x.id===u.taskId?'selected':'')+'>'+_xcsE(x.subject+' · '+x.title)+'</option>';}).join('')+'</select>'
    +'<div style="display:flex;gap:7px;margin-bottom:7px"><input id="xcsU_title" value="'+_xcsE(u.title)+'" placeholder="제목 (예: 과학 탐구보고서 초안)" style="'+XCS_I+'"><select id="xcsU_stage" onchange="_xcsUp.stage=this.value;_xcsUploadDraw()" style="'+XCS_I+'width:auto">'+XCL_FILE_STAGE.map(function(x){return '<option '+(x===u.stage?'selected':'')+'>'+x+'</option>';}).join('')+'</select></div>'
-   +'<input type="file" id="xcsU_files" multiple style="margin-bottom:7px;width:100%"><textarea id="xcsU_note" rows="2" placeholder="선생님께 한마디 (어디를 봐 주면 좋겠는지)" style="'+XCS_I+'">'+_xcsE(u.note)+'</textarea><div id="xcsU_msg" style="font-size:12.5px;margin-top:8px"></div>'
+   +'<input type="file" id="xcsU_files" multiple onchange="xcsFnCheck()" style="margin-bottom:4px;width:100%"><div id="xcsU_fn" style="font-size:12px;line-height:1.55;margin-bottom:7px"></div><textarea id="xcsU_note" rows="2" placeholder="선생님께 한마디 (어디를 봐 주면 좋겠는지)" style="'+XCS_I+'">'+_xcsE(u.note)+'</textarea><div id="xcsU_msg" style="font-size:12.5px;margin-top:8px"></div>'
    +'<div style="margin-top:12px;text-align:right"><button onclick="xcsModalClose()" style="'+XCS_B+'background:#e2e8f0">닫기</button> <button id="xcsU_go" onclick="xcsUploadGo()" style="'+XCS_B+'background:#0f766e;color:#fff">올리기</button></div>');
+}
+function xcsFnCheck(){
+  const box=document.getElementById('xcsU_fn'); if(!box) return; const fl=Array.from((document.getElementById('xcsU_files')||{}).files||[]); const w=[];
+  fl.forEach(function(f){
+    const n=f.name||''; const m=[];
+    if(/\.hwp$/i.test(n)) m.push('한글(.hwp)은 AI·미리보기가 안 돼요 → 한글에서 <b>PDF로 저장</b>해서 올려 주세요');
+    if(CU&&CU.name&&n.indexOf(CU.name)<0) m.push('파일명에 <b>내 이름('+_xcsE(CU.name)+')</b>이 없어요');
+    if(!/_v[0-9]/i.test(n)) m.push('버전(<b>v1/v2</b>)이 없어요');
+    if(m.length) w.push('<div>⚠ <b>'+_xcsE(n)+'</b><br>&nbsp;&nbsp;'+m.join('<br>&nbsp;&nbsp;')+'</div>'); else w.push('<div style="color:#0f766e">✔ '+_xcsE(n)+' — 파일명 좋아요</div>');
+  });
+  box.innerHTML=w.join('')+(w.some(function(x){return x.indexOf('⚠')>=0;})?'<div style="color:#64748b">고치지 않고 올려도 되지만, 가능하면 파일 이름을 바꾼 뒤 다시 선택해 주세요.</div>':'');
 }
 function _xcsUploadOne(path,file,onProg){
   return new Promise(function(res,rej){
