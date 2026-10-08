@@ -20597,6 +20597,7 @@ function renderRoadmapSurveyHub(){
   if(view==='cf70'){
     return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+renderRoadmapCF70();
   }
+  if(view==='booking'){ return renderBookingAdmin(); }
   if(view && view.indexOf('custom:')===0){
     const surveyId=view.slice('custom:'.length);
     return '<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>'+RM_customSurveySubmissionsHtml(surveyId);
@@ -20675,6 +20676,7 @@ function renderRoadmapSurveyHub(){
         <div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#0f766e;font-weight:700">결과 확인 →</span></div>
         ${_rmSurveyHubLinkButtonsHtml('cf70', orgId, isAdminRole)}
       </div>`:''}
+      ${_bkHubCardHtml()}
       ${customCardsHtml}
     </div>
   </div>`;
@@ -57771,6 +57773,226 @@ async function xgAiSuggest(){
     alert('AI 점수를 제안했습니다. (최고 우수 18점까지)\n항목별 근거를 확인하고 필요하면 단계를 바꾼 뒤 “평가 저장”을 누르세요.'+(r.summary?'\n\n요약: '+r.summary:''));
   }catch(e){ alert('AI 점수 제안 실패: '+e.message+(/^internal$/i.test(e.message)?'\n(서버 함수 xlabSuggestGrade가 배포되었는지 확인하세요)':'')); }
   finally{ _xgAiBusy=false; render(); }
+}
+
+/* ===== 상담 예약 링크 (관리자) — 2026-10-08 ===== */
+const BK_FILE='상담예약_웹폼.html';
+const BK_KST=9*3600000;
+function _bkE(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _bkP(n){return (n<10?'0':'')+n;}
+function _bkDKey(ms){const d=new Date(ms+BK_KST);return d.getUTCFullYear()+'-'+_bkP(d.getUTCMonth()+1)+'-'+_bkP(d.getUTCDate());}
+function _bkHM(ms){const d=new Date(ms+BK_KST);return _bkP(d.getUTCHours())+':'+_bkP(d.getUTCMinutes());}
+function _bkDLabel(key){const p=key.split('-').map(Number);const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));return p[1]+'/'+p[2]+'('+'일월화수목금토'[d.getUTCDay()]+')';}
+function _bkMs(dateStr,hm){const a=dateStr.split('-').map(Number),b=hm.split(':').map(Number);return Date.UTC(a[0],a[1]-1,a[2],b[0],b[1])-BK_KST;}
+const _bk={ orgId:'', links:[], slots:[], books:[], loaded:'', loading:false, sel:null, edit:null, gen:{}, msg:'' };
+function _bkOrg(){ return (typeof _rmSurveyHubMyOrgId==='function')?_rmSurveyHubMyOrgId():''; }
+function _bkOrgName(id){ try{ const o=(JSON.parse(localStorage.getItem(SK_ORGS)||'[]')).find(function(x){return String(x.id)===String(id);}); return o?o.name:''; }catch(e){return '';} }
+async function bkLoad(force){
+  const org=_bkOrg(); if(!org) return;
+  if(!force && _bk.loaded===org) return;
+  if(_bk.loading) return; _bk.loading=true;
+  try{
+    const f=window._fb;
+    const q=function(c){return f.getWhere(c,'orgId','==',String(org));};
+    const r=await Promise.all([q('counselBookingLinks'),q('counselSlots'),q('counselBookings')]);
+    _bk.links=r[0].sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    _bk.slots=r[1]; _bk.books=r[2]; _bk.loaded=org;
+  }catch(e){ console.warn('bkLoad',e); _bk.msg='불러오기 실패: '+(e.message||e)+' (Firestore 규칙 적용 여부를 확인하세요)'; _bk.loaded=org; }
+  _bk.loading=false; render();
+}
+function bkLinkUrl(id){ return location.origin+location.pathname.replace(/[^/]*$/,'')+encodeURIComponent(BK_FILE)+'?link='+encodeURIComponent(id); }
+function bkCopy(id){ const u=bkLinkUrl(id); if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(function(){alert('예약 링크를 복사했습니다:\n\n'+u+'\n\n학부모·상담 희망자에게 보내주세요.');}).catch(function(){prompt('아래 링크를 복사하세요:',u);}); } else prompt('아래 링크를 복사하세요:',u); }
+function bkOpenLink(id){ _bk.sel=id; _bk.edit=null; _bk.msg=''; render(); }
+function bkBack(){ _bk.sel=null; _bk.edit=null; render(); }
+function bkNew(){ _bk.edit={id:'',title:'입시 상담 예약',desc:'',method:'',contact:'',durationMin:30,leadMin:120,active:true}; _bk.sel=null; render(); }
+function bkEditLink(id){ const l=_bk.links.find(function(x){return x.id===id;}); if(!l) return; _bk.edit=Object.assign({},l); render(); }
+function bkCancelEdit(){ _bk.edit=null; render(); }
+async function bkSaveLink(){
+  const g=function(i){const e=document.getElementById(i);return e?e.value.trim():'';};
+  const e=_bk.edit; const org=_bkOrg(); if(!org){alert('기관을 먼저 선택해주세요.');return;}
+  const title=g('bkTitle'); if(!title){alert('예약 제목을 입력해주세요.');return;}
+  const id=e.id||('bk'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+  const d={id:id,orgId:String(org),orgName:_bkOrgName(org),title:title,desc:g('bkDesc').slice(0,500),method:g('bkMethod').slice(0,100),contact:g('bkContact').slice(0,100),
+    durationMin:Math.max(5,Math.min(240,parseInt(g('bkDur'),10)||30)),leadMin:Math.max(0,Math.min(10080,parseInt(g('bkLead'),10)||0)),active:!!(document.getElementById('bkActive')||{}).checked,createdAt:e.createdAt||Date.now()};
+  try{ await window._fb.set('counselBookingLinks',id,d); }catch(er){ alert('저장 실패: '+(er.message||er)); return; }
+  const i=_bk.links.findIndex(function(x){return x.id===id;}); if(i>=0) _bk.links[i]=d; else _bk.links.unshift(d);
+  _bk.edit=null; _bk.sel=id; render();
+}
+async function bkDelLink(id){
+  const n=_bk.slots.filter(function(s){return s.linkId===id;}).length;
+  if(!confirm('이 예약 링크와 시간대 '+n+'개를 삭제합니다.\n(이미 들어온 예약 기록은 남습니다.)\n계속할까요?')) return;
+  try{
+    const f=window._fb; const sl=_bk.slots.filter(function(s){return s.linkId===id;});
+    for(let i=0;i<sl.length;i++){ if(!sl[i].booked) await f.delete('counselSlots',sl[i].id); }
+    await f.delete('counselBookingLinks',id);
+  }catch(er){ alert('삭제 실패: '+(er.message||er)); }
+  _bk.sel=null; _bk.loaded=''; bkLoad(true);
+}
+async function bkToggleActive(id){
+  const l=_bk.links.find(function(x){return x.id===id;}); if(!l) return;
+  l.active=l.active===false; try{ await window._fb.set('counselBookingLinks',id,{active:l.active}); }catch(er){alert('실패: '+(er.message||er));} render();
+}
+function bkGenSet(k,v){ _bk.gen[k]=v; }
+async function bkGenerate(){
+  const L=_bk.sel; const link=_bk.links.find(function(x){return x.id===L;}); if(!link) return;
+  const g=function(i){const e=document.getElementById(i);return e?e.value:'';};
+  const d1=g('bkG1'),d2=g('bkG2'),t1=g('bkGs'),t2=g('bkGe'); const dur=parseInt(g('bkGd'),10)||link.durationMin||30; const gap=parseInt(g('bkGg'),10)||0;
+  const ls=g('bkGls'),le=g('bkGle');
+  const wd=[0,1,2,3,4,5,6].filter(function(w){const e=document.getElementById('bkW'+w);return e&&e.checked;});
+  if(!d1||!d2||!t1||!t2){alert('날짜 범위와 시간 범위를 입력해주세요.');return;}
+  if(!wd.length){alert('요일을 하나 이상 선택해주세요.');return;}
+  const out=[]; const a=d1.split('-').map(Number), b=d2.split('-').map(Number);
+  const dA=Date.UTC(a[0],a[1]-1,a[2]), dB=Date.UTC(b[0],b[1]-1,b[2]);
+  if(dB<dA||(dB-dA)/86400000>92){alert('날짜 범위는 최대 3개월입니다.');return;}
+  for(let t=dA;t<=dB;t+=86400000){
+    const dt=new Date(t); if(wd.indexOf(dt.getUTCDay())<0) continue;
+    const ds=dt.getUTCFullYear()+'-'+_bkP(dt.getUTCMonth()+1)+'-'+_bkP(dt.getUTCDate());
+    const s0=_bkMs(ds,t1), e0=_bkMs(ds,t2);
+    const ls0=ls&&le?_bkMs(ds,ls):0, le0=ls&&le?_bkMs(ds,le):0;
+    for(let s=s0; s+dur*60000<=e0; s+=(dur+gap)*60000){
+      const e=s+dur*60000;
+      if(ls0&&s<le0&&e>ls0) continue; // 점심·휴식 시간과 겹치면 제외
+      out.push({start:s,end:e});
+    }
+  }
+  if(!out.length){alert('생성될 시간이 없습니다. 시간 범위와 상담 시간을 확인해주세요.');return;}
+  if(out.length>400){alert('한 번에 400개까지 만들 수 있습니다. 범위를 줄여주세요.');return;}
+  const have={}; _bk.slots.forEach(function(s){have[s.id]=1;});
+  const nw=out.filter(function(o){return !have[L+'_'+o.start];});
+  if(!nw.length){alert('이미 모두 등록된 시간입니다.');return;}
+  if(!confirm(nw.length+'개의 상담 시간을 추가합니다. (이미 있는 '+(out.length-nw.length)+'개는 건너뜁니다)')) return;
+  await _bkAddSlots(link,nw);
+}
+async function _bkAddSlots(link,list){
+  const db=window._fb.db; const org=String(link.orgId);
+  try{
+    for(let i=0;i<list.length;i+=400){
+      const batch=db.batch();
+      list.slice(i,i+400).forEach(function(o){
+        const id=link.id+'_'+o.start;
+        batch.set(db.collection('counselSlots').doc(id),{id:id,linkId:link.id,orgId:org,start:o.start,end:o.end,booked:false,createdAt:Date.now()});
+      });
+      await batch.commit();
+    }
+  }catch(er){ alert('시간 추가 실패: '+(er.message||er)); }
+  _bk.loaded=''; bkLoad(true);
+}
+async function bkAddOne(){
+  const link=_bk.links.find(function(x){return x.id===_bk.sel;}); if(!link) return;
+  const d=(document.getElementById('bkOd')||{}).value, t=(document.getElementById('bkOt')||{}).value;
+  if(!d||!t){alert('날짜와 시간을 입력해주세요.');return;}
+  const s=_bkMs(d,t); const dur=link.durationMin||30;
+  if(_bk.slots.some(function(x){return x.id===link.id+'_'+s;})){alert('이미 있는 시간입니다.');return;}
+  await _bkAddSlots(link,[{start:s,end:s+dur*60000}]);
+}
+async function bkDelSlot(id){
+  const s=_bk.slots.find(function(x){return x.id===id;}); if(!s) return;
+  if(s.booked){alert('예약이 있는 시간은 삭제할 수 없습니다. 예약을 먼저 취소해주세요.');return;}
+  try{ await window._fb.delete('counselSlots',id); }catch(er){alert('삭제 실패: '+(er.message||er));return;}
+  _bk.slots=_bk.slots.filter(function(x){return x.id!==id;}); render();
+}
+async function bkDelDay(linkId,day){
+  const l=_bk.slots.filter(function(s){return s.linkId===linkId&&_bkDKey(s.start)===day&&!s.booked;});
+  if(!l.length) return; if(!confirm(_bkDLabel(day)+' 비어있는 시간 '+l.length+'개를 삭제할까요?')) return;
+  try{ for(let i=0;i<l.length;i++) await window._fb.delete('counselSlots',l[i].id); }catch(er){alert('삭제 실패: '+(er.message||er));}
+  _bk.loaded=''; bkLoad(true);
+}
+async function bkCancelBooking(slotId){
+  if(!confirm('이 예약을 취소하고 시간을 다시 공개합니다.\n(고객에게 자동 안내는 가지 않으니 직접 연락해주세요.)')) return;
+  try{
+    const db=window._fb.db; const b=db.batch();
+    b.delete(db.collection('counselBookings').doc(slotId));
+    b.update(db.collection('counselSlots').doc(slotId),{booked:false,bookedAt:firebase.firestore.FieldValue.delete()});
+    await b.commit();
+  }catch(er){alert('취소 실패: '+(er.message||er));return;}
+  _bk.loaded=''; bkLoad(true);
+}
+async function bkMark(slotId,st){
+  try{ await window._fb.set('counselBookings',slotId,{status:st}); }catch(er){alert('실패: '+(er.message||er));return;}
+  const b=_bk.books.find(function(x){return x.id===slotId;}); if(b) b.status=st; render();
+}
+function bkCsv(linkId){
+  const rows=[['날짜','시작','종료','보호자','연락처','학생','학년','메모','상태']];
+  _bk.books.filter(function(b){return b.linkId===linkId;}).sort(function(a,b){return a.start-b.start;}).forEach(function(b){
+    rows.push([_bkDKey(b.start),_bkHM(b.start),b.end?_bkHM(b.end):'',b.parentName,b.phone,b.studentName,b.grade,b.memo,b.status==='done'?'완료':'예약']);
+  });
+  const csv='﻿'+rows.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='상담예약_'+linkId+'.csv'; a.click();
+}
+function _bkEditHtml(){
+  const e=_bk.edit; const inp='style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px"';
+  const row=function(l,h){return '<div style="margin-bottom:10px"><div style="font-size:11.5px;color:#666;font-weight:700;margin-bottom:4px">'+l+'</div>'+h+'</div>';};
+  return '<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:18px;max-width:560px">'
+   +'<div style="font-size:14px;font-weight:800;margin-bottom:12px">'+(e.id?'예약 링크 수정':'새 예약 링크')+'</div>'
+   +row('예약 제목 *','<input id="bkTitle" '+inp+' value="'+_bkE(e.title)+'">')
+   +row('안내 문구 (학부모에게 보이는 설명)','<textarea id="bkDesc" rows="3" '+inp+'>'+_bkE(e.desc)+'</textarea>')
+   +row('상담 방식·장소','<input id="bkMethod" '+inp+' placeholder="예: 학원 방문 / 전화 / 화상" value="'+_bkE(e.method)+'">')
+   +row('문의 연락처 (일정 변경·취소용)','<input id="bkContact" '+inp+' placeholder="예: 02-000-0000" value="'+_bkE(e.contact)+'">')
+   +'<div style="display:flex;gap:10px">'+row('상담 시간(분)','<input id="bkDur" type="number" '+inp+' value="'+_bkE(e.durationMin)+'">')+row('예약 마감(상담 몇 분 전까지)','<input id="bkLead" type="number" '+inp+' value="'+_bkE(e.leadMin)+'">')+'</div>'
+   +'<label style="font-size:12.5px;display:block;margin-bottom:12px"><input type="checkbox" id="bkActive" '+(e.active!==false?'checked':'')+'> 예약 받는 중</label>'
+   +'<button onclick="bkSaveLink()" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;cursor:pointer">저장</button> '
+   +'<button onclick="bkCancelEdit()" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:9px 16px;cursor:pointer">취소</button></div>';
+}
+function _bkDetailHtml(){
+  const l=_bk.links.find(function(x){return x.id===_bk.sel;}); if(!l) return '<div style="color:#888">링크를 찾을 수 없습니다.</div>';
+  const slots=_bk.slots.filter(function(s){return s.linkId===l.id;}).sort(function(a,b){return a.start-b.start;});
+  const bk={}; _bk.books.forEach(function(b){bk[b.id]=b;});
+  const days={}; slots.forEach(function(s){(days[_bkDKey(s.start)]=days[_bkDKey(s.start)]||[]).push(s);});
+  const nBooked=slots.filter(function(s){return s.booked;}).length;
+  const inp='style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12.5px"';
+  const wdH=[1,2,3,4,5,6,0].map(function(w){return '<label style="margin-right:8px;font-size:12.5px"><input type="checkbox" id="bkW'+w+'" '+(w>=1&&w<=5?'checked':'')+'> '+'일월화수목금토'[w]+'</label>';}).join('');
+  const dayH=Object.keys(days).sort().map(function(k){
+    const free=days[k].filter(function(s){return !s.booked;}).length;
+    return '<div style="border:1px solid #eee;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:13px">'+_bkDLabel(k)+'</b><span style="font-size:11px;color:#888">예약 '+(days[k].length-free)+' / 전체 '+days[k].length+(free?' <a href="#" onclick="bkDelDay(\''+l.id+'\',\''+k+'\');return false" style="color:#c0392b;margin-left:8px">빈 시간 모두 삭제</a>':'')+'</span></div>'
+      +days[k].map(function(s){
+        const b=bk[s.id];
+        if(s.booked){
+          return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;background:'+(b&&b.status==='done'?'#f1f5f9':'#eef2ff')+';border-radius:8px;margin-bottom:4px;font-size:12.5px"><b style="min-width:92px">'+_bkHM(s.start)+'~'+_bkHM(s.end)+'</b><div style="flex:1">'
+           +(b?_bkE(b.parentName)+' · '+_bkE(b.phone)+'<br><span style="color:#555">학생 '+_bkE(b.studentName)+' ('+_bkE(b.grade)+')'+(b.memo?' — '+_bkE(b.memo):'')+'</span>':'<span style="color:#b45309">예약 정보를 불러오지 못했습니다(규칙 확인)</span>')
+           +'</div><div style="white-space:nowrap">'
+           +(b?'<button onclick="bkMark(\''+s.id+'\',\''+(b.status==='done'?'booked':'done')+'\')" style="font-size:11px;border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer">'+(b.status==='done'?'↩ 예약으로':'✅ 완료')+'</button> ':'')
+           +'<button onclick="bkCancelBooking(\''+s.id+'\')" style="font-size:11px;border:1px solid #fca5a5;color:#b91c1c;background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer">예약취소</button></div></div>';
+        }
+        return '<span style="display:inline-block;margin:0 6px 4px 0;padding:4px 8px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;font-size:12px">'+_bkHM(s.start)+' <a href="#" onclick="bkDelSlot(\''+s.id+'\');return false" style="color:#c0392b;text-decoration:none;margin-left:4px">✕</a></span>';
+      }).join('')+'</div>';
+  }).join('') || '<div style="color:#888;font-size:12.5px;padding:10px">아직 등록된 시간이 없습니다. 위에서 시간을 만들어주세요.</div>';
+  return '<div style="margin-bottom:10px"><button onclick="bkBack()" style="background:none;border:1px solid #ddd;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 예약 링크 목록</button></div>'
+   +'<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:16px;margin-bottom:14px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><div style="font-size:15px;font-weight:800">'+_bkE(l.title)+(l.active===false?' <span style="color:#b91c1c;font-size:11px">(예약 중지)</span>':'')+'</div><div style="font-size:11.5px;color:#777;margin-top:3px">'+l.durationMin+'분 · 예약 '+nBooked+'건 / 시간 '+slots.length+'개 · 상담 '+l.leadMin+'분 전 마감'+(l.method?' · '+_bkE(l.method):'')+'</div></div>'
+   +'<div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="bkCopy(\''+l.id+'\')" style="background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">🔗 링크복사</button>'
+   +'<button onclick="window.open(bkLinkUrl(\''+l.id+'\'))" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">👀 미리보기</button>'
+   +'<button onclick="bkEditLink(\''+l.id+'\')" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">✏️ 수정</button>'
+   +'<button onclick="bkToggleActive(\''+l.id+'\')" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">'+(l.active===false?'▶ 예약 재개':'⏸ 예약 중지')+'</button>'
+   +'<button onclick="bkCsv(\''+l.id+'\')" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">⬇ 엑셀(CSV)</button>'
+   +'<button onclick="bkDelLink(\''+l.id+'\')" style="border:1px solid #fca5a5;color:#b91c1c;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">🗑 삭제</button></div></div></div>'
+   +'<div style="background:#f8faff;border:1px solid #dbe4ff;border-radius:14px;padding:14px;margin-bottom:14px"><div style="font-size:13px;font-weight:800;margin-bottom:8px">⏱ 상담 시간 한꺼번에 만들기</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">날짜 <input type="date" id="bkG1" '+inp+'> ~ <input type="date" id="bkG2" '+inp+'></div>'
+   +'<div style="margin:8px 0">'+wdH+'</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">시간 <input type="time" id="bkGs" value="14:00" '+inp+'> ~ <input type="time" id="bkGe" value="20:00" '+inp+'> · 상담 <input type="number" id="bkGd" value="'+l.durationMin+'" style="width:60px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분 · 사이 간격 <input type="number" id="bkGg" value="0" style="width:50px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분</div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;margin-top:8px">제외(식사·휴식) <input type="time" id="bkGls" '+inp+'> ~ <input type="time" id="bkGle" '+inp+'> <span style="color:#999">(선택)</span></div>'
+   +'<button onclick="bkGenerate()" style="margin-top:10px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;cursor:pointer">시간 만들기</button>'
+   +'<div style="margin-top:12px;font-size:12.5px;border-top:1px dashed #cbd5e1;padding-top:10px">하나만 추가: <input type="date" id="bkOd" '+inp+'> <input type="time" id="bkOt" '+inp+'> <button onclick="bkAddOne()" style="border:1px solid #3b5bdb;color:#3b5bdb;background:#fff;border-radius:6px;padding:6px 12px;cursor:pointer">추가</button></div></div>'
+   +dayH;
+}
+function renderBookingAdmin(){
+  const org=_bkOrg();
+  const back='<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>';
+  if(!org) return back+'<div style="padding:20px;color:#777;font-size:13px">설문조사함 상단에서 <b>기관을 먼저 선택</b>해주세요. 예약 링크는 기관별로 관리됩니다.</div>';
+  if(_bk.loaded!==org){ bkLoad(); return back+'<div style="padding:20px;color:#777">불러오는 중…</div>'; }
+  if(_bk.edit) return back+_bkEditHtml();
+  if(_bk.sel) return back+_bkDetailHtml();
+  const cards=_bk.links.map(function(l){
+    const sl=_bk.slots.filter(function(s){return s.linkId===l.id;}); const nb=sl.filter(function(s){return s.booked;}).length;
+    const up=sl.filter(function(s){return !s.booked&&s.start>Date.now();}).length;
+    return '<div style="background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:16px;cursor:pointer" onclick="bkOpenLink(\''+l.id+'\')"><div style="font-size:14px;font-weight:800">📅 '+_bkE(l.title)+(l.active===false?' <span style="color:#b91c1c;font-size:11px">중지</span>':'')+'</div><div style="font-size:11.5px;color:#888;margin-top:6px">예약 '+nb+'건 · 남은 빈 시간 '+up+'개</div><div style="text-align:right;margin-top:8px"><span style="font-size:11.5px;color:#3b5bdb;font-weight:700">시간·예약 관리 →</span></div>'
+     +'<button onclick="event.stopPropagation();bkCopy(\''+l.id+'\')" style="width:100%;margin-top:6px;background:#f0fdf4;color:#0f9d58;border:1px solid #bbf7d0;border-radius:6px;padding:7px;font-size:11.5px;font-weight:700;cursor:pointer">🔗 링크복사</button></div>';
+  }).join('');
+  return back+'<div style="font-size:15px;font-weight:900;margin-bottom:4px">📅 상담 예약 링크</div><div style="font-size:11px;color:#777;margin-bottom:12px">상담 가능한 시간을 등록하고 링크를 보내면, 학부모가 빈 시간을 눌러 예약합니다. 예약된 시간은 다른 사람에게 자동으로 사라집니다.'+(_bk.msg?'<br><span style="color:#b91c1c">'+_bkE(_bk.msg)+'</span>':'')+'</div>'
+   +'<button onclick="bkNew()" style="background:#0f2540;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:14px">+ 새 예약 링크 만들기</button>'
+   +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">'+cards+'</div>';
+}
+function _bkHubCardHtml(){
+  const org=_bkOrg(); const n=(_bk.loaded===org)?_bk.books.filter(function(b){return b.status!=='done'&&b.start>Date.now();}).length:0;
+  return '<div style="background:#fff;border:1.5px solid #c7e9d4;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen(\'booking\')"><div style="display:flex;justify-content:space-between"><div style="font-size:14px;font-weight:800;color:#166534">📅 상담 예약</div>'+(n?'<span style="background:#16a34a;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">예정 '+n+'</span>':'')+'</div><div style="font-size:11.5px;color:#888;margin-top:6px">가능 시간을 등록하고 링크를 보내면 학부모가 직접 예약</div><div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#166534;font-weight:700">예약 관리 →</span></div></div>';
 }
 
 let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final' | 'buildup' | 'activity' | 'aar' | 'mockapply'
