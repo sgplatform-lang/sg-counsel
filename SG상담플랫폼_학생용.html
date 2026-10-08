@@ -6339,7 +6339,7 @@ function xpStopSw(){ if(_xpSw&&_xpSw.iv) clearInterval(_xpSw.iv); if(_xpSw){ _xp
 //  · 읽기 전용. 컬렉션 xlabGradesPub (학생 본인 문서만 읽기 가능 — Firestore 규칙 필요)
 // 이름 규칙: xgs* = 학점 학생 모듈
 // ════════════════════════════════════════════════════════════════════════
-let _xgsLoaded=false,_xgsLoading=false,_xgsDocs=[],_xgsOpen={};
+let _xgsLoaded=false,_xgsLoading=false,_xgsDocs=[],_xgsOpen={},_xgsRev=[];
 const XGS_KIND={topic:'📘 월별주제활동',subject:'📗 월별교과활동',final:'🏆 최종예상세특',self:'🎯 월별셀프활동',file:'📌 수행평가 파일'};
 function _xgsE(s){ return xclEsc(s); }
 function _xgsColor(g){ return g==='A+'?'#7c3aed':g==='A'?'#16a34a':(g==='B+'||g==='B')?'#2563eb':(g==='C+'||g==='C')?'#d97706':(g==='D+'||g==='D')?'#ea580c':'#dc2626'; }
@@ -6348,7 +6348,20 @@ async function xgsEnsureLoaded(){
   _xgsLoading=true; render();
   try{ _xgsDocs=((await window._fb.getWhere('xlabGradesPub','studentId','==',String(CU.id)))||[]).sort(function(a,b){return (b.itemDate||b.publishedAt||0)-(a.itemDate||a.publishedAt||0);}); }
   catch(e){ console.warn('학점 로딩 실패:',e.message); _xgsDocs=[]; }
+  try{ _xgsRev=((await window._fb.getWhere('xlabReviewPub','studentId','==',String(CU.id)))||[]).sort(function(a,b){return (b.sharedAt||0)-(a.sharedAt||0);}); }
+  catch(e){ console.warn('첨삭 질문 로딩 실패:',e.message); _xgsRev=[]; }
   _xgsLoaded=true; _xgsLoading=false; render();
+}
+async function xgsAck(id,v){ const r=_xgsRev.find(function(x){return x.id===id;}); if(!r) return; try{ await window._fb.set('xlabReviewPub',id,{ack:!!v,ackAt:v?Date.now():0}); r.ack=!!v; r.ackAt=v?Date.now():0; render(); }catch(e){ alert('저장하지 못했어요: '+e.message); } }
+function _xgsRevHtml(){
+  if(!_xgsRev.length) return '';
+  let h='<div style="background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:14px;padding:12px 14px;margin-bottom:14px"><div style="font-weight:900;font-size:14px;margin-bottom:2px">🤖 선생님이 보내준 첨삭 질문</div><div style="font-size:12px;color:#64748b;margin-bottom:8px">문장을 대신 고쳐 주는 게 아니라, 스스로 생각해 보라는 질문이에요. 읽고 내용을 다듬은 뒤 “반영했어요”를 눌러 주세요.</div>';
+  _xgsRev.forEach(function(r){
+    h+='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">'+_xgsE(r.title||'')+'</b>'+(r.targetLabel?'<span style="font-size:11.5px;color:#94a3b8">'+_xgsE(r.targetLabel)+'</span>':'')+'</div>';
+    (r.items||[]).forEach(function(x,i){ h+='<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0"><div>'+xclSymChip(x.sym,true)+' <span style="font-size:12px;color:#64748b">'+_xgsE(xclSym(x.sym).def)+'</span></div>'+(x.quote?'<div style="font-size:12.5px;color:#475569;background:#f8fafc;border-left:3px solid #cbd5e1;padding:5px 9px;margin-top:5px">“'+_xgsE(x.quote)+'”</div>':'')+'<div style="font-size:13.5px;line-height:1.6;margin-top:5px"><b>Q'+(i+1)+'.</b> '+_xgsE(x.q)+'</div></div>'; });
+    h+='<div style="margin-top:10px;text-align:right">'+(r.ack?'<span style="font-size:12.5px;color:#16a34a;font-weight:700">✅ 반영했어요</span> <a href="#" onclick="xgsAck(\''+_xgsE(r.id)+'\',false);return false" style="font-size:11.5px;color:#94a3b8">되돌리기</a>':'<button onclick="xgsAck(\''+_xgsE(r.id)+'\',true)" style="background:#0d9488;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;font-size:12.5px;cursor:pointer">✅ 반영했어요</button>')+'</div></div>';
+  });
+  return h+'</div>';
 }
 function xgsReload(){ _xgsLoaded=false; _xgsLoading=false; xgsEnsureLoaded(); }
 function xgsToggle(id){ _xgsOpen[id]=!_xgsOpen[id]; render(); }
@@ -6357,8 +6370,8 @@ function renderXgradeStu(){
   if(!_xgsLoaded){ xgsEnsureLoaded(); return _xlabTopModeBar()+'<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>'; }
   const docs=_xgsDocs; const gp=docs.length?docs.reduce(function(a,d){return a+Number(d.gp||0);},0)/docs.length:null; const avg=docs.length?Math.round(docs.reduce(function(a,d){return a+Number(d.total||0);},0)/docs.length*10)/10:null;
   let h=_xlabTopModeBar()+'<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><b style="font-size:16px">🎓 내 학점</b><span style="flex:1;font-size:12px;color:#94a3b8">선생님이 공개한 평가만 보여요.</span><button onclick="xgsReload()" style="border:none;background:#e2e8f0;border-radius:8px;padding:7px 12px;font-weight:800;font-size:12px;cursor:pointer">↻ 새로고침</button></div>';
-  if(!docs.length) return h+'<div style="text-align:center;color:#94a3b8;padding:36px;border:2px dashed #cbd5e1;border-radius:14px;font-size:13.5px;line-height:1.7">아직 공개된 평가가 없어요.<br>선생님이 평가를 마치고 공개하면 여기에 나타나요.</div>';
-  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">'+[['평점평균',gp===null?'-':gp.toFixed(2)+' / 4.5'],['평균 점수',avg===null?'-':avg+'점'],['평가',docs.length+'건']].map(function(c){ return '<div style="background:#f8fafc;border-radius:12px;padding:10px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:700">'+c[0]+'</div><div style="font-size:18px;font-weight:900">'+c[1]+'</div></div>'; }).join('')+'</div>';
+  if(!docs.length) return h+_xgsRevHtml()+'<div style="text-align:center;color:#94a3b8;padding:36px;border:2px dashed #cbd5e1;border-radius:14px;font-size:13.5px;line-height:1.7">아직 공개된 평가가 없어요.<br>선생님이 평가를 마치고 공개하면 여기에 나타나요.</div>';
+  h+=_xgsRevHtml()+'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">'+[['평점평균',gp===null?'-':gp.toFixed(2)+' / 4.5'],['평균 점수',avg===null?'-':avg+'점'],['평가',docs.length+'건']].map(function(c){ return '<div style="background:#f8fafc;border-radius:12px;padding:10px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:700">'+c[0]+'</div><div style="font-size:18px;font-weight:900">'+c[1]+'</div></div>'; }).join('')+'</div>';
   const groups={}; docs.forEach(function(d){ const m=_xgsMonth(d.itemDate||d.publishedAt); (groups[m]=groups[m]||[]).push(d); });
   Object.keys(groups).sort().reverse().forEach(function(m){
     const g=groups[m], mg=g.reduce(function(a,d){return a+Number(d.gp||0);},0)/g.length;
