@@ -57787,7 +57787,7 @@ function _bkMs(dateStr,hm){const a=dateStr.split('-').map(Number),b=hm.split(':'
 const _bk={ orgId:'', links:[], slots:[], books:[], loaded:'', loading:false, sel:null, edit:null, gen:{}, msg:'' };
 function _bkOrg(){ return (typeof _rmSurveyHubMyOrgId==='function')?_rmSurveyHubMyOrgId():''; }
 function _bkOrgName(id){ try{ const o=(JSON.parse(localStorage.getItem(SK_ORGS)||'[]')).find(function(x){return String(x.id)===String(id);}); return o?o.name:''; }catch(e){return '';} }
-async function bkLoad(force){
+async function bkLoad(force,silent){
   const org=_bkOrg(); if(!org) return;
   if(!force && _bk.loaded===org) return;
   if(_bk.loading) return; _bk.loading=true;
@@ -57798,8 +57798,19 @@ async function bkLoad(force){
     _bk.links=r[0].sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
     _bk.slots=r[1]; _bk.books=r[2]; _bk.loaded=org;
   }catch(e){ console.warn('bkLoad',e); _bk.msg='불러오기 실패: '+(e.message||e)+' (Firestore 규칙 적용 여부를 확인하세요)'; _bk.loaded=org; }
-  _bk.loading=false; render();
+  _bk.loading=false;
+  if(silent){ const ae=document.activeElement; const busy=_bk.edit||(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName))||['bkG1','bkG2','bkOd','bkOt'].some(function(i){const e=document.getElementById(i);return e&&e.value;}); if(busy) return; }
+  render();
 }
+let _bkTimer=null;
+function _bkAutoRefresh(){
+  if(_bkTimer) return;
+  _bkTimer=setInterval(function(){
+    if(ST._surveyHubView!=='booking'||document.hidden){ return; }
+    bkLoad(true,true);
+  },20000);
+}
+function bkRefresh(){ _bk.msg=''; bkLoad(true); }
 function bkLinkUrl(id){ return location.origin+location.pathname.replace(/[^/]*$/,'')+encodeURIComponent(BK_FILE)+'?link='+encodeURIComponent(id); }
 function bkCopy(id){ const u=bkLinkUrl(id); if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(function(){alert('예약 링크를 복사했습니다:\n\n'+u+'\n\n학부모·상담 희망자에게 보내주세요.');}).catch(function(){prompt('아래 링크를 복사하세요:',u);}); } else prompt('아래 링크를 복사하세요:',u); }
 function bkOpenLink(id){ _bk.sel=id; _bk.edit=null; _bk.msg=''; render(); }
@@ -57997,8 +58008,9 @@ function _bkDetailHtml(){
 }
 function renderBookingAdmin(){
   const org=_bkOrg();
-  const back='<div style="margin-bottom:10px"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button></div>';
+  const back='<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center"><button onclick="RM_surveyHubBack()" style="background:none;border:1px solid #ddd;color:#333;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← 설문조사함</button><button onclick="bkRefresh()" style="background:#fff;border:1px solid #3b5bdb;color:#3b5bdb;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🔄 새로고침</button><span style="font-size:11px;color:#999">20초마다 자동으로 새 예약을 확인합니다</span></div>';
   if(!org) return back+'<div style="padding:20px;color:#777;font-size:13px">설문조사함 상단에서 <b>기관을 먼저 선택</b>해주세요. 예약 링크는 기관별로 관리됩니다.</div>';
+  _bkAutoRefresh();
   if(_bk.loaded!==org){ bkLoad(); return back+'<div style="padding:20px;color:#777">불러오는 중…</div>'; }
   if(_bk.edit) return back+_bkEditHtml();
   if(_bk.sel) return back+_bkDetailHtml();
@@ -58013,7 +58025,7 @@ function renderBookingAdmin(){
    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">'+cards+'</div>';
 }
 function _bkHubCardHtml(){
-  const org=_bkOrg(); const n=(_bk.loaded===org)?_bk.books.filter(function(b){return b.status!=='done'&&b.start>Date.now();}).length:0;
+  const org=_bkOrg(); if(org&&_bk.loaded!==org&&!_bk.loading) bkLoad(); const n=(_bk.loaded===org)?_bk.books.filter(function(b){return b.status!=='done'&&b.start>Date.now();}).length:0;
   return '<div style="background:#fff;border:1.5px solid #c7e9d4;border-radius:14px;padding:18px;cursor:pointer" onclick="RM_surveyHubOpen(\'booking\')"><div style="display:flex;justify-content:space-between"><div style="font-size:14px;font-weight:800;color:#166534">📅 상담 예약</div>'+(n?'<span style="background:#16a34a;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px">예정 '+n+'</span>':'')+'</div><div style="font-size:11.5px;color:#888;margin-top:6px">가능 시간을 등록하고 링크를 보내면 학부모가 직접 예약</div><div style="text-align:right;margin-top:10px"><span style="font-size:11.5px;color:#166534;font-weight:700">예약 관리 →</span></div></div>';
 }
 
