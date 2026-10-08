@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>상담 예약</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
+<style>
+  :root{ --bg:#f4f6fb; --card:#fff; --ink:#1b2440; --muted:#6b7490; --line:#dfe3ee; --accent:#2f4ea2; --accent-soft:#e8edfb; --ok:#0f766e; --warn:#b45309; --bad:#b91c1c; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Pretendard Variable',Pretendard,-apple-system,'Malgun Gothic',sans-serif;line-height:1.6}
+  .wrap{max-width:560px;margin:0 auto;padding:20px 16px 56px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+  h1{font-size:22px;margin:0 0 4px}
+  .org{font-size:13px;color:var(--muted);font-weight:600}
+  .desc{font-size:14px;color:#3a4361;white-space:pre-wrap;margin-top:10px}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .chip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:3px 11px;font-size:12.5px;font-weight:700}
+  h2{font-size:15px;margin:0 0 10px}
+  .dates{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
+  .date{flex:none;min-width:68px;text-align:center;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:8px 6px;cursor:pointer;font-family:inherit;color:var(--ink)}
+  .date b{display:block;font-size:17px}.date span{font-size:12px;color:var(--muted)}
+  .date.on{border-color:var(--accent);background:var(--accent);color:#fff}.date.on span{color:#dbe4ff}
+  .times{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:10px}
+  .time{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:10px 4px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;color:var(--ink)}
+  .time.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  label.f{display:block;font-size:13px;color:var(--muted);font-weight:700;margin:12px 0 4px}
+  input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;color:var(--ink);background:#fff}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .req{color:var(--bad)}
+  .consent{background:#f8f9fd;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:#3a4361;margin-top:14px}
+  .consent label{display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:700;font-size:13.5px;color:var(--ink)}
+  .consent input{width:18px;height:18px;margin-top:2px;flex:none}
+  .btn{width:100%;border:none;border-radius:12px;background:var(--accent);color:#fff;font-weight:800;font-size:16px;padding:14px;margin-top:16px;cursor:pointer;font-family:inherit}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn.sub{background:#e8edfb;color:var(--accent);margin-top:10px}
+  .msg{margin-top:12px;font-size:13.5px;border-radius:10px;padding:10px 12px}
+  .msg.err{background:#fef2f2;color:var(--bad);border:1px solid #fecaca}
+  .center{text-align:center;color:var(--muted);padding:30px 10px;font-size:14.5px}
+  .done{text-align:center}
+  .done .big{font-size:44px}
+  .sum{background:var(--accent-soft);border-radius:12px;padding:14px;margin:14px 0;text-align:left;font-size:15px}
+  .sum b{color:var(--accent)}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  .foot{text-align:center;font-size:11.5px;color:#9aa3bd;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="center">불러오는 중…</div></div>
+<script>
+let _db=null;
+const SG_RECAPTCHA_SITE_KEY='6LcoRrEtAAAAAG2W-Q8g-rhXW7j53hB6peh2DOFZ';
+try{
+  firebase.initializeApp({
+    apiKey:"AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
+    authDomain:"sg-counsel.firebaseapp.com",
+    projectId:"sg-counsel",
+    storageBucket:"sg-counsel.firebasestorage.app",
+    messagingSenderId:"134794459070",
+    appId:"1:134794459070:web:a636cac4df344bd26e2bef"
+  });
+  try{ firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),true); }catch(e){ console.warn('App Check 활성화 실패(무시하고 진행):',e.message); }
+  _db=firebase.firestore();
+  _db.settings({experimentalAutoDetectLongPolling:true});
+}catch(e){ console.warn('Firebase 초기화 실패:',e.message); }
+
+const params=new URLSearchParams(location.search);
+const LINK=(params.get('link')||'').trim();
+let notice='', link=null, slots=[], selDate='', selSlot=null, busy=false, done=null, bkf={parent:'',phone:'',student:'',grade:'',memo:'',consent:false};
+const GRADES=['초5','초6','중1','중2','중3','고1','고2','고3','N수·기타'];
+const WD=['일','월','화','수','목','금','토'];
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function kst(ms){ return new Date(Number(ms)+9*3600*1000); }               // 한국 시간으로 읽기 위해 +9시간한 Date(UTC 메서드로만 사용)
+function dkey(ms){ return kst(ms).toISOString().slice(0,10); }
+function hhmm(ms){ return kst(ms).toISOString().slice(11,16); }
+function dlabel(ms){ const d=kst(ms); return (d.getUTCMonth()+1)+'월 '+d.getUTCDate()+'일 ('+WD[d.getUTCDay()]+')'; }
+function $(id){ return document.getElementById(id); }
+
+async function init(){
+  if(!_db||!LINK){ return closed('올바르지 않은 예약 링크입니다. 학원에서 받은 링크를 다시 확인해 주세요.'); }
+  try{
+    const ld=await _db.collection('counselBookingLinks').doc(LINK).get();
+    if(!ld.exists) return closed('예약 링크를 찾을 수 없습니다. 학원에서 받은 링크를 다시 확인해 주세요.');
+    link=ld.data();
+    if(link.active===false) return closed('지금은 예약을 받지 않는 링크입니다.'+(link.contact?'\n문의: '+link.contact:''));
+    await loadSlots();
+  }catch(e){ console.warn(e); return closed('예약 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'); }
+  draw();
+}
+async function loadSlots(){
+  const q=await _db.collection('counselSlots').where('linkId','==',LINK).where('booked','==',false).get();
+  const lead=(link.leadMin==null?120:Number(link.leadMin))*60000, now=Date.now();
+  slots=q.docs.map(function(d){return d.data();}).filter(function(s){return Number(s.start)>now+lead;}).sort(function(a,b){return a.start-b.start;});
+  const days=Array.from(new Set(slots.map(function(s){return dkey(s.start);})));
+  if(!selDate||days.indexOf(selDate)<0) selDate=days[0]||'';
+  if(selSlot&&!slots.some(function(s){return s.id===selSlot;})) selSlot=null;
+}
+function closed(t){ $('app').innerHTML='<div class="card"><div class="center" style="white-space:pre-wrap">'+esc(t)+'</div></div>'; }
+function header(){
+  return '<div class="card"><div class="org">'+esc(link.orgName||'')+'</div><h1>'+esc(link.title||'상담 예약')+'</h1>'
+   +(link.desc?'<div class="desc">'+esc(link.desc)+'</div>':'')
+   +'<div class="meta">'+(link.durationMin?'<span class="chip">⏱ '+esc(link.durationMin)+'분</span>':'')+(link.method?'<span class="chip">📍 '+esc(link.method)+'</span>':'')+(link.contact?'<span class="chip">☎ '+esc(link.contact)+'</span>':'')+'</div></div>';
+}
+function draw(){
+  if(done) return drawDone();
+  const days=Array.from(new Set(slots.map(function(s){return dkey(s.start);})));
+  let h=header();
+  if(notice){ h+='<div class="msg err" style="margin:0 0 12px">'+esc(notice)+'</div>'; }
+  if(!slots.length){ $('app').innerHTML=h+'<div class="card"><div class="center">현재 예약 가능한 시간이 없습니다.<br>'+(link.contact?'문의: '+esc(link.contact):'학원으로 문의해 주세요.')+'</div></div>'; return; }
+  h+='<div class="card"><h2>① 날짜와 시간을 선택하세요</h2><div class="dates">'+days.map(function(k){ const ms=slots.find(function(s){return dkey(s.start)===k;}).start; const d=kst(ms); const n=slots.filter(function(s){return dkey(s.start)===k;}).length;
+    return '<button class="date '+(k===selDate?'on':'')+'" onclick="pickDate(\''+k+'\')"><span>'+WD[d.getUTCDay()]+'</span><b>'+(d.getUTCMonth()+1)+'/'+d.getUTCDate()+'</b><span>'+n+'개</span></button>'; }).join('')+'</div>'
+   +'<div class="times">'+slots.filter(function(s){return dkey(s.start)===selDate;}).map(function(s){ return '<button class="time '+(s.id===selSlot?'on':'')+'" onclick="pickSlot(\''+esc(s.id)+'\')">'+hhmm(s.start)+'</button>'; }).join('')+'</div></div>';
+  if(selSlot){ const s=slots.find(function(x){return x.id===selSlot;});
+    h+='<div class="card"><h2>② 예약 정보를 입력하세요</h2><div class="sum">선택한 일정: <b>'+dlabel(s.start)+' '+hhmm(s.start)+(s.end?' ~ '+hhmm(s.end):'')+'</b></div>'
+     +'<label class="f">보호자(학부모) 성함 <span class="req">*</span></label><input id="f_parent" value="'+esc(bkf.parent)+'" oninput="bkf.parent=this.value" maxlength="30" autocomplete="name">'
+     +'<label class="f">연락처 <span class="req">*</span></label><input id="f_phone" value="'+esc(bkf.phone)+'" oninput="bkf.phone=this.value" inputmode="tel" placeholder="010-0000-0000" maxlength="20" autocomplete="tel">'
+     +'<label class="f">학생 이름 <span class="req">*</span></label><input id="f_student" value="'+esc(bkf.student)+'" oninput="bkf.student=this.value" maxlength="30">'
+     +'<label class="f">학년 <span class="req">*</span></label><select id="f_grade" onchange="bkf.grade=this.value"><option value="">선택</option>'+GRADES.map(function(g){return '<option '+(bkf.grade===g?'selected':'')+'>'+g+'</option>';}).join('')+'</select>'
+     +'<label class="f">상담받고 싶은 내용 (선택)</label><textarea id="f_memo" rows="3" maxlength="300" oninput="bkf.memo=this.value" placeholder="예) 내신 관리, 수시/정시 방향, 희망 학과 상담">'+esc(bkf.memo)+'</textarea>'
+     +'<input class="hp" id="f_hp" tabindex="-1" autocomplete="off" aria-hidden="true">'
+     +'<div class="consent"><b>개인정보 수집·이용 안내</b><br>· 수집 항목: 보호자 성함, 연락처, 학생 이름·학년, 상담 희망 내용<br>· 이용 목적: 상담 일정 확정 및 안내, 상담 진행<br>· 보유 기간: 상담 종료 후 1년 이내 파기 (학원 내부 기준에 따름)<br>· 동의하지 않을 수 있으나, 동의하지 않으면 예약이 어렵습니다.'
+     +'<label><input type="checkbox" id="f_consent" '+(bkf.consent?'checked':'')+' onchange="bkf.consent=this.checked">개인정보 수집·이용에 동의합니다. <span class="req">*</span></label></div>'
+     +'<div id="err"></div><button class="btn" id="goBtn" onclick="submitBooking()">'+(busy?'예약 중…':'이 시간으로 예약하기')+'</button></div>'; }
+  h+='<div class="foot">예약 후 변경·취소는 학원으로 연락해 주세요.</div>';
+  $('app').innerHTML=h;
+}
+function pickDate(k){ notice=''; selDate=k; selSlot=null; draw(); }
+function pickSlot(id){ notice=''; selSlot=id; draw(); setTimeout(function(){ const e=$('f_parent'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },50); }
+function err(t){ const e=$('err'); if(e) e.innerHTML='<div class="msg err">'+esc(t)+'</div>'; }
+function digits(s){ return String(s||'').replace(/\D/g,''); }
+async function submitBooking(){
+  if(busy) return; const s=slots.find(function(x){return x.id===selSlot;}); if(!s){ err('시간을 먼저 선택해 주세요.'); return; }
+  if(($('f_hp')||{}).value) return;                                    // 봇 방지(숨김 입력칸이 채워지면 무시)
+  const f={parent:bkf.parent.trim(),phone:bkf.phone.trim(),student:bkf.student.trim(),grade:bkf.grade,memo:bkf.memo.trim()};
+  if(f.parent.length<2) return err('보호자 성함을 입력해 주세요.');
+  const dg=digits(f.phone); if(dg.length<9||dg.length>11) return err('연락처를 정확히 입력해 주세요. (예: 010-1234-5678)');
+  if(f.student.length<2) return err('학생 이름을 입력해 주세요.');
+  if(!f.grade) return err('학년을 선택해 주세요.');
+  if(!bkf.consent) return err('개인정보 수집·이용에 동의해 주세요.');
+  busy=true; draw();
+  const now=Date.now();
+  try{
+    const batch=_db.batch();
+    batch.set(_db.collection('counselBookings').doc(s.id),{id:s.id,slotId:s.id,linkId:LINK,orgId:link.orgId,parentName:f.parent,phone:f.phone,studentName:f.student,grade:f.grade,memo:f.memo,status:'booked',start:s.start,end:s.end||null,createdAt:now,consent:true});
+    batch.update(_db.collection('counselSlots').doc(s.id),{booked:true,bookedAt:now});
+    await batch.commit();                                              // 같은 시간을 동시에 예약하면 한 명만 성공, 나머지는 여기서 거부됨
+    done={slot:s,f:f}; busy=false; draw();
+  }catch(e){
+    busy=false; console.warn(e);
+    const taken=/permission|already|exists|aborted/i.test(String(e&&(e.code||e.message)));
+    try{ await loadSlots(); }catch(x){}
+    selSlot=null; notice=taken?'방금 다른 분이 먼저 예약한 시간입니다. 다른 시간을 선택해 주세요.':'예약에 실패했습니다. 잠시 후 다시 시도해 주세요. ('+(e&&e.code||'오류')+')'; draw(); return;
+    err(taken?'방금 다른 분이 먼저 예약한 시간입니다. 다른 시간을 선택해 주세요.':'예약에 실패했습니다. 잠시 후 다시 시도해 주세요. ('+(e&&e.code||'오류')+')');
+  }
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function icsTime(ms){ const d=new Date(Number(ms)); return d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())+'T'+pad(d.getUTCHours())+pad(d.getUTCMinutes())+'00Z'; }
+function downloadIcs(){
+  const s=done.slot, end=s.end||(Number(s.start)+(Number(link.durationMin)||30)*60000);
+  const t=(link.title||'상담')+(link.orgName?' - '+link.orgName:'');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//SG상담플랫폼//KO','BEGIN:VEVENT','UID:'+s.id+'@sg-counsel','DTSTAMP:'+icsTime(Date.now()),'DTSTART:'+icsTime(s.start),'DTEND:'+icsTime(end),'SUMMARY:'+t.replace(/[,;\n]/g,' '),'LOCATION:'+String(link.method||'').replace(/[,;\n]/g,' '),'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'})); a.download='상담예약.ics'; document.body.appendChild(a); a.click(); a.remove();
+}
+function drawDone(){
+  const s=done.slot;
+  $('app').innerHTML=header()+'<div class="card done"><div class="big">✅</div><h2 style="font-size:20px">예약이 완료되었습니다</h2>'
+   +'<div class="sum"><b>'+dlabel(s.start)+' '+hhmm(s.start)+(s.end?' ~ '+hhmm(s.end):'')+'</b><br>보호자: '+esc(done.f.parent)+' · 학생: '+esc(done.f.student)+' ('+esc(done.f.grade)+')'+(link.method?'<br>장소·방식: '+esc(link.method):'')+'</div>'
+   +'<button class="btn sub" onclick="downloadIcs()">📅 내 캘린더에 저장하기</button>'
+   +'<div style="font-size:12.5px;color:var(--muted);margin-top:14px">이 화면을 캡처해 두시면 좋습니다.<br>일정 변경·취소는 '+(link.contact?esc(link.contact)+'로 ':'학원으로 ')+'연락해 주세요.</div></div>';
+}
+init();
+</script>
+</body>
+</html>
