@@ -4761,7 +4761,7 @@ async function xlabGenerateRecord(){
       department:t.department, topic:t.topicTitle, reportSummary: reportSummary.slice(0,2000),
       subject, motivation, relatedActivity, linkedActivity,
     });
-    t.expectedRecord = { subject, motivation, relatedActivity, linkedActivity, recordText:r.recordText, generatedAt:Date.now() };
+    t.expectedRecord = { subject, motivation, relatedActivity, linkedActivity, recordText:r.recordText, aiText:r.recordText, generatedAt:Date.now() };
     _xlabRecordWizardStep = 0;
   }catch(e){
     alert('예상세특 생성 중 오류가 발생했습니다: '+e.message);
@@ -6334,6 +6334,45 @@ function xpSwToggle(){ _xpSw=_xpSw||{acc:0,t0:0,iv:null}; const b=document.getEl
 function xpSwReset(){ xpStopSw(); _xpSw=null; _xpSwDraw(); const b=document.getElementById('xpSwBtn'); if(b) b.textContent='▶ 시작'; }
 function xpStopSw(){ if(_xpSw&&_xpSw.iv) clearInterval(_xpSw.iv); if(_xpSw){ _xpSw.t0=0; } }
 
+// ════════════════════════════════════════════════════════════════════════
+// 🎓 X-lab · 내 학점 (학생용, 2026-10-08 신규) — 선생님이 "공개"한 평가만 보임
+//  · 읽기 전용. 컬렉션 xlabGradesPub (학생 본인 문서만 읽기 가능 — Firestore 규칙 필요)
+// 이름 규칙: xgs* = 학점 학생 모듈
+// ════════════════════════════════════════════════════════════════════════
+let _xgsLoaded=false,_xgsLoading=false,_xgsDocs=[],_xgsOpen={};
+const XGS_KIND={topic:'📘 월별주제활동',subject:'📗 월별교과활동',final:'🏆 최종예상세특',self:'🎯 월별셀프활동',file:'📌 수행평가 파일'};
+function _xgsE(s){ return xclEsc(s); }
+function _xgsColor(g){ return g==='A+'?'#7c3aed':g==='A'?'#16a34a':(g==='B+'||g==='B')?'#2563eb':(g==='C+'||g==='C')?'#d97706':(g==='D+'||g==='D')?'#ea580c':'#dc2626'; }
+async function xgsEnsureLoaded(){
+  if(_xgsLoaded||_xgsLoading||!FB()||!CU) return;
+  _xgsLoading=true; render();
+  try{ _xgsDocs=((await window._fb.getWhere('xlabGradesPub','studentId','==',String(CU.id)))||[]).sort(function(a,b){return (b.itemDate||b.publishedAt||0)-(a.itemDate||a.publishedAt||0);}); }
+  catch(e){ console.warn('학점 로딩 실패:',e.message); _xgsDocs=[]; }
+  _xgsLoaded=true; _xgsLoading=false; render();
+}
+function xgsReload(){ _xgsLoaded=false; _xgsLoading=false; xgsEnsureLoaded(); }
+function xgsToggle(id){ _xgsOpen[id]=!_xgsOpen[id]; render(); }
+function _xgsMonth(ts){ if(!ts) return '날짜 없음'; const d=new Date(ts); return isNaN(d.getTime())?'날짜 없음':(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')); }
+function renderXgradeStu(){
+  if(!_xgsLoaded){ xgsEnsureLoaded(); return _xlabTopModeBar()+'<div style="text-align:center;color:#888;padding:40px">불러오는 중...</div>'; }
+  const docs=_xgsDocs; const gp=docs.length?docs.reduce(function(a,d){return a+Number(d.gp||0);},0)/docs.length:null; const avg=docs.length?Math.round(docs.reduce(function(a,d){return a+Number(d.total||0);},0)/docs.length*10)/10:null;
+  let h=_xlabTopModeBar()+'<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><b style="font-size:16px">🎓 내 학점</b><span style="flex:1;font-size:12px;color:#94a3b8">선생님이 공개한 평가만 보여요.</span><button onclick="xgsReload()" style="border:none;background:#e2e8f0;border-radius:8px;padding:7px 12px;font-weight:800;font-size:12px;cursor:pointer">↻ 새로고침</button></div>';
+  if(!docs.length) return h+'<div style="text-align:center;color:#94a3b8;padding:36px;border:2px dashed #cbd5e1;border-radius:14px;font-size:13.5px;line-height:1.7">아직 공개된 평가가 없어요.<br>선생님이 평가를 마치고 공개하면 여기에 나타나요.</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">'+[['평점평균',gp===null?'-':gp.toFixed(2)+' / 4.5'],['평균 점수',avg===null?'-':avg+'점'],['평가',docs.length+'건']].map(function(c){ return '<div style="background:#f8fafc;border-radius:12px;padding:10px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:700">'+c[0]+'</div><div style="font-size:18px;font-weight:900">'+c[1]+'</div></div>'; }).join('')+'</div>';
+  const groups={}; docs.forEach(function(d){ const m=_xgsMonth(d.itemDate||d.publishedAt); (groups[m]=groups[m]||[]).push(d); });
+  Object.keys(groups).sort().reverse().forEach(function(m){
+    const g=groups[m], mg=g.reduce(function(a,d){return a+Number(d.gp||0);},0)/g.length;
+    h+='<div style="display:flex;gap:8px;align-items:center;margin:14px 0 6px"><b style="font-size:14px">'+m+'</b><span style="font-size:12px;color:#64748b">월 평점 '+mg.toFixed(2)+'</span></div>';
+    g.forEach(function(d){ const open=!!_xgsOpen[d.id];
+      h+='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:11px 14px;margin-bottom:8px"><div onclick="xgsToggle(\''+_xgsE(d.id)+'\')" style="cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="background:#0f172a;color:#fff;border-radius:6px;padding:1px 8px;font-size:11.5px;font-weight:700">'+_xgsE(XGS_KIND[d.kind]||d.kind)+'</span><b style="flex:1;min-width:130px;font-size:14px">'+_xgsE(d.title)+'</b><span style="font-size:18px;font-weight:900;color:#fff;background:'+_xgsColor(d.grade)+';border-radius:99px;padding:2px 13px">'+_xgsE(d.grade)+'</span><span style="font-size:15px;font-weight:900">'+_xgsE(d.total)+'점</span><span style="color:#94a3b8">'+(open?'▲':'▼')+'</span></div>';
+      if(open){
+        h+='<div style="margin-top:10px;border-top:1px solid #f1f5f9;padding-top:8px">'+(d.crit||[]).map(function(c){ const pct=Math.round(Number(c.pts||0)/20*100); return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><b>'+_xgsE(c.label)+'</b><span style="font-weight:800">'+_xgsE(c.pts)+' / 20</span></div><div style="font-size:11.5px;color:#94a3b8;margin-bottom:3px">'+_xgsE(c.desc||'')+'</div><div style="height:8px;background:#e2e8f0;border-radius:99px"><div style="height:8px;width:'+pct+'%;background:'+_xgsColor(d.grade)+';border-radius:99px"></div></div></div>'; }).join('')
+         +(d.comment?'<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:9px 12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-top:6px"><b>👨‍🏫 선생님 총평</b><br>'+_xgsE(d.comment)+'</div>':'')+'</div>'; }
+      h+='</div>'; });
+  });
+  return h;
+}
+
 let _xlabTopModeMain = 'topic'; // 'topic' | 'subject' | 'final' | 'self' | 'aar' | 'workbook' | 'mockapply'
 function xlabSwitchTopMode(mode){
   _xlabTopModeMain = mode;
@@ -6360,7 +6399,7 @@ function xlabSwitchTopMode(mode){
   render();
 }
 function _xlabTopModeBar(){
-  const modes = [['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['workbook','📓 월별워크북'],['self','📓 월별셀프활동'],['aar','🎯 X-lab AAR'],['mockapply','📝 모의수시지원'],['xclass','📚 수업'],['xpass','📖 제시문'],['xperf','📌 수행평가·파일']];
+  const modes = [['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['workbook','📓 월별워크북'],['self','📓 월별셀프활동'],['aar','🎯 X-lab AAR'],['mockapply','📝 모의수시지원'],['xclass','📚 수업'],['xpass','📖 제시문'],['xperf','📌 수행평가·파일'],['xgrade','🎓 내 학점']];
   return `<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
     ${modes.map(function(pair){
       const k=pair[0], label=pair[1];
@@ -6760,6 +6799,7 @@ function renderXlab(){
   if(_xlabTopModeMain==='mockapply') return renderXmap();
   if(_xlabTopModeMain==='xclass') return renderXclassStu();
   if(_xlabTopModeMain==='xpass') return renderXpassStu();
+  if(_xlabTopModeMain==='xgrade') return renderXgradeStu();
   if(_xlabTopModeMain==='xperf') return renderXperfStu();
   if(_xlabTopModeMain==='subject') return renderXsub();
   if(_xlabTopModeMain==='final') return renderXfin();
@@ -7520,7 +7560,7 @@ async function xsubGenerateRecord(){
       reportSummary: summary.slice(0,2000),
       grade: CU.grade||'',
     });
-    _xsubCurrent.expectedRecord = {recordText:r.recordText, subject:subjArea, generatedAt:Date.now()};
+    _xsubCurrent.expectedRecord = {recordText:r.recordText, aiText:r.recordText, subject:subjArea, generatedAt:Date.now()};
     if(FB()) await window._fb.set('xlabSubjectReports', _xsubCurrent.id, _xsubCurrent);
     toast('교과 예상세특이 생성·저장되었습니다 💾');
   }catch(e){
@@ -8037,7 +8077,7 @@ async function xfinGenerateFinalRecord(){
   _xfinFinalLoading = true; render();
   try{
     const r = await window._fb.xlabGenerateFinalRecord({department:_xfinCurrent.department||'', subjectArea:subjArea, topic:_xfinCurrent.topicTitle, sectionTexts:sectionTexts, linkedActivityText:linkedText, grade:CU.grade||''});
-    _xfinCurrent.finalRecordText = r.recordText;
+    _xfinCurrent.finalRecordText = r.recordText; _xfinCurrent.finalRecordAi = r.recordText;
   }catch(e){
     alert('생성 중 오류가 발생했습니다: '+e.message);
   }
