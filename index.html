@@ -408,6 +408,9 @@ try{
     // ★ 2026-10-07 추가: X-lab 수행평가 파일 AI 첨삭(7기호·질문만) / 기출 PDF 자동 추출 — 파일은 Storage 경로만 보냄(용량 제한 회피)
     xlabReviewFile: (payload)=>firebase.functions().httpsCallable('xlabReviewFile', {timeout: 540000})(payload).then(r=>r.data),
     xlabExtractPastQ: (payload)=>firebase.functions().httpsCallable('xlabExtractPastQ', {timeout: 540000})(payload).then(r=>r.data),
+    // ★ 2026-10-08 추가: 워크북·예상세특 텍스트 AI 첨삭 / 학점 AI 제안(서버가 최고 18점으로 제한)
+    xlabReviewText: (payload)=>firebase.functions().httpsCallable('xlabReviewText', {timeout: 300000})(payload).then(r=>r.data),
+    xlabSuggestGrade: (payload)=>firebase.functions().httpsCallable('xlabSuggestGrade', {timeout: 540000})(payload).then(r=>r.data),
     // ★ 2026-09-30 추가: X-lab AAR 카드관리(개념·자료 카드) — 교과명/파일/링크만 주면
     // 나머지 칸을 AI가 채워주는 두 서버 함수. 자료 분량이 많을 수 있어 5분 타임아웃.
     xaarAnalyzeConceptCards: (payload)=>firebase.functions().httpsCallable('xaarAnalyzeConceptCards', {timeout: 300000})(payload).then(r=>r.data),
@@ -56356,9 +56359,9 @@ function _xcaLoading(){ return '<div style="text-align:center;color:#888;padding
 function xcaSetTab(t){ _xcaTab=t; _xcaSel=null; render(); }
 function renderXclassAdmin(s){
   if(!_xcaGlobalLoaded) return _xcaLoading();
-  const tabs=[['db','🏛 대학 기출DB'],['curri','🗓 수업 커리큘럼'],['wb','📓 워크북 배정·열람'],['files','📎 워크북 파일·인쇄'],['pass','📖 제시문 배정·현황'],['recq','🧾 생기부 면접질문']];
-  const body=_xcaTab==='recq'?_xrqHtml(s):_xcaTab==='curri'?_xcaCurriHtml():_xcaTab==='wb'?_xcaWbHtml(s):_xcaTab==='pass'?_xpaHtml(s):_xcaTab==='files'?_xcaCfHtml():(_xcaSel?_xcaUnivDetailHtml():_xcaDbHtml(s));
-  return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 12px;font-size:12px;color:#92400e;margin-bottom:10px">🔒 대학 기출DB는 <b>관리자 전용</b>입니다. 학생 화면에는 “워크북에 배정한 오늘의 기출 2문항”만 보입니다. (※ Firestore 규칙이 공개 상태라 화면에서만 숨겨집니다.)</div>'
+  const tabs=[['db','🏛 대학 기출DB'],['curri','🗓 수업 커리큘럼'],['wb','📓 워크북 배정·열람'],['files','📎 워크북 파일·인쇄'],['pass','📖 제시문 배정·현황'],['recq','🧾 생기부 면접질문'],['grade','🎓 학점·평가']];
+  const body=_xcaTab==='grade'?_xgHtml(s):_xcaTab==='recq'?_xrqHtml(s):_xcaTab==='curri'?_xcaCurriHtml():_xcaTab==='wb'?_xcaWbHtml(s):_xcaTab==='pass'?_xpaHtml(s):_xcaTab==='files'?_xcaCfHtml():(_xcaSel?_xcaUnivDetailHtml():_xcaDbHtml(s));
+  return '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 12px;font-size:12px;color:#92400e;margin-bottom:10px">🔒 대학 기출DB는 <b>관리자 전용</b>입니다. 학생 화면에는 “워크북에 배정한 오늘의 기출 2문항”만 보입니다. (Firestore 규칙으로 직원 계정만 읽을 수 있습니다.)</div>'
     +_xcaTabBar(tabs,_xcaTab,'xcaSetTab')+body;
 }
 // ── 기출DB 목록 ──
@@ -56883,6 +56886,7 @@ function _xcaFileDetailHtml(s){
    +'<div style="font-size:12.5px;margin-bottom:6px"><b>첨삭 파일 첨부</b> (주석 단 PDF·문서 등, 용량 제한 없음) <input type="file" id="xcaAnnF" multiple> <button onclick="xcaAnnUpload()" style="'+XCA_B+'background:#e2e8f0">올리기</button>'+((f.annotatedFiles||[]).map(function(x,i){ return '<div style="margin-top:3px">📎 <a href="'+_xcaE(x.url)+'" target="_blank" rel="noopener">'+_xcaE(x.name)+'</a> <a href="javascript:xcaAnnDel('+i+')" style="color:#b91c1c;font-size:11px">삭제</a></div>'; }).join(''))+'</div>'
    +'<div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="xcaDraftSave()" style="'+XCA_B+'background:#e2e8f0">💾 초안 저장</button><button onclick="xcaReviewPrint()" style="'+XCA_B+'background:#e2e8f0">🖨 인쇄</button>'+(f.status==='shared'||f.status==='acked'?'<button onclick="xcaUnshare()" style="'+XCA_B+'background:#fef3c7;color:#92400e">↩ 공유 취소</button><button onclick="xcaShare()" style="'+XCA_B+'background:#16a34a;color:#fff">✅ 수정본 다시 공유</button>':'<button onclick="xcaShare()" style="'+XCA_B+'background:#16a34a;color:#fff">✅ 검토 완료 · 학생에게 공유</button>')+'</div>'
    +(f.status==='acked'?'<div style="margin-top:8px;font-size:12px;color:#6d28d9;font-weight:800">학생이 “반영했어요”를 눌렀습니다'+(f.ackAt?' ('+new Date(f.ackAt).toLocaleDateString('ko-KR')+')':'')+'.</div>':'')+'</div>';
+  h+='<div style="margin-top:10px">'+_xgPanelHtml('file',f.id,f.title||f.taskTitle||'',f.createdAt)+'</div>';
   return h;
 }
 function _xcaDraftEnsure(){ const f=_xcaFile(); let d=_xcaDrafts[f.id]; if(!d){ d=_xcaDrafts[f.id]={id:f.id,studentId:f.studentId,items:[],comment:''}; } return d; }
@@ -57251,8 +57255,9 @@ let _xrqDoc=null, _xrqFor=null, _xrqLoading=false, _xrqBusy=null, _xrqTimer=null
 function _xrqStu(){ return ((typeof ST!=='undefined'&&ST.students)||[]).find(function(x){return String(x.id)===String(_xcaStudentId);}); }
 async function xrqLoad(s){
   if(!s||_xrqLoading) return; _xrqLoading=true;
-  try{ const r=((await window._fb.getWhere('xlabRecordQ','studentId','==',String(s.id)))||[])[0]; _xrqDoc=r||{id:String(s.id),studentId:String(s.id),studentName:s.name||'',raw:{},major:'',extra:'',qs:{}}; }
-  catch(e){ _xrqDoc={id:String(s.id),studentId:String(s.id),studentName:s.name||'',raw:{},major:'',extra:'',qs:{}}; alert('생기부 면접질문 불러오기 실패: '+e.message+'\n(Firestore 규칙에 xlabRecordQ 컬렉션 허용이 필요합니다)'); }
+  try{ const r=((await window._fb.getWhere('xlabRecordQ','studentId','==',String(s.id)))||[])[0]; _xrqDoc=r||{id:String(s.id),studentId:String(s.id),studentName:s.name||'',raw:{},major:'',extra:'',qs:{},wb:{}}; }
+  catch(e){ _xrqDoc={id:String(s.id),studentId:String(s.id),studentName:s.name||'',raw:{},major:'',extra:'',qs:{},wb:{}}; alert('생기부 면접질문 불러오기 실패: '+e.message+'\n(Firestore 규칙에 xlabRecordQ 컬렉션 허용이 필요합니다)'); }
+  _xrqDoc.raw=_xrqDoc.raw||{}; _xrqDoc.qs=_xrqDoc.qs||{}; _xrqDoc.wb=_xrqDoc.wb||{};
   _xrqFor=String(s.id); _xrqLoading=false; render();
 }
 // ── 자동 가림 ──
@@ -57271,7 +57276,7 @@ function xrqMask(text,s,extra){
 }
 function _xrqMasked(d,s){ let tot=0; const out={}; XRQ_SRC.forEach(function(k){ const r=xrqMask((d.raw||{})[k[0]],s,d.extra); out[k[0]]=r.text; tot+=r.count; }); return {parts:out,count:tot}; }
 // ── 화면 ──
-function _xrqHtml(s){
+function _xrqRawHtml(s){
   if(!s) return '';
   if(_xrqFor!==String(s.id)&&!_xrqLoading) xrqLoad(s);
   if(_xrqLoading||_xrqFor!==String(s.id)||!_xrqDoc) return _xcaLoading();
@@ -57306,7 +57311,7 @@ function _xrqSetPath(path,v){ const p=path.split('.'); let o=_xrqDoc; for(let i=
 function xrqInput(path,v){ _xrqSetPath(path,v); const e=document.getElementById('xrqSaved'); if(e){ e.style.color='#64748b'; e.textContent='✏️ 입력 중…'; } clearTimeout(_xrqTimer); _xrqTimer=setTimeout(xrqSave,1000); }
 async function xrqSave(){
   clearTimeout(_xrqTimer); const d=_xrqDoc; if(!d) return; const s=_xrqStu();
-  try{ await window._fb.set('xlabRecordQ',d.id,{id:d.id,studentId:d.studentId,studentName:(s&&s.name)||d.studentName||'',raw:d.raw||{},major:d.major||'',extra:d.extra||'',qs:d.qs||{},updatedAt:Date.now()}); d.updatedAt=Date.now(); const e=document.getElementById('xrqSaved'); if(e){ e.style.color='#16a34a'; e.textContent='✅ 저장됨'; } }
+  try{ await window._fb.set('xlabRecordQ',d.id,{id:d.id,studentId:d.studentId,studentName:(s&&s.name)||d.studentName||'',raw:d.raw||{},major:d.major||'',extra:d.extra||'',qs:d.qs||{},wb:d.wb||{},updatedAt:Date.now()}); d.updatedAt=Date.now(); const e=document.getElementById('xrqSaved'); if(e){ e.style.color='#16a34a'; e.textContent='✅ 저장됨'; } }
   catch(e){ const x=document.getElementById('xrqSaved'); if(x){ x.style.color='#dc2626'; x.textContent='⚠️ 저장 실패: '+e.message; } }
 }
 function xrqQ(type,i,v){ _xrqDoc.qs[type][i].text=v; clearTimeout(_xrqTimer); _xrqTimer=setTimeout(xrqSave,1000); }
@@ -57346,6 +57351,426 @@ function xrqGenOne(type){ _xrqGenTypes([XRQ_TYPES.find(function(t){return t[0]==
 function xrqPrint(){ const s=_xrqStu(); const qs=_xrqDoc.qs||{}; const E=_xcaE;
   const body='<h1>🧾 생기부 기반 면접 질문 <span class="m">'+E((s&&s.name)||'')+' 학생'+(_xrqDoc.major?' · 희망 '+E(_xrqDoc.major):'')+'</span></h1>'+XRQ_TYPES.map(function(t){ const a=(qs[t[0]]||[]).filter(function(q){return q.text;}); return a.length?'<h2>'+t[0]+' · '+E(t[1].split(' — ')[1])+'</h2>'+a.map(function(q,i){ return '<div class="sec"><b>'+(i+1)+'.</b> '+E(q.text)+'</div>'; }).join(''):''; }).join('');
   _xpaPrintWin(((s&&s.name)||'학생')+'_생기부면접질문',body);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// 📥 학생 워크북 불러오기 → 면접 질문 (2026-10-08 2차)
+//  · 학생이 쓴 월별주제활동(xlabTopics)·월별교과활동(xlabSubjectReports)·최종예상세특(xlabFinalRecords)·월별셀프활동(xlabSelfActivities)을
+//    그대로 읽어 와 활동별로 질문을 만든다. (학생이 고친 예상세특 = 저장된 recordText 그대로)
+//  · 필수 질문 4개(WHY·HOW·EVIDENCE·LIMIT) 한 번에 + 관리자가 "＋ 질문 1개 더"로 유형·초점을 골라 하나씩 추가(AI 또는 직접)
+//  · 저장: xlabRecordQ/{studentId}.wb[활동키] — 학생 화면에는 나오지 않음, AI에는 이름·학교명 가림 처리 후 전송
+// ═════════════════════════════════════════════════════════════════════════
+const XRQ_REQ=['WHY','HOW','EVIDENCE','LIMIT'];
+const XRQ_WB_LABEL={topic:'📘 월별주제활동',subject:'📗 월별교과활동',final:'🏆 최종예상세특',self:'🎯 월별셀프활동'};
+let _xrqMode='wb', _xrqWbFor=null, _xrqWbItems=[], _xrqWbLoading=false, _xrqWbOpen={}, _xrqWbBusy={}, _xrqWbEx={}, _xrqWbAll=null;
+function _xrqT(type){ return XRQ_TYPES.find(function(t){return t[0]===type;})||[type,type,'']; }
+function _xrqTShort(type){ return (_xrqT(type)[1]||type).split(' — ')[1]||type; }
+async function xrqWbLoad(s){
+  if(!s||_xrqWbLoading) return; _xrqWbLoading=true;
+  try{
+    const id=String(s.id), cols=['xlabTopics','xlabSubjectReports','xlabFinalRecords','xlabSelfActivities'], kinds=['topic','subject','final','self'];
+    const r=await Promise.all(cols.map(function(c){ return window._fb.getWhere(c,'studentId','==',id); }));
+    const items=[];
+    r.forEach(function(arr,i){ (arr||[]).forEach(function(t){ const title=kinds[i]==='self'?t.interestTopic:t.topicTitle; if(!title) return; items.push({key:kinds[i]+'_'+t.id,type:kinds[i],id:t.id,title:String(title),createdAt:t.createdAt||0,doc:t}); }); });
+    items.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    _xrqWbItems=items;
+  }catch(e){ _xrqWbItems=[]; alert('워크북 불러오기 실패: '+e.message); }
+  _xrqWbFor=String(s.id); _xrqWbLoading=false; render();
+}
+function _xrqWbText(it){
+  let parts=[]; try{ parts=(typeof _xaarAdminSourceSummary==='function')?(_xaarAdminSourceSummary(it.type,it.doc)||[]):[]; }catch(e){ parts=[]; }
+  return parts.map(function(p){ return '['+p[0]+']\n'+String(p[1]||'').trim(); }).join('\n\n');
+}
+function _xrqWbMasked(it,s,d){ const a=xrqMask(_xrqWbText(it),s,d.extra), b=xrqMask(it.title,s,d.extra); return {text:a.text,title:b.text,count:a.count+b.count}; }
+function _xrqWbRec(it){ const d=_xrqDoc; d.wb=d.wb||{}; const r=d.wb[it.key]=d.wb[it.key]||{key:it.key,type:it.type,sourceId:it.id,title:it.title,req:{},extra:[]}; r.title=it.title; r.req=r.req||{}; r.extra=r.extra||[]; return r; }
+function _xrqWbPrompt(it,m,major,types,existing,kw){
+  return '당신은 대학 입학사정관 출신의 학생부종합전형 면접 전문가입니다. 아래는 학생이 직접 쓴 탐구 활동 기록입니다(이름·학교명은 가려져 있음). 이 기록을 바탕으로 면접 질문을 만드세요.\n\n'
+   +'[활동 종류] '+XRQ_WB_LABEL[it.type].replace(/^\S+\s/,'')+'\n[제목] '+m.title+'\n[희망 학과·진로] '+(major||'(미입력)')+'\n\n[학생 기록]\n'+m.text+'\n\n'
+   +'[만들 질문 — 유형마다 정확히 1개]\n'+types.map(function(t){ return '- '+t[0]+': '+t[2]; }).join('\n')+'\n'
+   +(existing.length?'\n[이미 있는 질문 — 이것과 겹치지 않게]\n'+existing.map(function(q){return '- '+q;}).join('\n')+'\n':'')
+   +(kw?'\n[관리자가 요청한 초점] '+kw+'\n':'')
+   +'\n규칙:\n- 기록에 실제로 적힌 활동·개념·표현을 짚어 구체적으로 묻는다 (일반론 금지).\n- 한 질문은 한 문장(길어도 두 문장), 면접관이 실제로 말하는 어투(~했나요? ~설명해 주세요).\n- 기록에 없는 활동을 지어내지 않는다. 정답·모범 답안은 쓰지 않는다.\n- 출력은 설명·코드블록 없이 JSON 객체 하나만: {"'+types[0][0]+'":"질문", ...} (요청한 유형 키만)';
+}
+function _xrqParseObj(raw){ const m=String(raw).match(/\{[\s\S]*\}/); if(!m) throw new Error('응답 해석 실패'); const o=JSON.parse(m[0]); const out={}; Object.keys(o).forEach(function(k){ const v=String(o[k]||'').trim(); if(v) out[k]=v; }); return out; }
+async function _xrqWbRun(it,types,kw,existing){
+  const s=_xrqStu(), d=_xrqDoc; const m=_xrqWbMasked(it,s,d);
+  if(m.text.replace(/\s/g,'').length<30) throw new Error('이 활동에는 작성된 내용이 거의 없어 질문을 만들 수 없어요.');
+  return _xrqParseObj(await _xrqAsk(_xrqWbPrompt(it,m,d.major,types,existing||[],kw)));
+}
+function _xrqWbAllQs(rec){ const a=[]; XRQ_REQ.forEach(function(t){ const x=(rec.req||{})[t]; if(x&&x.text) a.push(x.text); }); (rec.extra||[]).forEach(function(x){ if(x.text) a.push(x.text); }); return a; }
+async function xrqWbGen(i,silent){
+  const it=_xrqWbItems[i]; if(!it||_xrqWbBusy[it.key]) return;
+  const rec=_xrqWbRec(it);
+  if(!silent&&XRQ_REQ.some(function(t){return (rec.req[t]||{}).text;})&&!confirm('이 활동의 필수 질문 4개가 새 질문으로 바뀝니다. (추가 질문은 그대로 유지됩니다)')) return;
+  _xrqWbBusy[it.key]=true; render();
+  try{
+    const o=await _xrqWbRun(it,XRQ_REQ.map(_xrqT),'',rec.extra.map(function(x){return x.text;}).filter(Boolean));
+    XRQ_REQ.forEach(function(t){ if(o[t]) rec.req[t]={text:o[t]}; });
+    rec.genAt=Date.now(); await xrqSave();
+  }catch(e){ if(!silent) alert('질문 생성 실패: '+e.message+(/API_KEY|auth|key/i.test(e.message)?'\n(API 키 설정을 확인하세요)':'')); else throw e; }
+  finally{ _xrqWbBusy[it.key]=false; render(); }
+}
+async function xrqWbRegen(i,type){
+  const it=_xrqWbItems[i]; if(!it||_xrqWbBusy[it.key]) return; const rec=_xrqWbRec(it);
+  _xrqWbBusy[it.key]=true; render();
+  try{ const o=await _xrqWbRun(it,[_xrqT(type)],'',_xrqWbAllQs(rec)); if(o[type]){ rec.req[type]={text:o[type]}; await xrqSave(); } }
+  catch(e){ alert('질문 생성 실패: '+e.message); } finally{ _xrqWbBusy[it.key]=false; render(); }
+}
+function _xrqWbExState(it,rec){ let st=_xrqWbEx[it.key]; if(!st){ const used=(rec.extra||[]).map(function(x){return x.type;}); const nx=['COUNTER','MAJOR','DEEP'].filter(function(t){return used.indexOf(t)<0;})[0]||'DEEP'; st=_xrqWbEx[it.key]={type:nx,kw:''}; } return st; }
+async function xrqWbAddAI(i){
+  const it=_xrqWbItems[i]; if(!it||_xrqWbBusy[it.key]) return; const rec=_xrqWbRec(it); const st=_xrqWbExState(it,rec);
+  _xrqWbBusy[it.key]=true; render();
+  try{ const o=await _xrqWbRun(it,[_xrqT(st.type)],st.kw,_xrqWbAllQs(rec)); if(!o[st.type]) throw new Error('질문이 만들어지지 않았어요. 다시 눌러 주세요.'); rec.extra.push({type:st.type,text:o[st.type],kw:st.kw||'',ai:true,at:Date.now()}); st.kw=''; const used=rec.extra.map(function(x){return x.type;}); st.type=['COUNTER','MAJOR','DEEP','WHY','HOW','EVIDENCE','LIMIT'].filter(function(t){return used.indexOf(t)<0;})[0]||st.type; await xrqSave(); }
+  catch(e){ alert('질문 추가 실패: '+e.message); } finally{ _xrqWbBusy[it.key]=false; render(); }
+}
+function xrqWbAddManual(i){ const it=_xrqWbItems[i]; if(!it) return; const rec=_xrqWbRec(it); const st=_xrqWbExState(it,rec); rec.extra.push({type:st.type,text:'',kw:'',ai:false,at:Date.now()}); render(); }
+function xrqWbExSet(i,k,v){ const it=_xrqWbItems[i]; if(!it) return; const st=_xrqWbExState(it,_xrqWbRec(it)); st[k]=v; }
+function xrqWbQ(i,kind,key,v){ const it=_xrqWbItems[i]; if(!it) return; const rec=_xrqWbRec(it); if(kind==='req'){ rec.req[key]={text:v}; } else if(rec.extra[key]){ rec.extra[key].text=v; } clearTimeout(_xrqTimer); _xrqTimer=setTimeout(xrqSave,1000); }
+function xrqWbDel(i,idx){ const it=_xrqWbItems[i]; if(!it) return; const rec=_xrqWbRec(it); if(!confirm('이 추가 질문을 삭제할까요?')) return; rec.extra.splice(idx,1); xrqSave(); render(); }
+function xrqWbToggle(key){ _xrqWbOpen[key]=!_xrqWbOpen[key]; render(); }
+function xrqWbLive(i,kind,key){ const it=_xrqWbItems[i]; if(!it) return; const rec=_xrqWbRec(it); const s=_xrqStu(); let type,text; if(kind==='req'){ type=key; text=(rec.req[key]||{}).text; } else { const x=rec.extra[key]||{}; type=x.type; text=x.text; } if(!text) return;
+  _xpaLiveShow({head:'생기부 면접 질문',sub:XRQ_WB_LABEL[it.type].replace(/^\S+\s/,'')+' · '+it.title+' · '+type+(_xpaLiveName?' · '+((s&&s.name)||''):''),q:'',text:text}); }
+async function xrqWbGenAll(){
+  const todo=_xrqWbItems.map(function(it,i){return i;}).filter(function(i){ const rec=((_xrqDoc.wb||{})[_xrqWbItems[i].key]||{}); return !XRQ_REQ.some(function(t){return ((rec.req||{})[t]||{}).text;}); });
+  if(!todo.length){ alert('필수 질문이 아직 없는 활동이 없어요.'); return; }
+  if(!confirm('필수 질문이 없는 활동 '+todo.length+'건의 필수 질문 4개씩을 만듭니다. (AI 호출 '+todo.length+'회) 계속할까요?')) return;
+  const fails=[]; _xrqWbAll='0/'+todo.length; render(); let done=0;
+  for(let k=0;k<todo.length;k+=3){ await Promise.all(todo.slice(k,k+3).map(async function(i){ try{ await xrqWbGen(i,true); }catch(e){ fails.push(_xrqWbItems[i].title+': '+e.message); } done++; _xrqWbAll=done+'/'+todo.length; })); }
+  _xrqWbAll=null; render(); if(fails.length) alert('일부 활동 생성 실패:\n'+fails.join('\n'));
+}
+function _xrqWbList(){ // 질문이 있는 활동만
+  return _xrqWbItems.map(function(it){ const rec=(_xrqDoc.wb||{})[it.key]; if(!rec) return null; const lines=[]; XRQ_REQ.forEach(function(t){ const x=(rec.req||{})[t]; if(x&&x.text) lines.push({type:t,text:x.text,req:true}); }); (rec.extra||[]).forEach(function(x){ if(x.text) lines.push({type:x.type,text:x.text,req:false}); }); return lines.length?{it:it,lines:lines}:null; }).filter(Boolean);
+}
+function xrqWbCopy(){ const L=_xrqWbList(); if(!L.length){ alert('복사할 질문이 없어요.'); return; } const txt=L.map(function(g){ return '■ '+XRQ_WB_LABEL[g.it.type]+' · '+g.it.title+'\n'+g.lines.map(function(l,i){ return (i+1)+'. ['+l.type+(l.req?'':' 추가')+'] '+l.text; }).join('\n'); }).join('\n\n'); try{ navigator.clipboard.writeText(txt); alert('복사했습니다.'); }catch(e){ prompt('복사하세요',txt); } }
+function xrqWbPrint(){ const L=_xrqWbList(); if(!L.length){ alert('인쇄할 질문이 없어요.'); return; } const s=_xrqStu(); const E=_xcaE;
+  const body='<h1>🧾 워크북 기반 면접 질문 <span class="m">'+E((s&&s.name)||'')+' 학생'+(_xrqDoc.major?' · 희망 '+E(_xrqDoc.major):'')+'</span></h1>'+L.map(function(g){ return '<h2>'+E(XRQ_WB_LABEL[g.it.type])+' · '+E(g.it.title)+'</h2>'+g.lines.map(function(l,i){ return '<div class="sec"><b>'+(i+1)+'.</b> <span class="m">['+E(l.type)+(l.req?'':' 추가')+']</span> '+E(l.text)+'</div>'; }).join(''); }).join('');
+  _xpaPrintWin(((s&&s.name)||'학생')+'_워크북면접질문',body); }
+function _xrqWbDate(ts){ if(!ts) return ''; const d=new Date(ts); return isNaN(d.getTime())?'':(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')); }
+function _xrqWbHtml(s){
+  if(_xrqWbFor!==String(s.id)&&!_xrqWbLoading) xrqWbLoad(s);
+  if(_xrqWbLoading||_xrqWbFor!==String(s.id)) return _xcaLoading();
+  const d=_xrqDoc, E=_xcaE;
+  const lab=function(t){ return '<div style="font-size:11.5px;font-weight:800;color:#64748b;margin:0 0 2px">'+t+'</div>'; };
+  let h='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:12px">'
+   +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:14px">📥 '+E(s.name)+' 학생 워크북 ('+_xrqWbItems.length+'건)</b><span style="font-size:11.5px;color:#94a3b8;flex:1;min-width:200px">학생이 쓴 월별주제·교과활동·최종예상세특·셀프활동을 불러옵니다(학생이 고친 예상세특 포함). 학생 화면에는 나오지 않고, AI에는 이름·학교명을 가린 내용만 전송됩니다.</span><span id="xrqSaved" style="font-size:11.5px;color:#16a34a"></span>'
+   +'<button onclick="_xrqWbFor=null;render()" style="'+XCA_B+'background:#e2e8f0;color:#334155">🔄 다시 불러오기</button></div>'
+   +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 12px;margin-top:8px"><div>'+lab('희망 학과·진로 (MAJOR 질문에 사용)')+'<input value="'+E(d.major||'')+'" oninput="xrqInput(\'major\',this.value)" style="'+XCA_I+'"></div><div>'+lab('추가로 가릴 단어 (쉼표로 구분)')+'<input value="'+E(d.extra||'')+'" oninput="xrqInput(\'extra\',this.value)" style="'+XCA_I+'"></div></div>'
+   +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center"><button onclick="xrqWbGenAll()" '+(_xrqWbAll?'disabled':'')+' style="'+XCA_B+'background:#0f766e;color:#fff">'+(_xrqWbAll?'⏳ 전체 생성 중… '+_xrqWbAll:'🤖 필수 질문 한꺼번에 만들기')+'</button><button onclick="xpaLiveOpen()" style="'+XCA_B+'background:#facc15;color:#0f172a">📺 송출 창 열기</button><label style="font-size:12px;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(_xpaLiveName?'checked':'')+' onchange="_xpaLiveName=this.checked;render()" style="width:16px;height:16px;margin:0">송출에 학생 이름 표시</label><span style="flex:1"></span><button onclick="xrqWbCopy()" style="'+XCA_B+'background:#e2e8f0;color:#334155">📋 복사</button><button onclick="xrqWbPrint()" style="'+XCA_B+'background:#1a1a1a;color:#fff">🖨 인쇄/PDF</button></div>'
+   +'<div style="font-size:11.5px;color:#94a3b8;margin-top:6px">필수 질문 = <b>WHY(동기)·HOW(과정)·EVIDENCE(근거)·LIMIT(한계)</b> 4개. 그 밖의 질문은 각 활동 아래 “＋ 질문 1개 더”로 유형·초점을 골라 하나씩 추가하세요.</div></div>';
+  if(!_xrqWbItems.length) return h+'<div style="text-align:center;color:#94a3b8;padding:24px;border:2px dashed #cbd5e1;border-radius:12px;font-size:13px">이 학생이 작성한 월별주제활동·월별교과활동·최종예상세특·셀프활동이 아직 없습니다.</div>';
+  _xrqWbItems.forEach(function(it,i){
+    const rec=(d.wb||{})[it.key]||{req:{},extra:[]}; const nReq=XRQ_REQ.filter(function(t){return ((rec.req||{})[t]||{}).text;}).length, nEx=(rec.extra||[]).length;
+    const busy=!!_xrqWbBusy[it.key], open=!!_xrqWbOpen[it.key], src=_xrqWbText(it), thin=src.replace(/\s/g,'').length<30;
+    h+='<div style="background:#fff;border:1.5px solid '+(nReq?'#99f6e4':'#e2e8f0')+';border-radius:12px;padding:11px 14px;margin-bottom:9px">'
+     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="background:#0f172a;color:#fff;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700">'+E(XRQ_WB_LABEL[it.type])+'</span><span style="font-size:11.5px;color:#94a3b8">'+_xrqWbDate(it.createdAt)+'</span><b style="font-size:13.5px;flex:1;min-width:160px">'+E(it.title)+'</b>'
+     +'<span style="font-size:11.5px;color:'+(nReq===4?'#0f766e':'#64748b')+'">필수 '+nReq+'/4 · 추가 '+nEx+'</span>'
+     +'<button onclick="xrqWbToggle(\''+it.key+'\')" style="'+XCA_B+'background:#e2e8f0;color:#334155">'+(open?'내용 닫기':'📄 학생이 쓴 내용')+'</button>'
+     +'<button onclick="xrqWbGen('+i+')" '+(busy||thin?'disabled':'')+' title="'+(thin?'작성된 내용이 거의 없어요':'')+'" style="'+XCA_B+'background:#0f766e;color:#fff">'+(busy?'⏳ 생성 중…':(nReq?'🔄 필수 질문 다시':'🤖 필수 질문 만들기'))+'</button></div>';
+    if(open) h+='<div style="margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.65;white-space:pre-wrap;max-height:260px;overflow:auto">'+(src?E(src):'<span style="color:#94a3b8">작성된 내용이 없습니다.</span>')+'</div>';
+    if(nReq||nEx){
+      XRQ_REQ.forEach(function(t){ const x=(rec.req||{})[t]; if(!x||!x.text) return;
+        h+='<div style="display:flex;gap:6px;align-items:flex-start;margin-top:7px"><span style="background:#0f766e;color:#fff;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:800;margin-top:6px;min-width:64px;text-align:center">'+t+'<br><span style="font-weight:600;font-size:10px">'+_xrqTShort(t)+'</span></span><textarea rows="2" oninput="xrqWbQ('+i+',\'req\',\''+t+'\',this.value)" style="'+XCA_I+'flex:1;resize:vertical;line-height:1.5">'+E(x.text)+'</textarea><button onclick="xrqWbLive('+i+',\'req\',\''+t+'\')" title="송출" style="'+XCA_B+'background:#facc15;color:#0f172a;padding:7px 9px">📺</button><button onclick="xrqWbRegen('+i+',\''+t+'\')" '+(busy?'disabled':'')+' title="이 질문만 다시 만들기" style="'+XCA_B+'background:#e2e8f0;color:#334155;padding:7px 9px">🔄</button></div>'; });
+      (rec.extra||[]).forEach(function(x,k){
+        h+='<div style="display:flex;gap:6px;align-items:flex-start;margin-top:7px"><span style="background:#7c3aed;color:#fff;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:800;margin-top:6px;min-width:64px;text-align:center">추가<br><span style="font-weight:600;font-size:10px">'+E(x.type)+(x.kw?' · '+E(x.kw):'')+'</span></span><textarea rows="2" oninput="xrqWbQ('+i+',\'extra\','+k+',this.value)" placeholder="직접 질문을 쓰세요" style="'+XCA_I+'flex:1;resize:vertical;line-height:1.5">'+E(x.text)+'</textarea><button onclick="xrqWbLive('+i+',\'extra\','+k+')" title="송출" style="'+XCA_B+'background:#facc15;color:#0f172a;padding:7px 9px">📺</button><button onclick="xrqWbDel('+i+','+k+')" title="삭제" style="'+XCA_B+'background:#fee2e2;color:#b91c1c;padding:7px 9px">✕</button></div>'; });
+    }
+    if(nReq){ const st=_xrqWbExState(it,rec);
+      h+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px dashed #e2e8f0"><b style="font-size:12px;color:#7c3aed">＋ 질문 1개 더</b><select onchange="xrqWbExSet('+i+',\'type\',this.value)" style="'+XCA_I+'width:auto;display:inline-block">'+XRQ_TYPES.map(function(t){ return '<option value="'+t[0]+'" '+(t[0]===st.type?'selected':'')+'>'+t[0]+' · '+t[1].split(' — ')[1]+'</option>'; }).join('')+'</select><input value="'+E(st.kw)+'" oninput="xrqWbExSet('+i+',\'kw\',this.value)" placeholder="초점 키워드 (선택) 예: 실험 변수 통제" style="'+XCA_I+'flex:1;min-width:160px"><button onclick="xrqWbAddAI('+i+')" '+(busy?'disabled':'')+' style="'+XCA_B+'background:#7c3aed;color:#fff">🤖 AI로 1개 더</button><button onclick="xrqWbAddManual('+i+')" style="'+XCA_B+'background:#e2e8f0;color:#334155">✍️ 직접 쓰기</button></div>'; }
+    h+='</div>';
+  });
+  return h;
+}
+function _xrqHtml(s){
+  if(!s) return '';
+  if(_xrqFor!==String(s.id)&&!_xrqLoading) xrqLoad(s);
+  if(_xrqLoading||_xrqFor!==String(s.id)||!_xrqDoc) return _xcaLoading();
+  const seg=function(k,t){ const on=_xrqMode===k; return '<button onclick="_xrqMode=\''+k+'\';render()" style="'+XCA_B+'background:'+(on?'#0f172a':'#e2e8f0')+';color:'+(on?'#fff':'#334155')+'">'+t+'</button>'; };
+  return '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+seg('wb','📥 학생 워크북에서 불러오기')+seg('raw','🧾 생기부 원문 붙여넣기')+'</div>'+(_xrqMode==='wb'?_xrqWbHtml(s):_xrqRawHtml(s));
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// 🎓 학점·평가 (관리자 전용, 2026-10-08 신규)
+//  · 대상: 월별주제활동 / 월별교과활동 / 최종예상세특 / 월별셀프활동 (xlabTopics·xlabSubjectReports·xlabFinalRecords·xlabSelfActivities)
+//          + 수행평가 파일(xlabFiles)
+//  · 항목(루브릭) 5개 × 6단계(탁월20·우수18·양호16·보통14·미흡10·없음0) → 100점 → 학점(A+~F) + 평점(4.5 만점)
+//  · A+ 규칙: 점수 95↑ + 최고 단계(탁월) 4개 이상 + 선생님이 "A+ 부여" 체크 + 사유 입력 → 그 외에는 최고 A. AI는 "우수"까지만 제안(→ 최고 A)
+//  · 반 전체 A+ 비율이 10%를 넘으면 경고
+//  · 저장: xlabGrades/{학생ID}_{종류}_{대상ID} (관리자 전용) / 공개 시 xlabGradesPub/{같은 ID} 로 복사(학생 본인만 읽기)
+//    ⚠️ Firestore 규칙에 xlabGrades(직원 전용), xlabGradesPub(직원 쓰기 + 학생 본인 읽기) 추가 필요
+// 이름 규칙: xg* = 이 모듈
+// ═════════════════════════════════════════════════════════════════════════
+const XG_LEVELS=[['탁월',20,'#7c3aed'],['우수',18,'#16a34a'],['양호',16,'#2563eb'],['보통',14,'#d97706'],['미흡',10,'#ea580c'],['없음',0,'#dc2626']];
+const XG_SCALE=[['A+',95,4.5],['A',90,4.0],['B+',85,3.5],['B',80,3.0],['C+',75,2.5],['C',70,2.0],['D+',65,1.5],['D',60,1.0],['F',0,0]];
+const XG_KIND={topic:'📘 월별주제활동',subject:'📗 월별교과활동',final:'🏆 최종예상세특',self:'🎯 월별셀프활동',file:'📌 수행평가 파일'};
+const XG_RUBRIC={
+  topic:[['reason','주제 선정 근거','진로·관심에서 출발한 구체적인 계기가 있는가'],['concept','개념·원리 정확성','핵심 개념을 정확히 이해하고 설명했는가'],['example','실사례·근거','구체적 사례·자료로 뒷받침했는가'],['issue','한계·개선점','문제점과 후속 탐구를 스스로 짚었는가'],['link','학교활동·진로 연계','교내 활동과 희망 진로에 이어졌는가']],
+  subject:[['concept','개념 정확성','교과 개념·원리를 정확히 이해했는가'],['process','탐구·활동 과정','무엇을 어떻게 했는지 과정이 보이는가'],['example','사례·적용','실제 사례나 문제에 적용했는가'],['reflect','성찰(배운점·한계)','배운 점과 아쉬운 점을 스스로 짚었는가'],['link','심화·진로 연결','심화 탐구나 진로로 이어졌는가']],
+  final:[['specific','구체성','활동·내용이 구체적으로 드러나는가'],['evidence','활동 근거','워크북 활동에 근거하고 과장이 없는가'],['process','과정·역할','학생이 한 행동과 역할이 보이는가'],['link','진로·교과 연결','교과와 진로가 자연스럽게 이어지는가'],['defend','면접 방어 가능성','면접에서 말로 설명하고 방어할 수 있는가']],
+  self:[['motive','계기·동기','활동을 하게 된 계기가 분명한가'],['role','역할·과정','학생의 역할과 과정이 보이는가'],['skill','방법·기법','사용한 방법·기법이 적절하고 구체적인가'],['learned','알게 된 점·성찰','배운 점을 자기 말로 정리했는가'],['link','연결·확장','다른 활동·진로로 연결·확장했는가']],
+  file:[['content','내용·개념 정확성','내용이 정확하고 충실한가'],['process','과정이 드러남','탐구·작성 과정과 학생의 행동이 보이는가'],['limit','한계·후속 탐구','한계와 보완·후속 계획을 짚었는가'],['honest','출처·자기 말','출처가 있고 자기 말로 썼는가(AI·자료 그대로 옮기지 않음)'],['complete','완성도·개선도','완성도가 높고 첨삭 후 개선되었는가 (v1→v2)']]
+};
+const XG_RATIO_WARN=0.10;
+let _xgFor=null,_xgLoading=false,_xgWb=[],_xgDocs={},_xgAllDocs=[],_xgSel=null,_xgDraft=null,_xgDraftKey=null,_xgBusy=false,_xgAiBusy=false;
+function _xgGid(sid,kind,ref){ return String(sid)+'_'+kind+'_'+String(ref); }
+function _xgScale(total){ for(let i=0;i<XG_SCALE.length;i++){ if(total>=XG_SCALE[i][1]) return XG_SCALE[i]; } return XG_SCALE[XG_SCALE.length-1]; }
+function xgGradeColor(g){ return g==='A+'?'#7c3aed':g==='A'?'#16a34a':(g==='B+'||g==='B')?'#2563eb':(g==='C+'||g==='C')?'#d97706':(g==='D+'||g==='D')?'#ea580c':'#dc2626'; }
+function xgChip(g,total){ if(!g) return '<span style="font-size:11px;color:#94a3b8;background:#f1f5f9;border-radius:99px;padding:2px 9px">미평가</span>'; return '<span style="font-size:12px;font-weight:900;color:#fff;background:'+xgGradeColor(g)+';border-radius:99px;padding:2px 10px">'+g+'</span> <span style="font-size:12px;font-weight:800;color:#334155">'+total+'점</span>'; }
+// 점수 계산 — scores: {항목키: 점수(20/18/16/14/10/0)}
+function xgCalc(kind,scores,aPlus,reason){
+  const rub=XG_RUBRIC[kind]||[]; const vals=rub.map(function(c){ const v=(scores||{})[c[0]]; return (v===undefined||v===null||v==='')?null:Number(v); });
+  const complete=vals.length>0&&vals.every(function(v){return v!==null;});
+  if(!complete) return {complete:false,total:null,grade:'',gp:null,eligible:false,aplusOk:false,topN:vals.filter(function(v){return v===20;}).length};
+  const total=vals.reduce(function(a,b){return a+b;},0);
+  const topN=vals.filter(function(v){return v===20;}).length;
+  const eligible=total>=95&&topN>=4&&vals.every(function(v){return v>=18;});
+  const aplusOk=!!(aPlus&&eligible&&String(reason||'').trim());
+  let sc=_xgScale(total); if(sc[0]==='A+'&&!aplusOk) sc=XG_SCALE[1];
+  return {complete:true,total:total,grade:sc[0],gp:sc[2],eligible:eligible,aplusOk:aplusOk,topN:topN};
+}
+function xgGpa(docs){ const g=docs.filter(function(d){return d&&d.grade&&d.gp!==null&&d.gp!==undefined;}); if(!g.length) return null; return g.reduce(function(a,d){return a+Number(d.gp);},0)/g.length; }
+// ── 불러오기 ──
+async function xgLoad(s){
+  if(!s||_xgLoading) return; _xgLoading=true;
+  try{
+    const id=String(s.id), cols=['xlabTopics','xlabSubjectReports','xlabFinalRecords','xlabSelfActivities'], kinds=['topic','subject','final','self'];
+    const r=await Promise.all(cols.map(function(c){ return window._fb.getWhere(c,'studentId','==',id); }).concat([window._fb.getAll('xlabGrades')]));
+    const items=[];
+    for(let i=0;i<4;i++){ (r[i]||[]).forEach(function(t){ const title=kinds[i]==='self'?t.interestTopic:t.topicTitle; if(!title) return; items.push({kind:kinds[i],ref:t.id,title:String(title),date:t.createdAt||0,doc:t}); }); }
+    _xgWb=items;
+    _xgAllDocs=(r[4]||[]).filter(function(d){return d&&d.grade;});
+    _xgDocs={}; (r[4]||[]).forEach(function(d){ if(String(d.studentId)===id) _xgDocs[d.id]=d; });
+  }catch(e){ _xgWb=[]; _xgDocs={}; _xgAllDocs=[]; alert('학점 정보 불러오기 실패: '+e.message+'\n(Firestore 규칙에 xlabGrades 컬렉션 추가가 필요합니다)'); }
+  _xgDraftKey=null; _xgDraft=null; _xgFor=String(s.id); _xgLoading=false; render();
+}
+function _xgReady(){ if(_xgFor!==String(_xcaStudentId)&&!_xgLoading){ const s=_xrqStu(); if(s) xgLoad(s); } return !_xgLoading&&_xgFor===String(_xcaStudentId); }
+function _xgItems(){
+  const out=_xgWb.slice();
+  (_xcaFiles||[]).forEach(function(f){ out.push({kind:'file',ref:f.id,title:f.title||f.taskTitle||'(제목 없음)',date:f.createdAt||0,doc:f}); });
+  out.sort(function(a,b){return (b.date||0)-(a.date||0);}); return out;
+}
+function _xgFind(kind,ref){ return _xgItems().find(function(x){return x.kind===kind&&String(x.ref)===String(ref);}); }
+function _xgMonth(ts){ if(!ts) return '날짜 없음'; const d=new Date(ts); return isNaN(d.getTime())?'날짜 없음':(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')); }
+function _xgDate(ts){ if(!ts) return ''; const d=new Date(ts); return isNaN(d.getTime())?'':(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')); }
+// ── 화면: 학점·평가 탭 ──
+function _xgHtml(s){
+  if(!s) return '';
+  if(_xcaStuLoading||!_xgReady()) return _xcaLoading();
+  if(_xgSel){ const it=_xgFind(_xgSel.kind,_xgSel.ref); if(it) return _xgDetailHtml(s,it); _xgSel=null; }
+  const E=_xcaE, items=_xgItems(); const docs=items.map(function(it){return _xgDocs[_xgGid(s.id,it.kind,it.ref)];}).filter(Boolean);
+  const gpa=xgGpa(docs), n=docs.filter(function(d){return d.grade;}).length, pub=docs.filter(function(d){return d.published;}).length, ap=docs.filter(function(d){return d.grade==='A+';}).length;
+  const avg=n?Math.round(docs.filter(function(d){return d.grade;}).reduce(function(a,d){return a+d.total;},0)/n*10)/10:null;
+  const all=_xgAllDocs, allAp=all.filter(function(d){return d.grade==='A+';}).length, ratio=all.length?allAp/all.length:0, warn=all.length>=10&&ratio>XG_RATIO_WARN;
+  let h='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px">'
+   +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">🎓 '+E(s.name)+' 학생 학점·평가</b><span style="flex:1;font-size:11.5px;color:#94a3b8;min-width:180px">평가 결과는 <b>관리자만</b> 볼 수 있습니다. 항목별로 “공개”를 눌러야 학생에게 보입니다.</span>'
+   +'<button onclick="_xgFor=null;render()" style="'+XCA_B+'background:#e2e8f0;color:#334155">🔄 새로고침</button><button onclick="xgPubAll(true)" style="'+XCA_B+'background:#dcfce7;color:#166534">전체 공개</button><button onclick="xgPubAll(false)" style="'+XCA_B+'background:#fef3c7;color:#92400e">전체 비공개</button><button onclick="xgPrint()" style="'+XCA_B+'background:#1a1a1a;color:#fff">🖨 학점표 인쇄/PDF</button></div>'
+   +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px">'
+   +[['평점평균',gpa===null?'-':gpa.toFixed(2)+' / 4.5'],['평균 점수',avg===null?'-':avg+'점'],['평가 완료',n+' / '+items.length],['A+',ap+'개'],['학생 공개',pub+'개']].map(function(c){ return '<div style="background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:center"><div style="font-size:11px;color:#64748b;font-weight:700">'+c[0]+'</div><div style="font-size:16px;font-weight:900">'+c[1]+'</div></div>'; }).join('')+'</div></div>';
+  h+='<div style="background:'+(warn?'#fef2f2':'#f8fafc')+';border:1.5px solid '+(warn?'#fca5a5':'#e2e8f0')+';border-radius:10px;padding:8px 12px;font-size:12px;margin-bottom:10px;color:'+(warn?'#991b1b':'#64748b')+'">'+(warn?'⚠️ <b>A+ 비율 경고</b> — ':'📊 ')+'전체 학생 평가 '+all.length+'건 중 A+ '+allAp+'건 ('+(Math.round(ratio*1000)/10)+'%). '+(warn?'권장 상한 '+(XG_RATIO_WARN*100)+'%를 넘었습니다. A+ 부여 기준을 다시 점검하세요.':'A+ 권장 상한은 '+(XG_RATIO_WARN*100)+'% 입니다 (평가 10건 이상부터 경고).')+'<br>점수 구간: '+XG_SCALE.map(function(x){return x[0]+' '+x[1]+'↑';}).join(' · ')+' · F 60 미만. A+는 95점 이상 + 선생님 승인(사유 필수)일 때만 부여됩니다.</div>';
+  if(!items.length) return h+'<div style="text-align:center;color:#94a3b8;padding:24px;border:2px dashed #cbd5e1;border-radius:12px;font-size:13px">이 학생이 작성한 활동이나 수행평가 파일이 아직 없습니다.</div>';
+  const groups={}; items.forEach(function(it){ (groups[_xgMonth(it.date)]=groups[_xgMonth(it.date)]||[]).push(it); });
+  Object.keys(groups).sort().reverse().forEach(function(m){
+    const gd=groups[m].map(function(it){return _xgDocs[_xgGid(s.id,it.kind,it.ref)];}).filter(Boolean), mg=xgGpa(gd);
+    h+='<div style="display:flex;gap:8px;align-items:center;margin:12px 0 5px"><b style="font-size:13px">'+m+'</b><span style="font-size:11.5px;color:#64748b">월 평점 '+(mg===null?'-':mg.toFixed(2))+' · '+gd.filter(function(d){return d.grade;}).length+'/'+groups[m].length+'건 평가</span></div>';
+    groups[m].forEach(function(it){ const d=_xgDocs[_xgGid(s.id,it.kind,it.ref)];
+      h+='<div onclick="xgOpen(\''+it.kind+'\',\''+E(it.ref)+'\')" style="cursor:pointer;background:#fff;border:1.5px solid '+(d&&d.grade?'#e2e8f0':'#fde68a')+';border-radius:12px;padding:9px 13px;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="background:#0f172a;color:#fff;border-radius:6px;padding:1px 8px;font-size:11.5px;font-weight:700">'+E(XG_KIND[it.kind])+'</span><span style="font-size:11.5px;color:#94a3b8">'+_xgDate(it.date)+'</span><b style="flex:1;min-width:140px;font-size:13px">'+E(it.title)+'</b>'+xgChip(d&&d.grade,d&&d.total)+(d&&d.published?'<span style="font-size:11px;font-weight:800;color:#166534;background:#dcfce7;border-radius:99px;padding:2px 8px">공개</span>':(d&&d.grade?'<span style="font-size:11px;color:#64748b;background:#f1f5f9;border-radius:99px;padding:2px 8px">비공개</span>':''))+'</div>'; });
+  });
+  return h;
+}
+function xgOpen(kind,ref){ _xgSel={kind:kind,ref:ref}; _xgDraftKey=null; render(); window.scrollTo(0,0); }
+function xgBack(){ _xgSel=null; _xgDraftKey=null; render(); }
+function _xgSrcHtml(it){
+  const E=_xcaE;
+  if(it.kind==='file'){ const f=it.doc; return (f.files||[]).map(function(x){ return '<div style="font-size:13px;margin:3px 0">📄 <a href="'+E(x.url)+'" target="_blank" rel="noopener">'+E(x.name)+'</a></div>'; }).join('')+(f.note?'<div style="font-size:12.5px;color:#475569;margin-top:6px;white-space:pre-wrap">💬 학생 메모: '+E(f.note)+'</div>':''); }
+  let parts=[]; try{ parts=(typeof _xaarAdminSourceSummary==='function')?(_xaarAdminSourceSummary(it.kind,it.doc)||[]):[]; }catch(e){}
+  return parts.length?parts.map(function(p){ return '<div style="margin-bottom:8px"><div style="font-size:11px;color:#94a3b8;font-weight:800">'+E(p[0])+'</div><div style="font-size:12.5px;line-height:1.65;white-space:pre-wrap">'+E(p[1])+'</div></div>'; }).join(''):'<span style="color:#94a3b8">작성된 내용이 없습니다.</span>';
+}
+function _xgDetailHtml(s,it){
+  const E=_xcaE; _xgPanelInit(it.kind,it.ref,it.title,it.date);
+  return '<div style="display:flex;gap:6px;margin-bottom:10px"><button onclick="xgBack()" style="'+XCA_B+'background:#e2e8f0;color:#334155">← 학점 목록</button></div>'
+   +'<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:13px;margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><span style="background:#0f172a;color:#fff;border-radius:6px;padding:1px 8px;font-size:11.5px;font-weight:700">'+E(XG_KIND[it.kind])+'</span><b style="font-size:15px">'+E(it.title)+'</b><span style="font-size:11.5px;color:#94a3b8">'+_xgDate(it.date)+'</span></div>'
+   +'<details><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#475569">📄 학생이 쓴 내용 보기</summary><div style="margin-top:8px;background:#f8fafc;border-radius:10px;padding:10px 12px;max-height:300px;overflow:auto">'+_xgSrcHtml(it)+'</div></details></div>'
+   +(it.kind==='file'?'':_xgRvHtml(it))
+   +_xgPanelHtml(it.kind,it.ref,it.title,it.date);
+}
+// ── 평가 패널 (학점 탭 + 수행평가 파일 상세에서 공통 사용) ──
+function _xgPanelInit(kind,ref,title,date){
+  const key=kind+'|'+ref; if(_xgDraftKey===key&&_xgDraft) return;
+  const s=_xrqStu()||{}; const ex=_xgDocs[_xgGid(_xcaStudentId,kind,ref)];
+  _xgDraft=ex?JSON.parse(JSON.stringify(ex)):{id:_xgGid(_xcaStudentId,kind,ref),studentId:String(_xcaStudentId),studentName:s.name||'',kind:kind,refId:String(ref),title:title||'',itemDate:date||0,scores:{},aPlus:false,aPlusReason:'',comment:'',published:false};
+  _xgDraft.scores=_xgDraft.scores||{}; _xgDraft.comment=_xgDraft.comment||''; _xgDraft.aPlusReason=_xgDraft.aPlusReason||'';
+  _xgDraftKey=key;
+}
+function _xgPanelHtml(kind,ref,title,date){
+  if(!_xgReady()) return '<div style="color:#94a3b8;font-size:12px;padding:10px">학점 정보를 불러오는 중…</div>';
+  _xgPanelInit(kind,ref,title,date); const d=_xgDraft, E=_xcaE, rub=XG_RUBRIC[kind]; const c=xgCalc(kind,d.scores,d.aPlus,d.aPlusReason);
+  let h='<div style="background:#fff;border:1.5px solid #fcd34d;border-radius:12px;padding:13px;margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><b style="font-size:14px">🎓 학점 평가</b><span style="font-size:11.5px;color:#64748b;flex:1">항목마다 단계를 고르면 100점·학점이 자동 계산됩니다. '+(d.published?'<b style="color:#166534">현재 학생에게 공개 중</b>':'현재 비공개 (관리자만 보임)')+'</span>'+_xgAiBtn(kind,ref)+'</div>';
+  h+='<div style="font-size:11.5px;color:#94a3b8;margin-bottom:6px">'+XG_LEVELS.map(function(l){return '<b style="color:'+l[2]+'">'+l[0]+'</b> '+l[1]+'점';}).join(' · ')+' (항목당 20점 만점 × 5)</div>';
+  rub.forEach(function(r){ const cur=d.scores[r[0]]; const ai=d.ai&&d.ai.scores&&d.ai.scores[r[0]];
+    h+='<div style="border-top:1px solid #f1f5f9;padding:7px 0"><div style="display:flex;gap:6px;align-items:baseline;flex-wrap:wrap"><b style="font-size:13px">'+E(r[1])+'</b><span style="font-size:11.5px;color:#94a3b8">'+E(r[2])+'</span></div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">'
+     +XG_LEVELS.map(function(l){ const on=cur===l[1]; return '<button onclick="xgSet(\''+r[0]+'\','+l[1]+')" style="border:1.5px solid '+l[2]+';background:'+(on?l[2]:'#fff')+';color:'+(on?'#fff':l[2])+';border-radius:8px;padding:5px 10px;font-weight:800;font-size:12px;cursor:pointer">'+l[0]+' '+l[1]+'</button>'; }).join('')
+     +(ai!==undefined&&ai!==null?'<span style="font-size:11px;color:#7c3aed;align-self:center;margin-left:4px">🤖 제안 '+ai+'점</span>':'')+'</div>'
+     +((d.ai&&d.ai.notes&&d.ai.notes[r[0]])?'<div style="font-size:11.5px;color:#6d28d9;margin-top:3px">🤖 '+E(d.ai.notes[r[0]])+'</div>':'')+'</div>'; });
+  h+='<div style="margin-top:8px;background:#f8fafc;border-radius:10px;padding:10px 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="font-size:12px;color:#64748b;font-weight:800">합계</div><div style="font-size:22px;font-weight:900">'+(c.complete?c.total+'점':'-')+'</div><div>'+(c.complete?'<span style="font-size:18px;font-weight:900;color:#fff;background:'+xgGradeColor(c.grade)+';border-radius:99px;padding:3px 14px">'+c.grade+'</span> <span style="font-size:12px;color:#64748b">평점 '+c.gp.toFixed(1)+'</span>':'<span style="font-size:12px;color:#b45309">모든 항목을 선택하면 계산됩니다</span>')+'</div></div>';
+  // A+ 승인
+  if(c.complete&&c.total>=95){
+    h+='<div style="margin-top:8px;border:1.5px dashed '+(c.eligible?'#c4b5fd':'#e2e8f0')+';border-radius:10px;padding:9px 12px;background:'+(c.eligible?'#faf5ff':'#f8fafc')+'"><label style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;color:'+(c.eligible?'#6d28d9':'#94a3b8')+'"><input type="checkbox" '+(d.aPlus?'checked':'')+' '+(c.eligible?'':'disabled')+' onchange="xgAplus(this.checked)" style="width:17px;height:17px;margin:0">A+ 부여 (선생님 승인)</label>'
+     +'<div style="font-size:11.5px;color:#64748b;margin:3px 0 5px">조건: 95점 이상 · “탁월” 4개 이상 · 나머지 항목도 “우수” 이상'+(c.eligible?'':' — <b style="color:#b45309">현재 조건 미충족이라 A로 표시됩니다</b>')+'</div>'
+     +(c.eligible&&d.aPlus?'<input value="'+E(d.aPlusReason||'')+'" oninput="xgAplusReason(this.value)" placeholder="A+ 부여 사유 (필수) 예: 면접에서 그대로 답변 가능한 수준, 한계 분석까지 스스로 완성" style="'+XCA_I+'">':'')+(c.eligible&&d.aPlus&&!String(d.aPlusReason||'').trim()?'<div style="font-size:11.5px;color:#b91c1c;margin-top:3px">사유를 입력해야 A+가 적용됩니다 (그때까지는 A).</div>':'')+'</div>'; }
+  h+='<textarea rows="3" oninput="xgComment(this.value)" placeholder="학생에게 보여줄 총평 (공개 시 점수·항목과 함께 표시됩니다)" style="'+XCA_I+'margin-top:8px">'+E(d.comment||'')+'</textarea>'
+   +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center"><button onclick="xgSave()" '+(_xgBusy?'disabled':'')+' style="'+XCA_B+'background:#1d4ed8;color:#fff">💾 평가 저장</button>'
+   +(d.published?'<button onclick="xgPublish(false)" style="'+XCA_B+'background:#fef3c7;color:#92400e">🙈 공개 취소</button>':'<button onclick="xgPublish(true)" style="'+XCA_B+'background:#16a34a;color:#fff">👁 학생에게 공개</button>')
+   +(_xgDocs[d.id]?'<button onclick="xgDelete()" style="'+XCA_B+'background:#fee2e2;color:#b91c1c;margin-left:auto">🗑 평가 삭제</button>':'')+'<span id="xgMsg" style="font-size:12px;color:#64748b"></span></div></div>';
+  return h;
+}
+function _xgAiBtn(kind,ref){ return '<button onclick="xgAiSuggest()" '+(_xgAiBusy?'disabled':'')+' title="AI는 최고 \'우수(18점)\'까지만 제안합니다 → 최고 A" style="'+XCA_B+'background:#7c3aed;color:#fff">'+(_xgAiBusy?'⏳ AI가 읽는 중… (1~3분)':'🤖 AI 점수 제안 (최고 A)')+'</button>'; }
+function xgSet(k,v){ if(!_xgDraft) return; _xgDraft.scores=_xgDraft.scores||{}; _xgDraft.scores[k]=v; const c=xgCalc(_xgDraft.kind,_xgDraft.scores,_xgDraft.aPlus,_xgDraft.aPlusReason); if(!c.eligible){ _xgDraft.aPlus=false; } render(); }
+function xgAplus(ch){ if(!_xgDraft) return; _xgDraft.aPlus=!!ch; render(); }
+function xgAplusReason(v){ if(_xgDraft) _xgDraft.aPlusReason=v; }
+function xgComment(v){ if(_xgDraft) _xgDraft.comment=v; }
+function _xgMsg(t,c){ const e=document.getElementById('xgMsg'); if(e){ e.textContent=t; e.style.color=c||'#64748b'; } }
+function _xgPubBody(d,c){ const rub=XG_RUBRIC[d.kind]; return {id:d.id,studentId:d.studentId,kind:d.kind,refId:d.refId,title:d.title,itemDate:d.itemDate||0,total:d.total,grade:d.grade,gp:d.gp,
+  crit:rub.map(function(r){ return {label:r[1],desc:r[2],pts:Number((d.scores||{})[r[0]]||0)}; }),comment:d.comment||'',publishedAt:d.publishedAt||Date.now()}; }
+async function xgSave(silent){
+  const d=_xgDraft; if(!d) return false; const c=xgCalc(d.kind,d.scores,d.aPlus,d.aPlusReason);
+  if(!c.complete){ alert('모든 항목의 단계를 선택해 주세요.'); return false; }
+  if(d.aPlus&&!c.eligible){ alert('A+ 조건(95점 이상·탁월 4개 이상)을 충족하지 않습니다.'); return false; }
+  if(d.aPlus&&!String(d.aPlusReason||'').trim()){ alert('A+ 부여 사유를 입력해 주세요. (사유가 없으면 A로 저장됩니다)'); return false; }
+  _xgBusy=true; d.total=c.total; d.grade=c.grade; d.gp=c.gp; d.updatedAt=Date.now(); if(!d.aPlus) d.aPlusReason=d.aPlus?d.aPlusReason:'';
+  try{
+    await window._fb.set('xlabGrades',d.id,d);
+    _xgDocs[d.id]=JSON.parse(JSON.stringify(d)); const ai=_xgAllDocs.findIndex(function(x){return x.id===d.id;}); if(ai>=0) _xgAllDocs[ai]=_xgDocs[d.id]; else _xgAllDocs.push(_xgDocs[d.id]);
+    if(d.published){ await window._fb.set('xlabGradesPub',d.id,_xgPubBody(d,c)); }
+    _xgBusy=false; render(); if(!silent){ _xgMsg(d.published?'✅ 저장됨 (공개 중이라 학생 화면에도 반영)':'✅ 저장됨','#16a34a'); } return true;
+  }catch(e){ _xgBusy=false; render(); alert('저장 실패: '+e.message+'\n(Firestore 규칙에 xlabGrades / xlabGradesPub 추가가 필요합니다)'); return false; }
+}
+async function xgPublish(on){
+  const d=_xgDraft; if(!d) return;
+  if(on){ if(!(await xgSave(true))) return; d.published=true; d.publishedAt=Date.now(); const c=xgCalc(d.kind,d.scores,d.aPlus,d.aPlusReason);
+    try{ await window._fb.set('xlabGrades',d.id,{published:true,publishedAt:d.publishedAt}); await window._fb.set('xlabGradesPub',d.id,_xgPubBody(d,c)); _xgDocs[d.id]=JSON.parse(JSON.stringify(d)); alert('학생에게 공개했습니다. (점수·항목·총평 모두 보입니다)'); }catch(e){ d.published=false; alert('공개 실패: '+e.message); }
+  } else {
+    if(!confirm('공개를 취소할까요? 학생 화면에서 이 평가가 사라집니다.')) return;
+    try{ await window._fb.delete('xlabGradesPub',d.id); await window._fb.set('xlabGrades',d.id,{published:false}); d.published=false; if(_xgDocs[d.id]) _xgDocs[d.id].published=false; }catch(e){ alert('공개 취소 실패: '+e.message); }
+  }
+  render();
+}
+async function xgDelete(){
+  const d=_xgDraft; if(!d||!_xgDocs[d.id]) return; if(!confirm('이 평가를 삭제할까요? 공개 중이면 학생 화면에서도 사라집니다.')) return;
+  try{ await window._fb.delete('xlabGrades',d.id); try{ await window._fb.delete('xlabGradesPub',d.id); }catch(e){} delete _xgDocs[d.id]; _xgAllDocs=_xgAllDocs.filter(function(x){return x.id!==d.id;}); _xgDraftKey=null; _xgDraft=null; if(_xgSel) _xgSel=null; render(); }
+  catch(e){ alert('삭제 실패: '+e.message); }
+}
+async function xgPubAll(on){
+  const ids=Object.keys(_xgDocs).filter(function(k){ const d=_xgDocs[k]; return d&&d.grade&&!!d.published!==on; });
+  if(!ids.length){ alert(on?'공개할 평가가 없어요 (이미 모두 공개했거나 평가가 없습니다).':'비공개로 바꿀 평가가 없어요.'); return; }
+  if(!confirm((on?'평가 완료 '+ids.length+'건을 학생에게 공개합니다.':'공개 중인 '+ids.length+'건을 비공개로 바꿉니다.')+' 계속할까요?')) return;
+  try{ for(let i=0;i<ids.length;i++){ const d=_xgDocs[ids[i]];
+      if(on){ d.published=true; d.publishedAt=Date.now(); await window._fb.set('xlabGrades',d.id,{published:true,publishedAt:d.publishedAt}); await window._fb.set('xlabGradesPub',d.id,_xgPubBody(d,null)); }
+      else { await window._fb.delete('xlabGradesPub',d.id); await window._fb.set('xlabGrades',d.id,{published:false}); d.published=false; } }
+  }catch(e){ alert('일부 실패: '+e.message); }
+  _xgDraftKey=null; render();
+}
+function xgPrint(){
+  const s=_xrqStu()||{}; const E=_xcaE; const items=_xgItems().map(function(it){ return {it:it,d:_xgDocs[_xgGid(_xcaStudentId,it.kind,it.ref)]}; }).filter(function(x){return x.d&&x.d.grade;});
+  if(!items.length){ alert('인쇄할 평가가 없어요.'); return; }
+  const gpa=xgGpa(items.map(function(x){return x.d;})); const groups={}; items.forEach(function(x){ (groups[_xgMonth(x.it.date)]=groups[_xgMonth(x.it.date)]||[]).push(x); });
+  const body='<h1>🎓 학점표 <span class="m">'+E(s.name||'')+' 학생 · 평점평균 '+(gpa===null?'-':gpa.toFixed(2))+' / 4.5</span></h1>'
+   +Object.keys(groups).sort().reverse().map(function(m){ const gg=xgGpa(groups[m].map(function(x){return x.d;})); return '<h2>'+m+' <span class="m">월 평점 '+(gg===null?'-':gg.toFixed(2))+'</span></h2><table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="background:#f1f5f9"><th style="text-align:left;padding:5px 8px">구분</th><th style="text-align:left;padding:5px 8px">제목</th><th style="padding:5px 8px">점수</th><th style="padding:5px 8px">학점</th><th style="text-align:left;padding:5px 8px">총평</th></tr>'
+     +groups[m].map(function(x){ return '<tr style="border-top:1px solid #e2e8f0"><td style="padding:5px 8px;white-space:nowrap">'+E(XG_KIND[x.it.kind])+'</td><td style="padding:5px 8px">'+E(x.it.title)+'</td><td style="padding:5px 8px;text-align:center">'+x.d.total+'</td><td style="padding:5px 8px;text-align:center;font-weight:900">'+E(x.d.grade)+'</td><td style="padding:5px 8px;color:#475569">'+E(x.d.comment||'')+'</td></tr>'; }).join('')+'</table>'; }).join('');
+  _xpaPrintWin((s.name||'학생')+'_학점표',body);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// 🤖 AI 점수 제안 + 워크북·예상세특 AI 첨삭 (3단계)
+//  · 서버 함수: xlabSuggestGrade(점수 제안, 서버가 최고 18점으로 제한) / xlabReviewText(7기호+질문, 예상세특은 활동 근거와 대조)
+//  · 첨삭 결과는 xlabGrades 문서의 review 필드에 저장 (관리자 전용 — 학생에게 공유하지 않음)
+//  · 예상세특은 기본으로 "학생이 고친 최종본(저장된 recordText)"을 점검하고, AI 원본(aiText)이 저장된 경우 선택해서 점검 가능
+// ═════════════════════════════════════════════════════════════════════════
+let _xgRv={key:null,target:'',gl:'',busy:false};
+function _xgWbFullText(it){
+  let parts=[]; try{ parts=(typeof _xaarAdminSourceSummary==='function')?(_xaarAdminSourceSummary(it.kind,it.doc)||[]):[]; }catch(e){}
+  return parts.map(function(p){ return '['+p[0]+']\n'+String(p[1]||'').trim(); }).join('\n\n');
+}
+function _xgTargets(it){
+  const doc=it.doc||{}; let parts=[]; try{ parts=(typeof _xaarAdminSourceSummary==='function')?(_xaarAdminSourceSummary(it.kind,doc)||[]):[]; }catch(e){}
+  const fmt=function(p){ return '['+p[0]+']\n'+String(p[1]||'').trim(); }; const T=[];
+  const same=function(a,b){ return String(a||'').trim()===String(b||'').trim(); };
+  if(it.kind==='topic'||it.kind==='subject'){
+    const rep=parts.filter(function(p){return p[0]!=='예상세특';}).map(fmt).join('\n\n');
+    if(rep.replace(/\s/g,'').length>=30) T.push({key:'report',mode:'report',label:'보고서 본문 (학생이 쓴 내용)',text:rep,ref:''});
+    const er=doc.expectedRecord||{};
+    if(er.recordText){ const st=er.aiText?(same(er.aiText,er.recordText)?'학생 수정 없음 — AI 원본 그대로':'학생이 고친 최종본'):'저장된 최종본 (AI 원본은 저장돼 있지 않음)';
+      T.push({key:'rec',mode:'record',label:'예상세특 — '+st,text:er.recordText,ref:rep});
+      if(er.aiText&&!same(er.aiText,er.recordText)) T.push({key:'recAi',mode:'record',label:'예상세특 — AI 생성 원본',text:er.aiText,ref:rep}); }
+  } else if(it.kind==='final'){
+    if(doc.finalRecordText){ const st=doc.finalRecordAi?(same(doc.finalRecordAi,doc.finalRecordText)?'학생 수정 없음 — AI 원본 그대로':'학생이 고친 최종본'):'저장된 최종본 (AI 원본은 저장돼 있지 않음)';
+      T.push({key:'rec',mode:'record',label:'최종예상세특 — '+st,text:doc.finalRecordText,ref:''});
+      if(doc.finalRecordAi&&!same(doc.finalRecordAi,doc.finalRecordText)) T.push({key:'recAi',mode:'record',label:'최종예상세특 — AI 생성 원본',text:doc.finalRecordAi,ref:''}); }
+  } else {
+    const t=parts.map(fmt).join('\n\n'); if(t.replace(/\s/g,'').length>=30) T.push({key:'report',mode:'report',label:'활동 기록 (학생이 쓴 내용)',text:t,ref:''});
+  }
+  return T;
+}
+function _xgRvState(it){ const key=it.kind+'|'+it.ref; if(_xgRv.key!==key){ const T=_xgTargets(it); const def=T.find(function(t){return t.key==='rec';})||T[0]; _xgRv={key:key,target:def?def.key:'',gl:'',busy:false}; } return _xgRv; }
+function _xgRvHtml(it){
+  const E=_xcaE, st=_xgRvState(it), T=_xgTargets(it), d=_xgDraft, rv=(d&&d.review)||null;
+  if(!T.length) return '<div style="background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:11px 13px;margin-bottom:10px;font-size:12.5px;color:#94a3b8">🤖 AI 첨삭: 학생이 작성한 내용이 아직 충분하지 않아요.</div>';
+  const items=(rv&&rv.items)||[];
+  let h='<div style="background:#fff;border:1.5px solid #c4b5fd;border-radius:12px;padding:13px;margin-bottom:10px"><div style="font-weight:900;margin-bottom:4px">🤖 AI 첨삭 (7기호 · 질문만)</div><div style="font-size:11.5px;color:#64748b;margin-bottom:8px;line-height:1.5">'+XCL_SYMS.map(function(x){return xclSymChip(x.k,true)+' '+x.def;}).join(' &nbsp;·&nbsp; ')+'<br>문장을 대신 써 주지 않고 원문 인용 + 기호 + 질문만 만듭니다. 만든 초안은 <b>관리자만</b> 볼 수 있습니다.</div>'
+   +'<select onchange="_xgRv.target=this.value;render()" style="'+XCA_I+'">'+T.map(function(t){ return '<option value="'+t.key+'" '+(t.key===st.target?'selected':'')+'>'+E(t.label)+'</option>'; }).join('')+'</select>'
+   +(T.some(function(t){return t.key==='rec';})&&!T.some(function(t){return t.key==='recAi';})?'<div style="font-size:11px;color:#94a3b8;margin-top:3px">※ AI 생성 원본이 학생 수정본과 같거나 저장돼 있지 않으면 “AI 원본” 선택지가 나타나지 않습니다. (학생용 12부터 새로 만드는 예상세특은 원본이 함께 저장됩니다)</div>':'')
+   +'<textarea rows="2" oninput="_xgRv.gl=this.value" placeholder="추가 안내(선택) — 예: 이 활동은 진로(의대) 연결을 특히 점검" style="'+XCA_I+'margin-top:6px">'+E(st.gl)+'</textarea>'
+   +'<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button onclick="xgRvRun()" '+(st.busy?'disabled':'')+' style="'+XCA_B+'background:#7c3aed;color:#fff">'+(st.busy?'⏳ AI가 읽는 중…':(items.length?'🔄 AI 초안 다시 만들기':'✨ AI 첨삭 초안 만들기'))+'</button>'
+   +(items.length?'<button onclick="xgRvAdd()" style="'+XCA_B+'background:#e2e8f0;color:#334155">＋ 직접 추가</button><button onclick="xgRvSave()" style="'+XCA_B+'background:#1d4ed8;color:#fff">💾 저장</button><button onclick="xgRvPrint()" style="'+XCA_B+'background:#1a1a1a;color:#fff">🖨 인쇄</button><button onclick="xgRvCopy()" style="'+XCA_B+'background:#e2e8f0;color:#334155">📋 복사</button>':'')+'<span id="xgRvMsg" style="font-size:12px;color:#64748b"></span></div>';
+  if(rv&&rv.targetLabel) h+='<div style="font-size:11.5px;color:#94a3b8;margin-top:6px">마지막 첨삭 대상: '+E(rv.targetLabel)+(rv.aiAt?' · '+_xgDate(rv.aiAt):'')+(rv.dropped?' · (문장 대체형·원문 불일치 등 '+rv.dropped+'개 자동 제외)':'')+'</div>';
+  items.forEach(function(x,i){
+    h+='<div style="border:1.5px solid '+(x.keep===false?'#e2e8f0':xclSym(x.sym).color)+';border-radius:10px;padding:8px 10px;margin-top:7px;opacity:'+(x.keep===false?.5:1)+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select onchange="xgRvSet('+i+',\'sym\',this.value)" style="'+XCA_I+'width:auto">'+XCL_SYMS.map(function(s2){ return '<option value="'+s2.k+'" '+(s2.k===x.sym?'selected':'')+'>['+s2.k+'] '+E(s2.def)+'</option>'; }).join('')+'</select>'
+     +(x.verified?'<span style="font-size:11px;color:#16a34a">✔ 원문 확인</span>':'')+'<span style="flex:1"></span><label class="xca-lb" style="font-size:12px"><input type="checkbox" class="xca-ck" '+(x.keep===false?'':'checked')+' onchange="xgRvSet('+i+',\'keep\',this.checked)"> 사용</label><button onclick="xgRvDel('+i+')" style="'+XCA_B+'background:#fee2e2;color:#b91c1c;padding:5px 9px">✕</button></div>'
+     +'<textarea rows="2" onchange="xgRvSet('+i+',\'quote\',this.value)" placeholder="학생 원문 인용" style="'+XCA_I+'margin-top:5px;background:#f8fafc">'+E(x.quote||'')+'</textarea><textarea rows="2" onchange="xgRvSet('+i+',\'q\',this.value)" placeholder="질문 (문장을 고쳐 쓰지 말고 질문만)" style="'+XCA_I+'margin-top:4px">'+E(x.q||'')+'</textarea></div>'; });
+  return h+'</div>';
+}
+function _xgRvEnsure(){ const d=_xgDraft; d.review=d.review||{items:[],comment:''}; d.review.items=d.review.items||[]; return d.review; }
+function xgRvSet(i,k,v){ const rv=_xgRvEnsure(); if(!rv.items[i]) return; rv.items[i][k]=v; if(k==='sym'||k==='keep') render(); }
+function xgRvDel(i){ _xgRvEnsure().items.splice(i,1); render(); }
+function xgRvAdd(){ _xgRvEnsure().items.push({sym:'과정',quote:'',q:'',keep:true,verified:false}); render(); }
+function _xgRvMsg(t,c){ const e=document.getElementById('xgRvMsg'); if(e){ e.textContent=t; e.style.color=c||'#64748b'; } }
+async function xgRvSave(silent){
+  const d=_xgDraft; if(!d) return; const rv=_xgRvEnsure();
+  try{ await window._fb.set('xlabGrades',d.id,{id:d.id,studentId:d.studentId,studentName:d.studentName||'',kind:d.kind,refId:d.refId,title:d.title,itemDate:d.itemDate||0,review:JSON.parse(JSON.stringify(rv))});
+    const ex=_xgDocs[d.id]||(_xgDocs[d.id]={id:d.id,studentId:d.studentId,kind:d.kind,refId:d.refId,title:d.title,itemDate:d.itemDate||0}); ex.review=JSON.parse(JSON.stringify(rv));
+    if(!silent) _xgRvMsg('✅ 저장됨','#16a34a'); }
+  catch(e){ alert('첨삭 저장 실패: '+e.message); }
+}
+async function xgRvRun(){
+  const it=_xgFind(_xgSel.kind,_xgSel.ref); if(!it) return; const st=_xgRvState(it); if(st.busy) return;
+  const tg=_xgTargets(it).find(function(t){return t.key===st.target;}); if(!tg){ alert('첨삭할 대상을 선택해 주세요.'); return; }
+  const rvOld=_xgDraft&&_xgDraft.review; if(rvOld&&(rvOld.items||[]).length&&!confirm('기존 첨삭 초안('+rvOld.items.length+'개, 직접 고친 내용 포함)이 새 초안으로 바뀝니다. 계속할까요?')) return;
+  st.busy=true; render();
+  try{
+    const r=await window._fb.xlabReviewText({text:tg.text,mode:tg.mode,reference:tg.ref,context:{kind:XG_KIND[it.kind].replace(/^\S+\s/,''),title:it.title,dept:(typeof _xrqDoc!=='undefined'&&_xrqDoc&&_xrqDoc.major)||'',guideline:st.gl}});
+    if(!r||!r.ok) throw new Error((r&&r.reason)||'AI가 읽지 못했습니다.');
+    _xgDraft.review={target:tg.key,targetLabel:tg.label,items:(r.items||[]).map(function(x){return Object.assign({keep:true},x);}),comment:'',aiAt:Date.now(),dropped:(r.dropped?(r.dropped.sym+r.dropped.form+r.dropped.rewrite+r.dropped.quote):0)};
+    await xgRvSave(true); alert('첨삭 초안 '+_xgDraft.review.items.length+'개를 만들었습니다. 관리자만 볼 수 있습니다.'+(_xgDraft.review.dropped?'\n(문장 대체형·원문 불일치 등 '+_xgDraft.review.dropped+'개는 자동으로 제외)':''));
+  }catch(e){ alert('AI 첨삭 실패: '+e.message+(/^internal$/i.test(e.message)?'\n(서버 함수 xlabReviewText가 배포되었는지 확인하세요)':'')); }
+  finally{ st.busy=false; render(); }
+}
+function _xgRvLines(){ const it=_xgFind(_xgSel.kind,_xgSel.ref); const rv=(_xgDraft&&_xgDraft.review)||{items:[]}; return {it:it,rv:rv,items:(rv.items||[]).filter(function(x){return x.keep!==false&&x.q;})}; }
+function xgRvCopy(){ const L=_xgRvLines(); if(!L.items.length){ alert('복사할 항목이 없어요.'); return; } const txt='■ '+L.it.title+(L.rv.targetLabel?' ('+L.rv.targetLabel+')':'')+'\n'+L.items.map(function(x,i){ return (i+1)+'. ['+x.sym+'] '+(x.quote?'“'+x.quote+'” → ':'')+x.q; }).join('\n'); try{ navigator.clipboard.writeText(txt); alert('복사했습니다.'); }catch(e){ prompt('복사하세요',txt); } }
+function xgRvPrint(){ const L=_xgRvLines(); if(!L.items.length){ alert('인쇄할 항목이 없어요.'); return; } const s=_xrqStu()||{}; const E=_xcaE;
+  _xpaPrintWin((s.name||'학생')+'_AI첨삭',
+   '<h1>📝 첨삭지 <span class="m">'+E(s.name||'')+' 학생 · '+E(L.it.title)+(L.rv.targetLabel?' · '+E(L.rv.targetLabel):'')+'</span></h1>'
+   +L.items.map(function(x,i){ return '<div class="sec"><b>'+(i+1)+'. ['+E(x.sym)+']</b>'+(x.quote?'<div style="color:#475569;margin:3px 0">“'+E(x.quote)+'”</div>':'')+'<div>❓ '+E(x.q)+'</div></div>'; }).join('')); }
+async function xgAiSuggest(){
+  const d=_xgDraft; if(!d||_xgAiBusy) return; const it=_xgFind(d.kind,d.refId); if(!it) return;
+  const payload={rubric:XG_RUBRIC[d.kind].map(function(r){return {key:r[0],label:r[1],desc:r[2]};}),context:{kind:XG_KIND[d.kind].replace(/^\S+\s/,''),title:it.title,dept:(typeof _xrqDoc!=='undefined'&&_xrqDoc&&_xrqDoc.major)||''}};
+  if(d.kind==='file'){ const f=it.doc||{}; const sel=document.getElementById('xcaR_file'); const idx=sel?Number(sel.value||0):0; const fi=(f.files||[])[idx]||(f.files||[])[0]; if(!fi){ alert('평가할 파일이 없습니다.'); return; } payload.path=fi.path; payload.fileName=fi.name; }
+  else { payload.text=_xgWbFullText(it); if(payload.text.replace(/\s/g,'').length<30){ alert('학생이 작성한 내용이 너무 짧아 AI가 평가할 수 없어요.'); return; } }
+  if(Object.keys(d.scores||{}).length&&!confirm('이미 입력한 항목은 그대로 두고, 비어 있는 항목만 AI 제안으로 채웁니다. (AI 제안 점수는 각 항목 옆에 표시됩니다) 계속할까요?')) return;
+  _xgAiBusy=true; render();
+  try{
+    const r=await window._fb.xlabSuggestGrade(payload); if(!r||!r.ok) throw new Error((r&&r.reason)||'AI가 평가하지 못했습니다.');
+    d.ai={scores:r.scores,notes:r.notes||{},summary:r.summary||'',at:Date.now()}; d.scores=d.scores||{};
+    Object.keys(r.scores).forEach(function(k){ if(d.scores[k]===undefined||d.scores[k]===null) d.scores[k]=r.scores[k]; });
+    alert('AI 점수를 제안했습니다. (최고 우수 18점까지)\n항목별 근거를 확인하고 필요하면 단계를 바꾼 뒤 “평가 저장”을 누르세요.'+(r.summary?'\n\n요약: '+r.summary:''));
+  }catch(e){ alert('AI 점수 제안 실패: '+e.message+(/^internal$/i.test(e.message)?'\n(서버 함수 xlabSuggestGrade가 배포되었는지 확인하세요)':'')); }
+  finally{ _xgAiBusy=false; render(); }
 }
 
 let _xlabAdminTopMode = 'topic'; // 'topic' | 'subject' | 'final' | 'buildup' | 'activity' | 'aar' | 'mockapply'
