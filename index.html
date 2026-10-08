@@ -57871,13 +57871,14 @@ async function bkGenerate(){
   if(!confirm(nw.length+'개의 상담 시간을 추가합니다. (이미 있는 '+(out.length-nw.length)+'개는 건너뜁니다)')) return;
   await _bkAddSlots(link,nw);
 }
-function _bkGenFormHtml(dur,title){
-  const inp='style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12.5px"';
-  const wdH=[1,2,3,4,5,6,0].map(function(w){return '<label style="margin-right:8px;font-size:12.5px"><input type="checkbox" id="bkW'+w+'" '+(w>=1&&w<=5?'checked':'')+'> '+'일월화수목금토'[w]+'</label>';}).join('');
-  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">날짜 <input type="date" id="bkG1" '+inp+'> ~ <input type="date" id="bkG2" '+inp+'></div>'
-   +'<div style="margin:8px 0">'+wdH+'</div>'
-   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px">시간 <input type="time" id="bkGs" value="14:00" '+inp+'> ~ <input type="time" id="bkGe" value="20:00" '+inp+'> · 상담 <input type="number" id="bkGd" value="'+dur+'" style="width:60px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분 · 사이 간격 <input type="number" id="bkGg" value="0" style="width:50px;padding:6px;border:1px solid #ddd;border-radius:6px"> 분</div>'
-   +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;margin-top:8px">제외(식사·휴식) <input type="time" id="bkGls" '+inp+'> ~ <input type="time" id="bkGle" '+inp+'> <span style="color:#999">(선택)</span></div>';
+const _BK_CSS='<style>.bkg input[type=date],.bkg input[type=time],.bkg input[type=number]{width:auto!important;min-width:0!important;display:inline-block!important;margin:0!important;padding:5px 7px!important;font-size:12.5px!important;height:auto!important}.bkg input[type=number]{width:56px!important}.bkg input[type=checkbox]{width:auto!important;height:auto!important;display:inline-block!important;margin:0 3px 0 0!important}.bkg label{display:inline-flex!important;align-items:center;width:auto!important;margin:0 10px 0 0!important;font-size:12.5px!important;font-weight:600!important;white-space:nowrap}.bkg .r{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:7px;font-size:12.5px}</style>';
+function _bkGenFormHtml(dur){
+  const wdH=[1,2,3,4,5,6,0].map(function(w){return '<label><input type="checkbox" id="bkW'+w+'" '+(w>=1&&w<=5?'checked':'')+'>'+'일월화수목금토'[w]+'</label>';}).join('');
+  return _BK_CSS+'<div class="bkg">'
+   +'<div class="r"><b>날짜</b><input type="date" id="bkG1"> ~ <input type="date" id="bkG2"></div>'
+   +'<div class="r"><b>요일</b>'+wdH+'</div>'
+   +'<div class="r"><b>시간</b><input type="time" id="bkGs" value="14:00"> ~ <input type="time" id="bkGe" value="20:00"> <b style="margin-left:6px">상담</b><input type="number" id="bkGd" value="'+dur+'"> 분 <b style="margin-left:6px">간격</b><input type="number" id="bkGg" value="0"> 분</div>'
+   +'<div class="r"><b>제외</b><input type="time" id="bkGls"> ~ <input type="time" id="bkGle"> <span style="color:#999">식사·휴식 시간 (선택)</span></div></div>';
 }
 async function _bkAddSlots(link,list){
   const db=window._fb.db; const org=String(link.orgId);
@@ -57957,7 +57958,11 @@ function _bkDetailHtml(){
   const days={}; slots.forEach(function(s){(days[_bkDKey(s.start)]=days[_bkDKey(s.start)]||[]).push(s);});
   const nBooked=slots.filter(function(s){return s.booked;}).length;
   const inp='style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12.5px"';
-  const wdH=[1,2,3,4,5,6,0].map(function(w){return '<label style="margin-right:8px;font-size:12.5px"><input type="checkbox" id="bkW'+w+'" '+(w>=1&&w<=5?'checked':'')+'> '+'일월화수목금토'[w]+'</label>';}).join('');
+  const myB=_bk.books.filter(function(b){return b.linkId===l.id;}).sort(function(a,b){return a.start-b.start;});
+  const bookListH='<div style="background:#fff;border:1.5px solid #c7e9d4;border-radius:12px;padding:12px 14px;margin-bottom:14px"><div style="font-size:13px;font-weight:800;color:#166534;margin-bottom:8px">📋 예약 현황 ('+myB.length+'건)</div>'
+   +(myB.length?'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12.5px;width:100%"><tr style="background:#f0fdf4;text-align:left">'+['일시','보호자','연락처','학생','학년','메모','상태',''].map(function(h){return '<th style="padding:6px 8px;white-space:nowrap">'+h+'</th>';}).join('')+'</tr>'
+     +myB.map(function(b){return '<tr style="border-top:1px solid #eee'+(b.status==='done'?';color:#94a3b8':'')+'"><td style="padding:6px 8px;white-space:nowrap"><b>'+_bkDLabel(_bkDKey(b.start))+' '+_bkHM(b.start)+'</b></td><td style="padding:6px 8px">'+_bkE(b.parentName)+'</td><td style="padding:6px 8px;white-space:nowrap">'+_bkE(b.phone)+'</td><td style="padding:6px 8px">'+_bkE(b.studentName)+'</td><td style="padding:6px 8px">'+_bkE(b.grade)+'</td><td style="padding:6px 8px;max-width:220px">'+_bkE(b.memo)+'</td><td style="padding:6px 8px;white-space:nowrap">'+(b.status==='done'?'완료':'예약')+'</td><td style="padding:6px 8px;white-space:nowrap"><button onclick="bkMark(\''+b.id+'\',\''+(b.status==='done'?'booked':'done')+'\')" style="font-size:11px;border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer">'+(b.status==='done'?'↩':'✅ 완료')+'</button> <button onclick="bkCancelBooking(\''+b.id+'\')" style="font-size:11px;border:1px solid #fca5a5;color:#b91c1c;background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer">취소</button></td></tr>';}).join('')+'</table></div>'
+    :'<div style="font-size:12.5px;color:#888">아직 들어온 예약이 없습니다. 링크를 보내면 여기에 표시됩니다.</div>')+'</div>';
   const dayH=Object.keys(days).sort().map(function(k){
     const free=days[k].filter(function(s){return !s.booked;}).length;
     return '<div style="border:1px solid #eee;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:13px">'+_bkDLabel(k)+'</b><span style="font-size:11px;color:#888">예약 '+(days[k].length-free)+' / 전체 '+days[k].length+(free?' <a href="#" onclick="bkDelDay(\''+l.id+'\',\''+k+'\');return false" style="color:#c0392b;margin-left:8px">빈 시간 모두 삭제</a>':'')+'</span></div>'
@@ -57981,10 +57986,13 @@ function _bkDetailHtml(){
    +'<button onclick="bkToggleActive(\''+l.id+'\')" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">'+(l.active===false?'▶ 예약 재개':'⏸ 예약 중지')+'</button>'
    +'<button onclick="bkCsv(\''+l.id+'\')" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">⬇ 엑셀(CSV)</button>'
    +'<button onclick="bkDelLink(\''+l.id+'\')" style="border:1px solid #fca5a5;color:#b91c1c;background:#fff;border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">🗑 삭제</button></div></div></div>'
-   +'<div style="background:#f8faff;border:1px solid #dbe4ff;border-radius:14px;padding:14px;margin-bottom:14px"><div style="font-size:13px;font-weight:800;margin-bottom:8px">⏱ 상담 시간 한꺼번에 만들기</div>'
-   +_bkGenFormHtml(l.durationMin,'')
-   +'<button onclick="bkGenerate()" style="margin-top:10px;background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;cursor:pointer">시간 만들기</button>'
-   +'<div style="margin-top:12px;font-size:12.5px;border-top:1px dashed #cbd5e1;padding-top:10px">하나만 추가: <input type="date" id="bkOd" '+inp+'> <input type="time" id="bkOt" '+inp+'> <button onclick="bkAddOne()" style="border:1px solid #3b5bdb;color:#3b5bdb;background:#fff;border-radius:6px;padding:6px 12px;cursor:pointer">추가</button></div></div>'
+   +bookListH
+   +'<details '+(slots.length?'':'open')+' style="background:#f8faff;border:1px solid #dbe4ff;border-radius:12px;padding:10px 14px;margin-bottom:14px;max-width:640px"><summary style="font-size:13px;font-weight:800;cursor:pointer">➕ 상담 일정 추가하기 (눌러서 열기)</summary><div style="margin-top:10px">'
+   +'<div style="font-size:11.5px;color:#555;margin-bottom:6px">① 요일 단위로 한꺼번에</div>'
+   +_bkGenFormHtml(l.durationMin)
+   +'<button onclick="bkGenerate()" style="background:#3b5bdb;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer">요일 추가</button>'
+   +'<div style="margin-top:12px;border-top:1px dashed #cbd5e1;padding-top:10px"><div style="font-size:11.5px;color:#555;margin-bottom:6px">② 하루·한 시간만 추가</div><div class="bkg"><div class="r"><input type="date" id="bkOd"><input type="time" id="bkOt"><button onclick="bkAddOne()" style="border:1px solid #3b5bdb;color:#3b5bdb;background:#fff;border-radius:6px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer">일정 추가</button></div></div></div>'
+   +'</div></details>'
    +dayH;
 }
 function renderBookingAdmin(){
