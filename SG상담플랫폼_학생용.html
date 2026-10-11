@@ -111,6 +111,7 @@ try{
     xlabRecommendTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendTopics', {timeout: 120000})(payload).then(r=>r.data),
     xlabGenerateTopicReport: (payload)=>firebase.functions().httpsCallable('xlabGenerateTopicReport', {timeout: 120000})(payload).then(r=>r.data),
     xlabGenerateExpectedRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateExpectedRecord', {timeout: 120000})(payload).then(r=>r.data),
+    xlabStuDocq: (payload)=>firebase.functions().httpsCallable('xlabStuDocq', {timeout: 90000})(payload).then(r=>r.data),
     xlabRecommendAdvancedTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendAdvancedTopics', {timeout: 120000})(payload).then(r=>r.data),
     // ★ 2026-09-28 추가: X-lab · 월별교과활동(교과별 예상세특용 교과활동 보고서) 전용 함수 2종.
     xlabGenerateSubjectSection: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectSection', {timeout: 120000})(payload).then(r=>r.data),
@@ -5881,13 +5882,49 @@ const XCL_RUBRIC = [
   {k:'speak',label:'말하기',desc:'1분 안에 구조(결론→근거→한계)로 말한다'}
 ];
 // 워크북 섹션 정의 — type: chips(복수선택) / area / text / score(1~4) / pick(단일선택)
+
+// ── 서류기반 기출 연습(샘플): 가상 복원 지문 ── (실제 학생부가 아닌 연습용 가상 예시)
+const XCL_TYPE_HELP = {
+  '과정·역할':{d:'“내가 실제로 무엇을 했는지”(행동·순서·맡은 역할)를 묻는 질문',e:'“그 설문은 어떻게 설계했나요? 본인이 맡은 부분은?”'},
+  '개념·원리 검증':{d:'세특에 적은 개념을 진짜 이해하고 있는지 확인하는 질문',e:'“표본 대표성이 뭔가요? 왜 중요한가요?”'},
+  '확장·적용·연결':{d:'배운 것을 다른 상황·전공·교과와 연결해 보라는 질문',e:'“이 방법을 다른 지역 문제에도 쓸 수 있을까요?”'},
+  '가치판단·관점':{d:'내 입장과 그 이유(생각)를 묻는 질문',e:'“청년 유입 정책은 정부와 상인 중 누가 책임져야 한다고 보나요?”'},
+  '계기·동기':{d:'“왜 그걸 시작했는지”를 묻는 질문',e:'“왜 하필 전통시장을 주제로 잡았나요?”'},
+  '독서 연계':{d:'읽은 책과 활동의 연결·이해를 묻는 질문',e:'“그 책의 어떤 개념을 보고서에 썼나요?”'},
+  '한계·보완·후속':{d:'아쉬운 점, 다시 한다면 고칠 점, 다음 단계를 묻는 질문',e:'“다시 한다면 무엇을 바꾸겠어요?”'},
+  '협업·공동체':{d:'함께 일한 과정, 갈등 해결, 공동체 기여를 묻는 질문',e:'“의견이 갈렸을 때 어떻게 정리했나요?”'}
+};
+const XCL_DOCQ_SAMPLE = {
+  id:'catholic_q1', univ:'가톨릭대학교', fake:true,
+  q:'사회탐구보고서 발표에서 인상적인 활동이 보이는데, 본인이 다른 경쟁자들보다 좋은 평가를 받았던 가장 큰 이유는 무엇인가요? 지금 다시 그 활동을 한다면 어떤 점을 보완하고 싶은지 이야기해 보세요.',
+  types:['과정·역할','한계·보완·후속'],
+  typeWhy:'“좋은 평가를 받은 가장 큰 이유”는 내가 한 행동·방법을 묻는 〈과정·역할〉, “다시 한다면 보완할 점”은 〈한계·보완·후속〉입니다. 한 질문 안에 두 유형이 같이 들어 있어요.',
+  title:'사회·문화 세부능력 및 특기사항 (가상 복원 예시)',
+  lines:[
+    {id:'s1',t:'사회·문화 시간에 ‘지역 소멸’ 단원을 학습한 뒤, 학교 인근 전통시장의 청년 방문 감소 문제에 관심을 갖고 ‘우리 동네 시장은 왜 비어 가는가’를 주제로 사회탐구보고서를 작성함.'},
+    {id:'s2',t:'상인 10명 대상 심층 면접과 방문객 60명 대상 설문조사를 직접 설계·실시하고, 응답을 연령대별로 분류하여 20대 방문 비율이 낮은 원인을 ‘접근성’과 ‘소비 경험’ 두 요인으로 구조화함.'},
+    {id:'s3',t:'수집한 자료를 막대그래프와 면접 발췌문으로 시각화하여 학급 발표에서 제시하였으며, 청중이 결과를 직관적으로 이해했다는 동료 평가에서 가장 높은 점수를 받음.'},
+    {id:'s4',t:'제안 과정에서 ‘야시장 운영’과 ‘모바일 결제 도입’의 효과를 비교하는 표를 만들어 근거를 제시하고, 질의응답에서 표본 대표성에 대한 지적을 수용하여 후속 조사 계획을 덧붙임.'},
+    {id:'s5',t:'발표 후 자신의 탐구 과정을 ‘문제 인식–자료 수집–해석–제안’ 4단계로 정리한 성찰 일지를 제출함.'},
+    {id:'s6',t:'모둠 토의에서 의견이 갈릴 때 쟁점을 칠판에 정리하여 합의를 이끄는 역할을 맡음.'}
+  ],
+  hot:['s3','s4'],
+  hotWhy:'s3 “가장 높은 평가를 받음” → 앞 질문(평가받은 이유)이 나온 문장 / s4 “표본 대표성 지적을 수용·후속 조사” → 뒤 질문(보완할 점)이 나온 문장. (s2의 직접 설계·실시는 “이유”를 답할 때 근거로 쓰이는 문장이에요.)',
+  tails:[
+    {k:'why',tag:'WHY',q:'왜 그 방법(활동)을 선택했나요? 다른 방법 대신 그걸 고른 이유는 무엇인가요?'},
+    {k:'how',tag:'HOW',q:'구체적으로 어떤 순서로 했나요? 그중 본인이 직접 한 부분은 어디까지인가요?'},
+    {k:'evi',tag:'EVIDENCE',q:'그 결론을 뒷받침하는 자료·수치·결과물은 무엇인가요?'},
+    {k:'lim',tag:'LIMIT',q:'그 활동의 한계는 무엇이고, 다시 한다면 무엇을 바꾸겠어요?'}
+  ]
+};
 const XCL_SECTIONS = {
-  qa:{icon:'🎯',title:'오늘의 기출 2문항',time:'10~25분',desc:'기출 질문을 읽고 ① 어떤 유형인지 고르고 ② 이 질문이 나오려면 세특에 어떤 문장이 있어야 하는지 직접 써 봅니다. (정답을 쓰는 칸이 아니라, 질문의 “숨은 세특 문장”을 찾는 칸입니다.)',per:2,
+  qa:{hidden:true,icon:'🎯',title:'오늘의 기출 2문항',time:'10~25분',desc:'기출 질문을 읽고 ① 어떤 유형인지 고르고 ② 이 질문이 나오려면 세특에 어떤 문장이 있어야 하는지 직접 써 봅니다. (정답을 쓰는 칸이 아니라, 질문의 “숨은 세특 문장”을 찾는 칸입니다.)',per:2,
     fields:[
       {k:'tags',type:'chips',label:'① 질문 유형 태깅 (1~2개)',opts:XCL_TYPES,max:2},
       {k:'hidden',type:'area',label:'② 이 질문이 숨기고 있는 세특 문장 (한 문장)',ph:'예) “○○ 실험에서 변인을 △△로 통제하고 결과를 해석함”처럼, 이 질문이 나오게 만든 문장을 상상해서 써 보세요.'},
       {k:'ans',type:'area',label:'③ 내 세특이라면 첫 답 한 줄 (키워드 3개)',ph:'결론 한 줄 + 근거 키워드'}
     ]},
+  docq:{icon:'🎯',title:'오늘의 서류기반 기출연습 2문항',time:'10~40분',custom:true,per:2,desc:'서류기반 면접은 실제 서류를 볼 수 없어요. 그래서 기출 질문 하나마다 ① 질문 유형 → ② 가상 지문에서 질문이 나온 문장 찾기(연습) → ③ 내 예상서류에서 한 문장을 골라 예상질문·꼬리질문 연습 → ④ 앞으로 할 활동·예상세특 만들기 순서로 연습합니다.',fields:[]},
   rev14:{icon:'🧩',title:'기출 역설계 템플릿 ①~④',time:'25~60분',desc:'기출 1문항을 골라 질문 → 의도 → 근거 문장 → 내 활동 순서로 거꾸로 설계합니다.',
     fields:[
       {k:'q',type:'area',label:'골라온 기출 문항',ph:'오늘 가장 어렵게 느낀 기출을 옮겨 적기'},
@@ -5947,6 +5984,18 @@ const XCL_SECTIONS = {
 };
 const XCL_DEFAULT_WEEKS = /*XCL_WEEKS_JSON*/[{"w":1,"when":"3월 2주","stage":"진단","kind":"진단","title":"OT · 내 6칸 대학 기출 첫 답하기","activity":"OT, 성적·희망·6칸·활동 입력, 내 6칸 대학 기출 1문항에 즉석 답하기","output":"모의수시지원리포트 1호, 출발점 1분 녹화","focus":[],"wb":["qa","aar"],"start":"","open":true},{"w":2,"when":"3월 3주","stage":"진단","kind":"진단","title":"내 6칸 기출 세트 받기 · 수행평가 트래커 만들기","activity":"1호 해설 상담, 내 6칸 대학 기출 세트 배부, 학기 수행평가 일정 수집","output":"나의 기출 세트, 수행평가 트래커","focus":[],"wb":["qa","plan","aar"],"start":"","open":true},{"w":3,"when":"3월 4주","stage":"사이클1 ①","kind":"기출분석","title":"[대학 기출분석 ①] 개념·원리 검증형 · 과정·역할형","activity":"기출 해부: 개념·원리 검증형, 과정·역할형 기출을 받고 숨은 세특 문장 쓰기","output":"역설계 템플릿 ①~④","focus":["개념·원리 검증","과정·역할"],"wb":["qa","rev14","aar"],"start":"","open":true},{"w":4,"when":"4월 1주","stage":"사이클1 ②","kind":"기출 역설계","title":"[기출 역설계 ①] 나의 탐구 설계 · 주제 선정 · 보고서 전반","activity":"탐구 역설계, 주제 선정(AI 추천 중 선택), 보고서 전반 작성","output":"템플릿 완성","focus":["개념·원리 검증","과정·역할"],"wb":["qa","rev","aar"],"start":"","open":true},{"w":5,"when":"4월 2주","stage":"사이클1 ③","kind":"탐구·작성","title":"[탐구·작성 ①] 보고서 완성 · 예상세특 v1 · 서로 면접관 되기","activity":"보고서 완성, 예상세특 v1, 서로의 예상세특을 읽고 면접관이 되어 질문 만들기","output":"보고서, 예상세특 v1","focus":["개념·원리 검증","과정·역할"],"wb":["qa","rev","mockq","aar"],"start":"","open":true},{"w":6,"when":"4월 3주","stage":"사이클1 ④","kind":"모의면접","title":"[모의면접 ①] 기본 1 + 꼬리 2 → 루브릭 → 리라이팅","activity":"모의면접 1차(기본 1 + 꼬리 2, 1분 말하기) → 루브릭 채점 → 리라이팅, 수행평가 이식 계획","output":"예상세특 v2, 루브릭 1차","focus":[],"wb":["mock","rubric","rewrite","aar"],"start":"","open":true},{"w":7,"when":"4월 4주","stage":"시험주","kind":"시험주","title":"시험주 미니수업 · AAR + 시험 학습 계획","activity":"40분 미니수업: AAR + 시험 학습 계획","output":"시험 계획","focus":[],"wb":["aar"],"start":"","open":true},{"w":8,"when":"5월 1주","stage":"사이클2 ①","kind":"기출분석","title":"[대학 기출분석 ②] 확장·연결형 · 독서 연계형","activity":"기출 해부: 확장·연결형, 독서 연계형 기출을 받고 숨은 세특 문장 쓰기","output":"역설계 템플릿 ①~④","focus":["확장·적용·연결","독서 연계"],"wb":["qa","rev14","aar"],"start":"","open":true},{"w":9,"when":"5월 2주","stage":"사이클2 ②","kind":"기출 역설계","title":"[기출 역설계 ②] 교과 심화 탐구 · 도서 1권과 교과 개념 연결","activity":"교과 심화(G~J) 역설계, 도서 1권과 교과 개념 연결","output":"템플릿 완성","focus":["확장·적용·연결","독서 연계"],"wb":["qa","rev","aar"],"start":"","open":true},{"w":10,"when":"5월 3주","stage":"사이클2 ③","kind":"탐구·작성","title":"[탐구·작성 ②] 교과활동 보고서 · 예상세특 v1","activity":"교과활동 보고서, 예상세특 v1","output":"교과활동 예상세특 v1","focus":["확장·적용·연결","독서 연계"],"wb":["qa","rev","mockq","aar"],"start":"","open":true},{"w":11,"when":"5월 4주","stage":"사이클2 ④","kind":"모의면접","title":"[모의면접 ②] 모의면접 2차 · 1차 첨삭 · 경쟁력 체크리스트","activity":"모의면접 2차 + 1차 첨삭, 경쟁력 체크리스트","output":"예상세특 v2, 스냅샷 2호","focus":[],"wb":["mock","rubric","rewrite","aar"],"start":"","open":true},{"w":12,"when":"6월 1주","stage":"사이클3 ①","kind":"기출분석","title":"[대학 기출분석 ③] 한계·후속형 · 가치판단형 + 최종 예상세특 6섹션","activity":"기출 해부: 한계·후속형, 가치판단형 + 최종 예상세특 6섹션 통합","output":"6섹션 매핑","focus":["한계·보완·후속","가치판단·관점"],"wb":["qa","rev14","aar"],"start":"","open":true},{"w":13,"when":"6월 2주","stage":"사이클3 ②","kind":"탐구·작성","title":"[최종 예상세특 ①] 연계활동 설정 · 500자 다듬기 · 과목 간 질문 겹침 점검","activity":"연계활동 설정, 500자 다듬기, 과목 간 예상질문 겹침 점검","output":"최종 예상세특 v1","focus":["한계·보완·후속","가치판단·관점"],"wb":["qa","rev","mockq","aar"],"start":"","open":true},{"w":14,"when":"6월 3주","stage":"사이클3 ③","kind":"실전 모의면접","title":"[실전 모의면접] 목표 대학 형식 그대로 + 2차 첨삭","activity":"실전 모의면접: 목표 대학 형식 그대로(10~12분, 면접관 2인, 블라인드 규칙) + 2차 첨삭","output":"최종 예상세특 v2, 루브릭 3차","focus":[],"wb":["mock","rubric","rewrite","aar"],"start":"","open":true},{"w":15,"when":"6월 4주","stage":"시험주","kind":"시험주","title":"시험주 미니수업 · AAR + 시험 학습 계획","activity":"40분 미니수업: AAR + 시험 학습 계획","output":"시험 계획","focus":[],"wb":["aar"],"start":"","open":true},{"w":16,"when":"7월 1주","stage":"마무리","kind":"발표","title":"[발표] 나의 예상 기출집 · 1학기 대비 1분 녹화 비교","activity":"발표 \"나의 예상 기출집\"(내 세특에서 나올 질문 10개 + 답 키워드), 1학기 대비 1분 녹화 비교","output":"스냅샷 3호, 예상 기출집","focus":[],"wb":["qa","aar"],"start":"","open":true}]/*XCL_WEEKS_JSON_END*/;
 
+// 주차의 반별 공개: w.classNamesByOrg={기관ID:[반이름…]} — 비었거나 내 기관 항목이 없으면 전체 공개
+function xclWeekForClass(w,orgId,cls){ const m=w&&w.classNamesByOrg; if(!m) return true; const l=m[String(orgId||'')]; if(!l||!l.length) return true; return l.indexOf(String(cls||''))>=0; }
+// 기관별 커리큘럼: xlabClassConfig/org_{기관ID} 가 있으면 그것, 없으면 공통(main), 그것도 없으면 기본값
+// 주차 워크북 섹션 정리: 예전 'qa(오늘의 기출 2문항)'은 'docq(오늘의 서류기반 기출연습 2문항)'로 합쳐 보여줌
+function xclNormWeeks(weeks){ return (weeks||[]).map(function(w){ const c=Object.assign({},w); const seen={}; c.wb=(w.wb||[]).map(function(k){return k==='qa'?'docq':k;}).filter(function(k){ if(!XCL_SECTIONS[k]||seen[k]) return false; seen[k]=1; return true; }); return c; }); }
+function xclPickSrc(cfgs,orgId){ const ok=function(c){ return c&&c.weeks&&c.weeks.length; }; const o=orgId?(cfgs||[]).find(function(x){return x.id==='org_'+orgId;}):null; if(ok(o)) return '기관 전용'; const m=(cfgs||[]).find(function(x){return x.id==='main';}); return ok(m)?'공통':'기본값(저장된 커리큘럼 없음)'; }
+function xclPickWeeks(cfgs,orgId){
+  const ok=function(c){ return c&&c.weeks&&c.weeks.length; };
+  const o=orgId?(cfgs||[]).find(function(x){return x.id==='org_'+orgId;}):null;
+  if(ok(o)) return xclNormWeeks(o.weeks); const m=(cfgs||[]).find(function(x){return x.id==='main';});
+  return xclNormWeeks(ok(m)?m.weeks:JSON.parse(JSON.stringify(XCL_DEFAULT_WEEKS)));
+}
 function xclOrd(weeks,w){ const i=(weeks||[]).findIndex(function(x){return x.w===w;}); return i>=0?i+1:w; }
 function xclDday(dateStr){
   if(!dateStr) return null;
@@ -5960,10 +6009,23 @@ function xclFmtSize(n){ n=Number(n)||0; if(n>=1073741824) return (n/1073741824).
 function xclSafeName(s){ return String(s||'').replace(/[\\/:*?"<>|#%\s]+/g,'_').slice(0,80); }
 function xclEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function xclSym(k){ return XCL_SYMS.find(function(x){return x.k===k;})||{k:k,def:'',color:'#475569',bg:'#f1f5f9'}; }
+function xclPg(p){ p=String(p==null?'':p).trim(); return /^\d+$/.test(p)?p+'쪽':p; }
 function xclSymChip(k,small){ const s=xclSym(k); return '<span style="display:inline-block;background:'+s.bg+';color:'+s.color+';border:1.5px solid '+s.color+';border-radius:6px;padding:'+(small?'1px 6px':'2px 8px')+';font-weight:900;font-size:'+(small?11:12.5)+'px;white-space:nowrap">['+xclEsc(s.k)+']</span>'; }
 // 답 읽기전용 표시(관리자 열람용)
 function xclAnsReadOnly(secKey, ans){
   const sec=XCL_SECTIONS[secKey]; if(!sec) return '';
+  if(secKey==='docq'){ const a=ans||{}; const D=XCL_DOCQ_SAMPLE; let out='';
+    const row=function(l,v){ if(v==null||v===''||(Array.isArray(v)&&!v.length)) return ''; return '<div style="margin:4px 0"><div style="font-size:11px;color:#64748b;font-weight:800">'+xclEsc(l)+'</div><div style="font-size:13px;white-space:pre-wrap;background:#f8fafc;border-radius:8px;padding:6px 9px">'+xclEsc(Array.isArray(v)?v.join(' · '):v)+'</div></div>'; };
+    for(let i=0;i<2;i++){ const P='q'+i+'_'; if(!Object.keys(a).some(function(k){return k.indexOf(P)===0&&k!==P+'qtext';})) continue;
+      const ps=a[P+'passage']||(a[P+'qtext']===D.q?D:null); const PL=(ps&&ps.lines)||[]; const sentTxt=(a[P+'sent']||[]).map(function(id){ const l=PL.find(function(x){return x.id===id;}); return id+' '+(l?l.t.slice(0,40)+'…':''); });
+      const SL=a[P+'lines']||[]; const pk=SL.find(function(x){return x.id===a[P+'pick'];}); const qs=a[P+'qs']||[]; const qsel=qs[a[P+'qsel']];
+      out+='<div style="font-size:12px;font-weight:800;color:#3b5bdb;margin:6px 0 2px">서류기반 기출연습 '+(i+1)+(a[P+'qtext']?'. '+xclEsc(a[P+'qtext']):'')+'</div>'
+        +row('① 고른 질문 유형',a[P+'types'])+row('② 질문이 나온 문장으로 고른 것',sentTxt)+row('②-2 왜 그 문장인가',a[P+'sentWhy'])
+        +row('③ 고른 내 예상서류',a[P+'srcTitle'])+row('③ 내가 고른 문장',pk&&pk.t)+row('③ 연습한 예상질문',qsel?qsel.q:a[P+'qmanual'])+row('③ 내가 고른 질문 유형',a[P+'qtypes'])
+        +D.tails.map(function(t){ return row('③ 꼬리질문 '+t.tag+' — '+t.q,a[P+'t_'+t.k]); }).join('')
+        +[0,1,2].map(function(n){ return row('③ 추가 꼬리질문 '+(n+1)+': '+(a[P+'x'+n+'q']||''),a[P+'x'+n+'a']||(a[P+'x'+n+'q']?'(답 미작성)':'')); }).join('')
+        +row('④ 앞으로 할 활동',a[P+'outAct'])+row('④ 예상 세특 한 문장',a[P+'outSeh']); }
+    return out||'<div style="color:#94a3b8;font-size:12px">아직 작성한 내용이 없어요.</div>'; }
   const a=ans||{}; const blocks=[]; const per=sec.per||1;
   for(let i=0;i<per;i++){
     const pre=per>1?('q'+i+'_'):''; let rows='';
@@ -5989,7 +6051,7 @@ function xclAnsReadOnly(secKey, ans){
 (function(){ try{ var st=document.createElement('style'); st.textContent='.xcs-ck{width:20px!important;height:20px!important;padding:0!important;margin:0!important;flex:none!important;display:inline-block!important;vertical-align:middle;accent-color:#3b5bdb}.xcs-lb{display:inline-flex!important;align-items:center;gap:6px;margin:0!important}'; document.head.appendChild(st); }catch(e){} })();
 let _xcsClsFiles=[];
 let _xcsLoaded=false, _xcsLoading=false, _xcsCfg=null, _xcsWork={}, _xcsPerf=null, _xcsFiles=[];
-let _xcsWeek=null, _xcsSaveTimer=null, _xcsUp=null, _xcsFileOpen=null;
+let _xcsCfgSrc='', _xcsWeek=null, _xcsSaveTimer=null, _xcsUp=null, _xcsFileOpen=null;
 const XCS_B='border:none;border-radius:10px;padding:9px 14px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;';
 const XCS_I='width:100%;box-sizing:border-box;border:1.5px solid #d1d5db;border-radius:10px;padding:9px 11px;font-size:14px;font-family:inherit;line-height:1.5;';
 function _xcsE(s){ return xclEsc(s); }
@@ -6000,7 +6062,7 @@ async function xcsEnsureLoaded(){
   _xcsLoading=true; render();
   try{
     const cfgs=(await window._fb.getAll('xlabClassConfig'))||[]; _xcsClsFiles=cfgs.filter(function(x){return String(x.id).indexOf('file_')===0&&x.share;}); const c=cfgs.find(function(x){return x.id==='main';});
-    _xcsCfg=(c&&c.weeks&&c.weeks.length)?c.weeks:JSON.parse(JSON.stringify(XCL_DEFAULT_WEEKS));
+    _xcsCfg=xclPickWeeks(cfgs,CU.orgId); _xcsCfgSrc=xclPickSrc(cfgs,CU.orgId);
     const ws=(await window._fb.getWhere('xlabClassWork','studentId','==',String(CU.id)))||[]; _xcsWork={}; ws.forEach(function(d){ _xcsWork[d.w]=d; });
     const pf=((await window._fb.getWhere('xlabPerf','studentId','==',String(CU.id)))||[])[0]; _xcsPerf=pf&&pf.tasks?pf:{id:'perf_'+CU.id,studentId:String(CU.id),tasks:[]};
     _xcsFiles=((await window._fb.getWhere('xlabFiles','studentId','==',String(CU.id)))||[]).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
@@ -6016,20 +6078,21 @@ function xcsModalClose(){ const m=document.getElementById('xcsModal'); if(m) m.r
 // ═══ 📚 수업 ═══
 function _xcsVisibleWeeks(){
   const today=new Date(); today.setHours(0,0,0,0);
-  return (_xcsCfg||[]).filter(function(w){ if(w.open===false) return false; if(w.start){ const d=new Date(w.start+'T00:00:00'); if(!isNaN(d)&&d>today) return false; } return true; });
+  return (_xcsCfg||[]).filter(function(w){ if(w.open===false) return false; if(!xclWeekForClass(w,CU&&CU.orgId,CU&&CU.className)) return false; if(w.start){ const d=new Date(w.start+'T00:00:00'); if(!isNaN(d)&&d>today) return false; } return true; });
 }
 function _xcsCurWeekNo(){
   const vis=_xcsVisibleWeeks(); const today=new Date(); today.setHours(0,0,0,0); let best=null;
   vis.forEach(function(w){ if(w.start){ const d=new Date(w.start+'T00:00:00'); if(!isNaN(d)&&d<=today) best=w; } }); return (best||vis[vis.length-1]||{}).w;
 }
-function _xcsSecDone(w,k){ const a=((_xcsWork[w]||{}).a||{})[k]; if(!a) return false; return Object.keys(a).some(function(x){ const v=a[x]; return Array.isArray(v)?v.length>0:(v!==''&&v!=null&&x.indexOf('qtext')<0); }); }
+function _xcsSecDone(w,k){ if(k==='docq'){ const d=((_xcsWork[w]||{}).a||{}).docq||{}; return Object.keys(d).some(function(x){ const v=d[x]; if(/qtext|passage|lines|qs$|Opts$|srcId|srcTitle|pick|qsel|Show/.test(x)) return false; return Array.isArray(v)?v.length>0:(typeof v==='string'&&v.trim()!==''); }); } const a=((_xcsWork[w]||{}).a||{})[k]; if(!a) return false; return Object.keys(a).some(function(x){ const v=a[x]; return Array.isArray(v)?v.length>0:(v!==''&&v!=null&&x.indexOf('qtext')<0); }); }
 function xcsOpenWeek(w){ _xcsWeek=w; render(); window.scrollTo(0,0); const c=document.getElementById('content'); if(c) c.scrollTop=0; }
 function xcsBackWeeks(){ _xcsWeek=null; render(); }
 function renderXclassStu(){
   if(!_xcsLoaded){ xcsEnsureLoaded(); return _xlabTopModeBar()+_xcsLoadingHtml(); }
-  if(_xcsWeek!==null) return _xcsWeekHtml(_xcsWeek);
-  return _xlabTopModeBar()+_xcsClassList();
+  if(_xcsWeek!==null) return _xcsWeekHtml(_xcsWeek)+_xcsSrcNote();
+  return _xlabTopModeBar()+_xcsClassList()+_xcsSrcNote();
 }
+function _xcsSrcNote(){ return '<div style="text-align:center;font-size:10.5px;color:#cbd5e1;margin:14px 0 4px">수업 커리큘럼: '+_xcsE(_xcsCfgSrc||'-')+(CU&&CU.orgId?'':' · 기관 정보 없음')+'</div>'; }
 function _xcsFilesCard(w){
   const fs=_xcsClsFiles.filter(function(d){return (d.week||0)===w;}); if(!fs.length) return '';
   return '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:11px 14px;margin-bottom:10px"><div style="font-weight:900;color:#166534;margin-bottom:4px">📎 '+(w?'이번 주 수업 자료':'공통 수업 자료 (워크북 등)')+'</div>'+fs.map(function(d){ return (d.files||[]).map(function(x){ return '<div style="font-size:13.5px;margin:4px 0">📄 <a href="'+_xcsE(x.url)+'" target="_blank" rel="noopener">'+_xcsE(d.title)+(d.files.length>1?' · '+_xcsE(x.name):'')+'</a> <span style="color:#94a3b8;font-size:11px">'+xclFmtSize(x.size)+'</span></div>'; }).join(''); }).join('')+'</div>';
@@ -6054,6 +6117,7 @@ function _xcsWeekHtml(wn){
 }
 function xcsJump(k){ const el=document.getElementById('xcsSec_'+k); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 function _xcsSecHtml(wn,k,wd){
+  if(k==='docq') return _xcsDocqHtml(wn,wd);
   const sec=XCL_SECTIONS[k]; if(!sec) return ''; const a=((wd.a||{})[k])||{}; const per=sec.per||1; let body='';
   for(let i=0;i<per;i++){
     const pre=per>1?('q'+i+'_'):''; let head='';
@@ -6084,6 +6148,127 @@ function _xcsSecHtml(wn,k,wd){
   return '<div id="xcsSec_'+k+'" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:14px 15px;margin-bottom:12px;scroll-margin-top:12px"><div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="font-size:20px">'+sec.icon+'</span><b style="font-size:16px">'+_xcsE(sec.title)+'</b><span style="font-size:11px;color:#94a3b8">'+_xcsE(sec.time||'')+'</span></div><div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-bottom:10px">'+_xcsE(sec.desc)+'</div>'+body
    +(coach?'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:8px 11px;font-size:13px;line-height:1.55;white-space:pre-wrap">👩‍🏫 선생님 코멘트: '+_xcsE(coach)+'</div>':'')+'</div>';
 }
+
+// ═══ 🎯 오늘의 서류기반 기출연습 2문항 (문항마다: ①유형 → ②가상지문 문장찾기 → ③내 예상서류 실전 → ④활동·세특) ═══
+let _xcsRec=null, _xcsRecLoading=false; const _xcsDqBusy={}, _xcsDqErr={};
+function _xcsDa(wn){ return ((_xcsWd(wn).a||{}).docq)||{}; }
+function xcsDqSet(wn,key,v,r){ xcsSetVal(wn,'docq',key,v); if(r!==false){ render(); xcsFlush(wn); } }
+function xcsDqSent(wn,P,id){ const cur=(_xcsDa(wn)[P+'sent']||[]).slice(); const i=cur.indexOf(id); if(i>=0) cur.splice(i,1); else { if(cur.length>=2) cur.shift(); cur.push(id); } xcsDqSet(wn,P+'sent',cur); }
+async function xcsDocqLoadRec(){
+  if(_xcsRec||_xcsRecLoading||!FB()) return; _xcsRecLoading=true; render();
+  const out=[]; const add=function(arr,kind,get){ (arr||[]).forEach(function(t){ const txt=get(t); if(txt&&String(txt).trim().length>20) out.push({id:t.id,kind:kind,title:t.topicTitle||'(제목 없음)',text:String(txt),at:t.createdAt||0}); }); };
+  try{
+    const q=function(c){ return window._fb.getWhere(c,'studentId','==',String(CU.id)).catch(function(){return [];}); };
+    const r=await Promise.all([q('xlabTopics'),q('xlabSubjectReports'),q('xlabFinalRecords')]);
+    add(r[0],'월별주제활동',function(t){return t.expectedRecord&&t.expectedRecord.recordText;});
+    add(r[1],'교과 주제보고서',function(t){return t.expectedRecord&&t.expectedRecord.recordText;});
+    add(r[2],'최종 예상세특',function(t){return t.finalRecordText;});
+  }catch(e){ console.warn('예상세특 로딩 실패',e.message); }
+  out.sort(function(a,b){return b.at-a.at;}); _xcsRec=out; _xcsRecLoading=false; render();
+}
+function xcsDqUseRec(wn,P,idx){
+  const r=(_xcsRec||[])[idx]; if(!r) return;
+  const parts=r.text.split(/(?<=[.!?])\s+|\n+/).map(function(x){return x.trim();}).filter(function(x){return x.length>8;});
+  xcsSetVal(wn,'docq',P+'srcId',r.id); xcsSetVal(wn,'docq',P+'srcTitle',r.kind+' · '+r.title); xcsSetVal(wn,'docq',P+'lines',parts.slice(0,14).map(function(t,i){return {id:'s'+(i+1),t:t};}));
+  ['pick','qs','qsel','qmanual','qtypes','qtShow','outAct','outSeh','actOpts','sehOpts'].forEach(function(k){ xcsSetVal(wn,'docq',P+k,''); });
+  render(); xcsFlush(wn);
+}
+async function _xcsDqCall(wn,key,payload,onOk){
+  if(_xcsDqBusy[key]) return; _xcsDqBusy[key]=1; delete _xcsDqErr[key]; render();
+  try{
+    if(!(window._fb&&window._fb.xlabStuDocq)) throw new Error('AI 연결이 아직 준비되지 않았어요.');
+    const r=await window._fb.xlabStuDocq(payload);
+    if(!r||!r.ok) throw new Error((r&&r.reason)||'AI가 만들지 못했어요.');
+    onOk(r);
+  }catch(e){ const m=String(e&&e.message||''); _xcsDqErr[key]=m+(/^internal$/i.test(m)?' (서버 함수가 아직 설치되지 않았을 수 있어요. 선생님께 알려 주세요.)':''); }
+  delete _xcsDqBusy[key]; render(); xcsFlush(wn);
+}
+function xcsDqGenPassage(wn,i,P,Q){ _xcsDqCall(wn,P+'passage',{action:'passage',question:Q.q,univ:Q.univ},function(r){ xcsSetVal(wn,'docq',P+'passage',r.passage); }); }
+function xcsDqPick(wn,P,id){ const a=_xcsDa(wn); if(a[P+'pick']===id) return; ['qs','qsel','qmanual','qtypes','qtShow','actOpts','sehOpts'].forEach(function(k){ xcsSetVal(wn,'docq',P+k,''); }); xcsDqSet(wn,P+'pick',id); }
+function xcsDqGenQs(wn,P){ const a=_xcsDa(wn); const l=(a[P+'lines']||[]).find(function(x){return x.id===a[P+'pick'];}); if(!l) return; _xcsDqCall(wn,P+'qs',{action:'questions',quote:l.t,dept:CU.xlabDepartment||''},function(r){ xcsSetVal(wn,'docq',P+'qs',r.questions); xcsSetVal(wn,'docq',P+'qsel',''); xcsSetVal(wn,'docq',P+'qtypes',''); xcsSetVal(wn,'docq',P+'qtShow',''); }); }
+function xcsDqGenOpts(wn,P,kind){ const a=_xcsDa(wn); const l=(a[P+'lines']||[]).find(function(x){return x.id===a[P+'pick'];}); const qs=a[P+'qs']||[]; const qq=(qs[a[P+'qsel']]||{}).q||a[P+'qmanual']||'';
+  if(!l||!qq){ alert('먼저 ③에서 내 서류의 한 문장과 예상질문을 골라 주세요.'); return; }
+  const ans=['why','how','evi','lim'].map(function(k){return a[P+'t_'+k];}).filter(Boolean).join(' / ');
+  _xcsDqCall(wn,P+kind+'Opts',{action:'suggest',kind:kind,quote:l.t,question:qq,answers:ans,dept:CU.xlabDepartment||''},function(r){ xcsSetVal(wn,'docq',P+kind+'Opts',r.options); }); }
+function xcsDqUseOpt(wn,P,kind,idx){ const o=(_xcsDa(wn)[P+kind+'Opts']||[])[idx]; if(o==null) return; xcsDqSet(wn,P+(kind==='act'?'outAct':'outSeh'),o); }
+function _xcsDocqHtml(wn,wd){
+  const sec=XCL_SECTIONS.docq; const a=((wd.a||{}).docq)||{};
+  let h='<div id="xcsSec_docq" style="scroll-margin-top:12px"><div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="font-size:20px">'+sec.icon+'</span><b style="font-size:17px">'+_xcsE(sec.title)+'</b><span style="font-size:11px;color:#94a3b8">'+_xcsE(sec.time)+'</span></div><div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-bottom:10px">'+_xcsE(sec.desc)+'</div>';
+  for(let i=0;i<2;i++) h+=_xcsDqSlot(wn,wd,i,a);
+  const coach=(wd.coach||{}).docq;
+  h+=(coach?'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:8px 11px;font-size:13px;line-height:1.55;white-space:pre-wrap">👩‍🏫 선생님 코멘트: '+_xcsE(coach)+'</div>':'')+'</div>';
+  return h;
+}
+function _xcsDqSlot(wn,wd,i,a){
+  const D=XCL_DOCQ_SAMPLE; const P='q'+i+'_'; const aq=(wd.assigned||[])[i]; const manual=a[P+'qtext_m']||'';
+  const Q=aq?{q:aq.q,univ:aq.univ,types:aq.types||[]}:(manual?{q:manual,univ:'',types:[]}:null);
+  const box='background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:11px 12px;margin-bottom:10px';
+  const step=function(n,t,done){ return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px"><span style="background:'+(done?'#16a34a':'#3b5bdb')+';color:#fff;border-radius:99px;min-width:22px;height:22px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900">'+(done?'✓':n)+'</span><b style="font-size:14px">'+t+'</b></div>'; };
+  const ta=function(key,ph,rows){ return '<textarea rows="'+(rows||2)+'" oninput="xcsInput('+wn+',\'docq\',\''+key+'\',this.value)" placeholder="'+_xcsE(ph||'')+'" style="'+XCS_I+'resize:vertical">'+_xcsE(a[key]||'')+'</textarea>'; };
+  const lab=function(t){ return '<div style="font-size:12.5px;font-weight:800;color:#1e293b;margin:8px 0 4px">'+t+'</div>'; };
+  const btn=function(on,txt,js){ return '<button onclick="'+js+'" style="border:1.5px solid '+(on?'#3b5bdb':'#cbd5e1')+';background:'+(on?'#3b5bdb':'#fff')+';color:'+(on?'#fff':'#475569')+';border-radius:99px;padding:6px 12px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit">'+txt+'</button>'; };
+  const gbtn=function(txt,js,bg){ return '<button onclick="'+js+'" style="'+XCS_B+'background:'+(bg||'#16a34a')+';color:#fff;margin-top:8px">'+txt+'</button>'; };
+  const okbox=function(t){ return '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:12.5px;line-height:1.6">'+t+'</div>'; };
+  const errbox=function(k){ return _xcsDqErr[k]?'<div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:12.5px;color:#b91c1c;line-height:1.55">⚠️ '+_xcsE(_xcsDqErr[k])+'</div>':''; };
+  const busy=function(k,t){ return _xcsDqBusy[k]?'<div style="font-size:12.5px;color:#7c3aed;font-weight:800;margin-top:8px">⏳ '+t+'</div>':''; };
+  let h='<div style="background:#faf5ff;border:2px solid #7c3aed;border-radius:16px;padding:13px 14px;margin-bottom:14px"><div style="font-size:15px;font-weight:900;color:#5b21b6;margin-bottom:8px">오늘의 서류기반 기출연습 '+(i+1)+'</div>';
+  if(!Q){
+    return h+'<div style="background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:10px 12px"><div style="font-size:11.5px;font-weight:900;color:#64748b;margin-bottom:4px">선생님이 배정한 기출이 아직 없어요 — 수업에서 받은 질문을 직접 적으면 시작할 수 있어요</div><textarea rows="2" onchange="xcsDqSet('+wn+',\''+P+'qtext_m\',this.value)" style="'+XCS_I+'" placeholder="기출 질문 옮겨 적기"></textarea></div></div>';
+  }
+  h+='<div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:10px 12px;margin-bottom:10px"><div style="font-size:11.5px;font-weight:900;color:#1d4ed8;margin-bottom:3px">오늘의 기출'+(Q.univ?' · '+_xcsE(Q.univ):'')+'</div><div style="font-size:14px;line-height:1.65">'+_xcsE(Q.q)+'</div></div>';
+  // 가상 지문(샘플 질문이면 내장 지문, 아니면 AI가 질문에 맞춰 생성)
+  let PS=(Q.q===D.q)?{title:D.title,lines:D.lines,hot:D.hot,hotWhy:D.hotWhy,types:D.types,typeWhy:D.typeWhy}:a[P+'passage'];
+  if(!PS&&!_xcsDqBusy[P+'passage']&&!_xcsDqErr[P+'passage']) setTimeout(function(){ xcsDqGenPassage(wn,i,P,Q); },0);
+  // ① 유형
+  const types=a[P+'types']||[]; const keyTypes=(Q.types&&Q.types.length)?Q.types:((PS&&PS.types)||[]);
+  h+='<div style="'+box+'">'+step(1,'이 질문은 어떤 종류일까? (1~2개)',types.length>0)
+   +'<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:#6d28d9">📖 질문 유형 쉬운 설명 보기</summary><div style="margin-top:6px">'+XCL_TYPES.map(function(t){ const hp=XCL_TYPE_HELP[t]||{d:'',e:''}; return '<div style="font-size:12.5px;line-height:1.55;margin-bottom:5px"><b style="color:#6d28d9">'+_xcsE(t)+'</b> — '+_xcsE(hp.d)+'<div style="color:#64748b">예) '+_xcsE(hp.e)+'</div></div>'; }).join('')+'</div></details>'
+   +'<div style="display:flex;gap:5px;flex-wrap:wrap">'+XCL_TYPES.map(function(t){ return btn(types.indexOf(t)>=0,_xcsE(t),'xcsChip('+wn+',\'docq\',\''+P+'types\','+"'"+t+"'"+',false,2)'); }).join('')+'</div>'
+   +((types.length&&keyTypes.length)?(a[P+'tShow']?okbox('<b>확인:</b> '+keyTypes.map(function(t){return '['+_xcsE(t)+']';}).join(' ')+((PS&&PS.typeWhy&&Q.q===D.q)?' — '+_xcsE(PS.typeWhy):'')):gbtn('정답과 비교해 보기','xcsDqSet('+wn+',\''+P+'tShow\',1)')):'')+'</div>';
+  // ② 가상 지문
+  const sent=a[P+'sent']||[]; let body2='';
+  if(PS){
+    body2='<div style="background:#fffbeb;border:1.5px dashed #fcd34d;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:#92400e;font-weight:800">⚠️ 가상 복원 지문 — 연습용으로 만든 가짜 예시이며, 실제 학생부나 실제 기출 서류가 아닙니다.</div><div style="font-size:12.5px;font-weight:900;margin-bottom:5px">'+_xcsE(PS.title||'세부능력 및 특기사항 (가상 복원 예시)')+'</div>'
+     +PS.lines.map(function(l){ const on=sent.indexOf(l.id)>=0; return '<div onclick="xcsDqSent('+wn+',\''+P+'\',\''+l.id+'\')" style="cursor:pointer;border:1.5px solid '+(on?'#3b5bdb':'#e2e8f0')+';background:'+(on?'#eef2ff':'#fff')+';border-radius:10px;padding:7px 10px;margin-bottom:5px;font-size:13px;line-height:1.6"><b style="color:#3b5bdb;margin-right:5px">'+l.id+'</b>'+_xcsE(l.t)+'</div>'; }).join('')
+     +lab('왜 그 문장이라고 생각했나요? (한 줄)')+ta(P+'sentWhy','예) 질문에 나온 핵심 말과 같은 내용이 이 문장에 들어 있어서')
+     +((sent.length&&PS.hot&&PS.hot.length)?(a[P+'sShow']?okbox('<b>확인:</b> 이 질문이 나온 문장 후보는 '+PS.hot.join(', ')+'. '+_xcsE(PS.hotWhy||'')):gbtn('정답과 비교해 보기','xcsDqSet('+wn+',\''+P+'sShow\',1)')):'');
+  } else body2=busy(P+'passage','이 질문에 맞는 가상 지문을 만드는 중… (10~20초)')+errbox(P+'passage')+(_xcsDqErr[P+'passage']?gbtn('🔄 다시 만들기','delete _xcsDqErr[\''+P+'passage\'];render()','#7c3aed'):'');
+  h+='<div style="'+box+'">'+step(2,'이 질문은 아래 세특의 어느 문장에서 나왔을까? (1~2개)',sent.length>0)+body2+'</div>';
+  // ③ 실전 — 내 예상서류
+  const L=a[P+'lines']||[]; const pk=L.find(function(x){return x.id===a[P+'pick'];}); const qs=a[P+'qs']||[]; const qsel=a[P+'qsel']; const selQ=(qsel!==''&&qsel!=null&&qs[qsel])?qs[qsel]:null; const qtxt=selQ?selQ.q:(a[P+'qmanual']||'');
+  if(a[P+'srcId']&&!L.length&&false){}
+  if(!_xcsRec&&!_xcsRecLoading) setTimeout(xcsDocqLoadRec,0);
+  let b3='<div style="font-size:12px;color:#64748b;line-height:1.55;margin-bottom:6px">이제 <b>내 서류</b>로 연습해요. 내가 만든 예상서류에서 한 문장을 고르면, 면접관이 물을 만한 예상질문을 보여줘요.</div>';
+  if(!L.length){
+    b3+=(_xcsRecLoading||!_xcsRec)?'<div style="color:#64748b;font-size:12.5px">내 예상서류를 불러오는 중…</div>':(_xcsRec.length?'<div style="font-size:12.5px;font-weight:800;margin-bottom:5px">① 내 서류 하나를 골라요</div>'+_xcsRec.map(function(r,k){ return '<div onclick="xcsDqUseRec('+wn+',\''+P+'\','+k+')" style="cursor:pointer;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 10px;margin-bottom:5px"><span style="font-size:11px;background:#ede9fe;color:#6d28d9;border-radius:99px;padding:1px 8px;font-weight:800">'+_xcsE(r.kind)+'</span> <b style="font-size:13px">'+_xcsE(r.title)+'</b><div style="font-size:12px;color:#64748b;margin-top:3px">'+_xcsE(r.text.slice(0,70))+'…</div></div>'; }).join(''):'<div style="background:#f8fafc;border-radius:10px;padding:10px;font-size:12.5px;color:#64748b;line-height:1.6">아직 만든 예상서류가 없어요. 「월별주제활동」이나 「최종 예상세특」에서 예상세특을 먼저 만들면 여기에서 불러올 수 있어요.</div>');
+  } else {
+    b3+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><div style="font-size:12.5px;font-weight:900;flex:1">'+_xcsE(a[P+'srcTitle']||'내 예상서류')+'</div><button onclick="xcsDqSet('+wn+',\''+P+'lines\',\'\')" style="'+XCS_B+'padding:4px 10px;background:#e2e8f0;color:#334155;font-size:11.5px">다른 서류 고르기</button></div>'
+      +'<div style="font-size:12.5px;font-weight:800;margin:6px 0 4px">② 연습하고 싶은 문장(활동) 하나를 골라요</div>'
+      +L.map(function(l){ const on=a[P+'pick']===l.id; return '<div onclick="xcsDqPick('+wn+',\''+P+'\',\''+l.id+'\')" style="cursor:pointer;border:1.5px solid '+(on?'#7c3aed':'#e2e8f0')+';background:'+(on?'#f5f3ff':'#fff')+';border-radius:10px;padding:7px 10px;margin-bottom:5px;font-size:13px;line-height:1.6"><b style="color:#7c3aed;margin-right:5px">'+l.id.replace('s','')+'.</b>“'+_xcsE(l.t)+'”</div>'; }).join('');
+    if(pk){
+      b3+='<div style="font-size:12.5px;font-weight:800;margin:10px 0 4px">③ 이 문장에서 나올 수 있는 예상질문</div>';
+      if(!qs.length){ b3+=busy(P+'qs','예상질문을 만드는 중…')+errbox(P+'qs')+(_xcsDqBusy[P+'qs']?'':gbtn('🤖 예상질문 만들기','xcsDqGenQs('+wn+',\''+P+'\')','#7c3aed')+'<div style="font-size:12px;color:#64748b;margin-top:6px">AI가 안 될 때는 아래에 질문을 직접 써도 돼요.</div><textarea rows="2" oninput="xcsInput('+wn+',\'docq\',\''+P+'qmanual\',this.value)" placeholder="예상질문 직접 쓰기" style="'+XCS_I+'margin-top:4px;resize:vertical">'+_xcsE(a[P+'qmanual']||'')+'</textarea>'); }
+      else { b3+=qs.map(function(q,k){ const on=Number(qsel)===k&&qsel!==''; return '<div onclick="xcsDqSet('+wn+',\''+P+'qsel\','+k+')" style="cursor:pointer;border:1.5px solid '+(on?'#3b5bdb':'#e2e8f0')+';background:'+(on?'#eef2ff':'#fff')+';border-radius:10px;padding:8px 10px;margin-bottom:5px;font-size:13px;line-height:1.6">❓ '+_xcsE(q.q)+'</div>'; }).join('')+'<button onclick="xcsDqGenQs('+wn+',\''+P+'\')" style="'+XCS_B+'padding:4px 10px;background:#e2e8f0;color:#334155;font-size:11.5px">🔄 다른 질문 받기</button>'+busy(P+'qs','예상질문을 만드는 중…')+errbox(P+'qs'); }
+    }
+    if(qtxt){
+      const qt=a[P+'qtypes']||[];
+      b3+='<div style="border-top:2px dashed #cbd5e1;margin:12px 0 8px"></div><div style="background:#eff6ff;border-radius:10px;padding:8px 11px;font-size:13.5px;line-height:1.6;margin-bottom:8px"><b style="color:#1d4ed8">연습할 질문</b><br>'+_xcsE(qtxt)+'</div>'
+       +'<div style="font-size:12.5px;font-weight:800;margin-bottom:4px">④ 이 질문은 어떤 종류일까? (1~2개)</div><div style="display:flex;gap:5px;flex-wrap:wrap">'+XCL_TYPES.map(function(t){ return btn(qt.indexOf(t)>=0,_xcsE(t),'xcsChip('+wn+',\'docq\',\''+P+'qtypes\','+"'"+t+"'"+',false,2)'); }).join('')+'</div>'
+       +((qt.length&&selQ&&selQ.type)?(a[P+'qtShow']?okbox('<b>확인:</b> AI 분류는 ['+_xcsE(selQ.type)+']예요.'):gbtn('AI 분류와 비교해 보기','xcsDqSet('+wn+',\''+P+'qtShow\',1)')):'')
+       +'<div style="font-size:12.5px;font-weight:800;margin:12px 0 2px">⑤ 꼬리질문 4개에 한 줄씩 답하기</div><div style="font-size:12px;color:#64748b;margin-bottom:2px">면접관은 첫 답을 듣고 꼭 꼬리질문을 합니다. 더 받고 싶은 질문은 아래에 추가해요.</div>'
+       +D.tails.map(function(t){ return lab('<span style="background:#ede9fe;color:#6d28d9;border-radius:6px;padding:1px 7px;font-size:11px;margin-right:5px">'+t.tag+'</span>'+_xcsE(t.q))+ta(P+'t_'+t.k,'',2); }).join('')
+       +[0,1,2].map(function(n){ if(n>0&&!a[P+'x'+(n-1)+'q']) return ''; return '<div style="background:#f8fafc;border-radius:10px;padding:8px 10px;margin-top:8px"><div style="font-size:11.5px;font-weight:800;color:#64748b">＋ 추가 꼬리질문 '+(n+1)+' (친구·선생님이 준 질문이나 내가 예상한 질문)</div><input value="'+_xcsE(a[P+'x'+n+'q']||'')+'" oninput="xcsInput('+wn+',\'docq\',\''+P+'x'+n+'q\',this.value)" placeholder="질문" style="'+XCS_I+'margin:4px 0">'+(a[P+'x'+n+'q']?'<textarea rows="2" oninput="xcsInput('+wn+',\'docq\',\''+P+'x'+n+'a\',this.value)" placeholder="내 답" style="'+XCS_I+'resize:vertical">'+_xcsE(a[P+'x'+n+'a']||'')+'</textarea>':'')+'</div>'; }).join('');
+    }
+  }
+  h+='<div style="'+box+'">'+step(3,'✍️ 실전 — 내 예상서류',!!(a[P+'t_why']||a[P+'t_how']||a[P+'t_evi']||a[P+'t_lim']))+b3+'</div>';
+  // ④ 산출물
+  const optsHtml=function(kind){ const o=a[P+kind+'Opts']; if(!o||!o.length) return ''; return '<div style="margin-top:6px">'+o.map(function(t,k){ return '<div onclick="xcsDqUseOpt('+wn+',\''+P+'\',\''+kind+'\','+k+')" style="cursor:pointer;border:1.5px solid #ddd6fe;background:#faf5ff;border-radius:10px;padding:7px 10px;margin-bottom:5px;font-size:12.5px;line-height:1.55"><b style="color:#7c3aed">추천 '+(k+1)+'</b> '+_xcsE(t)+'</div>'; }).join('')+'<div style="font-size:11px;color:#94a3b8">누르면 아래 칸에 들어가요. 내 말로 고쳐 쓰세요.</div></div>'; };
+  const aibtn=function(kind){ return '<button onclick="xcsDqGenOpts('+wn+',\''+P+'\',\''+kind+'\')" style="'+XCS_B+'padding:5px 11px;background:#7c3aed;color:#fff;font-size:12px" '+(_xcsDqBusy[P+kind+'Opts']?'disabled':'')+'>🤖 AI 추천 5개 받기</button>'+busy(P+kind+'Opts','추천을 만드는 중…')+errbox(P+kind+'Opts'); };
+  h+='<div style="'+box+'">'+step(4,'오늘 답을 내 산출물로 연결하기',!!(a[P+'outAct']||a[P+'outSeh']))
+   +lab('오늘 답을 “앞으로 할 활동”으로 바꾼다면? <span style="font-weight:600;color:#94a3b8">(직접 쓰거나 AI 추천)</span>')+aibtn('act')+optsHtml('act')+'<div style="height:6px"></div>'+ta(P+'outAct','예) 3월: 우리 학교 급식 잔반 설문 설계 → 4월: 결과 시각화 → 5월: 개선안 제안')
+   +lab('예상 세특 문장 한 문장 (과정 + 개념 + 한계가 모두 들어가게) <span style="font-weight:600;color:#94a3b8">(직접 쓰거나 AI 추천)</span>')+aibtn('seh')+optsHtml('seh')+'<div style="height:6px"></div>'+ta(P+'outSeh','예) …를 직접 설계·실시하고 …를 해석했으며, 표본의 한계를 인식하여 후속 조사를 계획함.',3)+'</div></div>';
+  return h;
+}
 function _xcsWd(wn){ if(!_xcsWork[wn]) _xcsWork[wn]={id:CU.id+'_w'+wn,studentId:String(CU.id),w:wn,a:{},coach:{}}; _xcsWork[wn].a=_xcsWork[wn].a||{}; return _xcsWork[wn]; }
 function xcsSetVal(wn,k,key,v){ const wd=_xcsWd(wn); wd.a[k]=wd.a[k]||{}; wd.a[k][key]=v; wd._dirty=wd._dirty||{}; wd._dirty[k]=1; }
 function xcsInput(wn,k,key,v){ xcsSetVal(wn,k,key,v); const s=document.getElementById('xcsSaved'); if(s) s.textContent='✏️ 입력 중…'; clearTimeout(_xcsSaveTimer); _xcsSaveTimer=setTimeout(function(){ xcsFlush(wn); },900); }
@@ -6092,9 +6277,9 @@ function xcsChip(wn,k,key,o,single,max){ const wd=_xcsWd(wn); const cur=(wd.a[k]
   xcsSetVal(wn,k,key,nv); render(); xcsFlush(wn); }
 function xcsScore(wn,k,key,n){ const wd=_xcsWd(wn); const cur=(wd.a[k]||{})[key]; xcsSetVal(wn,k,key,Number(cur)===n?'':n); render(); xcsFlush(wn); }
 async function xcsFlush(wn){
-  const wd=_xcsWd(wn); if(!wd._dirty||!FB()) return; const keys=Object.keys(wd._dirty); wd._dirty={}; const a={};
+  const wd=_xcsWd(wn); if(!wd._dirty||!FB()) return; const keys=Object.keys(wd._dirty); if(!keys.length) return; wd._dirty={}; const a={};
   keys.forEach(function(k){ a[k]=JSON.parse(JSON.stringify(wd.a[k]||{})); // 배정 문항 원문도 같이 저장(관리자 열람용)
-    if(k==='qa'){ (wd.assigned||[]).forEach(function(q,i){ a.qa['q'+i+'_qtext']=q.q; }); } });
+    if(k==='qa'){ (wd.assigned||[]).forEach(function(q,i){ a.qa['q'+i+'_qtext']=q.q; }); } if(k==='docq'){ (wd.assigned||[]).forEach(function(q,i){ a.docq['q'+i+'_qtext']=q.q; }); } });
   const sv=document.getElementById('xcsSaved');
   try{ await window._fb.set('xlabClassWork',wd.id,{id:wd.id,studentId:String(CU.id),studentName:CU.name||'',w:wn,a:a,updatedAt:Date.now()}); if(sv){ sv.textContent='✅ 저장됨'; } }
   catch(e){ keys.forEach(function(k){ wd._dirty[k]=1; }); if(sv) sv.innerHTML='<span style="color:#dc2626">⚠️ 저장 실패 — 다시 시도해요</span>'; console.warn('워크북 저장 실패',e.message); setTimeout(function(){ xcsFlush(wn); },5000); }
@@ -6207,7 +6392,7 @@ function _xcsFilesHtml(){
         const rv=f.review, ack=f.ackItems||{};
         h2+='<div style="margin-top:10px;border-top:2px solid #bbf7d0;padding-top:9px"><div style="font-weight:900;color:#166534;margin-bottom:6px">👩‍🏫 선생님 첨삭 — 기호와 질문만 있어요. 문장은 내 말로 직접 고쳐요.</div>'+(rv.comment?'<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:8px 11px;font-size:13px;margin-bottom:8px;white-space:pre-wrap">'+_xcsE(rv.comment)+'</div>':'')
          +(rv.items||[]).map(function(it,i){ const sy=xclSym(it.sym); const on=!!ack[i];
-           return '<div style="border:1.5px solid '+sy.color+';background:'+(on?'#f8fafc':sy.bg)+';border-radius:12px;padding:9px 11px;margin-bottom:7px;opacity:'+(on?.65:1)+'"><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">'+xclSymChip(it.sym)+'<span style="font-size:11.5px;color:#64748b">'+_xcsE(sy.def)+(it.page?' · '+_xcsE(it.page):'')+'</span><span style="flex:1"></span><label class="xcs-lb" style="font-size:12px;font-weight:800;cursor:pointer"><input type="checkbox" class="xcs-ck" '+(on?'checked':'')+' onchange="xcsAckItem(\''+f.id+'\','+i+',this.checked)"> 반영했어요</label></div>'
+           return '<div style="border:1.5px solid '+sy.color+';background:'+(on?'#f8fafc':sy.bg)+';border-radius:12px;padding:9px 11px;margin-bottom:7px;opacity:'+(on?.65:1)+'"><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">'+xclSymChip(it.sym)+'<span style="font-size:11.5px;color:#64748b">'+_xcsE(sy.def)+(it.page?' · '+_xcsE(xclPg(it.page)):'')+'</span><span style="flex:1"></span><label class="xcs-lb" style="font-size:12px;font-weight:800;cursor:pointer"><input type="checkbox" class="xcs-ck" '+(on?'checked':'')+' onchange="xcsAckItem(\''+f.id+'\','+i+',this.checked)"> 반영했어요</label></div>'
            +(it.quote?'<div style="font-size:12.5px;background:#fff;border-radius:7px;padding:5px 8px;margin:6px 0;color:#475569">“'+_xcsE(it.quote)+'”</div>':'')+'<div style="font-size:14px;font-weight:700;line-height:1.55">❓ '+_xcsE(it.q)+'</div></div>'; }).join('')
          +((f.annotatedFiles||[]).length?'<div style="margin:8px 0">'+f.annotatedFiles.map(function(x){ return '<div style="font-size:13px">📎 첨삭 파일: <a href="'+_xcsE(x.url)+'" target="_blank" rel="noopener">'+_xcsE(x.name)+'</a></div>'; }).join('')+'</div>':'')
          +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button onclick="xcsAckAll(\''+f.id+'\')" style="'+XCS_B+'background:#7c3aed;color:#fff">'+(st==='acked'?'✓ 반영 완료':'✅ 모두 반영했어요')+'</button><button onclick="xcsUploadOpen(\''+(f.taskId||'')+'\',\''+f.id+'\')" style="'+XCS_B+'background:#0f766e;color:#fff">⬆ 고친 파일(v2) 올리기</button></div></div>';
