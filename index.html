@@ -56191,13 +56191,49 @@ const XCL_RUBRIC = [
   {k:'speak',label:'말하기',desc:'1분 안에 구조(결론→근거→한계)로 말한다'}
 ];
 // 워크북 섹션 정의 — type: chips(복수선택) / area / text / score(1~4) / pick(단일선택)
+
+// ── 서류기반 기출 연습(샘플): 가상 복원 지문 ── (실제 학생부가 아닌 연습용 가상 예시)
+const XCL_TYPE_HELP = {
+  '과정·역할':{d:'“내가 실제로 무엇을 했는지”(행동·순서·맡은 역할)를 묻는 질문',e:'“그 설문은 어떻게 설계했나요? 본인이 맡은 부분은?”'},
+  '개념·원리 검증':{d:'세특에 적은 개념을 진짜 이해하고 있는지 확인하는 질문',e:'“표본 대표성이 뭔가요? 왜 중요한가요?”'},
+  '확장·적용·연결':{d:'배운 것을 다른 상황·전공·교과와 연결해 보라는 질문',e:'“이 방법을 다른 지역 문제에도 쓸 수 있을까요?”'},
+  '가치판단·관점':{d:'내 입장과 그 이유(생각)를 묻는 질문',e:'“청년 유입 정책은 정부와 상인 중 누가 책임져야 한다고 보나요?”'},
+  '계기·동기':{d:'“왜 그걸 시작했는지”를 묻는 질문',e:'“왜 하필 전통시장을 주제로 잡았나요?”'},
+  '독서 연계':{d:'읽은 책과 활동의 연결·이해를 묻는 질문',e:'“그 책의 어떤 개념을 보고서에 썼나요?”'},
+  '한계·보완·후속':{d:'아쉬운 점, 다시 한다면 고칠 점, 다음 단계를 묻는 질문',e:'“다시 한다면 무엇을 바꾸겠어요?”'},
+  '협업·공동체':{d:'함께 일한 과정, 갈등 해결, 공동체 기여를 묻는 질문',e:'“의견이 갈렸을 때 어떻게 정리했나요?”'}
+};
+const XCL_DOCQ_SAMPLE = {
+  id:'catholic_q1', univ:'가톨릭대학교', fake:true,
+  q:'사회탐구보고서 발표에서 인상적인 활동이 보이는데, 본인이 다른 경쟁자들보다 좋은 평가를 받았던 가장 큰 이유는 무엇인가요? 지금 다시 그 활동을 한다면 어떤 점을 보완하고 싶은지 이야기해 보세요.',
+  types:['과정·역할','한계·보완·후속'],
+  typeWhy:'“좋은 평가를 받은 가장 큰 이유”는 내가 한 행동·방법을 묻는 〈과정·역할〉, “다시 한다면 보완할 점”은 〈한계·보완·후속〉입니다. 한 질문 안에 두 유형이 같이 들어 있어요.',
+  title:'사회·문화 세부능력 및 특기사항 (가상 복원 예시)',
+  lines:[
+    {id:'s1',t:'사회·문화 시간에 ‘지역 소멸’ 단원을 학습한 뒤, 학교 인근 전통시장의 청년 방문 감소 문제에 관심을 갖고 ‘우리 동네 시장은 왜 비어 가는가’를 주제로 사회탐구보고서를 작성함.'},
+    {id:'s2',t:'상인 10명 대상 심층 면접과 방문객 60명 대상 설문조사를 직접 설계·실시하고, 응답을 연령대별로 분류하여 20대 방문 비율이 낮은 원인을 ‘접근성’과 ‘소비 경험’ 두 요인으로 구조화함.'},
+    {id:'s3',t:'수집한 자료를 막대그래프와 면접 발췌문으로 시각화하여 학급 발표에서 제시하였으며, 청중이 결과를 직관적으로 이해했다는 동료 평가에서 가장 높은 점수를 받음.'},
+    {id:'s4',t:'제안 과정에서 ‘야시장 운영’과 ‘모바일 결제 도입’의 효과를 비교하는 표를 만들어 근거를 제시하고, 질의응답에서 표본 대표성에 대한 지적을 수용하여 후속 조사 계획을 덧붙임.'},
+    {id:'s5',t:'발표 후 자신의 탐구 과정을 ‘문제 인식–자료 수집–해석–제안’ 4단계로 정리한 성찰 일지를 제출함.'},
+    {id:'s6',t:'모둠 토의에서 의견이 갈릴 때 쟁점을 칠판에 정리하여 합의를 이끄는 역할을 맡음.'}
+  ],
+  hot:['s3','s4'],
+  hotWhy:'s3 “가장 높은 평가를 받음” → 앞 질문(평가받은 이유)이 나온 문장 / s4 “표본 대표성 지적을 수용·후속 조사” → 뒤 질문(보완할 점)이 나온 문장. (s2의 직접 설계·실시는 “이유”를 답할 때 근거로 쓰이는 문장이에요.)',
+  tails:[
+    {k:'why',tag:'WHY',q:'왜 그 방법(활동)을 선택했나요? 다른 방법 대신 그걸 고른 이유는 무엇인가요?'},
+    {k:'how',tag:'HOW',q:'구체적으로 어떤 순서로 했나요? 그중 본인이 직접 한 부분은 어디까지인가요?'},
+    {k:'evi',tag:'EVIDENCE',q:'그 결론을 뒷받침하는 자료·수치·결과물은 무엇인가요?'},
+    {k:'lim',tag:'LIMIT',q:'그 활동의 한계는 무엇이고, 다시 한다면 무엇을 바꾸겠어요?'}
+  ]
+};
 const XCL_SECTIONS = {
-  qa:{icon:'🎯',title:'오늘의 기출 2문항',time:'10~25분',desc:'기출 질문을 읽고 ① 어떤 유형인지 고르고 ② 이 질문이 나오려면 세특에 어떤 문장이 있어야 하는지 직접 써 봅니다. (정답을 쓰는 칸이 아니라, 질문의 “숨은 세특 문장”을 찾는 칸입니다.)',per:2,
+  qa:{hidden:true,icon:'🎯',title:'오늘의 기출 2문항',time:'10~25분',desc:'기출 질문을 읽고 ① 어떤 유형인지 고르고 ② 이 질문이 나오려면 세특에 어떤 문장이 있어야 하는지 직접 써 봅니다. (정답을 쓰는 칸이 아니라, 질문의 “숨은 세특 문장”을 찾는 칸입니다.)',per:2,
     fields:[
       {k:'tags',type:'chips',label:'① 질문 유형 태깅 (1~2개)',opts:XCL_TYPES,max:2},
       {k:'hidden',type:'area',label:'② 이 질문이 숨기고 있는 세특 문장 (한 문장)',ph:'예) “○○ 실험에서 변인을 △△로 통제하고 결과를 해석함”처럼, 이 질문이 나오게 만든 문장을 상상해서 써 보세요.'},
       {k:'ans',type:'area',label:'③ 내 세특이라면 첫 답 한 줄 (키워드 3개)',ph:'결론 한 줄 + 근거 키워드'}
     ]},
+  docq:{icon:'🎯',title:'오늘의 서류기반 기출연습 2문항',time:'10~40분',custom:true,per:2,desc:'서류기반 면접은 실제 서류를 볼 수 없어요. 그래서 기출 질문 하나마다 ① 질문 유형 → ② 가상 지문에서 질문이 나온 문장 찾기(연습) → ③ 내 예상서류에서 한 문장을 골라 예상질문·꼬리질문 연습 → ④ 앞으로 할 활동·예상세특 만들기 순서로 연습합니다.',fields:[]},
   rev14:{icon:'🧩',title:'기출 역설계 템플릿 ①~④',time:'25~60분',desc:'기출 1문항을 골라 질문 → 의도 → 근거 문장 → 내 활동 순서로 거꾸로 설계합니다.',
     fields:[
       {k:'q',type:'area',label:'골라온 기출 문항',ph:'오늘 가장 어렵게 느낀 기출을 옮겨 적기'},
@@ -56257,6 +56293,18 @@ const XCL_SECTIONS = {
 };
 const XCL_DEFAULT_WEEKS = /*XCL_WEEKS_JSON*/[{"w":1,"when":"3월 2주","stage":"진단","kind":"진단","title":"OT · 내 6칸 대학 기출 첫 답하기","activity":"OT, 성적·희망·6칸·활동 입력, 내 6칸 대학 기출 1문항에 즉석 답하기","output":"모의수시지원리포트 1호, 출발점 1분 녹화","focus":[],"wb":["qa","aar"],"start":"","open":true},{"w":2,"when":"3월 3주","stage":"진단","kind":"진단","title":"내 6칸 기출 세트 받기 · 수행평가 트래커 만들기","activity":"1호 해설 상담, 내 6칸 대학 기출 세트 배부, 학기 수행평가 일정 수집","output":"나의 기출 세트, 수행평가 트래커","focus":[],"wb":["qa","plan","aar"],"start":"","open":true},{"w":3,"when":"3월 4주","stage":"사이클1 ①","kind":"기출분석","title":"[대학 기출분석 ①] 개념·원리 검증형 · 과정·역할형","activity":"기출 해부: 개념·원리 검증형, 과정·역할형 기출을 받고 숨은 세특 문장 쓰기","output":"역설계 템플릿 ①~④","focus":["개념·원리 검증","과정·역할"],"wb":["qa","rev14","aar"],"start":"","open":true},{"w":4,"when":"4월 1주","stage":"사이클1 ②","kind":"기출 역설계","title":"[기출 역설계 ①] 나의 탐구 설계 · 주제 선정 · 보고서 전반","activity":"탐구 역설계, 주제 선정(AI 추천 중 선택), 보고서 전반 작성","output":"템플릿 완성","focus":["개념·원리 검증","과정·역할"],"wb":["qa","rev","aar"],"start":"","open":true},{"w":5,"when":"4월 2주","stage":"사이클1 ③","kind":"탐구·작성","title":"[탐구·작성 ①] 보고서 완성 · 예상세특 v1 · 서로 면접관 되기","activity":"보고서 완성, 예상세특 v1, 서로의 예상세특을 읽고 면접관이 되어 질문 만들기","output":"보고서, 예상세특 v1","focus":["개념·원리 검증","과정·역할"],"wb":["qa","rev","mockq","aar"],"start":"","open":true},{"w":6,"when":"4월 3주","stage":"사이클1 ④","kind":"모의면접","title":"[모의면접 ①] 기본 1 + 꼬리 2 → 루브릭 → 리라이팅","activity":"모의면접 1차(기본 1 + 꼬리 2, 1분 말하기) → 루브릭 채점 → 리라이팅, 수행평가 이식 계획","output":"예상세특 v2, 루브릭 1차","focus":[],"wb":["mock","rubric","rewrite","aar"],"start":"","open":true},{"w":7,"when":"4월 4주","stage":"시험주","kind":"시험주","title":"시험주 미니수업 · AAR + 시험 학습 계획","activity":"40분 미니수업: AAR + 시험 학습 계획","output":"시험 계획","focus":[],"wb":["aar"],"start":"","open":true},{"w":8,"when":"5월 1주","stage":"사이클2 ①","kind":"기출분석","title":"[대학 기출분석 ②] 확장·연결형 · 독서 연계형","activity":"기출 해부: 확장·연결형, 독서 연계형 기출을 받고 숨은 세특 문장 쓰기","output":"역설계 템플릿 ①~④","focus":["확장·적용·연결","독서 연계"],"wb":["qa","rev14","aar"],"start":"","open":true},{"w":9,"when":"5월 2주","stage":"사이클2 ②","kind":"기출 역설계","title":"[기출 역설계 ②] 교과 심화 탐구 · 도서 1권과 교과 개념 연결","activity":"교과 심화(G~J) 역설계, 도서 1권과 교과 개념 연결","output":"템플릿 완성","focus":["확장·적용·연결","독서 연계"],"wb":["qa","rev","aar"],"start":"","open":true},{"w":10,"when":"5월 3주","stage":"사이클2 ③","kind":"탐구·작성","title":"[탐구·작성 ②] 교과활동 보고서 · 예상세특 v1","activity":"교과활동 보고서, 예상세특 v1","output":"교과활동 예상세특 v1","focus":["확장·적용·연결","독서 연계"],"wb":["qa","rev","mockq","aar"],"start":"","open":true},{"w":11,"when":"5월 4주","stage":"사이클2 ④","kind":"모의면접","title":"[모의면접 ②] 모의면접 2차 · 1차 첨삭 · 경쟁력 체크리스트","activity":"모의면접 2차 + 1차 첨삭, 경쟁력 체크리스트","output":"예상세특 v2, 스냅샷 2호","focus":[],"wb":["mock","rubric","rewrite","aar"],"start":"","open":true},{"w":12,"when":"6월 1주","stage":"사이클3 ①","kind":"기출분석","title":"[대학 기출분석 ③] 한계·후속형 · 가치판단형 + 최종 예상세특 6섹션","activity":"기출 해부: 한계·후속형, 가치판단형 + 최종 예상세특 6섹션 통합","output":"6섹션 매핑","focus":["한계·보완·후속","가치판단·관점"],"wb":["qa","rev14","aar"],"start":"","open":true},{"w":13,"when":"6월 2주","stage":"사이클3 ②","kind":"탐구·작성","title":"[최종 예상세특 ①] 연계활동 설정 · 500자 다듬기 · 과목 간 질문 겹침 점검","activity":"연계활동 설정, 500자 다듬기, 과목 간 예상질문 겹침 점검","output":"최종 예상세특 v1","focus":["한계·보완·후속","가치판단·관점"],"wb":["qa","rev","mockq","aar"],"start":"","open":true},{"w":14,"when":"6월 3주","stage":"사이클3 ③","kind":"실전 모의면접","title":"[실전 모의면접] 목표 대학 형식 그대로 + 2차 첨삭","activity":"실전 모의면접: 목표 대학 형식 그대로(10~12분, 면접관 2인, 블라인드 규칙) + 2차 첨삭","output":"최종 예상세특 v2, 루브릭 3차","focus":[],"wb":["mock","rubric","rewrite","aar"],"start":"","open":true},{"w":15,"when":"6월 4주","stage":"시험주","kind":"시험주","title":"시험주 미니수업 · AAR + 시험 학습 계획","activity":"40분 미니수업: AAR + 시험 학습 계획","output":"시험 계획","focus":[],"wb":["aar"],"start":"","open":true},{"w":16,"when":"7월 1주","stage":"마무리","kind":"발표","title":"[발표] 나의 예상 기출집 · 1학기 대비 1분 녹화 비교","activity":"발표 \"나의 예상 기출집\"(내 세특에서 나올 질문 10개 + 답 키워드), 1학기 대비 1분 녹화 비교","output":"스냅샷 3호, 예상 기출집","focus":[],"wb":["qa","aar"],"start":"","open":true}]/*XCL_WEEKS_JSON_END*/;
 
+// 주차의 반별 공개: w.classNamesByOrg={기관ID:[반이름…]} — 비었거나 내 기관 항목이 없으면 전체 공개
+function xclWeekForClass(w,orgId,cls){ const m=w&&w.classNamesByOrg; if(!m) return true; const l=m[String(orgId||'')]; if(!l||!l.length) return true; return l.indexOf(String(cls||''))>=0; }
+// 기관별 커리큘럼: xlabClassConfig/org_{기관ID} 가 있으면 그것, 없으면 공통(main), 그것도 없으면 기본값
+// 주차 워크북 섹션 정리: 예전 'qa(오늘의 기출 2문항)'은 'docq(오늘의 서류기반 기출연습 2문항)'로 합쳐 보여줌
+function xclNormWeeks(weeks){ return (weeks||[]).map(function(w){ const c=Object.assign({},w); const seen={}; c.wb=(w.wb||[]).map(function(k){return k==='qa'?'docq':k;}).filter(function(k){ if(!XCL_SECTIONS[k]||seen[k]) return false; seen[k]=1; return true; }); return c; }); }
+function xclPickSrc(cfgs,orgId){ const ok=function(c){ return c&&c.weeks&&c.weeks.length; }; const o=orgId?(cfgs||[]).find(function(x){return x.id==='org_'+orgId;}):null; if(ok(o)) return '기관 전용'; const m=(cfgs||[]).find(function(x){return x.id==='main';}); return ok(m)?'공통':'기본값(저장된 커리큘럼 없음)'; }
+function xclPickWeeks(cfgs,orgId){
+  const ok=function(c){ return c&&c.weeks&&c.weeks.length; };
+  const o=orgId?(cfgs||[]).find(function(x){return x.id==='org_'+orgId;}):null;
+  if(ok(o)) return xclNormWeeks(o.weeks); const m=(cfgs||[]).find(function(x){return x.id==='main';});
+  return xclNormWeeks(ok(m)?m.weeks:JSON.parse(JSON.stringify(XCL_DEFAULT_WEEKS)));
+}
 function xclOrd(weeks,w){ const i=(weeks||[]).findIndex(function(x){return x.w===w;}); return i>=0?i+1:w; }
 function xclDday(dateStr){
   if(!dateStr) return null;
@@ -56270,10 +56318,23 @@ function xclFmtSize(n){ n=Number(n)||0; if(n>=1073741824) return (n/1073741824).
 function xclSafeName(s){ return String(s||'').replace(/[\\/:*?"<>|#%\s]+/g,'_').slice(0,80); }
 function xclEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function xclSym(k){ return XCL_SYMS.find(function(x){return x.k===k;})||{k:k,def:'',color:'#475569',bg:'#f1f5f9'}; }
+function xclPg(p){ p=String(p==null?'':p).trim(); return /^\d+$/.test(p)?p+'쪽':p; }
 function xclSymChip(k,small){ const s=xclSym(k); return '<span style="display:inline-block;background:'+s.bg+';color:'+s.color+';border:1.5px solid '+s.color+';border-radius:6px;padding:'+(small?'1px 6px':'2px 8px')+';font-weight:900;font-size:'+(small?11:12.5)+'px;white-space:nowrap">['+xclEsc(s.k)+']</span>'; }
 // 답 읽기전용 표시(관리자 열람용)
 function xclAnsReadOnly(secKey, ans){
   const sec=XCL_SECTIONS[secKey]; if(!sec) return '';
+  if(secKey==='docq'){ const a=ans||{}; const D=XCL_DOCQ_SAMPLE; let out='';
+    const row=function(l,v){ if(v==null||v===''||(Array.isArray(v)&&!v.length)) return ''; return '<div style="margin:4px 0"><div style="font-size:11px;color:#64748b;font-weight:800">'+xclEsc(l)+'</div><div style="font-size:13px;white-space:pre-wrap;background:#f8fafc;border-radius:8px;padding:6px 9px">'+xclEsc(Array.isArray(v)?v.join(' · '):v)+'</div></div>'; };
+    for(let i=0;i<2;i++){ const P='q'+i+'_'; if(!Object.keys(a).some(function(k){return k.indexOf(P)===0&&k!==P+'qtext';})) continue;
+      const ps=a[P+'passage']||(a[P+'qtext']===D.q?D:null); const PL=(ps&&ps.lines)||[]; const sentTxt=(a[P+'sent']||[]).map(function(id){ const l=PL.find(function(x){return x.id===id;}); return id+' '+(l?l.t.slice(0,40)+'…':''); });
+      const SL=a[P+'lines']||[]; const pk=SL.find(function(x){return x.id===a[P+'pick'];}); const qs=a[P+'qs']||[]; const qsel=qs[a[P+'qsel']];
+      out+='<div style="font-size:12px;font-weight:800;color:#3b5bdb;margin:6px 0 2px">서류기반 기출연습 '+(i+1)+(a[P+'qtext']?'. '+xclEsc(a[P+'qtext']):'')+'</div>'
+        +row('① 고른 질문 유형',a[P+'types'])+row('② 질문이 나온 문장으로 고른 것',sentTxt)+row('②-2 왜 그 문장인가',a[P+'sentWhy'])
+        +row('③ 고른 내 예상서류',a[P+'srcTitle'])+row('③ 내가 고른 문장',pk&&pk.t)+row('③ 연습한 예상질문',qsel?qsel.q:a[P+'qmanual'])+row('③ 내가 고른 질문 유형',a[P+'qtypes'])
+        +D.tails.map(function(t){ return row('③ 꼬리질문 '+t.tag+' — '+t.q,a[P+'t_'+t.k]); }).join('')
+        +[0,1,2].map(function(n){ return row('③ 추가 꼬리질문 '+(n+1)+': '+(a[P+'x'+n+'q']||''),a[P+'x'+n+'a']||(a[P+'x'+n+'q']?'(답 미작성)':'')); }).join('')
+        +row('④ 앞으로 할 활동',a[P+'outAct'])+row('④ 예상 세특 한 문장',a[P+'outSeh']); }
+    return out||'<div style="color:#94a3b8;font-size:12px">아직 작성한 내용이 없어요.</div>'; }
   const a=ans||{}; const blocks=[]; const per=sec.per||1;
   for(let i=0;i<per;i++){
     const pre=per>1?('q'+i+'_'):''; let rows='';
@@ -56302,7 +56363,7 @@ let _xcaGlobalLoaded=false, _xcaGlobalLoading=false;
 let _xcaStudentId=null, _xcaStuLoading=false;
 let _xcaTab='db';          // 'db' | 'curri' | 'wb'
 let _xcaPerfTab='tracker'; // 'tracker' | 'files'
-let _xcaUniv=[], _xcaCfg=null, _xcaSel=null, _xcaQ='', _xcaFType='', _xcaFTrack='', _xcaMine=false;
+let _xcaCfgAll=[], _xcaCurOrg=null, _xcaUniv=[], _xcaCfg=null, _xcaSel=null, _xcaQ='', _xcaFType='', _xcaFTrack='', _xcaMine=false;
 let _xcaWork=[], _xcaPerf={tasks:[]}, _xcaFiles=[], _xcaDrafts={};
 let _xcaWbWeek=1, _xcaFileSel=null, _xcaBusy='';
 let _xcaImport=null; // AI 추출 미리보기
@@ -56323,9 +56384,8 @@ async function _xcaGlobalLoad(){
     _xcaUniv=((await window._fb.getAll('xlabUniv'))||[]).sort(function(a,b){return String(a.name).localeCompare(String(b.name),'ko');});
     const allCfg=(await window._fb.getAll('xlabClassConfig'))||[];
     _xcaClsFiles=allCfg.filter(function(x){return String(x.id).indexOf('file_')===0;}).sort(function(p,q){return (q.createdAt||0)-(p.createdAt||0);});
-    const cfg=allCfg.find(function(x){return x.id==='main';});
-    _xcaCfg=cfg&&cfg.weeks&&cfg.weeks.length?cfg:{id:'main',weeks:JSON.parse(JSON.stringify(XCL_DEFAULT_WEEKS)),_default:true};
-  }catch(e){ console.warn('수업자료 로딩 실패:',e.message); _xcaUniv=[]; _xcaCfg={id:'main',weeks:JSON.parse(JSON.stringify(XCL_DEFAULT_WEEKS)),_default:true}; }
+    _xcaCfgAll=allCfg; if(_xcaCurOrg===null) _xcaCurOrg=_xcaMyOrgId(); _xcaBuildCfg();
+  }catch(e){ console.warn('수업자료 로딩 실패:',e.message); _xcaUniv=[]; _xcaCfgAll=[]; _xcaCurOrg=_xcaCurOrg||''; _xcaBuildCfg(); }
   _xcaGlobalLoaded=true; _xcaGlobalLoading=false; _xcaSyncRender();
 }
 async function _xcaStuLoad(sid){
@@ -56694,26 +56754,76 @@ async function xcaAiSave(){
   xcaModalClose(); _xcaImport=null; render(); alert('새 대학 '+nU+'개, 문항 '+nQ+'개를 저장했습니다. (유형 태그는 초안입니다)');
 }
 
+
+// ── 기관별 커리큘럼 ──
+function _xcaMyOrgId(){ const u=(typeof ST!=='undefined'&&ST.currentUser)||{}; return u.role==='admin'?'':String(u.orgId||''); }
+function _xcaIsSuper(){ const u=(typeof ST!=='undefined'&&ST.currentUser)||{}; return u.role==='admin'; }
+function _xcaOrgList(){ let o=[]; try{ o=JSON.parse(localStorage.getItem('sg_orgs_v1')||'[]'); }catch(e){} return o; }
+function _xcaOrgName(id){ if(!id) return '공통(모든 기관 기본)'; const o=_xcaOrgList().find(function(x){return String(x.id)===String(id);}); return o?o.name:id; }
+function _xcaBuildCfg(){
+  const org=_xcaCurOrg||''; const id=org?('org_'+org):'main';
+  const d=_xcaCfgAll.find(function(x){return x.id===id;});
+  if(d&&d.weeks&&d.weeks.length){ _xcaCfg=JSON.parse(JSON.stringify(d)); _xcaCfg.weeks=xclNormWeeks(_xcaCfg.weeks); return; }
+  const m=_xcaCfgAll.find(function(x){return x.id==='main';});
+  const base=(m&&m.weeks&&m.weeks.length)?m.weeks:XCL_DEFAULT_WEEKS;
+  _xcaCfg={id:id,orgId:org,weeks:xclNormWeeks(JSON.parse(JSON.stringify(base))),_default:!org,_inherit:!!org};
+}
+function xcaCurOrgSet(v){ _xcaCurOrg=v; _xcaBuildCfg(); render(); }
+function _xcaWeeksFor(orgId){ return xclPickWeeks(_xcaCfgAll,orgId); }
+function _xcaCurriOrgBar(){
+  const sup=_xcaIsSuper(); const org=_xcaCurOrg||'';
+  const sel=sup?'<select onchange="xcaCurOrgSet(this.value)" style="'+XCA_I+'width:auto;display:inline-block"><option value="">공통(모든 기관 기본)</option>'+_xcaOrgList().map(function(o){ return '<option value="'+_xcaE(o.id)+'" '+(String(o.id)===org?'selected':'')+'>'+_xcaE(o.name)+' 전용</option>'; }).join('')+'</select>':'<b>'+_xcaE(_xcaOrgName(org))+' 전용</b>';
+  const own=_xcaCfgAll.some(function(x){return x.id==='org_'+org&&x.weeks&&x.weeks.length;});
+  const msg=!org?'공통 커리큘럼은 “전용 커리큘럼이 없는 기관”의 학생들에게 보입니다.':(_xcaCfg._inherit?'⚠️ 아직 이 기관 전용 커리큘럼이 없어 <b>공통 커리큘럼을 쓰는 중</b>입니다. 아래에서 수정 후 저장하면 이 기관 전용으로 분리됩니다.':'✅ 이 기관 전용 커리큘럼입니다. 이 기관 학생에게만 적용되고 다른 기관에는 영향이 없습니다.');
+  return '<div style="background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:12px;padding:9px 12px;margin-bottom:10px;font-size:12.5px;line-height:1.7">🏫 편집 중인 커리큘럼: '+sel+'<div style="color:#5b21b6">'+msg+'</div>'+'<div style="color:#7c3aed;font-size:11.5px">※ 저장해야 학생 화면에 반영됩니다(체크만 바꾸면 적용 안 됨). 기관 전용 커리큘럼은 학생용 16 이상에서만 적용됩니다.</div>'+(org&&own?'<button onclick="xcaCurriOrgDel()" style="'+XCA_B+'padding:4px 10px;background:#fee2e2;color:#b91c1c;margin-top:4px">전용 삭제 → 공통 커리큘럼 따르기</button>':'')+'</div>';
+}
+async function xcaCurriOrgDel(){ const org=_xcaCurOrg||''; if(!org||!confirm(_xcaOrgName(org)+' 전용 커리큘럼을 삭제하고 공통 커리큘럼을 따를까요?\n(학생이 이미 쓴 워크북 기록은 남아 있습니다.)')) return; try{ await window._fb.delete('xlabClassConfig','org_'+org); _xcaCfgAll=_xcaCfgAll.filter(function(x){return x.id!=='org_'+org;}); _xcaBuildCfg(); render(); }catch(e){ alert('삭제 실패: '+e.message); } }
 // ── 수업 커리큘럼 ──
 function _xcaCurriHtml(){
   const w=_xcaCfg.weeks;
-  return '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><button onclick="xcaCurriSave()" style="'+XCA_B+'background:#1d4ed8;color:#fff">💾 커리큘럼 저장</button><button onclick="xcaCurriPrintOpen()" style="'+XCA_B+'background:#0f172a;color:#fff">🖨 수업 커리큘럼 인쇄·PDF</button><button onclick="xcaWeekAdd()" style="'+XCA_B+'background:#16a34a;color:#fff">＋ 주차 추가</button><button onclick="xcaCurriReset()" style="'+XCA_B+'background:#e2e8f0;color:#334155">기본값으로 되돌리기</button><button onclick="xcaWbPrint(\'all\',\'blank\')" style="'+XCA_B+'background:#0f172a;color:#fff">🖨 전체 빈 워크북 인쇄·PDF</button><span style="font-size:12px;color:#64748b">“공개”를 켜고 시작일을 정하면 학생 화면의 수업 탭에 주차가 나타납니다. 시작일 입력 시 해당 날짜부터 자동 공개.</span></div>'
+  return _xcaCurriOrgBar()+'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><button onclick="xcaCurriSave()" style="'+XCA_B+'background:#1d4ed8;color:#fff">💾 커리큘럼 저장</button><button onclick="xcaCurriPrintOpen()" style="'+XCA_B+'background:#0f172a;color:#fff">🖨 수업 커리큘럼 인쇄·PDF</button><button onclick="xcaWeekAdd()" style="'+XCA_B+'background:#16a34a;color:#fff">＋ 주차 추가</button><button onclick="xcaCurriReset()" style="'+XCA_B+'background:#e2e8f0;color:#334155">기본값으로 되돌리기</button><button onclick="xcaWbPrint(\'all\',\'blank\')" style="'+XCA_B+'background:#0f172a;color:#fff">🖨 전체 빈 워크북 인쇄·PDF</button><span style="font-size:12px;color:#64748b">“공개”를 켜고 시작일을 정하면 학생 화면의 수업 탭에 주차가 나타납니다. 시작일 입력 시 해당 날짜부터 자동 공개.</span></div>'
    +w.map(function(x,i){
      return '<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:11px;margin-bottom:8px"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="background:#1e293b;color:#fff;border-radius:8px;padding:3px 9px">'+(i+1)+'주차</b><input value="'+_xcaE(x.when)+'" onchange="_xcaCfg.weeks['+i+'].when=this.value" style="'+XCA_I+'width:90px"><input value="'+_xcaE(x.stage)+'" placeholder="단계(예: 사이클1 ①)" onchange="_xcaCfg.weeks['+i+'].stage=this.value" style="'+XCA_I+'width:130px;font-size:12px"><span style="flex:1"></span><button onclick="xcaWeekMove('+i+',-1)" '+(i===0?'disabled':'')+' style="'+XCA_B+'padding:4px 9px;background:#e2e8f0;color:#334155">↑</button><button onclick="xcaWeekMove('+i+',1)" '+(i===w.length-1?'disabled':'')+' style="'+XCA_B+'padding:4px 9px;background:#e2e8f0;color:#334155">↓</button><button onclick="xcaWeekCopy('+i+')" style="'+XCA_B+'padding:4px 9px;background:#e2e8f0;color:#334155">복제</button><button onclick="xcaWeekDel('+i+')" style="'+XCA_B+'padding:4px 9px;background:#fee2e2;color:#b91c1c">🗑 삭제</button><button onclick="xcaWbPrint('+x.w+',\'blank\')" style="'+XCA_B+'padding:4px 9px;background:#e2e8f0;color:#334155">🖨 빈 워크북</button> 시작일 <input type="date" value="'+_xcaE(x.start||'')+'" onchange="_xcaCfg.weeks['+i+'].start=this.value" style="'+XCA_I+'width:140px"><label class="xca-lb" style="font-size:12px;font-weight:800"><input type="checkbox" class="xca-ck" '+(x.open!==false?'checked':'')+' onchange="_xcaCfg.weeks['+i+'].open=this.checked"> 공개</label></div>'
       +'<input value="'+_xcaE(x.title)+'" onchange="_xcaCfg.weeks['+i+'].title=this.value" style="'+XCA_I+'font-weight:800;margin-bottom:5px" placeholder="수업명 (예: [대학 기출분석 ①] …)">'
       +'<textarea rows="2" onchange="_xcaCfg.weeks['+i+'].activity=this.value" style="'+XCA_I+'margin-bottom:5px" placeholder="수업 활동">'+_xcaE(x.activity)+'</textarea>'
       +'<input value="'+_xcaE(x.output)+'" onchange="_xcaCfg.weeks['+i+'].output=this.value" style="'+XCA_I+'margin-bottom:5px" placeholder="산출물">'
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;font-size:11.5px;margin-bottom:6px;align-items:center"><b style="color:#64748b">중점 기출 유형(자동 배정 기준)</b>'+XCL_TYPES.map(function(t){ const on=(x.focus||[]).indexOf(t)>=0; return '<button onclick="xcaWeekFocus('+i+',\''+t+'\')" style="border:1px solid '+(on?'#7c3aed':'#cbd5e1')+';background:'+(on?'#7c3aed':'#fff')+';color:'+(on?'#fff':'#64748b')+';border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer">'+t+'</button>'; }).join('')+'</div>'
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px">'+Object.keys(XCL_SECTIONS).map(function(k){ return '<label class="xca-lb" style="white-space:nowrap"><input type="checkbox" class="xca-ck" '+((x.wb||[]).indexOf(k)>=0?'checked':'')+' onchange="xcaCurriWb('+i+',\''+k+'\',this.checked)"> '+XCL_SECTIONS[k].icon+' '+XCL_SECTIONS[k].title+'</label>'; }).join('')+'</div></div>';
+      +_xcaWkClsHtml(x,i)
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px">'+Object.keys(XCL_SECTIONS).filter(function(k){return !XCL_SECTIONS[k].hidden;}).map(function(k){ return '<label class="xca-lb" style="white-space:nowrap"><input type="checkbox" class="xca-ck" '+((x.wb||[]).indexOf(k)>=0?'checked':'')+' onchange="xcaCurriWb('+i+',\''+k+'\',this.checked)"> '+XCL_SECTIONS[k].icon+' '+XCL_SECTIONS[k].title+'</label>'; }).join('')+'</div></div>';
    }).join('')+'<div style="text-align:center;margin:8px 0 14px"><button onclick="xcaWeekAdd()" style="'+XCA_B+'background:#16a34a;color:#fff;padding:10px 20px">＋ 주차 추가</button> <button onclick="xcaCurriSave()" style="'+XCA_B+'background:#1d4ed8;color:#fff;padding:10px 20px">💾 커리큘럼 저장</button></div>';
 }
-function xcaWeekAdd(){ const ws=_xcaCfg.weeks; const n=ws.reduce(function(m,x){return Math.max(m,x.w);},0)+1; ws.push({w:n,when:'',stage:'',kind:'',title:'새 수업',activity:'',output:'',focus:[],wb:['qa','aar'],start:'',open:false}); render(); setTimeout(function(){ window.scrollTo(0,document.body.scrollHeight); },50); }
+
+// ── 주차별 공개 반 (classNamesByOrg) ──
+function _xcaClsList(){
+  let orgs=[]; try{ orgs=JSON.parse(localStorage.getItem('sg_orgs_v1')||'[]'); }catch(e){}
+  try{ if(typeof SK_ORGS!=='undefined') orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); }catch(e){}
+  const map={}; (ST.students||[]).forEach(function(s){ if(!s.className) return; const o=String(s.orgId||''); if(_xcaCurOrg&&o!==String(_xcaCurOrg)) return; (map[o]=map[o]||{})[s.className]=1; });
+  const out=[]; Object.keys(map).sort().forEach(function(o){ const org=orgs.find(function(x){return String(x.id)===o;}); Object.keys(map[o]).sort(function(a,b){return a.localeCompare(b,'ko');}).forEach(function(c){ out.push({o:o,on:org?org.name:(o||'기관 미지정'),c:c}); }); });
+  window._xcaClsL=out; return out;
+}
+function _xcaWkClsHtml(x,i){
+  const L=_xcaClsList(); const m=x.classNamesByOrg||{}; const tot=L.length;
+  const sel=L.filter(function(r){ return (m[r.o]||[]).indexOf(r.c)>=0; }).length;
+  const multiOrg=L.some(function(r){return r.o!==L[0].o;});
+  const label=sel?('특정 반만 공개 ('+sel+'개 반 선택)'):'전체 반 공개';
+  const body=L.length?L.map(function(r,j){ const on=(m[r.o]||[]).indexOf(r.c)>=0; return '<label class="xca-lb" style="white-space:nowrap;display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0"><input type="checkbox" class="xca-ck" '+(on?'checked':'')+' onchange="xcaWkCls('+i+','+j+',this.checked)"> '+(multiOrg?'<span style="color:#94a3b8">'+_xcaE(r.on)+' ·</span> ':'')+_xcaE(r.c)+'</label>'; }).join(''):'<span style="color:#94a3b8">등록된 반이 없습니다. (학생 정보에 “반”을 입력하면 여기에 나타납니다)</span>';
+  return '<details style="margin-bottom:6px;font-size:11.5px"'+(sel?' open':'')+'><summary style="cursor:pointer;font-weight:800;color:'+(sel?'#b45309':'#64748b')+'">👥 공개 반: '+label+'</summary><div style="padding:6px 4px;line-height:1.9">'+body+'<div style="margin-top:4px;color:#94a3b8">아무 반도 체크하지 않으면 모든 학생에게, 체크하면 체크한 반 학생에게만 이 주차가 보입니다. (저장 버튼을 눌러야 적용)</div>'+(sel?'<button onclick="xcaWkClsClear('+i+')" style="'+XCA_B+'padding:3px 9px;background:#e2e8f0;color:#334155;margin-top:4px">전체 공개로 되돌리기</button>':'')+'</div></details>';
+}
+function xcaWkCls(i,j,on){
+  const r=(window._xcaClsL||[])[j]; if(!r) return; const w=_xcaCfg.weeks[i]; w.classNamesByOrg=w.classNamesByOrg||{};
+  const a=w.classNamesByOrg[r.o]=w.classNamesByOrg[r.o]||[]; const k=a.indexOf(r.c);
+  if(on&&k<0) a.push(r.c); if(!on&&k>=0) a.splice(k,1);
+  if(!a.length) delete w.classNamesByOrg[r.o]; if(!Object.keys(w.classNamesByOrg).length) delete w.classNamesByOrg;
+  render();
+}
+function xcaWkClsClear(i){ delete _xcaCfg.weeks[i].classNamesByOrg; render(); }
+function xcaWeekAdd(){ const ws=_xcaCfg.weeks; const n=ws.reduce(function(m,x){return Math.max(m,x.w);},0)+1; ws.push({w:n,when:'',stage:'',kind:'',title:'새 수업',activity:'',output:'',focus:[],wb:['docq','aar'],start:'',open:false}); render(); setTimeout(function(){ window.scrollTo(0,document.body.scrollHeight); },50); }
 function xcaWeekDel(i){ const x=_xcaCfg.weeks[i]; if(!confirm((i+1)+'주차 “'+x.title+'”를 삭제할까요?\n(학생들이 이미 쓴 워크북 기록은 남아 있지만 화면에서는 사라집니다. 저장 버튼을 눌러야 적용돼요.)')) return; _xcaCfg.weeks.splice(i,1); render(); }
 function xcaWeekMove(i,d){ const ws=_xcaCfg.weeks, j=i+d; if(j<0||j>=ws.length) return; const t=ws[i]; ws[i]=ws[j]; ws[j]=t; render(); }
 function xcaWeekCopy(i){ const ws=_xcaCfg.weeks; const n=ws.reduce(function(m,x){return Math.max(m,x.w);},0)+1; const c=JSON.parse(JSON.stringify(ws[i])); c.w=n; c.title=c.title+' (복제)'; c.start=''; c.open=false; ws.splice(i+1,0,c); render(); }
 function xcaWeekFocus(i,t){ const f=_xcaCfg.weeks[i].focus=_xcaCfg.weeks[i].focus||[]; const k=f.indexOf(t); if(k>=0) f.splice(k,1); else f.push(t); render(); }
 function xcaCurriWb(i,k,on){ const a=_xcaCfg.weeks[i].wb=_xcaCfg.weeks[i].wb||[]; const j=a.indexOf(k); if(on&&j<0) a.push(k); if(!on&&j>=0) a.splice(j,1); const order=Object.keys(XCL_SECTIONS); a.sort(function(p,q){return order.indexOf(p)-order.indexOf(q);}); }
-async function xcaCurriSave(){ try{ await window._fb.set('xlabClassConfig','main',{id:'main',weeks:_xcaCfg.weeks,updatedAt:Date.now()}); _xcaCfg._default=false; alert('저장했습니다.'); }catch(e){ alert('저장 실패: '+e.message); } }
+async function xcaCurriSave(){ try{ const org=_xcaCurOrg||''; const id=org?('org_'+org):'main'; const doc={id:id,weeks:_xcaCfg.weeks,updatedAt:Date.now()}; if(org) doc.orgId=org; await window._fb.set('xlabClassConfig',id,doc); _xcaCfg.id=id; _xcaCfg._default=false; _xcaCfg._inherit=false; const k=_xcaCfgAll.findIndex(function(x){return x.id===id;}); const cp=JSON.parse(JSON.stringify(doc)); if(k>=0) _xcaCfgAll[k]=cp; else _xcaCfgAll.push(cp); alert('저장했습니다.'+(org?' ('+_xcaOrgName(org)+' 전용)':' (공통)')); render(); }catch(e){ alert('저장 실패: '+e.message); } }
 function xcaCurriReset(){ if(!confirm('수업 커리큘럼을 기본값으로 되돌릴까요? (저장 전까지는 화면에만 적용)')) return; _xcaCfg.weeks=JSON.parse(JSON.stringify(XCL_DEFAULT_WEEKS)); render(); }
 
 // ── 워크북 배정·열람 ──
@@ -56721,10 +56831,10 @@ function _xcaWorkOf(w){ return _xcaWork.find(function(x){return x.id===_xcaStude
 function xcaWbWeek(w){ _xcaWbWeek=Number(w); render(); }
 function _xcaWbHtml(s){
   if(_xcaStuLoading) return _xcaLoading();
-  const weeks=_xcaCfg.weeks; const wk=weeks.find(function(x){return x.w===_xcaWbWeek;})||weeks[0]; const wd=_xcaWorkOf(wk.w)||{};
+  const weeks=_xcaWeeksFor(s.orgId).filter(function(x){ return xclWeekForClass(x,s.orgId,s.className); }); if(!weeks.length) return '<div style="color:#94a3b8;padding:14px">이 학생의 반에 공개된 주차가 없습니다. (수업 커리큘럼 → 주차별 “공개 반” 확인)</div>'; const wk=weeks.find(function(x){return x.w===_xcaWbWeek;})||weeks[0]; const wd=_xcaWorkOf(wk.w)||{};
   const asg=wd.assigned||[];
   let h='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b>'+_xcaE(s.name)+' 학생</b> · 주차 <select onchange="xcaWbWeek(this.value)" style="'+XCA_I+'width:auto">'+weeks.map(function(x){ const d=_xcaWorkOf(x.w); const n=d&&d.a?Object.keys(d.a).length:0; return '<option value="'+x.w+'" '+(x.w===wk.w?'selected':'')+'>'+xclOrd(weeks,x.w)+'주차 · '+_xcaE(x.title.slice(0,24))+(n?' ✓'+n:'')+'</option>'; }).join('')+'</select><button onclick="xcaReloadStudent()" style="'+XCA_B+'background:#e2e8f0">↻ 새로고침</button><button onclick="xcaWbPrint('+wk.w+',\'blankq\')" style="'+XCA_B+'background:#0f172a;color:#fff">🖨 빈 워크북 (배정 기출 포함)</button><button onclick="xcaWbPrint('+wk.w+',\'filled\')" style="'+XCA_B+'background:#334155;color:#fff">🖨 학생 작성본</button></div>';
-  h+='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:10px"><div style="font-weight:900;margin-bottom:6px">🎯 오늘의 기출 2문항 배정 <span style="font-size:11px;color:#64748b;font-weight:600">(이 문항만 학생 화면에 보입니다)</span></div>';
+  h+='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:10px"><div style="font-weight:900;margin-bottom:6px">🎯 오늘의 서류기반 기출연습 2문항 배정 <span style="font-size:11px;color:#64748b;font-weight:600">(이 문항만 학생 화면에 보입니다)</span></div>';
   h+=asg.length?asg.map(function(q,i){ return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px;margin-bottom:5px;font-size:12.5px"><span style="font-size:11px;font-weight:800;color:#7c3aed">'+_xcaE(q.univ)+'</span> '+(q.types||[]).map(function(t){return '<span style="font-size:10.5px;background:#ede9fe;border-radius:99px;padding:1px 6px">'+_xcaE(t)+'</span>';}).join(' ')+'<div style="margin-top:3px;white-space:pre-wrap">'+_xcaE(q.q)+'</div></div>'; }).join(''):'<div style="color:#94a3b8;font-size:12.5px;margin-bottom:6px">아직 배정하지 않았습니다. 학생은 직접 문항을 입력해서 쓸 수도 있습니다.</div>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="xcaWbAuto('+wk.w+')" style="'+XCA_B+'background:#7c3aed;color:#fff">🎲 6칸 대학·이번 주 유형으로 자동 2문항</button><button onclick="xcaWbPick('+wk.w+')" style="'+XCA_B+'background:#1d4ed8;color:#fff">🔎 직접 고르기</button>'+(asg.length?'<button onclick="xcaWbClear('+wk.w+')" style="'+XCA_B+'background:#fee2e2;color:#b91c1c">배정 비우기</button>':'')+'</div>'
    +'<div style="font-size:11px;color:#64748b;margin-top:6px">이번 주 중점 유형: '+((wk.focus||[]).join(' · ')||'(없음)')+'</div></div>';
@@ -56746,7 +56856,7 @@ async function xcaCoachSave(w,k){ const v=document.getElementById('xcaCoach_'+k)
 async function xcaWbClear(w){ if(!confirm('이번 주 배정을 비울까요?')) return; await _xcaWorkSave(w,{assigned:[]}); render(); }
 function _xcaQuePool(){ const out=[]; _xcaUniv.forEach(function(u){ (u.questions||[]).forEach(function(q){ out.push({univ:u.name,qid:q.id,q:q.q,track:q.track||'',types:q.types||[]}); }); }); return out; }
 async function xcaWbAuto(w){
-  const wk=_xcaCfg.weeks.find(function(x){return x.w===w;}); const names=_xcaMyUnivNames();
+  const _s0=(ST.students||[]).find(function(x){return String(x.id)===String(_xcaStudentId);})||{}; const wk=_xcaWeeksFor(_s0.orgId).find(function(x){return x.w===w;}); const names=_xcaMyUnivNames();
   let pool=_xcaQuePool(); if(!pool.length){ alert('기출DB가 비어 있습니다. 먼저 대학 기출을 등록해주세요.'); return; }
   const mine=pool.filter(function(p){ return _xcaUnivMatch({name:p.univ},names); });
   const focus=wk.focus||[]; const byFocus=function(arr){ return arr.filter(function(p){ return !focus.length||p.types.some(function(t){return focus.indexOf(t)>=0;}); }); };
@@ -56882,7 +56992,7 @@ function _xcaFileDetailHtml(s){
    +'<textarea id="xcaR_gl" rows="2" placeholder="평가기준·학교 안내(선택) — 있으면 그 기준으로 점검" style="'+XCA_I+'margin-top:6px"></textarea><div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button id="xcaR_go" onclick="xcaAiReview()" style="'+XCA_B+'background:#7c3aed;color:#fff">'+(dr?'🔄 AI 초안 다시 만들기':'✨ AI 첨삭 초안 만들기')+'</button><span id="xcaR_msg" style="font-size:12px;color:#64748b">'+(_xcaBusy||'')+'</span></div></div>';
   // 초안 편집
   h+='<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b>📝 첨삭 항목 ('+items.length+')</b><span style="flex:1"></span><button onclick="xcaItemAdd()" style="'+XCA_B+'background:#e2e8f0">＋ 직접 추가</button></div>'
-   +(items.length?items.map(function(it,i){ return '<div style="border:1.5px solid '+(it.keep===false?'#e2e8f0':xclSym(it.sym).color)+';border-radius:10px;padding:8px 10px;margin-bottom:7px;opacity:'+(it.keep===false?.5:1)+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select onchange="xcaItemSet('+i+',\'sym\',this.value)" style="'+XCA_I+'width:auto;font-weight:900">'+XCL_SYMS.map(function(x){return '<option value="'+x.k+'" '+(x.k===it.sym?'selected':'')+'>['+x.k+']</option>';}).join('')+'</select><input value="'+_xcaE(it.page||'')+'" placeholder="쪽/위치" onchange="xcaItemSet('+i+',\'page\',this.value)" style="'+XCA_I+'width:80px">'+(it.verified===false?'<span style="font-size:10.5px;color:#b45309">원문 확인 안 됨</span>':'')+'<span style="flex:1"></span><label class="xca-lb" style="font-size:11.5px;font-weight:800"><input type="checkbox" class="xca-ck" '+(it.keep===false?'':'checked')+' onchange="xcaItemSet('+i+',\'keep\',this.checked)"> 공유에 포함</label><button onclick="xcaItemDel('+i+')" style="'+XCA_B+'padding:3px 8px;background:#fee2e2;color:#b91c1c">삭제</button></div>'
+   +(items.length?items.map(function(it,i){ return '<div style="border:1.5px solid '+(it.keep===false?'#e2e8f0':xclSym(it.sym).color)+';border-radius:10px;padding:8px 10px;margin-bottom:7px;opacity:'+(it.keep===false?.5:1)+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select onchange="xcaItemSet('+i+',\'sym\',this.value)" style="'+XCA_I+'width:auto;font-weight:900">'+XCL_SYMS.map(function(x){return '<option value="'+x.k+'" '+(x.k===it.sym?'selected':'')+'>['+x.k+'] '+_xcaE(x.def)+'</option>';}).join('')+'</select><input value="'+_xcaE(it.page||'')+'" placeholder="원문 쪽(예: 2)" title="학생 파일에서 이 문장이 있는 쪽/위치 (AI가 자동 기록)" onchange="xcaItemSet('+i+',\'page\',this.value)" style="'+XCA_I+'width:110px">'+(it.verified===false?'<span style="font-size:10.5px;color:#b45309">원문 확인 안 됨</span>':'')+'<span style="flex:1"></span><label class="xca-lb" style="font-size:11.5px;font-weight:800"><input type="checkbox" class="xca-ck" '+(it.keep===false?'':'checked')+' onchange="xcaItemSet('+i+',\'keep\',this.checked)"> 공유에 포함</label><button onclick="xcaItemDel('+i+')" style="'+XCA_B+'padding:3px 8px;background:#fee2e2;color:#b91c1c">삭제</button></div>'
      +'<textarea rows="2" onchange="xcaItemSet('+i+',\'quote\',this.value)" placeholder="학생 원문 인용" style="'+XCA_I+'margin-top:5px;background:#f8fafc">'+_xcaE(it.quote||'')+'</textarea><textarea rows="2" onchange="xcaItemSet('+i+',\'q\',this.value)" placeholder="질문 (문장을 고쳐 쓰지 말고 질문만)" style="'+XCA_I+'margin-top:4px">'+_xcaE(it.q||'')+'</textarea></div>'; }).join(''):'<div style="color:#94a3b8;font-size:12.5px;padding:8px">항목이 없습니다. AI 초안을 만들거나 직접 추가하세요.</div>')+'</div>';
   // 공유
   const rv=f.review||null;
@@ -56934,7 +57044,7 @@ function xcaReviewPrint(){
   const items=d.items.filter(function(x){return x.keep!==false&&x.q;});
   const w=window.open('','_blank'); if(!w){ alert('팝업이 차단되었습니다. 팝업을 허용해주세요.'); return; }
   w.document.write('<html><head><meta charset="utf-8"><title>첨삭지</title><style>body{font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;padding:26px;color:#111;line-height:1.6}h1{font-size:20px;margin:0 0 4px}.m{color:#666;font-size:12px;margin-bottom:12px}.it{border:1.5px solid #999;border-radius:8px;padding:8px 11px;margin-bottom:9px;page-break-inside:avoid}.s{font-weight:900}.qt{background:#f3f4f6;padding:4px 7px;border-radius:5px;font-size:12.5px;margin:4px 0}.leg{font-size:11.5px;color:#444;margin-bottom:12px}</style></head><body><h1>📝 첨삭지 — '+_xcaE(f.title)+'</h1><div class="m">'+_xcaE(f.studentName||'')+' · '+_xcaE(f.subject||'')+' '+_xcaE(f.taskTitle||'')+'</div><div class="leg">'+XCL_SYMS.map(function(x){return '['+x.k+'] '+x.def;}).join(' / ')+'</div>'
-   +(comment?'<div class="it">💬 '+_xcaE(comment)+'</div>':'')+items.map(function(x,i){ return '<div class="it"><span class="s">'+(i+1)+'. ['+_xcaE(x.sym)+']</span> '+(x.page?'<span style="color:#666;font-size:12px">('+_xcaE(x.page)+')</span>':'')+(x.quote?'<div class="qt">“'+_xcaE(x.quote)+'”</div>':'')+'<div>❓ '+_xcaE(x.q)+'</div><div style="margin-top:6px;border-top:1px dashed #bbb;color:#999;font-size:11px">내 답 / 고친 점:</div><div style="height:34px"></div></div>'; }).join('')+'</body></html>');
+   +(comment?'<div class="it">💬 '+_xcaE(comment)+'</div>':'')+items.map(function(x,i){ return '<div class="it"><span class="s">'+(i+1)+'. ['+_xcaE(x.sym)+']</span> <span style="font-size:12px;color:#444">'+_xcaE(xclSym(x.sym).def)+'</span> '+(x.page?'<span style="color:#666;font-size:12px">('+_xcaE(xclPg(x.page))+')</span>':'')+(x.quote?'<div class="qt">“'+_xcaE(x.quote)+'”</div>':'')+'<div>❓ '+_xcaE(x.q)+'</div><div style="margin-top:6px;border-top:1px dashed #bbb;color:#999;font-size:11px">내 답 / 고친 점:</div><div style="height:34px"></div></div>'; }).join('')+'</body></html>');
   w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} },300);
 }
 
@@ -56986,7 +57096,7 @@ function xcaCfPrint(id,i){
 }
 // ── 🖨 플랫폼 워크북(빈 양식 / 학생 작성본) 인쇄·PDF ──
 function _xcaSecPrint(k,a,asg,filled){
-  const sec=XCL_SECTIONS[k]; if(!sec) return ''; a=a||{}; const per=sec.per||1; let b='';
+  const sec=XCL_SECTIONS[k]; if(!sec) return ''; a=a||{}; if(k==='docq'){ let o='<div class="sec"><b style="font-size:14px">'+sec.icon+' '+_xcaE(sec.title)+'</b>'; for(let n=0;n<2;n++){ const q=(asg||[])[n]; o+='<div class="q"><b>서류기반 기출연습 '+(n+1)+'.</b> '+(q?_xcaE(q.q)+'<div class="m">('+_xcaE(q.univ)+')</div>':'<div class="ln"></div>')+'<div class="m">① 질문 유형 □과정·역할 □개념·원리 □확장·연결 □가치판단 □계기·동기 □독서 □한계·보완 □협업</div><div class="m">② 질문이 나온 문장:</div><div class="ln"></div><div class="m">③ 내 서류에서 고른 문장 / 예상질문 / 꼬리질문(WHY·HOW·EVIDENCE·LIMIT):</div><div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="m">④ 앞으로 할 활동 / 예상 세특 한 문장:</div><div class="ln"></div><div class="ln"></div></div>'; } if(filled) o+=xclAnsReadOnly('docq',a); return o+'</div>'; }
   for(let i=0;i<per;i++){
     const pre=per>1?('q'+i+'_'):'';
     if(k==='qa'){ const q=(asg||[])[i]; const qt=q?q.q:(filled?a[pre+'qtext']:''); b+='<div class="q"><b>Q'+(i+1)+'.</b> '+(qt?_xcaE(qt):'<div class="ln"></div><div class="ln"></div>')+(q?'<div class="m">('+_xcaE(q.univ)+')</div>':'')+'</div>'; }
@@ -57003,11 +57113,11 @@ function _xcaSecPrint(k,a,asg,filled){
   return '<div class="sec"><b style="font-size:14px">'+sec.icon+' '+_xcaE(sec.title)+'</b> <span class="m">'+_xcaE(sec.time||'')+'</span><div class="m" style="margin-bottom:4px">'+_xcaE(sec.desc)+'</div>'+b+'</div>';
 }
 function xcaWbPrint(which,mode){
-  const weeks=which==='all'?_xcaCfg.weeks:[_xcaCfg.weeks.find(function(x){return x.w===Number(which);})].filter(Boolean);
   const s=(typeof ST!=='undefined'&&ST.students||[]).find(function(x){return String(x.id)===String(_xcaStudentId);})||{};
-  const useStu=(mode==='blankq'||mode==='filled'); let body='';
+  const useStu=(mode==='blankq'||mode==='filled'); let body=''; const ALLW=useStu?_xcaWeeksFor(s.orgId):_xcaCfg.weeks;
+  const weeks=which==='all'?ALLW:[ALLW.find(function(x){return x.w===Number(which);})].filter(Boolean);
   weeks.forEach(function(w,idx){ const wd=useStu?(_xcaWorkOf(w.w)||{}):{};
-    body+='<h1>X-lab 수업 워크북 · '+xclOrd(_xcaCfg.weeks,w.w)+'주차 <span class="m">'+_xcaE(w.when)+'</span></h1><div style="font-weight:800;margin:2px 0">'+_xcaE(w.title)+'</div><div class="m">활동: '+_xcaE(w.activity)+' / 산출물: '+_xcaE(w.output)+'</div>'
+    body+='<h1>X-lab 수업 워크북 · '+xclOrd(ALLW,w.w)+'주차 <span class="m">'+_xcaE(w.when)+'</span></h1><div style="font-weight:800;margin:2px 0">'+_xcaE(w.title)+'</div><div class="m">활동: '+_xcaE(w.activity)+' / 산출물: '+_xcaE(w.output)+'</div>'
      +'<table style="margin:8px 0"><tr><td style="width:50%">이름: '+(useStu?_xcaE(s.name||''):'')+'</td><td>날짜: </td></tr></table>'
      +(w.wb||[]).map(function(k){ return _xcaSecPrint(k,(wd.a||{})[k],wd.assigned,mode==='filled'); }).join('')
      +(mode==='filled'&&wd.coach?(w.wb||[]).filter(function(k){return wd.coach[k];}).map(function(k){return '<div class="sec"><b>👩‍🏫 코멘트 ('+_xcaE(XCL_SECTIONS[k].title)+')</b><div class="ans">'+_xcaE(wd.coach[k])+'</div></div>';}).join(''):'')
@@ -57774,11 +57884,11 @@ async function xgRvRun(){
   finally{ st.busy=false; render(); }
 }
 function _xgRvLines(){ const it=_xgFind(_xgSel.kind,_xgSel.ref); const rv=(_xgDraft&&_xgDraft.review)||{items:[]}; return {it:it,rv:rv,items:(rv.items||[]).filter(function(x){return x.keep!==false&&x.q;})}; }
-function xgRvCopy(){ const L=_xgRvLines(); if(!L.items.length){ alert('복사할 항목이 없어요.'); return; } const txt='■ '+L.it.title+(L.rv.targetLabel?' ('+L.rv.targetLabel+')':'')+'\n'+L.items.map(function(x,i){ return (i+1)+'. ['+x.sym+'] '+(x.quote?'“'+x.quote+'” → ':'')+x.q; }).join('\n'); try{ navigator.clipboard.writeText(txt); alert('복사했습니다.'); }catch(e){ prompt('복사하세요',txt); } }
+function xgRvCopy(){ const L=_xgRvLines(); if(!L.items.length){ alert('복사할 항목이 없어요.'); return; } const txt='■ '+L.it.title+(L.rv.targetLabel?' ('+L.rv.targetLabel+')':'')+'\n'+L.items.map(function(x,i){ return (i+1)+'. ['+x.sym+'] '+xclSym(x.sym).def+' — '+(x.quote?'“'+x.quote+'” → ':'')+x.q; }).join('\n'); try{ navigator.clipboard.writeText(txt); alert('복사했습니다.'); }catch(e){ prompt('복사하세요',txt); } }
 function xgRvPrint(){ const L=_xgRvLines(); if(!L.items.length){ alert('인쇄할 항목이 없어요.'); return; } const s=_xrqStu()||{}; const E=_xcaE;
   _xpaPrintWin((s.name||'학생')+'_AI첨삭',
    '<h1>📝 첨삭지 <span class="m">'+E(s.name||'')+' 학생 · '+E(L.it.title)+(L.rv.targetLabel?' · '+E(L.rv.targetLabel):'')+'</span></h1>'
-   +L.items.map(function(x,i){ return '<div class="sec"><b>'+(i+1)+'. ['+E(x.sym)+']</b>'+(x.quote?'<div style="color:#475569;margin:3px 0">“'+E(x.quote)+'”</div>':'')+'<div>❓ '+E(x.q)+'</div></div>'; }).join('')); }
+   +L.items.map(function(x,i){ return '<div class="sec"><b>'+(i+1)+'. ['+E(x.sym)+']</b> <span style="font-size:12px;color:#444">'+E(xclSym(x.sym).def)+'</span>'+(x.quote?'<div style="color:#475569;margin:3px 0">“'+E(x.quote)+'”</div>':'')+'<div>❓ '+E(x.q)+'</div></div>'; }).join('')); }
 async function xgAiSuggest(){
   const d=_xgDraft; if(!d||_xgAiBusy) return; const it=_xgFind(d.kind,d.refId); if(!it) return;
   const payload={rubric:XG_RUBRIC[d.kind].map(function(r){return {key:r[0],label:r[1],desc:r[2]};}),context:{kind:XG_KIND[d.kind].replace(/^\S+\s/,''),title:it.title,dept:(typeof _xrqDoc!=='undefined'&&_xrqDoc&&_xrqDoc.major)||''}};
