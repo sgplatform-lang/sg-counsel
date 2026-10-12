@@ -213,6 +213,43 @@ button:active{opacity:.8}
 .btn-primary{background:#3b5bdb;color:#fff;width:100%}
 .btn-sm{min-height:40px;font-size:12px;padding:8px 14px;border-radius:8px;border:1.5px solid #e0e3ef;background:#f4f6fb;color:#555}
 /* 로그인 */
+.sgl-wrap{width:100%;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(180deg,#fff 0%,#f6f7fd 100%);font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif}
+.sgl-top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px}
+.sgl-brand{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:#3b5bdb}
+.sgl-bm{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:14px}
+.sgl-login{border:none;background:#3b5bdb;color:#fff;font-size:14px;font-weight:700;padding:10px 26px;border-radius:24px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(59,91,219,.28)}
+.sgl-login:hover{background:#2f4ac2}
+.sgl-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px 9vh}
+.sgl-logo{width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 8px 22px rgba(99,102,241,.3);margin-bottom:14px}
+.sgl-title{font-size:30px;font-weight:900;color:#1a1a2e;letter-spacing:-.5px}
+.sgl-sub{font-size:13.5px;color:#94a3b8;margin:6px 0 34px}
+.sgl-grid{display:grid;grid-template-columns:repeat(4,92px);gap:22px 14px;justify-content:center}
+.sgl-t{display:flex;flex-direction:column;align-items:center;gap:10px;border:none;background:none;cursor:pointer;font-family:inherit;padding:4px 0}
+.sgl-c{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--fg);transition:transform .15s,box-shadow .15s}
+.sgl-c svg,.sgl-nic svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sgl-c svg{width:26px;height:26px}
+.sgl-nic svg{width:30px;height:30px}
+.sgl-t:hover .sgl-c{transform:scale(1.1);box-shadow:0 8px 18px rgba(30,41,90,.16)}
+.sgl-l{font-size:13px;font-weight:600;color:#334155;white-space:nowrap}
+.sgl-ov{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;z-index:1000}
+#login-modal{z-index:1001}
+.sgl-nc{background:#fff;border-radius:20px;padding:28px 26px 22px;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif}
+.sgl-nic{width:64px;height:64px;border-radius:50%;background:var(--bg);color:var(--fg);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.sgl-nt{font-size:17px;font-weight:800;color:#1a1a2e}
+.sgl-nx{font-size:13px;color:#64748b;margin:8px 0 20px;line-height:1.6}
+.sgl-nb{display:flex;gap:8px}
+.sgl-b1{flex:1;border:none;background:#3b5bdb;color:#fff;font-size:14px;font-weight:700;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit}
+.sgl-b2{border:1.5px solid #e0e3ef;background:#fff;color:#64748b;font-size:14px;font-weight:700;padding:12px 18px;border-radius:12px;cursor:pointer;font-family:inherit}
+.sgl-x{position:absolute;top:12px;right:14px;border:none;background:#f1f3fa;color:#64748b;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer}
+@media(max-width:520px){
+  .sgl-grid{grid-template-columns:repeat(4,1fr);gap:24px 6px;width:100%;max-width:360px}
+  .sgl-c{width:50px;height:50px}.sgl-c svg{width:23px;height:23px}
+  .sgl-l{font-size:12px}.sgl-title{font-size:25px}.sgl-top{padding:12px 16px}
+}
+.sgl-grid{grid-template-columns:repeat(4,92px)}
+.sgl-title{text-align:center;padding:0 8px}
+@media(max-width:520px){.sgl-title{font-size:21px}.sgl-grid{max-width:340px}}
+#sgl-modal-card{position:relative;max-height:94dvh;overflow-y:auto}
 #login-wrap{height:100dvh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#1e3a8a,#3b5bdb,#6366f1);padding:16px}
 .login-card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,.3)}
 /* 헤더 */
@@ -504,6 +541,7 @@ window.addEventListener('popstate', function(e){
 function render(){
   const app=document.getElementById('app');
   if(!app)return;
+  if(CU){ window._sglModal=false; }
   if(!CU){app.innerHTML=renderLogin();return;}
   // ★ APEX 입력 화면(iframe)이 열려 있는 동안에는 백그라운드 갱신(render)으로 iframe이 사라지지 않게 보호
   if(curTab==='apex' && _apexView==='form' && document.getElementById('apexFrame')) return;
@@ -538,28 +576,74 @@ function render(){
   });
 }
 
+var SGL_TILES=[
+ {id:'weekly',label:'주간플랜',bg:'#dff7f3',fg:'#0d9488',ic:"<rect x=\"3\" y=\"4.5\" width=\"18\" height=\"16.5\" rx=\"2.5\"/><path d=\"M3 10h18M8 2.5v4M16 2.5v4\"/>"},
+ {id:'challenger',label:'챌린저',bg:'#ffe8ee',fg:'#e11d48',ic:"<path d=\"M8 21h8M12 17v4\"/><path d=\"M7 4h10v5a5 5 0 0 1-10 0z\"/><path d=\"M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5\"/>"},
+ {id:'xlab',label:'X-lab',bg:'#f0e8ff',fg:'#7c3aed',ic:"<path d=\"M9 3h6M10 3v6.5L4.5 19a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L14 9.5V3\"/><path d=\"M7.5 15h9\"/>"},
+ {id:'apex',label:'APEX진단',bg:'#fff3dc',fg:'#d97706',ic:"<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/>"}
+];
+window._sglModal=window._sglModal||false;
+function sglOpen(){
+  window._sglModal=true; sglNoticeClose();
+  var m=document.getElementById('sgl-modal'); if(m) m.style.display='flex';
+  setTimeout(function(){ var i=document.getElementById('stu_id'); if(i) i.focus(); },60);
+}
+function sglClose(){ window._sglModal=false; var m=document.getElementById('sgl-modal'); if(m) m.style.display='none'; }
+function sglNoticeClose(){ var n=document.getElementById('sgl-notice'); if(n) n.style.display='none'; }
+function sglTile(i){
+  var t=SGL_TILES[i], n=document.getElementById('sgl-notice'); if(!t||!n) return;
+  var c=document.getElementById('sgl-n-ic'); if(c){ c.style.setProperty('--bg',t.bg); c.style.setProperty('--fg',t.fg); c.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+t.ic+'</svg>'; }
+  var x=document.getElementById('sgl-n-tx'); if(x) x.textContent="'"+t.label+"' 기능은 로그인한 뒤에 사용할 수 있습니다.";
+  n.style.display='flex';
+}
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ sglClose(); sglNoticeClose(); } });
 function renderLogin(){
-  return`<div id="login-wrap">
-    <div class="login-card">
-      <div style="text-align:center;margin-bottom:28px">
-        <div style="font-size:48px;margin-bottom:10px">🎓</div>
-        <div style="font-size:22px;font-weight:900;color:#1a1a2e">SG상담 학생</div>
-        <div style="font-size:13px;color:#888;margin-top:4px">선생님에게 받은 계정으로 로그인하세요</div>
+  var tiles=SGL_TILES.map(function(t,i){
+    return '<button class="sgl-t" onclick="sglTile('+i+')" style="--bg:'+t.bg+';--fg:'+t.fg+'"><span class="sgl-c"><svg viewBox="0 0 24 24" aria-hidden="true">'+t.ic+'</svg></span><span class="sgl-l">'+t.label+'</span></button>';
+  }).join('');
+  return`<div id="login-screen" style="min-height:100dvh;overflow-y:auto;background:#fff">
+    <div class="sgl-wrap">
+      <div class="sgl-top">
+        <div class="sgl-brand"><span class="sgl-bm">🎓</span><span>SG상담플랫폼</span></div>
+        <button class="sgl-login" onclick="sglOpen()">로그인</button>
       </div>
-      <div style="margin-bottom:14px">
-        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">학생 아이디</div>
-        <input id="stu_id" type="text" placeholder="아이디 입력" autocomplete="username" inputmode="text"
-          onkeydown="if(event.key==='Enter')document.getElementById('stu_pw').focus()">
+      <div class="sgl-main">
+        <div class="sgl-title">SG상담플랫폼_학생용</div>
+        <div class="sgl-sub">로그인하면 아래 기능을 이용할 수 있어요</div>
+        <div class="sgl-grid">${tiles}</div>
       </div>
-      <div style="margin-bottom:20px">
-        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">비밀번호</div>
-        <input id="stu_pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password"
-          onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="sgl-notice" class="sgl-ov" style="display:none" onclick="if(event.target===this)sglNoticeClose()">
+      <div class="sgl-nc">
+        <div id="sgl-n-ic" class="sgl-nic"></div>
+        <div class="sgl-nt">🔒 로그인 후 이용할 수 있어요</div>
+        <div id="sgl-n-tx" class="sgl-nx"></div>
+        <div class="sgl-nb"><button class="sgl-b1" onclick="sglOpen()">로그인하기</button><button class="sgl-b2" onclick="sglNoticeClose()">닫기</button></div>
       </div>
-      <button class="btn btn-primary" onclick="doLogin()">로그인</button>
-      <div id="login_err" style="text-align:center;color:#e53935;font-size:13px;margin-top:10px;min-height:18px;font-weight:600"></div>
-      ${!FB()?`<div style="margin-top:16px;background:#fff8e1;border-radius:10px;padding:12px;font-size:12px;color:#d97706;text-align:center;line-height:1.7">
-        ⚠️ Firebase가 연결되지 않았습니다<br>관리자에게 설정 파일을 요청하세요</div>`:''}
+    </div>
+    <div id="sgl-modal" class="sgl-ov" style="display:${window._sglModal?'flex':'none'};z-index:1001" onclick="if(event.target===this)sglClose()">
+      <div class="login-card" id="sgl-modal-card">
+        <button class="sgl-x" onclick="sglClose()" aria-label="닫기">✕</button>
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:44px;margin-bottom:8px">🎓</div>
+          <div style="font-size:21px;font-weight:900;color:#1a1a2e">SG상담플랫폼_학생용</div>
+          <div style="font-size:13px;color:#888;margin-top:4px">선생님에게 받은 계정으로 로그인하세요</div>
+        </div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">학생 아이디</div>
+          <input id="stu_id" type="text" placeholder="아이디 입력" autocomplete="username" inputmode="text"
+            onkeydown="if(event.key==='Enter')document.getElementById('stu_pw').focus()">
+        </div>
+        <div style="margin-bottom:20px">
+          <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">비밀번호</div>
+          <input id="stu_pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+        <div id="login_err" style="text-align:center;color:#e53935;font-size:13px;margin-top:10px;min-height:18px;font-weight:600"></div>
+        ${!FB()?`<div style="margin-top:16px;background:#fff8e1;border-radius:10px;padding:12px;font-size:12px;color:#d97706;text-align:center;line-height:1.7">
+          ⚠️ Firebase가 연결되지 않았습니다<br>관리자에게 설정 파일을 요청하세요</div>`:''}
+      </div>
     </div>
   </div>`;
 }
@@ -2929,6 +3013,7 @@ function renderChallengerAnswerInput(){
   // hiddenFromStudent와 마찬가지로 이미 진행 중이던 학생(_chgAnsCurrentExamEntry)이나
   // 제출된 답안·결과 조회(challengerData 기반)는 이 필터와 무관하게 그대로 열람 가능.
   const catalogList=(_chgAnsCatalog||[]).filter(function(e){
+    if(e.examType==='entrance') return false; // ★ 488: 입학TEST는 아래 별도 목록(신규생 전용)
     if(e.hiddenFromStudent) return false;
     if((e.status||'active')!=='active') return false;
     if(!(!e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0))) return false;
@@ -2936,6 +3021,13 @@ function renderChallengerAnswerInput(){
     if(clsForMyOrg.length && !clsForMyOrg.includes(CU.className)) return false;
     return true;
   }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||'')));
+  // ★ 488 추가: 입학TEST — 신규생(관리자가 "신규생" 체크 + 반명 없음)에게만 보인다. 재원생(반명 있음)·표시 없는 기존 학생에게는 목록 자체가 비어 있다.
+  const _isEntStu = !!(CU && CU.entranceNew && !String(CU.className||'').trim());
+  const entList=_isEntStu ? (_chgAnsCatalog||[]).filter(function(e){
+    if(e.examType!=='entrance' || e.entHidden) return false;
+    if((e.status||'active')!=='active') return false;
+    return !e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0);
+  }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||''))) : [];
   const examEntry=_chgAnsCurrentExamEntry();
   // ★ 2026-09-23 추가: 분리 저장된(대형) 시험이면 문항 정보를 먼저 불러온 뒤에 과목
   // 목록을 계산해야 한다 — 안 그러면 "채점 가능한 과목이 없습니다"로 잘못 보인다.
@@ -2974,6 +3066,15 @@ function renderChallengerAnswerInput(){
     <p style="font-size:11.5px;color:#888;margin:-6px 0 12px">문항별로 실제 고른 답을 입력하고 채점하면, 결과가 자동으로 챌린저·오답노트에 반영됩니다.</p>
     ${chgAnsSubmittedListHtml()}
     <div class="card"><div class="card-body">
+      ${_isEntStu?`<div style="margin-bottom:14px;padding:11px 12px;background:#fff7ed;border:1.5px solid #fdba74;border-radius:10px">
+        <label style="font-size:11.5px;color:#9a3412;font-weight:800">🎓 입학TEST 선택 (신규생 전용)</label>
+        <select onchange="chgAnsSelectCatalog(this.value)" style="width:100%;padding:9px 8px;border:1px solid #fdba74;border-radius:8px;font-size:13.5px;margin-top:4px;background:#fff">
+          <option value="">-- 입학TEST를 선택해주세요 --</option>
+          ${entList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.examName||'(이름 없음)')}</option>`).join('')}
+        </select>
+        ${!entList.length?`<p style="font-size:11px;color:#9a3412;margin:8px 0 0">현재 응시할 수 있는 입학TEST가 없습니다. 선생님께 문의해주세요.</p>`:''}
+        <p style="font-size:10.5px;color:#9a3412;margin:6px 0 0">※ 입학TEST는 1회만 제출할 수 있습니다. 재응시가 필요하면 선생님께 요청해주세요.</p>
+      </div>`:''}
       <label style="font-size:11px;color:#666">시험 선택</label>
       <select onchange="chgAnsSelectCatalog(this.value)" style="width:100%;padding:9px 8px;border:1px solid #ddd;border-radius:8px;font-size:13.5px;margin-top:4px">
         <option value="">-- 시험을 선택해주세요 --</option>
@@ -4193,7 +4294,7 @@ async function refreshData(){
       // 관리자가 관리하는 필드(플랜/과목) 업데이트
       const adminFields=['weeklyPlan','weeklyBookMap','_planWeek','weeklyPlanWeek',
         'weeklyHistory','weeklySubjPlans','weeklyAchieve','extraSubjs','challengerData',
-        'weeklyInspect','weeklyStrategyPeriod'];
+        'weeklyInspect','weeklyStrategyPeriod','className','entranceNew'];
       adminFields.forEach(function(f){if(student[f]!==undefined) CU[f]=student[f];});
       DATA={student:CU,tests:tests.filter(t=>!t.classNames?.length||t.classNames.includes(student.className))};
       render();toast('✅ 최신 데이터로 업데이트됨');
