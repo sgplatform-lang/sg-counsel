@@ -621,7 +621,7 @@ function renderLogin(){
         <div class="sgl-nb"><button class="sgl-b1" onclick="sglOpen()">로그인하기</button><button class="sgl-b2" onclick="sglNoticeClose()">닫기</button></div>
       </div>
     </div>
-    <div id="sgl-modal" class="sgl-ov" style="display:${window._sglModal?'flex':'none'};z-index:1001" onclick="if(event.target===this)sglClose()">
+    <div id="sgl-modal" class="sgl-ov" style="display:${window._sglModal?'flex':'none'};z-index:1001">
       <div class="login-card" id="sgl-modal-card">
         <button class="sgl-x" onclick="sglClose()" aria-label="닫기">✕</button>
         <div style="text-align:center;margin-bottom:24px">
