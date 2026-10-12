@@ -679,6 +679,7 @@ function doStudentLogout(){
   if(_unsubscribeStudent){ try{_unsubscribeStudent();}catch(e){} _unsubscribeStudent=null; }
   try{ firebase.auth().signOut(); }catch(e){}
   CU=null;
+  _chgAnsCatalog=null; _chgAnsState=null; _chgAnsLoadFailed=false; window._chgAnsEntRetried=false; // ★ 23: 다른 계정 로그인 시 이전 시험 목록·입력 상태가 남지 않게 초기화
   _xmapList=[]; _xmapLoaded=false; _xmapView='list'; _xmapCur=null; _xlabTopModeMain='topic'; _apexReset(); // 다른 계정 로그인 시 이전 학생 데이터 노출 방지
   try{ sessionStorage.removeItem('sg_stu_session'); }catch(e){}
   render();
@@ -3028,6 +3029,11 @@ function renderChallengerAnswerInput(){
     if((e.status||'active')!=='active') return false;
     return !e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0);
   }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||''))) : [];
+  // ★ 23: 신규생인데 입학TEST 목록이 비어 있으면, 캐시가 오래됐을 수 있으니 서버에서 한 번 다시 불러온다(탭 진입당 1회).
+  if(_isEntStu && !entList.length && !window._chgAnsEntRetried){
+    window._chgAnsEntRetried=true;
+    setTimeout(function(){ _chgAnsCatalog=null; if(curTab==='challengeranswer') render(); },0);
+  }
   const examEntry=_chgAnsCurrentExamEntry();
   // ★ 2026-09-23 추가: 분리 저장된(대형) 시험이면 문항 정보를 먼저 불러온 뒤에 과목
   // 목록을 계산해야 한다 — 안 그러면 "채점 가능한 과목이 없습니다"로 잘못 보인다.
@@ -3072,7 +3078,7 @@ function renderChallengerAnswerInput(){
           <option value="">-- 입학TEST를 선택해주세요 --</option>
           ${entList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.examName||'(이름 없음)')}</option>`).join('')}
         </select>
-        ${!entList.length?`<p style="font-size:11px;color:#9a3412;margin:8px 0 0">현재 응시할 수 있는 입학TEST가 없습니다. 선생님께 문의해주세요.</p>`:''}
+        ${!entList.length?`<p style="font-size:11px;color:#9a3412;margin:8px 0 0">현재 응시할 수 있는 입학TEST가 없습니다. 선생님께 문의해주세요. <button onclick="window._chgAnsEntRetried=false;_chgAnsCatalog=null;render();" style="margin-left:6px;padding:4px 10px;border:1px solid #fdba74;background:#fff;color:#9a3412;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🔄 새로고침</button></p>`:''}
         <p style="font-size:10.5px;color:#9a3412;margin:6px 0 0">※ 입학TEST는 1회만 제출할 수 있습니다. 재응시가 필요하면 선생님께 요청해주세요.</p>
       </div>`:''}
       <label style="font-size:11px;color:#666">시험 선택</label>
