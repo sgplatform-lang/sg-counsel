@@ -14184,6 +14184,10 @@ function _renderSForm(s){
           <div style="font-size:11px;color:#777;font-weight:600;margin-bottom:4px">반명</div>
           <input id="sf_cls" class="inp" placeholder="예) A반, 수학심화반" value="${esc(s?.className||'')}">
         </div>
+        <div style="grid-column:1/-1;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:9px 12px">
+          <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:#9a3412;cursor:pointer"><input type="checkbox" id="sf_entnew" ${((isNew||s?.entranceNew)&&!(s?.className))?'checked':''}> 🎓 신규생 (입학TEST 대상)</label>
+          <div style="font-size:11px;color:#9a3412;margin-top:4px;line-height:1.5">체크하면 학생용 페이지에 입학TEST 선택이 나타납니다. <b>반명을 입력하면 재원생으로 자동 전환</b>되어 입학TEST가 사라집니다.</div>
+        </div>
         <div>
           <div style="font-size:11px;color:#777;font-weight:600;margin-bottom:4px">담당 선생님</div>
           <select id="sf_c" class="inp">
@@ -14326,6 +14330,8 @@ window._saveSForm = function(sid){
     }
   }
 
+  const _entCls=document.getElementById('sf_cls')?.value?.trim()||'';
+  const _entNew=_entCls ? false : (document.getElementById('sf_entnew') ? document.getElementById('sf_entnew').checked : !!existing?.entranceNew);
   const baseInfo = {
     name, school,
     grade:     document.getElementById('sf_g')?.value||'고3',
@@ -14343,6 +14349,7 @@ window._saveSForm = function(sid){
       return tc ? String(tc.id) : (existing?.teacherId||null);
     })(),
     className: document.getElementById('sf_cls')?.value?.trim()||'',
+    entranceNew: _entNew,
     studentLoginId: document.getElementById('sf_lid')?.value?.trim()||existing?.studentLoginId||'',
     studentPassword: document.getElementById('sf_lpw')?.value?.trim()||existing?.studentPassword||'',
     // ★ 체크박스 자체가 이 관리자/선생님의 권한 부족으로 폼에 없을 수 있으므로(_sgHasPerm),
@@ -22235,6 +22242,7 @@ function openBulkImport(){
       </div>
 
       <!-- 미리보기 -->
+      <div style="margin-top:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px"><label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#9a3412;cursor:pointer"><input type="checkbox" id="bulk_entnew" checked> 🎓 반명이 비어 있는 학생은 신규생(입학TEST 대상)으로 등록</label></div>
       <div id="bulk_preview" style="margin-top:10px"></div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -22387,6 +22395,7 @@ function openBulkImport(){
         grade:String(p[2]||'').trim(),
         phone:String(p[3]||'').trim(),
         className:String(p[4]||'').trim(),
+        entranceNew: !String(p[4]||'').trim() && !!(ov.querySelector('#bulk_entnew') && ov.querySelector('#bulk_entnew').checked),
         counselor:String(p[5]||'').trim(),
         studentLoginId:String(p[6]||'').trim(),
         studentPassword:String(p[7]||'').trim(),
@@ -38489,6 +38498,7 @@ function renderChallenger(s){
       <button onclick="window.__SG_forceChallengerRefresh=true;window.__challengerLoadedFor=null;render();" style="margin-left:auto;background:#fff;color:#0f766e;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🔄 학생 입력 새로고침</button>
       <button onclick="openChallengerBulkReflect()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📋 결과 일괄반영</button>
       <button onclick="openExamCatalog()" style="background:#fff;color:#0369a1;border:1.5px solid #0369a1;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📚 시험 카탈로그 관리</button>
+      <button onclick="openEntranceResults()" style="background:#fff;color:#c2410c;border:1.5px solid #c2410c;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🎓 입학TEST 결과</button>
       <button onclick="openChallengerDupCheck()" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🧹 중복 회차 검사</button>
       <button onclick="openChallengerDataOptimize()" style="background:#fff;color:#7c3aed;border:1.5px solid #7c3aed;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">⚡ 회차 데이터 최적화</button>
       <button onclick="ST._chgDirListOpen=!ST._chgDirListOpen;render();" style="background:${ST._chgDirListOpen?'#7c3aed':'#fff'};color:${ST._chgDirListOpen?'#fff':'#7c3aed'};border:1.5px solid #7c3aed;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📌 행동강령 목록</button>
@@ -38918,8 +38928,123 @@ function _examcatToggleListOpen(){
 // ★ 시험 상태(status: 'active'=진행중/'ended'=종료/'archived'=보관) 필터 탭 — 기본은
 // "진행중"만 보이게 해서 목록이 길어져도 지금 응시 중인 시험을 바로 찾을 수 있게 한다.
 // 필드가 없는 기존 시험(24개)은 하위호환을 위해 항상 'active'로 취급한다.
+// ===== 입학TEST (488) =====
+// 입학TEST = 시험 카탈로그 항목 중 examType==='entrance'. 신규생(entranceNew && 반명 없음)에게만 학생용에서 노출.
+function _entHid(e){ return e.examType==='entrance' ? !!e.entHidden : !!e.hiddenFromStudent; }
+function _entTypeChange(){
+  var v=(document.querySelector('input[name="examcat-type"]:checked')||{}).value;
+  var w=document.getElementById('examcat-class-wrap'); if(w) w.style.display = (v==='entrance') ? 'none' : '';
+  var n=document.getElementById('examcat-type-note'); if(n) n.style.display = (v==='entrance') ? '' : 'none';
+}
+function _entTypeBlockHtml(e){
+  var isEnt = !!(e && e.examType==='entrance');
+  return '<div style="margin-bottom:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px">'
+    +'<div style="font-size:12.5px;font-weight:700;color:#9a3412;margin-bottom:6px">🎓 시험 유형</div>'
+    +'<label style="font-size:12.5px;margin-right:18px;cursor:pointer"><input type="radio" name="examcat-type" value="normal" '+(isEnt?'':'checked')+' onchange="_entTypeChange()"> 일반 시험</label>'
+    +'<label style="font-size:12.5px;cursor:pointer"><input type="radio" name="examcat-type" value="entrance" '+(isEnt?'checked':'')+' onchange="_entTypeChange()"> 입학TEST (신규생 전용)</label>'
+    +'<div id="examcat-type-note" style="display:'+(isEnt?'':'none')+';font-size:11px;color:#9a3412;margin-top:6px;line-height:1.6">입학TEST는 <b>신규생(학생 등록 시 "신규생" 체크 + 반명 없음)</b>에게만 학생용 "🎓 입학TEST 선택"으로 보입니다. 재원생에게는 보이지 않으며, 반 지정은 필요 없습니다. 종료/보관/삭제는 일반 시험과 동일합니다.</div>'
+    +'</div>';
+}
+// ---- 입학TEST 결과 보기(일반 챌린저 통계와 분리) ----
+var _ENT_SUBJ={KOR:'국어',MATH:'수학',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+var _entFilter='';
+function _entScopedExams(){
+  return (typeof _examcatScopedForCurrentOrg==='function'?_examcatScopedForCurrentOrg():(ST.examCatalog||[])).filter(function(e){ return e.examType==='entrance'; });
+}
+function _entCollect(){
+  var exams=_entScopedExams();
+  var names={}; exams.forEach(function(e){ names[String(e.examName||'').trim()]=e; });
+  var rows=[]; var taken={};
+  (ST.students||[]).forEach(function(s){
+    var cd=s.challengerData||{}; var seen={};
+    function add(date,test,subs){
+      var t=String(test||'').trim(); if(!names[t]) return;
+      var key=String(date||'').trim()+'|'+t; if(seen[key]) return; seen[key]=1;
+      rows.push({stu:s, date:String(date||'').trim(), test:t, subs:subs||[], exam:names[t]});
+      taken[String(s.id)+'|'+t]=1;
+    }
+    if(cd.lastTestName) add(cd.lastTestDate, cd.lastTestName, cd.lastSubjects);
+    (cd.history||[]).forEach(function(h){ add(h.date, h.test, h.fullSubjects||h.subjects); });
+  });
+  var waiting=[];
+  (ST.students||[]).forEach(function(s){
+    if(s.entranceNew && !String(s.className||'').trim()){
+      var any=exams.some(function(e){ return taken[String(s.id)+'|'+String(e.examName||'').trim()]; });
+      if(!any) waiting.push(s);
+    }
+  });
+  return {exams:exams, rows:rows, waiting:waiting};
+}
+function _entSubLabel(x){
+  var n=_ENT_SUBJ[x.subject]||x.subject||'?';
+  if(x.detail) n+='('+x.detail+')';
+  return n;
+}
+async function openEntranceResults(){
+  try{ if(typeof _ensureExamCatalogLoaded==='function') await _ensureExamCatalogLoaded(); }catch(e){}
+  var old=document.getElementById('ent-overlay'); if(old) old.remove();
+  var div=document.createElement('div'); div.id='ent-overlay';
+  div.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML='<div style="background:#fff;border-radius:16px;max-width:1000px;width:100%;max-height:90vh;overflow:auto;padding:22px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0;font-size:18px">🎓 입학TEST 결과</h2>'
+    +'<button onclick="document.getElementById(\'ent-overlay\').remove()" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 10px;cursor:pointer">✕ 닫기</button></div>'
+    +'<p style="font-size:12px;color:#64748b;margin:0 0 10px">일반 챌린저 통계와 별도로, 입학TEST를 응시한 신규생의 결과만 모아 봅니다. 최종관리자는 전체 기관, 기관관리자·선생님은 본인 범위만 표시됩니다.</p>'
+    +'<div id="ent-body"></div></div>';
+  document.body.appendChild(div);
+  _entRender();
+}
+function _entRender(){
+  var el=document.getElementById('ent-body'); if(!el) return;
+  var d=_entCollect(); var isAdm=ST.currentUser?.role==='admin';
+  var orgs=[]; try{ orgs=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); }catch(e){}
+  var rows=d.rows.filter(function(r){ return !_entFilter || r.test===_entFilter; });
+  rows.sort(function(a,b){ return String(b.date).localeCompare(String(a.date)) || String(a.stu.name||'').localeCompare(String(b.stu.name||''),'ko'); });
+  var sel='<select onchange="_entFilter=this.value;_entRender()" style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:12.5px;margin-bottom:10px"><option value="">전체 입학TEST ('+d.exams.length+'개)</option>'
+    +d.exams.map(function(e){ var n=String(e.examName||'').trim(); return '<option value="'+esc(n)+'"'+(_entFilter===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select>';
+  var h=sel+' <span style="font-size:12px;color:#64748b">응시 '+rows.length+'건 · 미응시 신규생 '+d.waiting.length+'명</span>';
+  if(!d.exams.length){ el.innerHTML='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;background:#f8fafc;border-radius:10px">등록된 입학TEST가 없습니다. 📚 시험 카탈로그 관리에서 "입학TEST" 유형으로 등록해주세요.</div>'; return; }
+  h+='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#f1f5f9;text-align:left">'
+    +'<th style="padding:7px 8px">학생</th>'+(isAdm?'<th style="padding:7px 8px">기관</th>':'')+'<th style="padding:7px 8px">학교/학년</th><th style="padding:7px 8px">입학TEST</th><th style="padding:7px 8px">응시일</th><th style="padding:7px 8px">과목별 점수</th><th style="padding:7px 8px">재응시</th></tr></thead><tbody>';
+  if(!rows.length) h+='<tr><td colspan="'+(isAdm?7:6)+'" style="padding:18px;text-align:center;color:#94a3b8">응시 결과가 없습니다.</td></tr>';
+  rows.forEach(function(r){
+    var s=r.stu; var locked=r.subs.some(function(x){ return x&&x._locked; });
+    var sc=r.subs.map(function(x){ return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:8px;padding:1px 7px;margin:1px 3px 1px 0">'+esc(_entSubLabel(x))+' <b>'+esc(String(x.score===''||x.score==null?'-':x.score))+'</b></span>'; }).join('');
+    var org=(orgs.find(function(o){ return String(o.id)===String(s.orgId); })||{}).name||s.orgName||'';
+    var btn = locked
+      ? '<button onclick="_entRetake(\''+esc(String(s.id))+'\',\''+esc(r.test).replace(/\\/g,'')+'\',\''+esc(r.date)+'\')" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:700;cursor:pointer">🔁 재응시 허용</button>'
+      : '<span style="color:#16a34a;font-size:11.5px;font-weight:700">재응시 허용됨</span>';
+    h+='<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:7px 8px;font-weight:700">'+esc(s.name||'')+'</td>'+(isAdm?'<td style="padding:7px 8px">'+esc(org)+'</td>':'')
+      +'<td style="padding:7px 8px">'+esc((s.school||'')+' '+(s.grade||''))+'</td><td style="padding:7px 8px">'+esc(r.test)+'</td><td style="padding:7px 8px">'+esc(r.date)+'</td><td style="padding:7px 8px">'+sc+'</td><td style="padding:7px 8px">'+btn+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(d.waiting.length){
+    h+='<div style="margin-top:14px;font-size:12.5px;font-weight:700;color:#0f172a">⏳ 아직 응시하지 않은 신규생 ('+d.waiting.length+'명)</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">'
+      +d.waiting.map(function(s){ return '<span style="background:#f1f5f9;border-radius:8px;padding:3px 9px;font-size:12px">'+esc(s.name||'')+(isAdm&&s.orgName?' · '+esc(s.orgName):'')+'</span>'; }).join('')+'</div>';
+  }
+  el.innerHTML=h;
+}
+// 재응시 허용: 해당 회차의 제출 잠금(_locked)을 풀어 학생이 1회 더 제출할 수 있게 한다(다시 제출하면 자동 재잠금).
+async function _entRetake(stuId, test, date){
+  var s=(ST.students||[]).find(function(x){ return String(x.id)===String(stuId); }); if(!s) return;
+  if(!confirm('"'+(s.name||'')+'" 학생의 "'+test+'" 재응시를 허용할까요?\n학생이 다시 제출하면 이전 점수가 새 결과로 교체됩니다.')) return;
+  var cd=JSON.parse(JSON.stringify(s.challengerData||{})); var changed=false;
+  function unlock(arr){ (arr||[]).forEach(function(x){ if(x&&x._locked){ x._locked=false; x._retakeGranted=Date.now(); changed=true; } }); }
+  if(String(cd.lastTestName||'').trim()===test) unlock(cd.lastSubjects);
+  (cd.history||[]).forEach(function(h){ if(String(h.test||'').trim()===test){ unlock(h.subjects); unlock(h.fullSubjects); } });
+  if(!changed){ toast('이미 재응시가 허용된 상태입니다'); return; }
+  try{
+    if(FB_USE() && window._fb && window._fb.db){
+      await window._fb.db.collection('students').doc(String(s.id)).update({'challengerData.lastSubjects':cd.lastSubjects||[], 'challengerData.history':cd.history||[], '_t':Date.now()});
+    }
+    s.challengerData=cd;
+    ST.students=ST.students.map(function(x){ return String(x.id)===String(s.id)?Object.assign({},x,{challengerData:cd}):x; });
+    toast('✅ 재응시를 허용했습니다. 학생이 다시 제출할 수 있습니다.');
+    _entRender();
+  }catch(e){ console.warn('재응시 허용 실패',e); alert('재응시 허용 저장에 실패했습니다: '+(e.message||e)); }
+}
+
 let _examcatStatusFilter = 'active';
-const EXAMCAT_STATUS_LABELS = {active:'진행중', ended:'종료', archived:'보관', all:'전체'};
+const EXAMCAT_STATUS_LABELS = {active:'진행중', ended:'종료', archived:'보관', entrance:'입학TEST', all:'전체'};
 function _examcatSetStatusFilter(st){
   _examcatStatusFilter = st;
   _examcatRenderList();
@@ -39004,7 +39129,7 @@ function _examcatRenderList(){
   const scopedList = isAdminRole ? allList : allList.filter(function(e){ return !e.orgIds || !e.orgIds.length || (myOrgId && e.orgIds.indexOf(myOrgId)>=0); });
   // ★ 상태(status) 필터 탭 적용 — 필드가 없는 기존 시험은 'active'로 취급(하위호환).
   // 'all'(전체) 탭은 상태 구분 없이 scopedList 전체를 그대로 보여준다.
-  const list = _examcatStatusFilter==='all' ? scopedList : scopedList.filter(function(e){ return (e.status||'active')===_examcatStatusFilter; });
+  const list = _examcatStatusFilter==='all' ? scopedList : (_examcatStatusFilter==='entrance' ? scopedList.filter(function(e){ return e.examType==='entrance'; }) : scopedList.filter(function(e){ return e.examType!=='entrance' && (e.status||'active')===_examcatStatusFilter; }));
   // ★ 452 추가: 문서 용량 문제로 일부 필드가 Storage로 분리 저장된 시험(examcatSaveEntry
   // 참고)은 목록에 보이는 "문항수/과목" 계산에 그 필드가 필요하다 — 아직 못 불러왔으면
   // 백그라운드로 조용히 불러온 뒤 목록만 다시 그린다(중복 요청은 _examcatEnsurePayloadLoaded
@@ -39036,14 +39161,16 @@ function _examcatRenderList(){
   // 상태의 시험만 목록에 보이게 한다(기본 선택: 진행중). 탭 전체 전환은 기존 목록
   // 재렌더 함수(_examcatRenderList)를 그대로 재사용한다.
   const _statusCounts = {
-    active: scopedList.filter(function(e){ return (e.status||'active')==='active'; }).length,
-    ended: scopedList.filter(function(e){ return e.status==='ended'; }).length,
-    archived: scopedList.filter(function(e){ return e.status==='archived'; }).length
+    active: scopedList.filter(function(e){ return e.examType!=='entrance' && (e.status||'active')==='active'; }).length,
+    ended: scopedList.filter(function(e){ return e.examType!=='entrance' && e.status==='ended'; }).length,
+    archived: scopedList.filter(function(e){ return e.examType!=='entrance' && e.status==='archived'; }).length,
+    entrance: scopedList.filter(function(e){ return e.examType==='entrance'; }).length
   };
   const _statusTabDefs = [
     {key:'active', label:'진행중', count:_statusCounts.active},
     {key:'ended', label:'종료', count:_statusCounts.ended},
     {key:'archived', label:'보관', count:_statusCounts.archived},
+    {key:'entrance', label:'🎓 입학TEST', count:_statusCounts.entrance},
     {key:'all', label:'전체', count:scopedList.length}
   ];
   const statusTabsHtml = `<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">` + _statusTabDefs.map(function(t){
@@ -39078,8 +39205,13 @@ function _examcatRenderList(){
   // 요청 → 카탈로그 항목 자체(문항DB·정답·이미 채점된 학생 결과 조회용 메타)는 그대로 두고,
   // hiddenFromStudent 플래그만 켜서 학생용 파일의 "시험 선택" 드롭다운에서만 제외한다
   // (학생용 파일의 catalogList 필터에서 이 플래그를 확인 — 아래 참고).
+  function entBadge(e){
+    if(e.examType!=='entrance') return '';
+    var st=e.status||'active'; var lb=EXAMCAT_STATUS_LABELS[st]||st;
+    return '<span style="background:#fff7ed;color:#c2410c;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🎓 입학TEST · '+esc(lb)+'</span>';
+  }
   function hiddenBadge(e){
-    return e.hiddenFromStudent ? '<span style="background:#f1f5f9;color:#475569;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🙈 학생 비공개</span>' : '';
+    return _entHid(e) ? '<span style="background:#f1f5f9;color:#475569;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🙈 학생 비공개</span>' : '';
   }
   // ★ 상태 전환 버튼 — 현재 status에 따라 이동 가능한 다음 상태 2개만 보여준다.
   function statusMoveButtons(e){
@@ -39096,10 +39228,10 @@ function _examcatRenderList(){
     const subj=_examcatSubjLabel(e);
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
       <div style="flex:1">
-        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${esc(e.examName||'(이름 없음)')}${isAdminRole?orgBadge(e):''}${classBadge(e)}${hiddenBadge(e)}</div>
+        <div style="font-weight:800;font-size:13.5px;color:#0f172a;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${esc(e.examName||'(이름 없음)')}${entBadge(e)}${isAdminRole?orgBadge(e):''}${classBadge(e)}${hiddenBadge(e)}</div>
         <div style="font-size:11.5px;color:#64748b;margin-top:2px">기본 응시일 ${esc(e.defaultDate||'미지정')} · ${esc(subj)} · 문항 ${qc}개</div>
       </div>
-      <button onclick="_examcatToggleHidden('${e.id}')" title="학생용 '시험 선택' 목록에서만 숨깁니다. 이미 채점된 결과·상담리포트·통계는 전혀 영향받지 않습니다." style="background:${e.hiddenFromStudent?'#eef2ff':'#f8fafc'};color:${e.hiddenFromStudent?'#3730a3':'#475569'};border:1px solid ${e.hiddenFromStudent?'#c7d2fe':'#cbd5e1'};border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">${e.hiddenFromStudent?'👁 학생 노출':'🙈 학생 숨김'}</button>
+      <button onclick="_examcatToggleHidden('${e.id}')" title="학생용 '시험 선택' 목록에서만 숨깁니다. 이미 채점된 결과·상담리포트·통계는 전혀 영향받지 않습니다." style="background:${_entHid(e)?'#eef2ff':'#f8fafc'};color:${_entHid(e)?'#3730a3':'#475569'};border:1px solid ${_entHid(e)?'#c7d2fe':'#cbd5e1'};border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">${_entHid(e)?'👁 학생 노출':'🙈 학생 숨김'}</button>
       ${statusMoveButtons(e)}
       <button onclick="_examcatEdit('${e.id}')" style="background:#eef1ff;color:#3b5bdb;border:1px solid #c5cae9;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">✏ 수정</button>
       <button onclick="_examcatDelete('${e.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer">🗑 삭제</button>
@@ -39109,6 +39241,7 @@ function _examcatRenderList(){
 async function _examcatToggleHidden(id){
   const e=(ST.examCatalog||[]).find(x=>x.id===id);
   if(!e) return;
+  if(e.examType==='entrance'){ e.entHidden=!e.entHidden; e.hiddenFromStudent=true; await examcatSaveEntry(e); _examcatRenderList(); toast(e.entHidden ? '🙈 신규생 화면의 입학TEST 선택에서 숨겼습니다.' : '👁 다시 신규생의 입학TEST 선택에 표시됩니다.'); return; }
   e.hiddenFromStudent = !e.hiddenFromStudent;
   await examcatSaveEntry(e);
   _examcatRenderList();
@@ -39561,6 +39694,7 @@ function _examcatRenderForm(){
       <input id="examcat-name" placeholder="시험명/회차 (예: 1회 고2 챌린저 모의고사_영어)" value="${isEdit?esc(e.examName||''):''}" style="flex:1;min-width:260px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px">
       <input id="examcat-date" placeholder="기본 응시일 (예: 2026-08-26)" value="${isEdit?esc(e.defaultDate||''):''}" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;width:190px">
     </div>
+    ${_entTypeBlockHtml(e)}
     ${_examcatAiZoneHtml()}
     ${_examcatSimplePanelHtml()}
     <div style="margin-bottom:10px">
@@ -39580,7 +39714,7 @@ ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?
     </div>
     ${isEdit?_examcatPdfSectionHtml():'<p style="font-size:11.5px;color:#94a3b8;margin:0 0 12px">💡 PDF에서 문항 이미지를 잘라 붙이는 기능은, 이 시험을 먼저 등록하신 뒤 "✏ 수정"으로 다시 열면 나타납니다.</p>'}
     ${_examcatOrgPickerHtml(e)}
-    ${_examcatClassPickerHtml(e)}
+    <div id="examcat-class-wrap" style="${(e&&e.examType==='entrance')?'display:none':''}">${_examcatClassPickerHtml(e)}</div>
     <div style="display:flex;gap:8px">
       <button onclick="_examcatSubmit()" style="background:#0369a1;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">${isEdit?'💾 수정 저장':'➕ 등록'}</button>
       ${isEdit?'<button onclick="EXAMCAT_editing=null;_examcatRenderForm()" style="background:#f1f5f9;color:#555;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer">취소</button>':''}
@@ -40396,6 +40530,15 @@ async function _examcatSubmit(){
   });
   entry.classNamesByOrg = classNamesByOrg;
   entry.classNames = classCheckedEls.map(function(el){ return el.value; });
+  // ★ 488: 시험 유형(일반/입학TEST). 입학TEST는 구버전 학생용 페이지에 노출되지 않도록 hiddenFromStudent=true를 함께 저장하고,
+  // 신규생 화면 노출 여부는 entHidden/status로 따로 관리한다. 반 제한은 쓰지 않는다.
+  const _entTypeEl=document.querySelector('input[name="examcat-type"]:checked');
+  if(_entTypeEl && _entTypeEl.value==='entrance'){
+    entry.examType='entrance'; entry.hiddenFromStudent=true; entry.classNamesByOrg={}; entry.classNames=[];
+  } else {
+    if(entry.examType==='entrance'){ entry.hiddenFromStudent=false; delete entry.entHidden; }
+    delete entry.examType;
+  }
   // ★ 2026-08-29 추가: 예전엔 수정 화면을 다시 열 때마다 저장된 itemMeta/answerKey 객체를
   // 텍스트로 "재조립"해서 보여줬는데, 이 재조립 결과가 처음 붙여넣은 원문과 100% 똑같다는
   // 보장이 없어서(특히 여러 줄짜리 해설/단원 내용이 있을 때), 다시 열어보면 이상하게 섞이거나
@@ -40436,7 +40579,7 @@ function openChallengerBulkReflect(){
     const _selEl2=document.getElementById('cbr-examcat-select');
     if(_selEl2){
       // 진행중인 시험만 불러오기 대상으로 노출(종료/보관 시험은 제외 — 상태 없는 기존 시험은 진행중으로 취급)
-      const list2=_examcatScopedForCurrentOrg().filter(e=>(e.status||'active')==='active');
+      const list2=_examcatScopedForCurrentOrg().filter(e=>(e.status||'active')==='active' && e.examType!=='entrance');
       _selEl2.innerHTML='<option value="">직접 입력 (카탈로그 사용 안 함)</option>'
         + list2.map(e=>`<option value="${e.id}">${esc(e.examName||'(이름 없음)')} (기본 ${esc(e.defaultDate||'날짜 미지정')})</option>`).join('');
     }
