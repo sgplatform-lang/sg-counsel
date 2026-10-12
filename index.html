@@ -38874,7 +38874,7 @@ async function examcatSaveEntry(entry){
         // 잘못 표시해 저장하지 않는다 — 여기서 완전히 중단해 학생용 페이지에 깨진 상태가
         // 전달되는 일 자체를 막는다(관리자가 원인을 확인하고 다시 저장을 시도해야 함).
         alert('⚠️ 대용량 시험 데이터(문항/정답) 저장에 실패했습니다.\n\n오류 내용: '+e.message+'\n\n인터넷 연결을 확인한 뒤 다시 "저장" 버튼을 눌러 재시도해주세요.\n\n(재시도해도 계속 실패하면 문의해주세요 — 이번 시도로는 기존 데이터가 바뀌지 않았습니다)');
-        return;
+        return false;
       }
       toSave=Object.assign({}, entry);
       EXAMCAT_OFFLOAD_FIELDS.forEach(function(f){ delete toSave[f]; });
@@ -40551,11 +40551,23 @@ async function _examcatSubmit(){
   // 아예 없으니 이런 불일치가 생길 수가 없다.
   entry.itemMetaRawText = itemMetaText;
   entry.answerKeyRawText = answerKeyText;
-  await examcatSaveEntry(entry);
+  const _wasEdit=!!EXAMCAT_editing;
+  const _sbtn=document.querySelector('#examcat-form button[onclick="_examcatSubmit()"]');
+  if(_sbtn){ if(_sbtn.dataset.busy==='1') return; _sbtn.dataset.busy='1'; _sbtn._t0=_sbtn.textContent; _sbtn.textContent='⏳ 저장 중...'; _sbtn.style.opacity='.6'; }
+  let _saved;
+  try{ _saved = await examcatSaveEntry(entry); }
+  catch(e){ console.error('[examcat] 저장 오류', e); alert('⚠️ 시험 저장 중 오류가 발생했습니다.\n\n'+(e&&e.message||e)); _saved=false; }
+  if(_saved===false){
+    if(_sbtn){ _sbtn.dataset.busy=''; _sbtn.textContent=_sbtn._t0||'➕ 등록'; _sbtn.style.opacity=''; }
+    return;
+  }
   EXAMCAT_editing=null;
   _examcatRenderForm();
+  EXAMCAT_listOpen=true;
+  _examcatStatusFilter = entry.examType==='entrance' ? 'entrance' : ((entry.status||'active')==='active' ? 'active' : (entry.status||'active'));
   _examcatRenderList();
-  toast(entry.createdAt===entry.updatedAt||!EXAMCAT_editing ? '✅ 시험을 등록했습니다.' : '✅ 수정했습니다.');
+  try{ var _le=document.getElementById('examcat-list'); if(_le && _le.scrollIntoView) _le.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){}
+  toast(_wasEdit ? '✅ 수정했습니다.' : (entry.examType==='entrance' ? '✅ 입학TEST를 등록했습니다. (입학TEST 탭에서 확인)' : '✅ 시험을 등록했습니다.'), 3500);
 }
 
 // ★ 2026-08-26 추가: 결과 일괄반영 모달을 열 때마다 지난 입력을 지우고 빈 화면으로
