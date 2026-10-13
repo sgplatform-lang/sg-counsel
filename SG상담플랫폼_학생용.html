@@ -3083,12 +3083,12 @@ function renderChallengerAnswerInput(){
         ${!entList.length?`<p style="font-size:11px;color:#9a3412;margin:8px 0 0">현재 응시할 수 있는 입학TEST가 없습니다. 선생님께 문의해주세요. <button onclick="window._chgAnsEntRetried=false;_chgAnsCatalog=null;render();" style="margin-left:6px;padding:4px 10px;border:1px solid #fdba74;background:#fff;color:#9a3412;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🔄 새로고침</button></p>`:''}
         <p style="font-size:10.5px;color:#9a3412;margin:6px 0 0">※ 입학TEST는 1회만 제출할 수 있습니다. 재응시가 필요하면 선생님께 요청해주세요.</p>
       </div>`:''}
-      <label style="font-size:11px;color:#666">시험 선택</label>
+      ${_isEntStu?'':`<label style="font-size:11px;color:#666">시험 선택</label>
       <select onchange="chgAnsSelectCatalog(this.value)" style="width:100%;padding:9px 8px;border:1px solid #ddd;border-radius:8px;font-size:13.5px;margin-top:4px">
         <option value="">-- 시험을 선택해주세요 --</option>
         ${catalogList.map(e=>`<option value="${esc(e.id)}" ${st.catId===e.id?'selected':''}>${esc(e.examName||'(이름 없음)')}</option>`).join('')}
       </select>
-      ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}
+      ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}`}
       ${st.catId?`<div style="margin-top:10px">
         ${(examEntry&&examEntry.examType==='entrance')?`<div style="padding:10px 12px;background:#fff7ed;border:2px solid #fb923c;border-radius:10px">
           <label style="font-size:13px;color:#9a3412;font-weight:900">📅 응시일을 확인해주세요 (시험을 보는 오늘 날짜)</label>
