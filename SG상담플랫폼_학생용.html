@@ -2812,6 +2812,7 @@ function chgAnsSelectCatalog(catId){
   const entry=(_chgAnsCatalog||[]).find(e=>e.id===catId);
   st.catId=catId;
   st.date=entry?(entry.defaultDate||''):'';
+  if(entry && entry.examType==='entrance') st.date=_chgAnsTodayStr(); // ★ 24: 입학TEST는 응시일 기본값을 시험 등록일이 아닌 '오늘'로 — 학생이 실제 응시일을 확인·수정하도록 강조 표시
   st.test=entry?(entry.examName||''):'';
   // ★ 380 추가: 시험을 바꾸면 이전 시험 기준으로 골라뒀던 과목·세부과목·답안은 더 이상
   // 유효하지 않으므로(과목 구성이 다를 수 있음) 초기화한다.
@@ -3027,6 +3028,7 @@ function renderChallengerAnswerInput(){
   const entList=_isEntStu ? (_chgAnsCatalog||[]).filter(function(e){
     if(e.examType!=='entrance' || e.entHidden) return false;
     if((e.status||'active')!=='active') return false;
+    if(e.entGrades && e.entGrades.length && e.entGrades.indexOf(String(CU.grade||'').trim())<0) return false; // ★ 24: 대상 학년
     return !e.orgIds || !e.orgIds.length || (CU.orgId && e.orgIds.indexOf(CU.orgId)>=0);
   }).sort((a,b)=>String(b.defaultDate||'').localeCompare(String(a.defaultDate||''))) : [];
   // ★ 23: 신규생인데 입학TEST 목록이 비어 있으면, 캐시가 오래됐을 수 있으니 서버에서 한 번 다시 불러온다(탭 진입당 1회).
@@ -3088,9 +3090,13 @@ function renderChallengerAnswerInput(){
       </select>
       ${!catalogList.length?`<p style="font-size:11px;color:#e53935;margin-top:8px">⚠️ 등록된 시험이 아직 없습니다. 선생님께 문의해주세요.</p>`:''}
       ${st.catId?`<div style="margin-top:10px">
-        <label style="font-size:11px;color:#666">응시일</label>
+        ${(examEntry&&examEntry.examType==='entrance')?`<div style="padding:10px 12px;background:#fff7ed;border:2px solid #fb923c;border-radius:10px">
+          <label style="font-size:13px;color:#9a3412;font-weight:900">📅 응시일을 확인해주세요 (시험을 보는 오늘 날짜)</label>
+          <input type="date" value="${esc(st.date)}" oninput="chgAnsSetDate(this.value)" style="width:100%;padding:10px 8px;border:2px solid #fb923c;border-radius:8px;font-size:14px;font-weight:700;margin-top:6px;background:#fff">
+          <p style="font-size:11.5px;color:#c2410c;font-weight:700;margin:6px 0 0">※ 시험을 실제로 응시하는 날짜가 맞는지 꼭 확인하고, 다르면 직접 수정해주세요.</p>
+        </div>`:`<label style="font-size:11px;color:#666">응시일</label>
         <input type="date" value="${esc(st.date)}" oninput="chgAnsSetDate(this.value)" style="width:100%;padding:9px 8px;border:1px solid #ddd;border-radius:8px;font-size:13.5px;margin-top:4px">
-        <p style="font-size:10.5px;color:#e67e22;margin:6px 0 0">※ 시험 응시일이 다르면 응시일을 직접 입력바랍니다.</p>
+        <p style="font-size:10.5px;color:#e67e22;margin:6px 0 0">※ 시험 응시일이 다르면 응시일을 직접 입력바랍니다.</p>`}
       </div>`:''}
       ${st.date&&st.test?`<div style="margin-top:10px;padding:9px 12px;background:${isFutureExam?'#fff7ed':'#f0fdfa'};border-radius:8px;font-size:12.5px;color:${isFutureExam?'#9a3412':'#0f766e'}"><b>${esc(st.date)}</b> · ${esc(st.test)}</div>`:''}
       ${isFutureExam?`<div style="margin-top:12px;padding:12px 14px;background:#fff7ed;border:1.5px solid #fb923c;border-radius:8px">
