@@ -38935,6 +38935,7 @@ function _entTypeChange(){
   var v=(document.querySelector('input[name="examcat-type"]:checked')||{}).value;
   var w=document.getElementById('examcat-class-wrap'); if(w) w.style.display = (v==='entrance') ? 'none' : '';
   var n=document.getElementById('examcat-type-note'); if(n) n.style.display = (v==='entrance') ? '' : 'none';
+  var g=document.getElementById('examcat-ent-grades-wrap'); if(g) g.style.display = (v==='entrance') ? '' : 'none';
 }
 function _entTypeBlockHtml(e){
   var isEnt = !!(e && e.examType==='entrance');
@@ -38946,6 +38947,10 @@ function _entTypeBlockHtml(e){
     +'<label style="'+lb+'"><input type="radio" style="'+rd+'" name="examcat-type" value="normal" '+(isEnt?'':'checked')+' onchange="_entTypeChange()">일반 시험</label>'
     +'<label style="'+lb+'"><input type="radio" style="'+rd+'" name="examcat-type" value="entrance" '+(isEnt?'checked':'')+' onchange="_entTypeChange()">입학TEST (신규생 전용)</label>'
     +'</div>'
+    +'<div id="examcat-ent-grades-wrap" style="display:'+(isEnt?'':'none')+';margin-top:6px;padding-top:6px;border-top:1px dashed #fdba74">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;font-weight:800;color:#9a3412;white-space:nowrap">👤 대상 학년</span>'
+    +['초4','초5','초6','중1','중2','중3','고1','고2','고3'].map(function(g){ var on=!!(e&&e.entGrades&&e.entGrades.indexOf(g)>=0); return '<label style="'+lb+';font-weight:700"><input type="checkbox" class="examcat-ent-grade" style="'+rd+'" value="'+g+'" '+(on?'checked':'')+'>'+g+'</label>'; }).join('')
+    +'</div><div style="font-size:11px;color:#9a3412;margin-top:3px">체크한 학년의 신규생에게만 이 입학TEST가 보입니다. <b>아무것도 체크하지 않으면 전체 학년</b>에 보입니다.</div></div>'
     +'<div id="examcat-type-note" style="display:'+(isEnt?'':'none')+';font-size:11px;color:#9a3412;margin-top:5px;line-height:1.6">입학TEST는 <b>신규생(학생 등록 시 "신규생" 체크 + 반명 없음)</b>에게만 학생용 "🎓 입학TEST 선택"으로 보입니다. 재원생에게는 보이지 않으며, 반 지정은 필요 없습니다.</div>'
     +'</div>';
 }
@@ -39212,7 +39217,7 @@ function _examcatRenderList(){
   function entBadge(e){
     if(e.examType!=='entrance') return '';
     var st=e.status||'active'; var lb=EXAMCAT_STATUS_LABELS[st]||st;
-    return '<span style="background:#fff7ed;color:#c2410c;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🎓 입학TEST · '+esc(lb)+'</span>';
+    return '<span style="background:#fff7ed;color:#c2410c;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🎓 입학TEST · '+esc(lb)+'</span>'+(e.entGrades&&e.entGrades.length ? '<span style="background:#eef2ff;color:#4338ca;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">👤 '+esc(e.entGrades.join(', '))+'</span>' : '<span style="background:#f0fdf4;color:#16a34a;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">👤 전체 학년</span>');
   }
   function hiddenBadge(e){
     return _entHid(e) ? '<span style="background:#f1f5f9;color:#475569;border-radius:10px;padding:2px 8px;font-size:10.5px;font-weight:700">🙈 학생 비공개</span>' : '';
@@ -40539,9 +40544,10 @@ async function _examcatSubmit(){
   const _entTypeEl=document.querySelector('input[name="examcat-type"]:checked');
   if(_entTypeEl && _entTypeEl.value==='entrance'){
     entry.examType='entrance'; entry.hiddenFromStudent=true; entry.classNamesByOrg={}; entry.classNames=[];
+    entry.entGrades=Array.from(document.querySelectorAll('.examcat-ent-grade:checked')).map(function(el){ return el.value; });
   } else {
     if(entry.examType==='entrance'){ entry.hiddenFromStudent=false; delete entry.entHidden; }
-    delete entry.examType;
+    delete entry.examType; delete entry.entGrades;
   }
   // ★ 2026-08-29 추가: 예전엔 수정 화면을 다시 열 때마다 저장된 itemMeta/answerKey 객체를
   // 텍스트로 "재조립"해서 보여줬는데, 이 재조립 결과가 처음 붙여넣은 원문과 100% 똑같다는
