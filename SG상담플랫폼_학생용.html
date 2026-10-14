@@ -3272,6 +3272,11 @@ function _chgAnsResolvedCount(code, detail, examMeta, fallbackCount){
   return union.size>0 ? union.size : fallbackCount;
 }
 function _chgAnsResolvedType(code, no, resolvedCount){
+  try{
+    const _ent=_chgAnsCurrentExamEntry();
+    const _sq=_ent && _ent.shortQNos && _ent.shortQNos[code];
+    if(_sq && _sq.length) return (_sq.indexOf(+no)>=0) ? 'short' : 'mc5';
+  }catch(e){}
   // 표준 수능 구성(수학 30문항)일 때만 16~22·29~30번을 단답형으로 처리한다.
   // 그 외 문항 수로 등록된 경우(예: 저학년용 20문항)는 전부 객관식으로 취급한다.
   if(code==='MATH' && resolvedCount===30){
