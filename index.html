@@ -486,7 +486,7 @@ try{
     // httpsCallable 호출엔 그 제한이 안 걸려있어 SDK 기본 타임아웃(약 70초)에 먼저 걸려버린
     // 것이 원인 — 문항수 많은 PDF는 분석에 70초 이상 걸릴 수 있어 실사용에서 충분히 재현됨.
     // 클라이언트 타임아웃을 서버와 동일하게 5분으로 맞춰서 해결.
-    analyzeExamPdf: (payload)=>firebase.functions().httpsCallable('analyzeExamPdf', {timeout: 300000})(payload).then(r=>r.data),
+    analyzeExamPdf: (payload)=>firebase.functions().httpsCallable('analyzeExamPdf', {timeout: 540000})(payload).then(r=>r.data),
     // ★ 2026-09-15 추가: 문제지 PDF에서 문항별 위치(페이지+사각형 좌표%)를 AI가 추정해
     // 알려주는 서버 함수. 위 analyzeExamPdf와 같은 5분 타임아웃(문항 많은 PDF 대비).
     analyzeExamPdfRegions: (payload)=>firebase.functions().httpsCallable('analyzeExamPdfRegions', {timeout: 300000})(payload).then(r=>r.data),
@@ -39416,14 +39416,17 @@ function _examcatSimpleApply(){
 // 로그인 없이도 누구나 가져갈 수 있어, 반드시 서버 함수를 거치도록 설계함 — 서버 함수
 // 배포가 먼저 돼 있어야 동작하며, 배포 전에는 아래에서 "서버 함수가 아직 배포되지
 // 않았거나…" 오류로 안내됨).
-let EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'' };
+let EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'', answerPaste:'' };
+// ★ 493: 서버가 돌려준 정답 교차검증 결과(문항번호→{level:'high'|'low', reason}) + 안내 문구
+let EXAMCAT_aiFlags = null;
+let EXAMCAT_aiInfo = null;
 // ★ 2026-09-14(416) 추가: AI가 가끔 정답/해설을 잘못 뽑아내는 경우가 있어(사용자 신고), 결과를
 // "문항별 단원/유형" 칸에 바로 밀어넣지 않고 표 형태로 미리보기+칸별 수정을 거치게 한다.
 // null이면 미리보기 패널 자체가 안 뜸(분석 전 상태이거나, 반영/취소로 닫힌 상태).
 let EXAMCAT_aiPreviewRows = null;
 function _examcatAiReset(){
-  EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'' };
-  EXAMCAT_aiPreviewRows = null;
+  EXAMCAT_aiState = { subj:'KOR', elective:'', qFile:null, aFile:null, busy:false, statusMsg:'', answerPaste:'' };
+  EXAMCAT_aiPreviewRows = null; EXAMCAT_aiFlags = null; EXAMCAT_aiInfo = null;
 }
 function _examcatAiReadFileAsBase64(file){
   return new Promise(function(resolve,reject){
@@ -39467,6 +39470,11 @@ function _examcatAiPanelHtml(){
       <label style="display:inline-block;background:#fff;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155"><span id="examcat-ai-qfile-label">${st.qFile?('📄 '+esc(st.qFile.name)):'📁 문제지 PDF 선택(필수)'}</span><input type="file" accept="application/pdf" style="display:none" onchange="_examcatAiSetQFile(this)"></label>
       <label style="display:inline-block;background:#fff;border:1px dashed #94a3b8;border-radius:8px;padding:6px 12px;font-size:11.5px;cursor:pointer;color:#334155"><span id="examcat-ai-afile-label">${st.aFile?('📄 '+esc(st.aFile.name)):'📁 정답지 PDF 선택(선택, 문제지에 정답이 함께 있으면 생략 가능)'}</span><input type="file" accept="application/pdf" style="display:none" onchange="_examcatAiSetAFile(this)"></label>
     </div>
+    <div style="margin-bottom:8px;background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px">
+      <div style="font-size:11.5px;font-weight:700;color:#5b21b6;margin-bottom:3px">✍️ 정답 직접 붙여넣기 <span style="font-weight:400;color:#7c3aed">(선택 · 넣으면 AI 판독보다 이 정답이 우선 적용됩니다)</span></div>
+      <textarea id="examcat-ai-paste" oninput="EXAMCAT_aiState.answerPaste=this.value" placeholder="예) 3 1 4 2 5 …(1번부터 순서대로)  또는  1:3, 2:1, 22:12 처럼 번호:정답" style="width:100%;box-sizing:border-box;min-height:44px;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">${esc(st.answerPaste||'')}</textarea>
+      <div style="font-size:10.5px;color:#7c3aed;margin-top:2px">①②③④⑤는 1~5로 자동 변환됩니다. 번호 없이 정답만 나열하면 1번부터 순서대로 넣습니다. 정답지 PDF를 올렸다면 비워두셔도 됩니다(AI가 정답지를 2번 따로 읽어 서로 다른 문항을 빨갛게 표시).</div>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button type="button" onclick="_examcatAiAnalyze()" ${st.busy?'disabled':''} style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;opacity:${st.busy?'0.6':'1'}">${st.busy?'⏳ 분석 중...':'🧠 AI로 분석해서 채우기'}</button>
       <span id="examcat-ai-status" style="font-size:11.5px;color:#7c3aed">${esc(st.statusMsg||'')}</span>
@@ -39489,6 +39497,7 @@ async function _examcatAiAnalyze(){
     const result = await window._fb.analyzeExamPdf({
       subjCode: st.subj, subjName: subjNameMap[st.subj]||st.subj, elective: st.elective||'',
       questionPdfBase64: questionPdfBase64, answerPdfBase64: answerPdfBase64,
+      answerOverrideText: String(st.answerPaste||'').trim(),
     });
     // ★ 2026-09-14(416) 변경: 예전엔 여기서 바로 examcat-itemmeta 칸에 텍스트를 채웠는데,
     // "AI가 가끔 정답을 잘못 뽑는데 텍스트칸만 보면 확인·수정이 어렵다"는 신고를 받아,
@@ -39503,6 +39512,8 @@ async function _examcatAiAnalyze(){
       return;
     }
     EXAMCAT_aiPreviewRows=rows;
+    EXAMCAT_aiFlags = (result && result.answerFlags && typeof result.answerFlags==='object') ? result.answerFlags : {};
+    EXAMCAT_aiInfo = { source:(result&&result.answerSource)||'none', fixedCount:(result&&result.answerFixedCount)||0, note:(result&&result.answerNote)||'' };
     st.busy=false;
     st.statusMsg = result.truncated ? '⚠️ 응답이 길어 일부만 반영됐을 수 있습니다 — 아래 미리보기에서 문항 수와 내용을 꼭 확인해주세요.' : '✅ 분석 완료! 아래 미리보기에서 내용을 확인·수정한 뒤 "문항별 단원/유형 칸에 반영" 버튼을 눌러주세요.';
     _examcatAiRerender();
@@ -39560,18 +39571,55 @@ function _examcatAiPreviewSyncFromDom(){
 const _EXAMCAT_DIFF_OPTIONS=['','최상','상','중상','중','하'];
 function _examcatAiPreviewRowsHtml(){
   return (EXAMCAT_aiPreviewRows||[]).map(function(r,i){
-    return `<tr data-ai-row>
+    const _fl=_examcatAiFlagFor(r);
+    return `<tr data-ai-row style="${_fl?('background:'+(_fl.level==='high'?'#fee2e2':'#ffedd5')):''}">
       <td style="padding:3px"><input data-f="no" value="${esc(r.no)}" style="width:36px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
       <td style="padding:3px"><input data-f="big" value="${esc(r.big)}" style="width:84px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
       <td style="padding:3px"><input data-f="detail" value="${esc(r.detail)}" style="width:110px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
       <td style="padding:3px"><input data-f="type" value="${esc(r.type)}" style="width:110px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
       <td style="padding:3px"><input data-f="points" value="${esc(r.points)}" style="width:38px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px"></td>
-      <td style="padding:3px"><input data-f="answer" value="${esc(r.answer)}" style="width:56px;border:1.5px solid #f59e0b;border-radius:4px;padding:4px;font-size:11.5px;font-weight:700;background:#fffbeb"></td>
+      <td style="padding:3px"><input data-f="answer" value="${esc(r.answer)}" oninput="_examcatAiFlagClear(this)" style="width:56px;border:1.5px solid ${_fl?(_fl.level==='high'?'#dc2626':'#f97316'):'#f59e0b'};border-radius:4px;padding:4px;font-size:11.5px;font-weight:700;background:#fffbeb">${_fl?`<div data-flag-note style="font-size:9.5px;line-height:1.3;color:${_fl.level==='high'?'#b91c1c':'#c2410c'};width:104px;margin-top:2px">${_fl.level==='high'?'⚠️ ':'ℹ️ '}${esc(_fl.reason)}</div>`:''}</td>
       <td style="padding:3px"><textarea data-f="explain" style="width:240px;min-height:34px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11px;font-family:inherit">${esc(r.explain)}</textarea></td>
       <td style="padding:3px"><select data-f="diff" style="width:60px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;font-size:11.5px">${_EXAMCAT_DIFF_OPTIONS.map(function(o){ return '<option value="'+o+'" '+(r.diff===o?'selected':'')+'>'+(o||'-')+'</option>'; }).join('')}</select></td>
       <td style="padding:3px;text-align:center"><button type="button" onclick="_examcatAiPreviewRemoveRow(${i})" title="이 문항 삭제" style="border:none;background:#fee2e2;color:#dc2626;border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:11px">✕</button></td>
     </tr>`;
   }).join('');
+}
+function _examcatAiFlagFor(r){
+  if(!EXAMCAT_aiFlags) return null;
+  const k=String(parseInt(String(r.no||'').trim(),10));
+  return EXAMCAT_aiFlags[k]||null;
+}
+// 정답 칸을 직접 고치면 그 문항의 경고 표시는 해제(관리자가 확인한 것으로 간주)
+function _examcatAiFlagClear(inp){
+  try{
+    const tr=inp.closest('[data-ai-row]'); if(!tr) return;
+    const noEl=tr.querySelector('[data-f="no"]');
+    const k=String(parseInt(String((noEl&&noEl.value)||'').trim(),10));
+    if(EXAMCAT_aiFlags && EXAMCAT_aiFlags[k]){ delete EXAMCAT_aiFlags[k]; }
+    tr.style.background=''; inp.style.borderColor='#f59e0b';
+    const n=tr.querySelector('[data-flag-note]'); if(n) n.remove();
+    const b=document.getElementById('examcat-ai-flag-count'); if(b) b.textContent=_examcatAiFlagCountText();
+  }catch(e){}
+}
+function _examcatAiFlagCountText(){
+  const f=EXAMCAT_aiFlags||{}; let h=0,l=0;
+  Object.keys(f).forEach(function(k){ if(f[k].level==='high') h++; else l++; });
+  return (h||l)?('확인 필요 '+h+'문항(빨강)'+(l?(' · 참고 '+l+'문항(주황)'):'')):'표시된 문항 없음';
+}
+function _examcatAiBannerHtml(){
+  const info=EXAMCAT_aiInfo||{source:'none',fixedCount:0,note:''};
+  const f=EXAMCAT_aiFlags||{};
+  const missing=Object.keys(f).filter(function(k){return k.indexOf('_missing_')===0;}).map(function(k){return f[k].reason;});
+  const srcTxt = info.source==='paste' ? ('✍️ 정답 출처: 직접 붙여넣기('+info.fixedCount+'문항) — AI 판독 없이 이 정답을 그대로 적용했습니다.')
+    : info.source==='pdf' ? ('📄 정답 출처: 정답지 PDF를 AI가 2번 따로 읽어 대조('+info.fixedCount+'문항) — 정답 칸은 이 값으로 고정했습니다.')
+    : '⚠️ 정답지/붙여넣기 정답이 없어 정답을 AI가 추정했습니다. 정답 칸을 원본과 꼭 대조하세요.';
+  return `<div style="margin:0 0 8px;padding:8px 10px;background:#fff;border:1px solid #fcd34d;border-radius:8px;font-size:11.5px;line-height:1.6;color:#78350f">
+    <div>${srcTxt}</div>
+    <div><b id="examcat-ai-flag-count" style="color:#b91c1c">${_examcatAiFlagCountText()}</b> — 빨강: 정답지 판독이 서로 다르거나 정답을 못 찾은 문항(반드시 확인), 주황: 해설을 쓴 AI가 정답지와 다른 답을 낸 문항(참고). 정답 칸을 고치면 표시가 사라집니다.</div>
+    ${info.note?`<div style="color:#b45309">${esc(info.note)}</div>`:''}
+    ${missing.length?`<div style="color:#b91c1c">${missing.map(esc).join('<br>')}</div>`:''}
+  </div>`;
 }
 function _examcatAiPreviewRemoveRow(i){
   _examcatAiPreviewSyncFromDom();
@@ -39590,6 +39638,7 @@ function _examcatAiPreviewPanelHtml(){
       </div>
     </div>
     <p style="font-size:11px;color:#92400e;margin:0 0 8px">화면 표에서 칸을 직접 고쳐도 되고, "엑셀로 다운로드" → 엑셀에서 편하게 수정 → "수정한 엑셀 업로드"로 다시 불러와도 됩니다(다운로드 받은 파일의 칸 구성을 그대로 유지해주세요: 문항/대영역/세부단원/유형/배점/정답/해설/예상난이도). 예상난이도는 AI가 채우지 않으니 필요하면 직접 선택해주세요(비워둬도 됩니다).</p>
+    ${_examcatAiBannerHtml()}
     <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11.5px;width:100%">
       <thead><tr style="background:#fef3c7;text-align:left">
         <th style="padding:3px">문항</th><th style="padding:3px">대영역</th><th style="padding:3px">세부단원</th><th style="padding:3px">유형</th><th style="padding:3px">배점</th><th style="padding:3px">정답</th><th style="padding:3px">해설</th><th style="padding:3px">예상난이도</th><th></th>
