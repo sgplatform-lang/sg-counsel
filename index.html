@@ -39766,6 +39766,11 @@ ENG		1	듣기 · 목적 파악	하	③		2">${isEdit?esc(e.itemMetaRawText!=null?
         <div id="examcat-detail-preview" style="margin-top:6px;font-size:11.5px;color:#475569"></div>
       </div>
     </div>
+    <div style="margin-bottom:12px;padding:10px 12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px">
+      <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">🔢 단답형 문항 번호 (선택 — 수학처럼 단답형 위치가 일반 모의고사와 다를 때만)</div>
+      <input id="examcat-shortq" value="${isEdit?esc(_examcatShortQToText(e.shortQNos)):''}" placeholder="예) 22-30   또는   수학: 22-30, 영어: 40-42" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff">
+      <p style="font-size:11px;color:#0f766e;margin:5px 0 0">비워두면 기존 방식 그대로입니다(수학 30문항이면 16~22·29~30번이 단답형). 여기에 번호를 적으면 <b>그 번호만 단답형(직접 입력)</b>, 나머지는 객관식(1~5 선택)으로 학생 답안 입력창이 만들어지고 채점도 그에 맞춰집니다. 과목 표시 없이 번호만 쓰면 수학으로 봅니다. 과목명은 수학·국어·영어·한국사·탐구 중에서 쓰세요.</p>
+    </div>
     <div style="margin-bottom:12px">
       <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-bottom:4px">✅ 문항별 정답/해설/문제 (선택 — 위 칸에 정답/해설 없을 때만 여기 따로)</div>
       <textarea id="examcat-answerkey" style="width:100%;min-height:90px;font-family:Consolas,monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px" placeholder="과목코드	세부과목(공통이면 비움)	문항번호	정답(선택)	해설(선택)	문제(선택, 줄바꿈은 ⏎ 로 표시)">${isEdit?esc(e.answerKeyRawText!=null?e.answerKeyRawText:_sgAnswerKeyMapToText(e.answerKey)):''}</textarea>
@@ -40544,6 +40549,38 @@ function _examcatPreviewDetailKeys(){
     '<div style="margin-top:6px;color:#dc2626;font-size:11px">※ 여기 "..." 안에 나온 표기가 학생 화면의 세부과목 선택지(예: "화법과 작문", "언어와 매체", "확률과 통계", "윤리와 사상", "생활과 윤리", "정치와 법")와 띄어쓰기까지 정확히 같아야 정상 채점됩니다. 다르게 보이면 해당 줄의 세부과목 칸을 학생 화면과 똑같이 고쳐서 다시 저장해주세요.</div>'+
     '</div>';
 }
+const _EXAMCAT_SQ_NAME2CODE={'수학':'MATH','국어':'KOR','영어':'ENG','한국사':'HIST','탐구':'INQ','MATH':'MATH','KOR':'KOR','ENG':'ENG','HIST':'HIST','INQ':'INQ'};
+const _EXAMCAT_SQ_CODE2NAME={MATH:'수학',KOR:'국어',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+function _examcatParseShortQ(text){
+  // "22-30" / "수학: 22-30, 영어: 40-42" / "MATH 22~30, 25" → {MATH:[22..30,25]}
+  const out={}; const src=String(text||'').trim(); if(!src) return out;
+  src.replace(/[,，]\s*(?=(?:수학|국어|영어|한국사|탐구|MATH|KOR|ENG|HIST|INQ))/gi,';').split(/[;\n]+/).forEach(function(seg){
+    seg=seg.trim(); if(!seg) return;
+    let code='MATH', body=seg;
+    const m=seg.match(/^(수학|국어|영어|한국사|탐구|MATH|KOR|ENG|HIST|INQ)\s*[:：]?\s*(.*)$/i);
+    if(m){ code=_EXAMCAT_SQ_NAME2CODE[m[1].toUpperCase()]||_EXAMCAT_SQ_NAME2CODE[m[1]]||'MATH'; body=m[2]; }
+    const nums=out[code]||[];
+    body.split(/[,，\s]+/).forEach(function(tok){
+      tok=tok.trim(); if(!tok) return;
+      const r=tok.match(/^(\d{1,3})\s*[-~–]\s*(\d{1,3})$/);
+      if(r){ let x=+r[1], y=+r[2]; if(x>y){ const t=x;x=y;y=t; } for(let n=x;n<=y&&n<=200;n++){ if(nums.indexOf(n)<0) nums.push(n); } }
+      else if(/^\d{1,3}$/.test(tok)){ const n=+tok; if(nums.indexOf(n)<0) nums.push(n); }
+    });
+    if(nums.length){ nums.sort(function(p,q){return p-q;}); out[code]=nums; }
+  });
+  return out;
+}
+function _examcatShortQToText(sq){
+  if(!sq) return '';
+  const codes=Object.keys(sq).filter(function(c){ return sq[c]&&sq[c].length; });
+  const fmt=function(arr){
+    const parts=[]; let i=0;
+    while(i<arr.length){ let j=i; while(j+1<arr.length && arr[j+1]===arr[j]+1) j++; parts.push(j>i?(arr[i]+'-'+arr[j]):String(arr[i])); i=j+1; }
+    return parts.join(', ');
+  };
+  if(codes.length===1 && codes[0]==='MATH') return fmt(sq.MATH);
+  return codes.map(function(c){ return (_EXAMCAT_SQ_CODE2NAME[c]||c)+': '+fmt(sq[c]); }).join('; ');
+}
 async function _examcatSubmit(){
   const name=(document.getElementById('examcat-name')||{}).value?.trim();
   const date=cbrNormalizeDate((document.getElementById('examcat-date')||{}).value?.trim()||'');
@@ -40606,6 +40643,11 @@ async function _examcatSubmit(){
   // 아예 없으니 이런 불일치가 생길 수가 없다.
   entry.itemMetaRawText = itemMetaText;
   entry.answerKeyRawText = answerKeyText;
+  // ★ 494: 단답형 문항 번호 지정(비우면 삭제 → 기존 방식)
+  try{
+    const _sq=_examcatParseShortQ((document.getElementById('examcat-shortq')||{}).value||'');
+    if(Object.keys(_sq).length) entry.shortQNos=_sq; else delete entry.shortQNos;
+  }catch(e){ delete entry.shortQNos; }
   const _wasEdit=!!EXAMCAT_editing;
   const _sbtn=document.querySelector('#examcat-form button[onclick="_examcatSubmit()"]');
   if(_sbtn){ if(_sbtn.dataset.busy==='1') return; _sbtn.dataset.busy='1'; _sbtn._t0=_sbtn.textContent; _sbtn.textContent='⏳ 저장 중...'; _sbtn.style.opacity='.6'; }
