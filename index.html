@@ -17678,6 +17678,13 @@ function RM_msCellToGrade(raw){
   const letterMap={A:1,B:2,C:3,D:4,E:5};
   const upper=v.toUpperCase();
   if(letterMap.hasOwnProperty(upper)) return letterMap[upper];
+  // ★ 2026-10-16(496) 추가: "A/95"·"B/89"·"A 95"·"A(95)"·"A+"처럼 A~E 문자가 앞에 있으면 문자를 우선해
+  // 1~5등급으로 환산한다(예전엔 문자+점수가 함께 있으면 숫자 변환이 실패해 평균·변화 추이가 비어 나왔다).
+  // "95/A"처럼 문자가 뒤에 있는 경우도 처리한다.
+  const _mLead=v.match(/^([A-Ea-e])(?![A-Za-z])/);
+  if(_mLead) return letterMap[_mLead[1].toUpperCase()];
+  const _mTail=v.match(/[\/,\s(]\s*([A-Ea-e])\s*\)?$/);
+  if(_mTail) return letterMap[_mTail[1].toUpperCase()];
   const num=parseFloat(v);
   if(isNaN(num)) return null;
   if(num>=90) return 1;
