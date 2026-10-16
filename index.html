@@ -21463,7 +21463,7 @@ function openOrgForm(orgData){
       email:  ov.querySelector('#of_email').value.trim(),
       createdAt: org?.createdAt||Date.now(),
       permissions: ['grade','weekly','consult','susi','gyogwa','jonghap','jeongsi','apex','addStudent','nulsul','challenger','xlab','roadmap'].filter(k=>ov.querySelector('#org_perm_'+k)?.checked),
-      surveyPerms: {presurvey:!!ov.querySelector('#org_sv_presurvey')?.checked, apexlow:!!ov.querySelector('#org_sv_apexlow')?.checked, cf70:!!ov.querySelector('#org_sv_cf70')?.checked}
+      surveyPerms: {presurvey:!!ov.querySelector('#org_sv_presurvey')?.checked, msstrategy:!!ov.querySelector('#org_sv_msstrategy')?.checked, apexlow:!!ov.querySelector('#org_sv_apexlow')?.checked, cf70:!!ov.querySelector('#org_sv_cf70')?.checked}
     };
 
     const idx=orgs.findIndex(o=>o.id===org?.id);
