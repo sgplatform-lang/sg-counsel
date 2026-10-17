@@ -3441,6 +3441,26 @@ async function chgAnsGradeAndSave(){
     }
   }
   // ★ 2026-08-30 추가: 제출 전 마지막 확인 — 제출 후에는 수정이 안 되므로 한 번 더 확인시킨다.
+  // ★ 2026-10-17(499) 추가: 과목 체크박스만 켜 두고 답안을 입력하지 않은 채 제출하면, 그 과목이
+  // 전부 오답·0점으로 채점되고 바로 잠겨 학생이 다시 제출할 수 없었다. 입력한 답이 하나도 없는
+  // 과목이 있으면 제출을 막고(응시하지 않은 과목은 체크 해제 안내), 일부만 비어 있으면 미입력 수를
+  // 보여주며 한 번 더 확인받는다.
+  const _emptySubs=[], _partialSubs=[];
+  for(const x of enabledSlots){
+    const def=CHG_ANS_SUBJ_DEFS[x.code];
+    const _det=st.detail[x.slot]||_chgAnsAutoDetail(x.code, examMeta)||'';
+    const _cnt=_chgAnsResolvedCount(x.code, _det, examMeta, def.count);
+    const _ans=st.answers[x.slot]||{};
+    let _filled=0; for(let n=1;n<=_cnt;n++){ if(String(_ans[n]==null?'':_ans[n]).trim()) _filled++; }
+    const _nm=(x.slot.indexOf('INQ')===0?'탐구'+(_det?'('+_det+')':''):def.name);
+    if(_filled===0) _emptySubs.push(_nm);
+    else if(_filled<_cnt) _partialSubs.push(_nm+' '+(_cnt-_filled)+'문항');
+  }
+  if(_emptySubs.length){
+    alert('⚠️ '+_emptySubs.join(', ')+' 과목에는 입력한 답안이 하나도 없습니다.\n\n이대로 제출하면 전부 오답(0점)으로 처리되고 다시 수정할 수 없습니다.\n응시하지 않은 과목이면 "응시 과목 선택"에서 체크를 해제하고, 응시한 과목이면 답안을 입력한 뒤 제출해주세요.');
+    return;
+  }
+  if(_partialSubs.length && !confirm('아직 입력하지 않은 문항이 있습니다.\n\n'+_partialSubs.join('\n')+'\n\n미입력 문항은 오답으로 처리되며 제출 후에는 수정할 수 없습니다.\n그래도 제출할까요?')) return;
   if(!confirm('제출하면 답안을 다시 수정할 수 없습니다.\n입력한 내용을 다시 한번 확인하셨나요?\n\n확인을 누르면 채점·저장이 진행됩니다.')) return;
   if(!FB()){ toast('서버에 연결되어 있지 않습니다'); return; }
   toast('채점 중입니다...', 4000);
