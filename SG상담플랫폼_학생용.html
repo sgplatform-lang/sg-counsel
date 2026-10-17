@@ -2973,7 +2973,28 @@ function _chgAnsFormatAnswerDisplay(correctRaw){
   const options=_chgAnsSplitMultiAnswer(correctRaw);
   return options.length>1 ? options.join(' 또는 ') : (options[0]||correctRaw);
 }
+let _chgHealAt=0;
+async function _chgHealServer(){
+  try{
+    if(!FB()||!window._db||!CU||!CU.id||window._studentSaving) return;
+    if(Date.now()-_chgHealAt<60000) return; _chgHealAt=Date.now();
+    const cd=CU.challengerData||{}; const loc=(cd.lastSubjects||[]).filter(function(x){return x&&x._studentSelfInput&&x._locked;});
+    if(!loc.length||!cd.lastTestDate||!cd.lastTestName) return;
+    const snap=await window._db.collection('students').doc(String(CU.id)).get();
+    if(!snap.exists) return;
+    const scd=(snap.data()||{}).challengerData||{};
+    const k=function(x){return (x&&x.subject||'')+'|'+(x&&x.detail||'');};
+    const sameR=String(scd.lastTestDate||'').trim()===String(cd.lastTestDate).trim()&&String(scd.lastTestName||'').trim()===String(cd.lastTestName).trim();
+    const sLast=sameR?(scd.lastSubjects||[]):[];
+    const miss=loc.filter(function(x){return !sLast.some(function(y){return k(y)===k(x);});});
+    if(!miss.length) return;
+    console.log('[챌린저] 서버에서 누락된 제출 과목 복원:',miss.map(k));
+    await chgArchiveRound(cd.lastTestDate,cd.lastTestName,cd.lastSubjects);
+    chgScheduleSave();
+  }catch(e){ console.warn('자가복원 실패',e&&e.message); }
+}
 function renderChallengerAnswerInput(){
+  _chgHealServer();
   const st=chgAnsInit();
   if(_chgAnsCatalog===null){
     if(_chgAnsLoadFailed){
