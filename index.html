@@ -38284,6 +38284,12 @@ function _gg_sendChallengerInit(ifr, stu){
   // ★ 2026-09-21 추가: "🔄 학생 입력 새로고침" 버튼을 눌렀을 때만 true로 세팅되는
   // 명시적 새로고침 신호. iframe 쪽(__SG_initFromHost)이 이 값이 true일 때만 매니저가
   // "과거 저장 회차"를 보고 있는 중이어도 최신 회차로 강제 갱신하도록 판단 기준으로 쓴다.
+  try{
+    window.__sgKnownSelf=window.__sgKnownSelf||{};
+    var _kk={}; var _kcd=stu.challengerData||{};
+    (_kcd.lastSubjects||[]).forEach(function(x){ if(x&&x._studentSelfInput) _kk[(x.subject||'')+'|'+(x.detail||'')]=1; });
+    window.__sgKnownSelf[String(stu.id)]={d:String(_kcd.lastTestDate||'').trim(),n:String(_kcd.lastTestName||'').trim(),k:_kk};
+  }catch(_e){}
   payload.forceRefresh = !!window.__SG_forceChallengerRefresh;
   window.__SG_forceChallengerRefresh = false;
   ifr.contentWindow.postMessage(payload, '*');
@@ -38392,9 +38398,36 @@ function renderChallenger(s){
             _mergedHist.push(r); // 서버에 없던 새 회차(관리자가 방금 추가) → 추가 반영
           }
         });
+        // ★ 498: 학생이 iframe 로드 이후 새로 제출한 과목 보존(관리자 옛 화면이 덮어쓰지 않도록)
+        let _incLast=(ev.data.lastSubjects||[]).slice();
+        try{
+          const _sk=function(x){ return (x&&x.subject||'')+'|'+(x&&x.detail||''); };
+          const _kn=(window.__sgKnownSelf||{})[String(sid)];
+          const _scd=stu.challengerData||{};
+          if(_kn && String(_scd.lastTestDate||'').trim()===String(ev.data.meta&&ev.data.meta.lastTestDate||'').trim()
+             && String(_scd.lastTestName||'').trim()===String(ev.data.meta&&ev.data.meta.lastTestName||'').trim()){
+            const _rest=[];
+            (_scd.lastSubjects||[]).forEach(function(x){
+              if(x&&x._studentSelfInput&&!_kn.k[_sk(x)]&&!_incLast.some(function(y){return _sk(y)===_sk(x);})){ _incLast.push(x); _rest.push(x); }
+            });
+            if(_rest.length){
+              const _hi=_mergedHist.findIndex(function(r){ return _chKey(r)===_curTestKey; });
+              if(_hi>-1){
+                const _hc=Object.assign({},_mergedHist[_hi]);
+                ['subjects','fullSubjects'].forEach(function(f){
+                  _hc[f]=(_hc[f]||[]).slice();
+                  _rest.forEach(function(x){ if(!_hc[f].some(function(y){return _sk(y)===_sk(x);})) _hc[f].push(x); });
+                });
+                _mergedHist[_hi]=_hc;
+              }
+              console.log('[챌린저 저장] 학생 신규 제출 과목 보존:',_rest.map(_sk));
+            }
+            _incLast.forEach(function(x){ if(x&&x._studentSelfInput) _kn.k[_sk(x)]=1; });
+          }
+        }catch(_e2){ console.warn('보존 병합 실패',_e2); }
         const newChallengerData = {
           history: _mergedHist,
-          lastSubjects: ev.data.lastSubjects || [],
+          lastSubjects: _incLast,
           lastTestDate: ev.data.meta?.lastTestDate || '',
           lastTestName: ev.data.meta?.lastTestName || '',
           meta: ev.data.meta || {},
