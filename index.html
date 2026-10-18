@@ -424,6 +424,24 @@ try{
   // 보안 문제가 있다 — 브라우저 탭/창을 닫으면 로그아웃되는 SESSION 방식으로 명시 설정.
   // ★ 507: 로그인 유지(자동 로그인). 기본은 LOCAL(브라우저를 닫았다 열어도 유지). 공용 PC 모드이거나
   // 로그인 화면에서 "로그인 상태 유지"를 해제하면 SESSION(창을 닫으면 로그아웃)으로 동작.
+  // ★ 508: "자동 로그인 중…/로그인 중…" 안내 화면 (로그인 상태가 확인될 때까지 로그인 화면이 비쳐 보이지 않게 가림)
+  function _sgLoginOv(show,text){
+    try{
+      var el=document.getElementById('sg_login_ov');
+      if(!show){ if(el&&el.parentNode) el.parentNode.removeChild(el); if(window._sgOvTimer){clearTimeout(window._sgOvTimer);window._sgOvTimer=null;} return; }
+      if(!el){
+        el=document.createElement('div'); el.id='sg_login_ov';
+        el.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(255,255,255,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:system-ui,sans-serif';
+        el.innerHTML='<style>@keyframes sgovspin{to{transform:rotate(360deg)}}</style><div style="width:42px;height:42px;border:4px solid #dbe3ff;border-top-color:#3b5bdb;border-radius:50%;animation:sgovspin .8s linear infinite"></div><div id="sg_login_ov_t" style="font-size:16px;font-weight:700;color:#3b5bdb"></div><div style="font-size:12px;color:#94a3b8">잠시만 기다려 주세요</div>';
+        (document.body||document.documentElement).appendChild(el);
+      }
+      var t=document.getElementById('sg_login_ov_t'); if(t) t.textContent=text||'로그인 중...';
+      if(window._sgOvTimer) clearTimeout(window._sgOvTimer);
+      window._sgOvTimer=setTimeout(function(){ _sgLoginOv(false); },25000);
+    }catch(e){}
+  }
+  window._sgLoginOv=_sgLoginOv;
+  try{ if(localStorage.getItem('sg_had_login')==='1' && localStorage.getItem('sg_shared_pc')!=='1') _sgLoginOv(true,'자동 로그인 중...'); }catch(e){}
   function _sgKeepLogin(){
     try{
       if(localStorage.getItem('sg_shared_pc')==='1') return false;
@@ -434,6 +452,7 @@ try{
   }
   function _sgSetPersist(){
     var keep=_sgKeepLogin();
+    try{ if(keep) localStorage.setItem('sg_had_login','1'); else localStorage.removeItem('sg_had_login'); }catch(e){}
     try{ if(document.getElementById('login_keep') && localStorage.getItem('sg_shared_pc')!=='1') localStorage.setItem('sg_keep_login',keep?'1':'0'); }catch(e){}
     try{
       return firebase.auth().setPersistence(keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION).catch(function(e){ console.warn('persistence',e.message); });
@@ -567,6 +586,7 @@ firebase.auth().onAuthStateChanged(async function(user){
   const _app = document.getElementById('app');
   if(!user){
     // 로그아웃 상태 — 로그인 화면 표시
+    window._sgLoginOv&&window._sgLoginOv(false); try{localStorage.removeItem('sg_had_login');}catch(e){}
     if(ST.currentUser){ ST.currentUser=null; ST.currentOrg=null; }
     try{
       if(_ls){ _ls.style.display='flex'; _ls.style.alignItems='center'; _ls.style.justifyContent='center'; }
@@ -598,7 +618,7 @@ firebase.auth().onAuthStateChanged(async function(user){
   } else {
     // 커스텀 클레임이 없는 계정 — 마이그레이션 스크립트를 거치지 않은 계정
     console.warn('알 수 없는 role — firebase-auth-migration.js를 이 계정에 대해 실행했는지 확인하세요:', user.email);
-    firebase.auth().signOut();
+    window._sgLoginOv&&window._sgLoginOv(false); firebase.auth().signOut();
     return;
   }
   ST.page='admin';
@@ -612,9 +632,11 @@ firebase.auth().onAuthStateChanged(async function(user){
     if(typeof fbLoadAll_all==='function') await fbLoadAll_all();
     ST._authLoading=false;
     if(typeof render==='function') render();
+    window._sgLoginOv&&window._sgLoginOv(false);
     if(typeof startRealtimeSync==='function') startRealtimeSync();
   } else {
     ST._authLoading=false;
+    window._sgLoginOv&&window._sgLoginOv(false);
   }
 });
 </script>
@@ -4296,6 +4318,7 @@ function doLogin(){
 
   if(!id||!pw){ if(err)err.textContent='아이디와 비밀번호를 입력하세요.'; return; }
   if(err) err.textContent='⏳ 로그인 중...';
+  window._sgLoginOv&&window._sgLoginOv(true,'로그인 중...');
 
   // ★ 2026-09-20 수정: 하드코딩된 admin/admin1234 비교, localStorage/ST.teachers 안의
   // 평문 비밀번호 비교를 전부 제거하고 Firebase Authentication이 서버에서 검증하도록
@@ -4304,6 +4327,7 @@ function doLogin(){
   // 받아서 전담 처리한다 — 여기서는 로그인 시도만 하면 된다.
   _sgSetPersist().then(function(){ return firebase.auth().signInWithEmailAndPassword(_sgToAuthEmail(id), pw); })
     .catch(function(e){
+      window._sgLoginOv&&window._sgLoginOv(false); try{localStorage.removeItem('sg_had_login');}catch(_e){}
       if(!err) return;
       if(e.code==='auth/wrong-password' || e.code==='auth/user-not-found' || e.code==='auth/invalid-credential' || e.code==='auth/invalid-email'){
         err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.';
