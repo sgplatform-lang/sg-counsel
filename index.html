@@ -18524,14 +18524,66 @@ function RM_generateReport(){
   };
 }
 // ★ 리포트를 학생 문서(s.roadmapReports)에 스냅샷 저장 — pickReports와 같은 방식(최근 20건 유지).
-function RM_saveReport(){
+const RM_REPORT_CACHE={};
+function RM_fullReport(r){ if(!r||r.html) return r; const c=r.archId&&RM_REPORT_CACHE[r.archId]; return c?Object.assign({},r,c):r; }
+async function RM_loadArchivedReport(r){
+  if(!r||r.html||!r.archId||RM_REPORT_CACHE[r.archId]) return true;
+  if(!FB_USE()) return false;
+  try{ const d=await window._fb.db.collection('studentArchive').doc(r.archId).get(); if(!d.exists) return false; const x=d.data(); RM_REPORT_CACHE[r.archId]={html:x.html||'', formSnapshot:x.formSnapshot||null}; return true; }
+  catch(e){ console.warn('보관 리포트 불러오기 실패', e&&e.message); return false; }
+}
+function RM_lightReport(r, archId){
+  const snap=r.formSnapshot||r.meta||{};
+  return { date:r.date, label:r.label, data:r.data||null, archId:archId, meta:{displayName:snap.displayName||'', displaySchool:snap.displaySchool||'', displayGrade:snap.displayGrade||''} };
+}
+async function RM_archiveReportDoc(s, r){
+  const id=String(s.id)+'__rr__'+(String(r.date||'').replace(/[^0-9A-Za-z]/g,'')||String(Date.now()));
+  const doc=JSON.parse(JSON.stringify({studentId:String(s.id), studentName:s.name||'', kind:'roadmapReport', date:r.date||'', label:r.label||'', html:r.html||'', formSnapshot:r.formSnapshot||null, archivedAt:Date.now()}));
+  await window._fb.db.collection('studentArchive').doc(id).set(doc);
+  return id;
+}
+function RM_deleteArchDoc(r){ try{ if(r&&r.archId&&FB_USE()) window._fb.db.collection('studentArchive').doc(r.archId).delete().catch(function(){}); }catch(e){} }
+// 기존(학생 문서에 본문이 들어있는) 리포트를 보관함으로 이전. 보관 성공 후에만 학생 문서를 가볍게 만든다.
+async function RM_migrateReports(){
+  if(!FB_USE()){ alert('서버(Firebase)에 연결된 상태에서만 이전할 수 있습니다.'); return; }
+  const targets=(ST.students||[]).filter(function(st){ return Array.isArray(st.roadmapReports)&&st.roadmapReports.some(function(r){ return r&&r.html&&!r.archId; }); });
+  if(!targets.length){ alert('이전할 리포트가 없습니다. (모두 보관함에 있습니다)'); return; }
+  const cnt=targets.reduce(function(n,st){ return n+st.roadmapReports.filter(function(r){ return r&&r.html&&!r.archId; }).length; },0);
+  if(!confirm('학생 '+targets.length+'명의 상담리포트 '+cnt+'건을 별도 보관함으로 이전합니다.\n(리포트 내용은 그대로 보이고, 학생 데이터 용량만 줄어듭니다)\n\n진행할까요?')) return;
+  let okS=0, failS=0, freed=0;
+  for(const st of targets){
+    try{
+      const before=JSON.stringify(st.roadmapReports).length;
+      const light=[];
+      for(const r of st.roadmapReports){
+        if(r&&r.html&&!r.archId){ const aid=await RM_archiveReportDoc(st, r); light.push(RM_lightReport(r, aid)); }
+        else light.push(r);
+      }
+      await window._fb.db.collection('students').doc(String(st.id)).update({roadmapReports:light});
+      freed+=before-JSON.stringify(light).length; okS++;
+      st.roadmapReports=light;
+      ST.students=ST.students.map(function(x){ return String(x.id)===String(st.id)?Object.assign({},x,{roadmapReports:light}):x; });
+      if(ST.sel&&String(ST.sel.id)===String(st.id)) ST.sel=Object.assign({},ST.sel,{roadmapReports:light});
+      if(ST.adminSel&&String(ST.adminSel.id)===String(st.id)) ST.adminSel=Object.assign({},ST.adminSel,{roadmapReports:light});
+    }catch(e){ failS++; console.warn('리포트 이전 실패', st.name, e&&e.message); }
+  }
+  alert('✅ 이전 완료: '+okS+'명'+(failS?' / 실패 '+failS+'명(원본은 그대로 유지됨)':'')+'\n줄어든 용량: 약 '+Math.round(freed/1024)+'KB');
+  render();
+}
+async function RM_saveReport(){
   const s=RM_STUDENT_REF; if(!s) return;
   const sheet=document.getElementById('rmReportSheet');
   if(!sheet || !sheet.innerHTML.trim()){ alert('먼저 "리포트 생성"을 눌러 리포트를 만들어주세요.'); return; }
   if(!Array.isArray(s.roadmapReports)) s.roadmapReports=[];
   const now=new Date();
-  s.roadmapReports.push({ date: now.toISOString(), label: now.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}), html: sheet.innerHTML, data: RM_LAST_REPORT_DATA||null, formSnapshot: RM_collectFormSnapshot() });
-  if(s.roadmapReports.length>20) s.roadmapReports=s.roadmapReports.slice(s.roadmapReports.length-20);
+  const full={ date: now.toISOString(), label: now.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}), html: sheet.innerHTML, data: RM_LAST_REPORT_DATA||null, formSnapshot: RM_collectFormSnapshot() };
+  let entry=full;
+  if(FB_USE()){
+    try{ const aid=await RM_archiveReportDoc(s, full); RM_REPORT_CACHE[aid]={html:full.html, formSnapshot:full.formSnapshot}; entry=RM_lightReport(full, aid); }
+    catch(e){ console.warn('리포트 보관함 저장 실패 → 학생 문서에 직접 저장', e&&e.message); }
+  }
+  s.roadmapReports.push(entry);
+  if(s.roadmapReports.length>20){ const _drop=s.roadmapReports.slice(0,s.roadmapReports.length-20); s.roadmapReports=s.roadmapReports.slice(s.roadmapReports.length-20); _drop.forEach(RM_deleteArchDoc); }
   if(typeof upd==='function') upd(s);
   alert('리포트가 저장됐습니다. "상담리포트" 탭에서 다시 열어보실 수 있습니다.');
 }
@@ -18640,7 +18692,7 @@ function renderRoadmapConsult(s){
   // 대체 표시한다. 학년도는 별도 필드가 없어 저장 일시(rpt.date)에서 연도를 추출한다.
   const rows=list.map(function(rpt,i){
     const origIdx=s.roadmapReports.length-1-i;
-    const snap=rpt.formSnapshot||{};
+    const snap=rpt.formSnapshot||rpt.meta||{};
     const rName=(snap.displayName||s.name||'').trim()||'(이름 미상)';
     const rSchool=(snap.displaySchool||s.school||'').trim();
     const rGrade=(snap.displayGrade||s.grade||'').trim();
@@ -18670,6 +18722,7 @@ function renderRoadmapConsult(s){
   }).join('');
   return `<div style="max-width:none;padding-bottom:40px">
     <div style="font-size:15px;font-weight:900;color:#1a1a2e;margin-bottom:4px">📁 ${esc(s.name||'')} 학생 상담리포트 이력 (${list.length}건)</div>
+    <div style="margin-bottom:10px"><button onclick="RM_migrateReports()" style="background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;border-radius:16px;padding:6px 14px;font-size:11.5px;font-weight:700;cursor:pointer">📦 리포트 보관함으로 이전 (학생 용량 절약)</button></div>
     <div style="font-size:12px;color:#888;margin-bottom:18px">저장된 입시상담(로드맵) 리포트를 최신순으로 보여줍니다. "📝 기본상담" 탭에서 리포트 생성 후 저장하면 여기에 쌓입니다.</div>
     ${list.length ? rows : `<div style="text-align:center;padding:48px;color:#888">
       <div style="font-size:40px;margin-bottom:12px">📁</div>
@@ -18678,8 +18731,9 @@ function renderRoadmapConsult(s){
     </div>`}
   </div>`;
 }
-function RM_replayArchived(idx){
+async function RM_replayArchived(idx){
   const s=RM_STUDENT_REF; if(!s||!Array.isArray(s.roadmapReports)||!s.roadmapReports[idx]) return;
+  if(!s.roadmapReports[idx].html){ const _ok=await RM_loadArchivedReport(s.roadmapReports[idx]); if(!_ok){ alert('보관된 리포트 본문을 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 시도해주세요.'); return; } }
   RM_VIEWING_ARCHIVED_IDX=idx;
   RM_VIEWING_SCROLLED=false;
   ST.roadmapSubTab='basic';
@@ -18704,6 +18758,7 @@ function RM_onHistoryQuickSelect(el){
 function RM_deleteArchived(idx){
   const s=RM_STUDENT_REF; if(!s||!Array.isArray(s.roadmapReports)||!s.roadmapReports[idx]) return;
   if(!confirm('이 리포트를 삭제하시겠습니까?')) return;
+  RM_deleteArchDoc(s.roadmapReports[idx]);
   s.roadmapReports.splice(idx,1);
   if(typeof upd==='function') upd(s);
   render();
@@ -20932,7 +20987,7 @@ function renderRoadmapReport(s){
   setTimeout(function(){
     const s2=RM_STUDENT_REF;
     if(RM_VIEWING_ARCHIVED_IDX!==null && s2 && Array.isArray(s2.roadmapReports) && s2.roadmapReports[RM_VIEWING_ARCHIVED_IDX]){
-      const rpt=s2.roadmapReports[RM_VIEWING_ARCHIVED_IDX];
+      const rpt=RM_fullReport(s2.roadmapReports[RM_VIEWING_ARCHIVED_IDX]);
       if(rpt.formSnapshot) RM_restoreFormSnapshot(rpt.formSnapshot);
       else if(rpt.data) RM_restoreFromLegacyData(rpt.data);
       const sheet=document.getElementById('rmReportSheet');
@@ -21002,7 +21057,7 @@ function renderRoadmapReport(s){
     +'</div>'
     +'</div>'
     +(RM_VIEWING_ARCHIVED_IDX!==null ? (function(){
-        const _rpt=s.roadmapReports[RM_VIEWING_ARCHIVED_IDX];
+        const _rpt=RM_fullReport(s.roadmapReports[RM_VIEWING_ARCHIVED_IDX]);
         const _isPartial = !!(_rpt && !_rpt.formSnapshot);
         const _msg = _isPartial
           ? '아래 입력값 중 일부(계열·희망학과·모의고사 등)만 저장 당시 내용으로 채워졌습니다 — 이 리포트는 이 기능이 추가되기 전에 저장되어 학기별 성적 등 나머지 항목은 자동 복원이 되지 않습니다.'
