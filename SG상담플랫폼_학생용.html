@@ -42,14 +42,14 @@
 // 아래 사이트 키를 Firebase 콘솔에서 발급받은 값으로 교체해야 동작한다.
 const SG_RECAPTCHA_SITE_KEY = '6LcoRrEtAAAAAG2W-Q8g-rhXW7j53hB6peh2DOFZ';
 try{
-  firebase.initializeApp({
+  window._sgApp=firebase.initializeApp({
     apiKey: "AIzaSyBzE9aGv1vtZWv7FKntPA9r_r_52HhV6Kg",
     authDomain: "sg-counsel.firebaseapp.com",
     projectId: "sg-counsel",
     storageBucket: "sg-counsel.firebasestorage.app",
     messagingSenderId: "134794459070",
     appId: "1:134794459070:web:a636cac4df344bd26e2bef"
-  });
+  },"sg-stu");
   // ★ 2026-09-20 추가: 관리자 파일과 동일한 이유 — Firebase Auth 기본값(브라우저를 꺼도
   // 로그인 유지)이 학원 공용 컴퓨터 등에서 이전 학생 로그인이 계속 남는 문제를 만들 수
   // 있어, 탭/창을 닫으면 로그아웃되는 SESSION 방식으로 명시 설정.
@@ -67,12 +67,12 @@ try{
     var keep=_sgKeepLogin();
     try{ if(document.getElementById('login_keep') && localStorage.getItem('sg_shared_pc')!=='1') localStorage.setItem('sg_keep_login',keep?'1':'0'); }catch(e){}
     try{
-      return firebase.auth().setPersistence(keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION).catch(function(e){ console.warn('persistence',e.message); });
+      return window._sgApp.auth().setPersistence(keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION).catch(function(e){ console.warn('persistence',e.message); });
     }catch(e){ return Promise.resolve(); }
   }
   window._sgKeepLogin=_sgKeepLogin; window._sgSetPersist=_sgSetPersist;
   try{
-    firebase.auth().setPersistence(_sgKeepLogin()?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION)
+    window._sgApp.auth().setPersistence(_sgKeepLogin()?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION)
       .catch(function(e){ console.warn('Auth persistence 설정 실패(무시하고 진행):', e.message); });
   }catch(e){ console.warn('Auth persistence 설정 실패(무시하고 진행):', e.message); }
   // ★ 2026-09-09(379) 수정: <body>가 아직 없는 시점에 reCAPTCHA가 배지를 삽입하려다
@@ -80,7 +80,7 @@ try{
   function _sgActivateAppCheck(){
     try{
       if(SG_RECAPTCHA_SITE_KEY && SG_RECAPTCHA_SITE_KEY.indexOf('PASTE_YOUR')!==0){
-        firebase.appCheck().activate(
+        window._sgApp.appCheck().activate(
           new firebase.appCheck.ReCaptchaEnterpriseProvider(SG_RECAPTCHA_SITE_KEY),
           true
         );
@@ -92,9 +92,9 @@ try{
   }
   if(document.body){ _sgActivateAppCheck(); }
   else { document.addEventListener('DOMContentLoaded', _sgActivateAppCheck); }
-  window._db = firebase.firestore(); // window에 노출하여 외부 접근 가능
+  window._db = window._sgApp.firestore(); // window에 노출하여 외부 접근 가능
   // ★ 2026-10-07 추가: 수행평가 파일 업로드용 Storage (용량 제한 없이 이어올리기)
-  try{ window._storage = firebase.storage(); }catch(e){ console.warn('Storage 초기화 실패:', e.message); }
+  try{ window._storage = window._sgApp.storage(); }catch(e){ console.warn('Storage 초기화 실패:', e.message); }
   // ★ 2026-08-30 추가: 관리자 페이지에서 겪었던 것과 동일하게, 일부 홈/학교 네트워크
   // 환경(공유기 보안기능·백신 웹보호·불완전한 IPv6 등)에서 Firestore의 실시간 연결 방식
   // (WebChannel)이 응답도 실패도 없이 그냥 멈춰버리는 경우가 있다. "챌린저 답안" 탭에서
@@ -122,22 +122,22 @@ try{
     // ★ 2026-09-20 추가(2단계 대비): firestore-rules-phase2.txt 게시 후에는 학생 role이
     // 본인 문서만 읽을 수 있어, 다른 학생들의 오답률을 직접 조회(_chgFetchExamPeerSubjects가
     // 예전에 하던 방식)할 수 없다. 같은 결과를 서버(Cloud Function)를 통해 받아온다.
-    getExamPeerSubjects: (payload)=>firebase.functions().httpsCallable('getExamPeerSubjects')(payload).then(r=>r.data),
+    getExamPeerSubjects: (payload)=>window._sgApp.functions().httpsCallable('getExamPeerSubjects')(payload).then(r=>r.data),
     // ★ 2026-09-27 추가: X-lab(월별 주제활동) AI 기능 3종 — analyzeExamPdf/
     // getExamPeerSubjects와 동일하게, Anthropic API 키는 서버(Cloud Function)에만
     // 있고 브라우저는 이 함수를 "호출"만 한다(키 자체는 절대 받지 않음).
-    xlabRecommendTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendTopics', {timeout: 120000})(payload).then(r=>r.data),
-    xlabGenerateTopicReport: (payload)=>firebase.functions().httpsCallable('xlabGenerateTopicReport', {timeout: 120000})(payload).then(r=>r.data),
-    xlabGenerateExpectedRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateExpectedRecord', {timeout: 120000})(payload).then(r=>r.data),
-    xlabStuDocq: (payload)=>firebase.functions().httpsCallable('xlabStuDocq', {timeout: 90000})(payload).then(r=>r.data),
-    xlabRecommendAdvancedTopics: (payload)=>firebase.functions().httpsCallable('xlabRecommendAdvancedTopics', {timeout: 120000})(payload).then(r=>r.data),
+    xlabRecommendTopics: (payload)=>window._sgApp.functions().httpsCallable('xlabRecommendTopics', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateTopicReport: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateTopicReport', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateExpectedRecord: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateExpectedRecord', {timeout: 120000})(payload).then(r=>r.data),
+    xlabStuDocq: (payload)=>window._sgApp.functions().httpsCallable('xlabStuDocq', {timeout: 90000})(payload).then(r=>r.data),
+    xlabRecommendAdvancedTopics: (payload)=>window._sgApp.functions().httpsCallable('xlabRecommendAdvancedTopics', {timeout: 120000})(payload).then(r=>r.data),
     // ★ 2026-09-28 추가: X-lab · 월별교과활동(교과별 예상세특용 교과활동 보고서) 전용 함수 2종.
-    xlabGenerateSubjectSection: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectSection', {timeout: 120000})(payload).then(r=>r.data),
-    xlabGenerateSubjectRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateSubjectRecord', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateSubjectSection: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateSubjectSection', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateSubjectRecord: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateSubjectRecord', {timeout: 120000})(payload).then(r=>r.data),
     // ★ 2026-09-28 추가: X-lab · 최종예상세특 전용 함수 3종.
-    xlabGenerateFinalSection: (payload)=>firebase.functions().httpsCallable('xlabGenerateFinalSection', {timeout: 120000})(payload).then(r=>r.data),
-    xlabGenerateFinalLinkedActivity: (payload)=>firebase.functions().httpsCallable('xlabGenerateFinalLinkedActivity', {timeout: 120000})(payload).then(r=>r.data),
-    xlabGenerateFinalRecord: (payload)=>firebase.functions().httpsCallable('xlabGenerateFinalRecord', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateFinalSection: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateFinalSection', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateFinalLinkedActivity: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateFinalLinkedActivity', {timeout: 120000})(payload).then(r=>r.data),
+    xlabGenerateFinalRecord: (payload)=>window._sgApp.functions().httpsCallable('xlabGenerateFinalRecord', {timeout: 120000})(payload).then(r=>r.data),
   };
   window._fbReady = true;
   console.log("✅ Firebase 연결 완료");
@@ -157,7 +157,7 @@ function _sgToAuthEmail(loginId){
   return String(loginId).trim().toLowerCase().replace(/[^a-z0-9._-]/g,'') + '@' + SG_AUTH_EMAIL_DOMAIN;
 }
 
-firebase.auth().onAuthStateChanged(async function(user){
+window._sgApp.auth().onAuthStateChanged(async function(user){
   if(!user){
     if(CU){ CU=null; if(typeof _unsubscribeStudent!=='undefined' && _unsubscribeStudent){ try{_unsubscribeStudent();}catch(e){} _unsubscribeStudent=null; } }
     if(typeof render==='function') render();
@@ -170,7 +170,7 @@ firebase.auth().onAuthStateChanged(async function(user){
   }catch(e){ console.warn('토큰 확인 실패:', e.message); }
   if(claims.role !== 'student' || !claims.studentId){
     console.warn('알 수 없는 role — firebase-auth-migration-students.js를 이 계정에 대해 실행했는지 확인하세요:', user.email);
-    firebase.auth().signOut();
+    window._sgApp.auth().signOut();
     return;
   }
   const err=document.getElementById('login_err');
@@ -182,7 +182,7 @@ firebase.auth().onAuthStateChanged(async function(user){
     ]);
     if(!studentSnap.exists){
       if(err) err.textContent='학생 정보를 찾을 수 없습니다. 담당 선생님께 문의해주세요.';
-      firebase.auth().signOut();
+      window._sgApp.auth().signOut();
       return;
     }
     const student = {...studentSnap.data(), id: studentSnap.id};
@@ -677,7 +677,7 @@ async function doLogin(){
   // ★ 2026-09-20 수정(2단계): studentLoginId 조회 + 평문 비밀번호 비교를 제거하고
   // Firebase Authentication이 서버에서 검증하도록 변경. role/데이터 로딩·화면 전환·
   // 환영 토스트·개인정보동의 팝업은 전부 위 onAuthStateChanged가 전담 처리한다.
-  _sgSetPersist().then(function(){ return firebase.auth().signInWithEmailAndPassword(_sgToAuthEmail(id), pw); })
+  _sgSetPersist().then(function(){ return window._sgApp.auth().signInWithEmailAndPassword(_sgToAuthEmail(id), pw); })
     .catch(function(e){
       if(!err) return;
       if(e.code==='auth/wrong-password' || e.code==='auth/user-not-found' || e.code==='auth/invalid-credential' || e.code==='auth/invalid-email'){
@@ -696,7 +696,7 @@ async function doLogin(){
 function doStudentLogout(){
   if(!confirm('로그아웃?')) return;
   if(_unsubscribeStudent){ try{_unsubscribeStudent();}catch(e){} _unsubscribeStudent=null; }
-  try{ firebase.auth().signOut(); }catch(e){}
+  try{ window._sgApp.auth().signOut(); }catch(e){}
   CU=null;
   _chgAnsCatalog=null; _chgAnsState=null; _chgAnsLoadFailed=false; window._chgAnsEntRetried=false; // ★ 23: 다른 계정 로그인 시 이전 시험 목록·입력 상태가 남지 않게 초기화
   _xmapList=[]; _xmapLoaded=false; _xmapView='list'; _xmapCur=null; _xlabTopModeMain='topic'; _apexReset(); // 다른 계정 로그인 시 이전 학생 데이터 노출 방지
