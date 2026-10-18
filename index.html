@@ -631,6 +631,21 @@ firebase.auth().onAuthStateChanged(async function(user){
   if(typeof render==='function') render();
   if(typeof FB_USE==='function' && FB_USE()){
     if(typeof fbLoadAll_all==='function') await fbLoadAll_all();
+    try{
+      const _oid510 = ST.currentUser && ST.currentUser.orgId;
+      if(_oid510 && (!ST.currentOrg || !ST.currentOrg.id)){
+        let _o510=null;
+        try{ const _lo=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); _o510=_lo.find(function(x){return String(x.id)===String(_oid510);})||null; }catch(e){}
+        if(!_o510){
+          const _snap=await window._db.collection('orgs').doc(String(_oid510)).get();
+          if(_snap.exists){
+            _o510=Object.assign({},_snap.data(),{id:_snap.id});
+            try{ const _lo2=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); if(!_lo2.some(function(x){return String(x.id)===String(_o510.id);})){ _lo2.push(_o510); localStorage.setItem(SK_ORGS,JSON.stringify(_lo2)); } }catch(e){}
+          }
+        }
+        if(_o510) ST.currentOrg=_o510;
+      }
+    }catch(e){ console.warn('소속 기관 정보 로드 실패:', e.message); }
     ST._authLoading=false;
     if(typeof render==='function') render();
     window._sgLoginOv&&window._sgLoginOv(false);
@@ -3219,6 +3234,19 @@ async function fbLoadAll_all(){
         localStorage.setItem(SK_ORGS, JSON.stringify(mergedOrgs));
       }catch(e){}
     }
+    // ★ 510: 최종관리자 — 이 기기에만 있고 서버에 없는 기관을 서버로 올림(추가만)
+    try{
+      if(ST.currentUser && ST.currentUser.role==='admin' && Array.isArray(orgs)){
+        const _fbIds=new Set(orgs.map(function(o){return String(o.id);}));
+        const _loc=JSON.parse(localStorage.getItem(SK_ORGS)||'[]');
+        const _miss=_loc.filter(function(o){return o && o.id && !_fbIds.has(String(o.id));});
+        if(_miss.length){
+          _miss.forEach(function(o){ try{ fbSave('orgs', o.id, o).catch(function(e){console.warn('기관 서버 저장 실패:',o.id,e&&e.message);}); }catch(e){} });
+          console.log('[SG] 서버에 없던 기관 '+_miss.length+'곳을 서버로 저장했습니다.');
+          setTimeout(function(){ try{ if(typeof toast==='function') toast('🏫 이 기기에만 있던 기관 '+_miss.length+'곳의 정보를 서버에 저장했습니다.', 4500); }catch(e){} }, 1500);
+        }
+      }
+    }catch(e){ console.warn('기관 서버 동기화 실패:', e.message); }
     dbS(SK, ST.students); dbS(SKT, ST.teachers); dbS(SK_TEST, ST.tests);
     saveAccounts();
     return true;
@@ -3372,13 +3400,13 @@ function getPlatformName(full){
 function getOrgStudents(){
   // 기관관리자는 자기 기관 학생만
   if(ST.currentUser?.role==='orgAdmin'){
-    return ST.students.filter(s=>s.orgId===ST.currentOrg?.id);
+    return ST.students.filter(s=>s.orgId===(ST.currentOrg?.id||ST.currentUser?.orgId));
   }
   return ST.students;
 }
 function getOrgTeachers(){
   if(ST.currentUser?.role==='orgAdmin'){
-    return ST.teachers.filter(t=>t.orgId===ST.currentOrg?.id);
+    return ST.teachers.filter(t=>t.orgId===(ST.currentOrg?.id||ST.currentUser?.orgId));
   }
   return ST.teachers;
 }
