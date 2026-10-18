@@ -637,7 +637,7 @@ firebase.auth().onAuthStateChanged(async function(user){
         let _o510=null;
         try{ const _lo=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); _o510=_lo.find(function(x){return String(x.id)===String(_oid510);})||null; }catch(e){}
         if(!_o510){
-          const _snap=await window._db.collection('orgs').doc(String(_oid510)).get();
+          const _snap=await firebase.firestore().collection('orgs').doc(String(_oid510)).get();
           if(_snap.exists){
             _o510=Object.assign({},_snap.data(),{id:_snap.id});
             try{ const _lo2=JSON.parse(localStorage.getItem(SK_ORGS)||'[]'); if(!_lo2.some(function(x){return String(x.id)===String(_o510.id);})){ _lo2.push(_o510); localStorage.setItem(SK_ORGS,JSON.stringify(_lo2)); } }catch(e){}
@@ -646,6 +646,7 @@ firebase.auth().onAuthStateChanged(async function(user){
         if(_o510) ST.currentOrg=_o510;
       }
     }catch(e){ console.warn('소속 기관 정보 로드 실패:', e.message); }
+    try{ if(ST.currentUser && ST.currentUser.orgId && (!ST.currentOrg || !ST.currentOrg.id)){ ST.currentOrg={id:ST.currentUser.orgId,name:ST.currentUser.name||''}; } }catch(e){}
     ST._authLoading=false;
     if(typeof render==='function') render();
     window._sgLoginOv&&window._sgLoginOv(false);
@@ -4511,7 +4512,7 @@ function renderCheckStatusPage(){
   const isOrgAdmin=ST.currentUser?.role==='orgAdmin';
   if(!isAdmin && !isOrgAdmin){ ST.page='main'; return renderMain(); }
 
-  const curOrgId=ST.currentOrg?.id||null;
+  const curOrgId=ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const allOrgs=isAdmin?(()=>{try{return JSON.parse(localStorage.getItem(SK_ORGS)||'[]');}catch(e){return [];}})():[];
   if(!ST.filterOrg) ST.filterOrg='전체';
   const baseStudents = isAdmin
@@ -4779,7 +4780,7 @@ function renderMain(){
   const curUserName = ST.currentUser?.name||'';
   const filters=['전체',...cList];
   // 선생님 계정이면 본인 담당 학생만 표시 (이름 또는 teacherId로 매칭)
-  const curOrgId=ST.currentOrg?.id||null;
+  const curOrgId=ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const teacher2 = (isAdmin||isOrgAdmin) ? null : ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId));
   // 최종관리자 기관 필터
   const allOrgs = isAdmin ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
@@ -17146,7 +17147,7 @@ function renderAdminReport(){
   const isOrgAdmin = ST.currentUser?.role==='orgAdmin';
   const isTeacher = ST.currentUser?.role==='teacher';
   const curUserName = ST.currentUser?.name||'';
-  const curOrgId = ST.currentOrg?.id;
+  const curOrgId = ST.currentOrg?.id||ST.currentUser?.orgId;
 
   // 역할별 학생 필터링
   let baseStudents;
@@ -17222,7 +17223,7 @@ function renderAdminGradeStat(){
   const isAdmin2 = ST.currentUser?.role==='admin';
   const isOrgAdmin2 = ST.currentUser?.role==='orgAdmin';
   const curUserName = ST.currentUser?.name||'';
-  const curOrgId2 = ST.currentOrg?.id||null;
+  const curOrgId2 = ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const teacher2 = (isAdmin2||isOrgAdmin2)?null:ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId));
   const allOrgs2 = isAdmin2 ? JSON.parse(localStorage.getItem(SK_ORGS)||'[]') : [];
   if(!ST.gradStatFilterOrg) ST.gradStatFilterOrg='전체';
@@ -17328,7 +17329,7 @@ function renderAdminGradeStat(){
 // ── 전체 엑셀 내보내기 ──
 function exportAllXls(cat){
   // 기관관리자/선생님은 자기 기관 학생만
-  const curOrgIdE=ST.currentOrg?.id||null;
+  const curOrgIdE=ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const roleE=ST.currentUser?.role;
   const isAdminE=(roleE==='admin');
   // 성적현황 탭에서 선택한 기관 필터 반영
@@ -22251,7 +22252,7 @@ function openAssignStudents(tid){
   const t=ST.teachers.find(x=>String(x.id)===String(tid));
   if(!t){alert('선생님 정보를 찾을 수 없습니다.');return;}
 
-  const curOrgIdA=ST.currentOrg?.id||null;
+  const curOrgIdA=ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const roleA=ST.currentUser?.role;
 
   // 배정 가능한 학생 목록 (역할별 필터)
@@ -23532,7 +23533,7 @@ function openStudentStatusModal(){
 function openStudentAccountModal(){
   const isAdm=ST.currentUser?.role==='admin';
   const isOrg=ST.currentUser?.role==='orgAdmin';
-  const curOrgId=ST.currentOrg?.id||null;
+  const curOrgId=ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const curUserName=ST.currentUser?.name||'';
   const teacher2=(!isAdm&&!isOrg)?ST.teachers.find(t=>String(t.id)===String(ST.currentUser?.teacherId)):null;
 
@@ -23639,7 +23640,7 @@ function openStudentAccountModal(){
 function exportStudentAccountXls(){
   const isAdm=ST.currentUser?.role==='admin';
   const isOrg=ST.currentUser?.role==='orgAdmin';
-  const curOrgId=ST.currentOrg?.id||null;
+  const curOrgId=ST.currentOrg?.id||ST.currentUser?.orgId||null;
   const myStudents = isAdm?ST.students:isOrg?ST.students.filter(s=>s.orgId===curOrgId):ST.students;
   let c=`이름,${isAdm?'기관,':''}학교,학년,반,담당,학생아이디,비밀번호\r\n`;
   myStudents.forEach(s=>{
