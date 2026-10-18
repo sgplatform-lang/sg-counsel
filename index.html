@@ -58907,6 +58907,7 @@ function sgAdmGo(k){
     case 'import': _gg_importData(); break;
     case 'restore': restoreData(); break;
     case 'api': openApiModal(); break;
+    case 'sharedpc': sgToggleSharedPc(); break;
   }
 }
 function _sgNavRow(opt){
@@ -58965,7 +58966,7 @@ function sgNavHtml(){
     if(addOpen){
       var sub=function(k,l,id){ return '<button class="sgr sgr-sub"'+(id?' id="'+id+'"':'')+' onclick="sgAdmGo(\''+k+'\')"><span class="t">'+l+'</span></button>'; };
       admMore.push('<div class="sgsub"><div class="sgsub-st">'+(fbOn?'🟢 Firebase 연결됨':'🟡 로컬 모드')+'</div>'
-        +sub('backup','데이터 백업')+sub('export','내보내기')+sub('import','가져오기','_gg_importBtn')+sub('restore','데이터 복원')+sub('api','API 설정')+'</div>');
+        +sub('backup','데이터 백업')+sub('export','내보내기')+sub('import','가져오기','_gg_importBtn')+sub('restore','데이터 복원')+sub('api','API 설정')+sub('sharedpc',(function(){try{return localStorage.getItem('sg_shared_pc')==='1'?'🖥️ 공용 PC 모드: 켜짐 (끄기)':'🖥️ 공용 PC 모드: 꺼짐 (켜기)';}catch(e){return '🖥️ 공용 PC 모드';}})())+'</div>');
     }
   }
   admMore.push(A('refresh','최신 데이터 불러오기','refresh','#eef0f6','#475569'));
