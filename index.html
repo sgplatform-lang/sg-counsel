@@ -816,7 +816,7 @@ function toast(msg,d){
       <div style="font-size:12px;color:#555;font-weight:600;margin-bottom:6px">비밀번호</div>
       <input id="login_pw" type="password" autocomplete="current-password" style="width:100%;border:1.5px solid #e0e3ef;border-radius:10px;padding:13px 14px;font-size:16px;outline:none;box-sizing:border-box;display:block" placeholder="비밀번호 입력">
     </div>
-    <label style="display:flex;align-items:center;gap:7px;margin:-10px 0 14px;font-size:12px;color:#64748b;cursor:pointer"><input type="checkbox" id="login_keep" checked> 로그인 상태 유지 (공용 PC에서는 해제)</label>
+    <label style="display:flex;align-items:center;justify-content:center;gap:6px;margin:-10px 0 14px;font-size:12px;color:#64748b;cursor:pointer"><span>로그인 상태 유지 (공용 PC에서는 해제)</span><input type="checkbox" id="login_keep" checked style="width:14px;height:14px;min-width:14px;padding:0;margin:0;flex:none;border:none;accent-color:#3b5bdb"></label>
     <script>(function(){try{var c=document.getElementById('login_keep');if(c&&(localStorage.getItem('sg_keep_login')==='0'||localStorage.getItem('sg_shared_pc')==='1'))c.checked=false;}catch(e){}})();</script>
     <button id="login_btn_static" onclick="doLogin()" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">
       로그인
@@ -4199,7 +4199,7 @@ function renderLogin(){
         <input id="login_pw" type="password" autocomplete="current-password"
           style="width:100%;border:1.5px solid #e0e3ef;border-radius:10px;padding:13px 14px;font-size:16px;outline:none;box-sizing:border-box">
       </div>
-      <label style="display:flex;align-items:center;gap:7px;margin:-10px 0 14px;font-size:12px;color:#64748b;cursor:pointer"><input type="checkbox" id="login_keep" ${(function(){try{return (localStorage.getItem('sg_keep_login')==='0'||localStorage.getItem('sg_shared_pc')==='1')?'':'checked';}catch(e){return 'checked';}})()}> 로그인 상태 유지 (공용 PC에서는 해제)</label>
+      <label style="display:flex;align-items:center;justify-content:center;gap:6px;margin:-10px 0 14px;font-size:12px;color:#64748b;cursor:pointer"><span>로그인 상태 유지 (공용 PC에서는 해제)</span><input type="checkbox" id="login_keep" ${(function(){try{return (localStorage.getItem('sg_keep_login')==='0'||localStorage.getItem('sg_shared_pc')==='1')?'':'checked';}catch(e){return 'checked';}})()} style="width:14px;height:14px;min-width:14px;padding:0;margin:0;flex:none;border:none;accent-color:#3b5bdb"></label>
       <button onclick="doLogin()"
         style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">
         로그인
