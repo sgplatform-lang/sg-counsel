@@ -422,8 +422,26 @@ try{
   // 닫으면 자동 로그아웃됐는데 그 습관/기대와 어긋나고, 특히 여러 사람이 쓰는 컴퓨터에서
   // 이전 사람이 로그아웃을 깜빡하면 다음 사람이 그 권한(예: 최종관리자)을 그대로 이어받는
   // 보안 문제가 있다 — 브라우저 탭/창을 닫으면 로그아웃되는 SESSION 방식으로 명시 설정.
+  // ★ 507: 로그인 유지(자동 로그인). 기본은 LOCAL(브라우저를 닫았다 열어도 유지). 공용 PC 모드이거나
+  // 로그인 화면에서 "로그인 상태 유지"를 해제하면 SESSION(창을 닫으면 로그아웃)으로 동작.
+  function _sgKeepLogin(){
+    try{
+      if(localStorage.getItem('sg_shared_pc')==='1') return false;
+      var cb=document.getElementById('login_keep');
+      if(cb) return !!cb.checked;
+      return localStorage.getItem('sg_keep_login')!=='0';
+    }catch(e){ return true; }
+  }
+  function _sgSetPersist(){
+    var keep=_sgKeepLogin();
+    try{ if(document.getElementById('login_keep') && localStorage.getItem('sg_shared_pc')!=='1') localStorage.setItem('sg_keep_login',keep?'1':'0'); }catch(e){}
+    try{
+      return firebase.auth().setPersistence(keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION).catch(function(e){ console.warn('persistence',e.message); });
+    }catch(e){ return Promise.resolve(); }
+  }
+  window._sgKeepLogin=_sgKeepLogin; window._sgSetPersist=_sgSetPersist;
   try{
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION)
+    firebase.auth().setPersistence(_sgKeepLogin()?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION)
       .catch(function(e){ console.warn('Auth persistence 설정 실패(무시하고 진행):', e.message); });
   }catch(e){ console.warn('Auth persistence 설정 실패(무시하고 진행):', e.message); }
   // ★ 2026-09-09(379) 수정: reCAPTCHA Enterprise가 활성화되면서 화면에 안 보이는 배지
@@ -798,6 +816,8 @@ function toast(msg,d){
       <div style="font-size:12px;color:#555;font-weight:600;margin-bottom:6px">비밀번호</div>
       <input id="login_pw" type="password" autocomplete="current-password" style="width:100%;border:1.5px solid #e0e3ef;border-radius:10px;padding:13px 14px;font-size:16px;outline:none;box-sizing:border-box;display:block" placeholder="비밀번호 입력">
     </div>
+    <label style="display:flex;align-items:center;gap:7px;margin:-10px 0 14px;font-size:12px;color:#64748b;cursor:pointer"><input type="checkbox" id="login_keep" checked> 로그인 상태 유지 (공용 PC에서는 해제)</label>
+    <script>(function(){try{var c=document.getElementById('login_keep');if(c&&(localStorage.getItem('sg_keep_login')==='0'||localStorage.getItem('sg_shared_pc')==='1'))c.checked=false;}catch(e){}})();</script>
     <button id="login_btn_static" onclick="doLogin()" style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">
       로그인
     </button>
@@ -4179,6 +4199,7 @@ function renderLogin(){
         <input id="login_pw" type="password" autocomplete="current-password"
           style="width:100%;border:1.5px solid #e0e3ef;border-radius:10px;padding:13px 14px;font-size:16px;outline:none;box-sizing:border-box">
       </div>
+      <label style="display:flex;align-items:center;gap:7px;margin:-10px 0 14px;font-size:12px;color:#64748b;cursor:pointer"><input type="checkbox" id="login_keep" ${(function(){try{return (localStorage.getItem('sg_keep_login')==='0'||localStorage.getItem('sg_shared_pc')==='1')?'':'checked';}catch(e){return 'checked';}})()}> 로그인 상태 유지 (공용 PC에서는 해제)</label>
       <button onclick="doLogin()"
         style="width:100%;background:#3b5bdb;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">
         로그인
@@ -4281,7 +4302,7 @@ function doLogin(){
   // 변경(1단계 — 학생 로그인은 미포함). 실제 role/orgId 반영과 화면 전환은
   // firebase.auth().onAuthStateChanged() 리스너(위쪽 스크립트)가 로그인 성공 이벤트를
   // 받아서 전담 처리한다 — 여기서는 로그인 시도만 하면 된다.
-  firebase.auth().signInWithEmailAndPassword(_sgToAuthEmail(id), pw)
+  _sgSetPersist().then(function(){ return firebase.auth().signInWithEmailAndPassword(_sgToAuthEmail(id), pw); })
     .catch(function(e){
       if(!err) return;
       if(e.code==='auth/wrong-password' || e.code==='auth/user-not-found' || e.code==='auth/invalid-credential' || e.code==='auth/invalid-email'){
