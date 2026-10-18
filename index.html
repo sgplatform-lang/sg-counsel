@@ -454,9 +454,15 @@ try{
   // 표준 HTTP 롱폴링 방식을 자동으로 감지해서 대신 쓰도록 설정한다. 살짝 느려질 수는
   // 있지만(스트리밍 대신 폴링), 연결 자체가 아예 안 되는 것보다 훨씬 낫다.
   try{
-    _db.settings({ experimentalAutoDetectLongPolling: true });
+    _db.settings({ experimentalAutoDetectLongPolling: true, cacheSizeBytes: (firebase.firestore.CACHE_SIZE_UNLIMITED||-1) });
     console.log("ℹ️ Firestore: 네트워크 환경에 따라 자동으로 롱폴링 방식을 감지하도록 설정했습니다.");
   }catch(e){ console.warn('Firestore settings() 적용 실패(무시하고 진행):', e.message); }
+  // ★ 503: 로컬 캐시 영구 저장(여러 탭 동기화). 실패해도(시크릿 모드·미지원 브라우저) 기존처럼 서버에서 받으며 계속 진행.
+  try{
+    _db.enablePersistence({ synchronizeTabs: true })
+      .then(function(){ console.log('✅ Firestore 로컬 캐시 활성화(다음 로그인부터 빠르게 열립니다)'); })
+      .catch(function(e){ console.warn('Firestore 로컬 캐시를 쓸 수 없는 환경(무시하고 진행):', e&&e.code); });
+  }catch(e){ console.warn('로컬 캐시 설정 실패(무시하고 진행):', e&&e.message); }
   const _storage = firebase.storage(); // ★ 2026-08-27 추가: 문항 이미지 영구 저장용
   window._fb = {
     db: _db,
@@ -2313,6 +2319,7 @@ function _sgHeaderMoreHtml(){
     ${ST._headerMoreOpen?`<div id="sgHeaderMorePanel" style="position:absolute;top:calc(100% + 6px);right:0;width:210px;background:#fff;border:1px solid #e0e3ef;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);z-index:200;padding:6px">
       <div style="padding:6px 8px;font-size:11px;color:#888;border-bottom:1px solid #f0f0f0;margin-bottom:4px">${fbOn?'🟢 Firebase 연결됨':'🟡 로컬 모드'}</div>
       <button onclick="closeHeaderMorePanel();backupData()" style="${itemStyle}">💾 데이터 백업</button>
+      <button onclick="closeHeaderMorePanel();sgToggleSharedPc()" style="${itemStyle}">${(function(){try{return localStorage.getItem('sg_shared_pc')==='1'?'🖥️ 공용 PC 모드: 켜짐 (끄기)':'🖥️ 공용 PC 모드: 꺼짐 (켜기)';}catch(e){return '🖥️ 공용 PC 모드';}})()}</button>
       <button onclick="closeHeaderMorePanel();_gg_exportData()" style="${itemStyle}">📥 내보내기</button>
       <button id="_gg_importBtn" onclick="closeHeaderMorePanel();_gg_importData()" style="${itemStyle}">📤 가져오기</button>
       <button onclick="closeHeaderMorePanel();restoreData()" style="${itemStyle}">📥 데이터 복원</button>
@@ -4338,6 +4345,32 @@ function doLogout(){
   if(_chHost){ _chHost.style.left = '-99999px'; }
   window.__challengerLoadedFor = null;
   render();
+  // ★ 504: 공용 PC로 표시된 기기는 로그아웃 시 이 기기에 저장된 학생 데이터를 지운다
+  try{ if(localStorage.getItem('sg_shared_pc')==='1') sgWipeLocalData(); }catch(_eW){}
+}
+function sgToggleSharedPc(){
+  let on=false; try{ on=localStorage.getItem('sg_shared_pc')==='1'; }catch(e){}
+  if(!on){
+    if(!confirm('이 기기를 공용 PC로 설정합니다.\n\n로그아웃할 때마다 이 기기에 저장된 학생 데이터(복사본)를 삭제하고 화면을 새로고침합니다. 서버의 데이터는 삭제되지 않습니다.\n다음 로그인은 처음처럼 느릴 수 있습니다.\n\n계속할까요?')) return;
+    try{ localStorage.setItem('sg_shared_pc','1'); }catch(e){}
+    if(typeof toast==='function') toast('🖥️ 공용 PC 모드를 켰습니다 (이 기기에서 로그아웃하면 저장 데이터를 지웁니다)', 4000);
+  }else{
+    try{ localStorage.removeItem('sg_shared_pc'); }catch(e){}
+    if(typeof toast==='function') toast('🖥️ 공용 PC 모드를 껐습니다', 3000);
+  }
+  render();
+}
+function sgWipeLocalData(){
+  try{ const keep=localStorage.getItem('sg_shared_pc'); localStorage.clear(); if(keep) localStorage.setItem('sg_shared_pc',keep); }catch(e){}
+  const done=function(){ try{ sessionStorage.setItem('sg_wipe_done','1'); }catch(e){} location.reload(); };
+  try{
+    const au=firebase.auth().signOut();
+    Promise.resolve(au).catch(function(){}).then(function(){
+      const db=window._fb&&window._fb.db;
+      if(!db){ done(); return; }
+      db.terminate().then(function(){ return db.clearPersistence(); }).catch(function(e){ console.warn('로컬 캐시 삭제 실패', e&&e.message); }).then(done);
+    });
+  }catch(e){ done(); }
 }
 
 // ★ 지정한 날짜 기준 플랜점검 현황 집계 (점검현황 전용 화면에서 사용)
@@ -38677,6 +38710,10 @@ function renderChallenger(s){
     }
     window.addEventListener('resize', repositionThrottled);
     window.addEventListener('scroll', repositionThrottled, true);
+    // ★ 504: 챌린저 자리(#challenger-slot)가 화면에 "나중에" 그려지는 경우(데이터가 많아 렌더가 늦을 때)
+    // 처음 3초 확인과 body 크기 변화만으로는 위치 갱신을 놓쳐 "불러오는 중"이 계속 보였다.
+    // DOM이 바뀔 때마다(rAF로 묶어서) 한 번만 위치를 확인한다. 스크롤과는 무관하므로 떨림 문제 없음.
+    try{ new MutationObserver(function(){ repositionThrottled(); }).observe(document.body,{childList:true,subtree:true}); }catch(_eMo){}
   }
 
   // ★ 학생이 바뀌었으면 해당 학생 데이터로 다시 초기화
@@ -38688,6 +38725,7 @@ function renderChallenger(s){
     const trySend = ()=>{
       if(ifr && ifr.contentWindow){
         _gg_sendChallengerInit(ifr, curStu);
+        if(window.__sgChallengerReposition) window.__sgChallengerReposition();
       }
     };
     // iframe이 이미 로드되어 있을 수도 있으므로 약간의 지연 후 전송 시도
