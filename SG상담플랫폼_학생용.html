@@ -193,6 +193,7 @@ window._sgApp.auth().onAuthStateChanged(async function(user){
     window._sgLoginOv&&window._sgLoginOv(false); window._sgApp.auth().signOut();
     return;
   }
+  try{ if(localStorage.getItem('sg_shared_pc')!=='1' && localStorage.getItem('sg_keep_login')!=='0') localStorage.setItem('sg_had_login','1'); }catch(e){}
   const err=document.getElementById('login_err');
   if(err) err.textContent='⏳ 정보를 불러오는 중...';
   try{
