@@ -40491,9 +40491,9 @@ async function _examcatUploadByFilename(fileList, mode){
   }
   const groups = {}; // key: "SUBJ|DETAIL|start-end" → {subj, detail, rangeKey, items:[{file,pageIdx}]}
   good.forEach(function(p){
-    const rangeKey = p.meta.start+'-'+p.meta.end;
+    const rangeKey = p.meta.subNo ? ('sub'+p.meta.subNo) : (p.meta.start+'-'+p.meta.end); // ★ 2026-11-12: 소문항 이미지는 별도 그룹
     const groupKey = p.meta.subj+'|'+p.meta.detail+'|'+rangeKey;
-    if(!groups[groupKey]) groups[groupKey]={subj:p.meta.subj, detail:p.meta.detail, rangeKey:rangeKey, items:[]};
+    if(!groups[groupKey]) groups[groupKey]={subj:p.meta.subj, detail:p.meta.detail, rangeKey:rangeKey, subNo:p.meta.subNo||'', baseNo:p.meta.start, items:[]};
     const pm = String(p.file.name).match(/_p(\d+)\s*\./i);
     groups[groupKey].items.push({file:p.file, pageIdx: pm?parseInt(pm[1],10):1});
   });
@@ -40508,7 +40508,7 @@ async function _examcatUploadByFilename(fileList, mode){
     const g = groups[gk];
     const items = g.items.slice().sort(function(a,b){ return a.pageIdx-b.pageIdx; });
     const groupId = gk+'_'+Date.now();
-    const nums = _examcatExpandRange(g.rangeKey);
+    const nums = g.subNo ? [g.subNo] : _examcatExpandRange(g.rangeKey); // ★ 2026-11-12: 소문항은 "15-1" 번호 하나로 저장
     if(!nums.length){ failMsgs.push(gk+' (구간 형식이 올바르지 않음)'); doneGroups++; continue; }
     try{
       const pages=[];
@@ -40520,7 +40520,8 @@ async function _examcatUploadByFilename(fileList, mode){
       const subjDetailKey = g.subj+'|'+g.detail;
       if(!rootMap[subjDetailKey]) rootMap[subjDetailKey]={};
       nums.forEach(function(no){
-        rootMap[subjDetailKey][no] = {url:pages[0].url, path:pages[0].path, start:nums[0], end:nums[nums.length-1], pages:pages, groupId:groupId};
+        rootMap[subjDetailKey][no] = {url:pages[0].url, path:pages[0].path, start:(g.subNo?g.baseNo:nums[0]), end:(g.subNo?g.baseNo:nums[nums.length-1]), pages:pages, groupId:groupId};
+        if(g.subNo) rootMap[subjDetailKey][no].subNo=g.subNo; // ★ Firestore는 undefined 값을 거부하므로 있을 때만 추가
       });
     }catch(e){
       failMsgs.push(gk+' (오류: '+e.message+')');
@@ -41028,6 +41029,74 @@ function _examcatPreviewDetailKeys(){
 }
 const _EXAMCAT_SQ_NAME2CODE={'수학':'MATH','국어':'KOR','영어':'ENG','한국사':'HIST','탐구':'INQ','MATH':'MATH','KOR':'KOR','ENG':'ENG','HIST':'HIST','INQ':'INQ'};
 const _EXAMCAT_SQ_CODE2NAME={MATH:'수학',KOR:'국어',ENG:'영어',HIST:'한국사',INQ:'탐구'};
+// ★ 2026-11-12 추가(소문항 지원 + 학생용과 채점 규칙 통일): 관리자 "🖊️ 학생답안" 보기·수정·
+// 재채점과 미응답 내보내기가 예전엔 1번부터 문항 수까지 숫자로만 돌아서, 카탈로그에
+// "15-1", "15-2"처럼 등록한 소문항 답안이 보이지도 저장되지도 않았다(관리자가 저장하면 소문항
+// 답이 사라질 수 있었음). 또 재채점 비교 규칙이 학생용(2026-11-10 수정: 분수·복소수·식 전체 비교,
+// "5+9+27+35" 묶음 정답, 객관식 2+4 복수선택)과 달라 같은 답이 화면마다 다르게 채점될 수 있었다.
+// 학생용 파일의 _chgAnsQNoList / _chgAnsResolvedType / _chgAnsIs*Correct와 동일한 규칙을 여기에 둔다.
+window._sgAnsHelpers = (function(){
+  function isQNo(v){ return /^\d{1,3}(-\d{1,2})?$/.test(String(v==null?'':v).trim()); }
+  function sortQNos(arr){
+    return arr.slice().sort(function(a,b){
+      var pa=String(a).split('-').map(Number), pb=String(b).split('-').map(Number);
+      return (pa[0]-pb[0]) || ((pa[1]||0)-(pb[1]||0));
+    });
+  }
+  // 저장된 학생 답안·오답 번호로 문항 목록을 만든다(없으면 1~total)
+  function qListFromSubject(sub){
+    var keys=Object.keys((sub&&sub.studentAnswers)||{}).concat(((sub&&sub.items)||[]).map(function(it){ return String(it.no); }));
+    var uniq=[]; keys.forEach(function(k){ k=String(k).trim(); if(isQNo(k) && uniq.indexOf(k)<0) uniq.push(k); });
+    if(uniq.length) return sortQNos(uniq);
+    var total=+((sub&&sub.totalItemCount)||0); var out=[]; for(var i=1;i<=total;i++) out.push(String(i)); return out;
+  }
+  function resolvedType(entry, code, no, total){
+    if(String(no).indexOf('-')>=0) return 'short';
+    var sq=entry && entry.shortQNos && entry.shortQNos[code];
+    if(sq && sq.length) return (sq.indexOf(+no)>=0) ? 'short' : 'mc5';
+    if(code==='MATH' && total===30){ var n=+no; return ((n>=1&&n<=15)||(n>=23&&n<=28)) ? 'mc5' : 'short'; }
+    return 'mc5';
+  }
+  function normMc(v){
+    var t=String(v==null?'':v).trim(); var map={'①':'1','②':'2','③':'3','④':'4','⑤':'5'};
+    if(map[t]) return map[t]; var m=t.match(/^[①-⑤]/); if(m) return map[m[0]];
+    var n=t.replace(/[^\d]/g,''); return n||t;
+  }
+  function splitMulti(raw){ return String(raw||'').split(/\s*(?:,|\/|·|또는|혹은)\s*/).map(function(x){return x.trim();}).filter(Boolean); }
+  function isCheckbox(raw){ return /^\s*[1-5①-⑤](\s*\+\s*[1-5①-⑤])+\s*$/.test(String(raw==null?'':raw)); }
+  function checkboxCorrect(my, raw){
+    var need=String(raw||'').split('+').map(function(x){return normMc(x.trim());}).filter(Boolean);
+    var got=String(my||'').split(',').map(function(x){return normMc(x.trim());}).filter(Boolean);
+    if(!need.length || need.length!==got.length) return false;
+    return need.slice().sort().join('|')===got.slice().sort().join('|');
+  }
+  function normShort(v){
+    return String(v==null?'':v).replace(/\s+/g,'').replace(/[−–—‐－]/g,'-').replace(/＋/g,'+').replace(/[×✕]/g,'*').replace(/÷/g,'/')
+      .replace(/¹/g,'^1').replace(/²/g,'^2').replace(/³/g,'^3').replace(/⁴/g,'^4').replace(/⁵/g,'^5').replace(/⁶/g,'^6').replace(/⁷/g,'^7').replace(/⁸/g,'^8').replace(/⁹/g,'^9').replace(/⁰/g,'^0')
+      .toLowerCase();
+  }
+  function splitShortAlt(raw){ return String(raw==null?'':raw).split(/\s*(?:,|또는|혹은|\|)\s*/).map(function(x){return x.trim();}).filter(Boolean); }
+  function isShortSet(raw){ return /^\s*-?\d+(\.\d+)?(\s*\+\s*-?\d+(\.\d+)?)+\s*$/.test(String(raw==null?'':raw).replace(/[−–—‐－]/g,'-')); }
+  function setKey(list){ return list.map(function(x){ var n=Number(x); return isNaN(n)?x:String(n); }).sort().join('|'); }
+  function shortCorrect(my, raw){
+    my=String(my==null?'':my).trim(); if(!my) return false;
+    if(isShortSet(raw)){
+      var need=String(raw).replace(/[−–—‐－]/g,'-').split('+').map(function(x){return x.trim();}).filter(Boolean);
+      var got=my.replace(/[−–—‐－]/g,'-').split(/[\s,，、·;+]+/).map(function(x){return x.trim();}).filter(Boolean);
+      return need.length>0 && need.length===got.length && setKey(need)===setKey(got);
+    }
+    var k=normShort(my);
+    if(k===normShort(raw)) return true;
+    return splitShortAlt(raw).some(function(o){ return k===normShort(o); });
+  }
+  function isCorrect(type, my, raw){
+    if(!raw) return false;
+    if(type==='mc5' && isCheckbox(raw)) return checkboxCorrect(my, raw);
+    if(type==='mc5'){ var m=normMc(my); return splitMulti(raw).some(function(o){ return normMc(o)===m; }); }
+    return shortCorrect(my, raw);
+  }
+  return {isQNo:isQNo, sortQNos:sortQNos, qListFromSubject:qListFromSubject, resolvedType:resolvedType, isCorrect:isCorrect};
+})();
 function _examcatParseShortQ(text){
   // "22-30" / "수학: 22-30, 영어: 40-42" / "MATH 22~30, 25" → {MATH:[22..30,25]}
   const out={}; const src=String(text||'').trim(); if(!src) return out;
@@ -41040,7 +41109,9 @@ function _examcatParseShortQ(text){
     body.split(/[,，\s]+/).forEach(function(tok){
       tok=tok.trim(); if(!tok) return;
       const r=tok.match(/^(\d{1,3})\s*[-~–]\s*(\d{1,3})$/);
-      if(r){ let x=+r[1], y=+r[2]; if(x>y){ const t=x;x=y;y=t; } for(let n=x;n<=y&&n<=200;n++){ if(nums.indexOf(n)<0) nums.push(n); } }
+      // ★ 2026-11-12: "15-1"처럼 뒤 숫자가 더 작은 건 범위가 아니라 소문항 번호다 — 예전엔 앞뒤를
+      // 뒤집어 1~15번 전체를 단답형으로 바꿔버렸다. 소문항은 학생 화면에서 자동으로 단답형이므로 무시한다.
+      if(r){ let x=+r[1], y=+r[2]; if(x>y) return; for(let n=x;n<=y&&n<=200;n++){ if(nums.indexOf(n)<0) nums.push(n); } }
       else if(/^\d{1,3}$/.test(tok)){ const n=+tok; if(nums.indexOf(n)<0) nums.push(n); }
     });
     if(nums.length){ nums.sort(function(p,q){return p-q;}); out[code]=nums; }
@@ -41657,10 +41728,10 @@ async function sgExportStudentSelfAnswers(){
       var total = sub.totalItemCount || Object.keys(sub.studentAnswers||{}).length;
       var wrongNos = (sub.items||[]).map(function(it){ return String(it.no); });
       var omittedNos=[];
-      for(var no=1; no<=total; no++){
+      window._sgAnsHelpers.qListFromSubject(sub).forEach(function(no){ // ★ 2026-11-12: 소문항 지원
         var v=(sub.studentAnswers||{})[no];
         if(!String(v==null?'':v).trim()) omittedNos.push(String(no));
-      }
+      });
       rows.push(['', s.name||'', s.school||'', s.grade||'', examDate, examName, s.counselor||'',
         sub.subject||'', subjLabel[sub.subject]||sub.subject||'', sub.detail||'',
         sub.score!=null?sub.score:'', wrongNos.join(','), String(wrongNos.length), omittedNos.join(','), '']);
@@ -42106,11 +42177,23 @@ function _cbrParseImageFilename(filename){
   if(parts.length<2) return null;
   const subj=(parts[0]||'').toUpperCase();
   let detail='', rangeStr='';
-  if(parts.length>=3 && !/^\d+\s*-\s*\d+$/.test(parts[1]) && !/^\d+$/.test(parts[1])){
+  if(parts.length>=3 && !/^\d+\s*-\s*\d+$/.test(parts[1]) && !/^\d+$/.test(parts[1]) && !/^\d+\s*\(\s*\d+\s*\)$/.test(parts[1])){
     detail=_cbrNormDetail(parts[1]);
     rangeStr=parts[2];
   } else {
     rangeStr=parts[1];
+  }
+  // ★ 2026-11-12 추가(소문항 이미지): "15-1"처럼 뒤 숫자가 앞보다 작은 형식(예전엔 거꾸로 된 구간이라
+  // 업로드가 거부되던 형식)과 "15(1)" 형식은 "15번 문제의 (1)번 소문항" 전용 이미지로 본다.
+  // 같은 번호에 _p1/_p2로 여러 장도 가능하다. 1-1, 2-2처럼 뒤 숫자가 앞보다 작지 않은 소문항은
+  // 구간과 구분이 안 되므로 반드시 1(1), 2(2)처럼 괄호 형식으로 적는다.
+  const _rs=String(rangeStr||'').trim();
+  const _mp=_rs.match(/^(\d+)\s*\(\s*(\d+)\s*\)$/);
+  const _mr=_rs.match(/^(\d+)\s*-\s*(\d+)$/);
+  if(_mp || (_mr && parseInt(_mr[2],10)<parseInt(_mr[1],10))){
+    const _a=parseInt((_mp||_mr)[1],10), _b=parseInt((_mp||_mr)[2],10);
+    if(isNaN(_a)||isNaN(_b)||_b<1) return null;
+    return {subj:subj, detail:detail, start:_a, end:_a, subNo:_a+'-'+_b};
   }
   const m=String(rangeStr||'').match(/(\d+)\s*-\s*(\d+)/);
   let start,end;
@@ -42136,7 +42219,7 @@ function _cbrLoadQuestionImages(){
         if(parsed){
           const key=parsed.subj+'|'+parsed.detail;
           if(!map[key]) map[key]=[];
-          map[key].push({start:parsed.start, end:parsed.end, dataUrl:reader.result, filename:f.name});
+          map[key].push({start:parsed.start, end:parsed.end, subNo:parsed.subNo||'', dataUrl:reader.result, filename:f.name}); // ★ 2026-11-12: 소문항 이미지 구분
         }
         if(statusEl) statusEl.textContent='이미지 읽는 중... ('+done+'/'+files.length+')';
         resolve();
@@ -42177,7 +42260,7 @@ function _cbrLoadExplanationImages(){
         if(parsed){
           const key=parsed.subj+'|'+parsed.detail;
           if(!map[key]) map[key]=[];
-          map[key].push({start:parsed.start, end:parsed.end, dataUrl:reader.result, filename:f.name});
+          map[key].push({start:parsed.start, end:parsed.end, subNo:parsed.subNo||'', dataUrl:reader.result, filename:f.name}); // ★ 2026-11-12: 소문항 이미지 구분
         }
         if(statusEl) statusEl.textContent='이미지 읽는 중... ('+done+'/'+files.length+')';
         resolve();
@@ -42204,9 +42287,17 @@ function _cbrLookupQuestionImages(map, subjectCode, detail, no){
   const subj=String(subjectCode||'').toUpperCase();
   const n=parseInt(no,10);
   const normDetail=String(detail||'').normalize?String(detail||'').normalize('NFC'):String(detail||'');
-  const pools=(map[subj+'|'+normDetail]||[]).concat(map[subj+'|']||[]);
-  return pools.filter(function(e){return n>=e.start && n<=e.end;})
-    .sort(function(a,b){return String(a.filename).localeCompare(String(b.filename));});
+  // ★ 2026-11-12 수정: 세부과목이 없는 공통 문항은 두 키가 같은 "과목|"이라, 예전엔 같은 이미지를 두 번 이어 붙여 오답노트에 이미지가 중복 출력됐다.
+  const pools=normDetail ? (map[subj+'|'+normDetail]||[]).concat(map[subj+'|']||[]) : (map[subj+'|']||[]).slice();
+  const _byName=function(a,b){return String(a.filename).localeCompare(String(b.filename));};
+  // ★ 2026-11-12: 소문항(15-1)이면 그 소문항 전용 이미지를 먼저 쓰고, 없으면 15번 문제 전체 이미지를 쓴다.
+  // 일반 문항(15)에는 소문항 전용 이미지가 섞이지 않게 한다.
+  const _sNo=String(no);
+  if(/^\d+-\d+$/.test(_sNo)){
+    const exact=pools.filter(function(e){return e.subNo===_sNo;});
+    if(exact.length) return exact.sort(_byName);
+  }
+  return pools.filter(function(e){return !e.subNo && n>=e.start && n<=e.end;}).sort(_byName);
 }
 // ★ 2026-08-27 추가: 시험 카탈로그에 PDF 드래그로 영구 저장해둔 문항/해설 이미지를
 // 찾는 함수. 세션 업로드(_cbrLookupQuestionImages)와 반환 형태를 동일하게 맞춰서
@@ -42282,7 +42373,13 @@ function _examcatLookupCatalogImages(examEntry, mode, subjectCode, detail, no){
   // ★ 2026-08-28 수정: qImages/eImages가 "과목코드|세부과목" 2단 구조로 바뀌었으므로,
   // 세부과목이 정확히 일치하는 그룹을 먼저 찾고, 없으면 세부과목 없는 공통 그룹을 본다.
   // (예전에 과목 구분 없이 저장된 데이터는 "|"(빈 과목빈 세부과목) 키에 남아있을 수 있어 마지막으로 확인)
-  const found = (rootMap[subj+'|'+normDetail]||{})[no] || (rootMap[subj+'|']||{})[no] || (rootMap['|']||{})[no];
+  let found = (rootMap[subj+'|'+normDetail]||{})[no] || (rootMap[subj+'|']||{})[no] || (rootMap['|']||{})[no];
+  // ★ 2026-11-12 추가(소문항 지원): 오답 문항이 "15-1"·"15-2" 같은 소문항이면, 카탈로그에는
+  // 문제 전체 이미지가 15번(파일명 MATH_15-15_p1 등)으로 저장돼 있으므로 15번 이미지를 그대로 쓴다.
+  if(!found && /^\d+-\d+$/.test(String(no))){
+    const base=String(parseInt(no,10));
+    found = (rootMap[subj+'|'+normDetail]||{})[base] || (rootMap[subj+'|']||{})[base] || (rootMap['|']||{})[base];
+  }
   if(!found) return [];
   // ★ 다중 페이지(pages 배열)로 저장된 항목을 순서대로 모두 반환.
   // pages가 없는 예전 데이터(드래그로 한 장만 저장)는 url 하나짜리로 그대로 처리(하위호환).
@@ -56093,7 +56190,7 @@ function generateReport() {
       }
       var subjBlocks=subs.map(function(s, subjIdx){
         var items=(s.items||[]).filter(function(it){return it&&it.no;})
-          .slice().sort(function(a,b){return (parseInt(a.no,10)||0)-(parseInt(b.no,10)||0);});
+          .slice().sort(function(a,b){var pa=String(a.no).split('-'),pb=String(b.no).split('-');return ((parseInt(pa[0],10)||0)-(parseInt(pb[0],10)||0))||((parseInt(pa[1],10)||0)-(parseInt(pb[1],10)||0));});
         if(!items.length) return '';
         // ★ 2026-08-29 수정: "이 과목의 첫 문항"은 이 과목 소제목(h3) 바로 아래에 자연스럽게
         // 이어져야 하는데, 이 플래그를 학생 전체 기준으로 한 번만 두고 있어서, 두 번째
@@ -56113,7 +56210,10 @@ function generateReport() {
           // 그 안에서 지금 카드가 다루는 문항이 몇 번인지 한눈에 보이도록 강조 배너를 붙인다.
           // 문항 하나만 딱 자른 이미지(start===end)라면 이미 명확하므로 배너를 붙이지 않는다.
           var qRange=qImages[0];
-          var qBanner=(qRange && qRange.start!==qRange.end)
+          var _wnSub=String(it.no).match(/^(\d+)-(\d+)$/); // ★ 2026-11-12: 소문항(15-1 등)이면 어느 소문항인지 표시
+          var qBanner=_wnSub
+            ? '<div class="wn-question-marker">🔎 아래 '+_wnEsc(_wnSub[1])+'번 문제 중 <b>('+_wnEsc(_wnSub[2])+')번 소문항</b>입니다</div>'
+            : (qRange && qRange.start!==qRange.end)
             ? '<div class="wn-question-marker">🔎 아래 자료에서 이 문항만 확인하세요 → <b>'+_wnEsc(it.no)+'번</b></div>'
             : '';
           var questionHtml=qImages.length
@@ -56124,7 +56224,9 @@ function generateReport() {
           if(!eImages.length && examCatEntry) eImages=_examcatLookupCatalogImages(examCatEntry,'e',s.subject,s.detail,it.no); // ★ 세션 업로드에 없으면 카탈로그 영구 저장분 확인 (과목+세부과목 일치하는 것만)
           if(eImages.length){
             var eRange=eImages[0];
-            var eBanner=(eRange && eRange.start!==eRange.end)
+            var eBanner=_wnSub
+              ? '<div class="wn-question-marker">🔎 아래 해설 중 <b>('+_wnEsc(_wnSub[2])+')번 소문항</b> 부분을 확인하세요</div>'
+              : (eRange && eRange.start!==eRange.end)
               ? '<div class="wn-question-marker">🔎 아래 자료에서 이 문항만 확인하세요 → <b>'+_wnEsc(it.no)+'번</b></div>'
               : '';
             explainHtml='<div class="wn-explain"><b class="wn-explain-label">해설 ('+_wnEsc(it.no)+'번)</b>'+eBanner+
@@ -56520,18 +56622,18 @@ function generateReport() {
     var wrongMap={}; (s.items||[]).forEach(function(it){ wrongMap[it.no]=it; });
     var total=s.totalItemCount||Object.keys(s.studentAnswers||{}).length;
     var cells=[];
-    for(var no=1;no<=total;no++){
+    window._sgAnsHelpers.qListFromSubject(s).forEach(function(no){ // ★ 2026-11-12: 소문항(15-1 등) 지원
       var my=(s.studentAnswers||{})[no];
       var w=wrongMap[no];
       var isWrong=!!w;
       // ★ 2026-08-30 추가: 관리자는 학생이 입력한 답을 직접 고칠 수 있어야 한다(학생은 제출
       // 후 수정이 막혀 있으므로, 오입력 등을 바로잡을 방법이 관리자 쪽에만 남아있어야 함).
       cells.push('<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;background:'+(isWrong?'#fff5f5':'#fff')+'">'
-        +'<span style="width:24px;font-weight:700;color:#555">'+no+'</span>'
+        +'<span style="min-width:24px;font-weight:700;color:#555">'+no+'</span>'
         +'<span style="display:flex;align-items:center;gap:5px;flex:1">학생 답: <input type="text" value="'+esc2(my||'')+'" id="sg-ansedit-'+no+'" style="width:70px;padding:3px 6px;border:1px solid #ccc;border-radius:5px;font-size:12px"></span>'
         +(isWrong?'<span style="color:#e53935">정답: '+esc2(w.answer)+' (오답)</span>':'<span style="color:#16a34a">정답</span>')
         +'</div>');
-    }
+    });
     det.innerHTML='<div style="border-top:2px solid #0f766e;padding-top:10px"><b style="font-size:13px">문항별 답안 (관리자가 직접 수정할 수 있습니다)</b>'
       +'<div style="max-height:320px;overflow:auto;margin-top:6px;border:1px solid #e2e8f0;border-radius:8px">'+cells.join('')+'</div>'
       +'<button onclick="window._sgSaveEditedAnswers(\''+idx+'\')" style="margin-top:10px;width:100%;padding:10px;background:#0369a1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">💾 수정 저장(재채점)</button>'
@@ -56543,11 +56645,12 @@ function generateReport() {
     if(!s||!cur){ alert('오류: 학생 정보를 찾을 수 없습니다.'); return; }
     var cd=cur.challengerData||{};
     var total=s.totalItemCount||Object.keys(s.studentAnswers||{}).length;
+    var qList=window._sgAnsHelpers.qListFromSubject(s); // ★ 2026-11-12: 소문항(15-1 등) 지원
     var newAnswers={};
-    for(var no=1;no<=total;no++){
+    qList.forEach(function(no){
       var el=document.getElementById('sg-ansedit-'+no);
       if(el) newAnswers[no]=el.value;
-    }
+    });
     // ★ 재채점을 위해 카탈로그(정답/해설/단원)를 다시 조회한다 — 이미 열려있으면 캐시 재사용.
     await _ensureExamCatalogLoaded();
     var examEntry=(ST.examCatalog||[]).find(function(e){ return String(e.examName||'').trim()===String(window._sgAnsViewRoundName||cd.lastTestName||'').trim(); });
@@ -56577,9 +56680,9 @@ function generateReport() {
     // 이제는 정답을 찾은 문항만 배점을 합산하고, 하나도 못 찾았으면 채점 자체를 중단해
     // 잘못된 0점이 조용히 저장되는 일을 막는다.
     var items=[]; var gotPoints=0, totalPoints=0, foundAnswerCount2=0;
-    for(var no2=1;no2<=total;no2++){
+    for(var qi=0;qi<qList.length;qi++){ var no2=qList[qi];
       var ak=akMapDetail[no2]||akMapCommon[no2]||{}; var meta=metaMapDetail[no2]||metaMapCommon[no2]||{};
-      var points=(+ak.points)||(+meta.points)||(100/total);
+      var points=(+ak.points)||(+meta.points)||(100/(qList.length||total));
       var correctRaw=ak.answer||meta.answer||'';
       var myRaw=newAnswers[no2];
       if(!correctRaw) continue;
@@ -56588,10 +56691,9 @@ function generateReport() {
       // 5지선다/단답형 구분 없이, 정답 표기(①~⑤ 등)까지 정규화해서 비교(학생용 채점 로직과 동일 규칙)
       var mcMap={'①':'1','②':'2','③':'3','④':'4','⑤':'5'};
       function normMc(v){ var t=String(v==null?'':v).trim(); if(mcMap[t])return mcMap[t]; var mm=t.match(/^[①-⑤]/); if(mm)return mcMap[mm[0]]; var n=t.replace(/[^\d]/g,''); return n||t; }
-      var isMcLike=/^[①-⑤1-5]$/.test(String(correctRaw).trim());
-      var isCorrect=isMcLike
-        ? normMc(myRaw)===normMc(correctRaw)
-        : (String(myRaw||'').trim().replace(/\s/g,'')===String(correctRaw).trim().replace(/\s/g,'') && String(myRaw||'').trim()!=='');
+      // ★ 2026-11-12: 학생용 채점과 완전히 같은 규칙(문항 유형 판정 + 객관식/복수선택/단답형 비교)으로 통일
+      var _qType=window._sgAnsHelpers.resolvedType(examEntry, s.subject, no2, qList.length);
+      var isCorrect=window._sgAnsHelpers.isCorrect(_qType, myRaw, correctRaw);
       if(isCorrect){ gotPoints+=points; }
       else{
         items.push({no:String(no2), unit:meta.unit||'', diff:meta.diff||'중', reasons:(function(){ var prevIt=(s.items||[]).find(function(x){return String(x.no)===String(no2);}); return prevIt?prevIt.reasons||[]:[]; })(),
