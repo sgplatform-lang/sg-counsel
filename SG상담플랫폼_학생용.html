@@ -639,7 +639,7 @@ function render(){
     ${renderHdr()}
     <div class="content" id="content">
       <div class="inner">
-        ${curTab==='timetable'?(_planSubBar()+renderTimetable()):curTab==='grade'?renderGrade():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?(_planSubBar()+renderPlanInspect()):curTab==='stats'?(_planSubBar()+renderPlanStats()):(curTab==='xlab'&&CU&&CU.xlabEnabled)?renderXlab():(curTab==='apex'&&CU&&CU.apexEnabled)?renderApexStudent():renderInfo()}
+        ${curTab==='timetable'?(_planSubBar()+renderTimetable()):curTab==='grade'?renderGrade():curTab==='my'?MY_render():curTab==='challenger'?renderChallengerInput():curTab==='challengeranswer'?renderChallengerAnswerInput():curTab==='inspect'?(_planSubBar()+renderPlanInspect()):curTab==='stats'?(_planSubBar()+renderPlanStats()):(curTab==='xlab'&&CU&&CU.xlabEnabled)?renderXlab():(curTab==='apex'&&CU&&CU.apexEnabled)?renderApexStudent():renderInfo()}
       </div>
     </div>
     ${renderTabbar()}`;
@@ -968,7 +968,7 @@ function renderTabbar(){
   // ★ 2026-09-27 추가: X-lab은 관리자가 학생 등록/수정 시 개별로 켜준 학생에게만
   // 보여야 하므로(전체 학생 기본 노출 금지 요청), CU.xlabEnabled가 true인 경우에만
   // 탭 목록에 포함시킨다 — 관리자에서 이 값을 꺼두면 새로고침/재로그인 시 즉시 탭이 사라짐.
-  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'grade',icon:'📊',label:'성적'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'}]
+  const tabs=[{id:'timetable',icon:'📅',label:'주간플랜'},{id:'grade',icon:'📊',label:'성적'},{id:'my',icon:'🗂️',label:'내 현황'},{id:'challenger',icon:'🎯',label:'챌린저'},{id:'challengeranswer',icon:'🖊️',label:'챌린저 답안'}]
     .concat(CU && CU.xlabEnabled ? [{id:'xlab',icon:'🔬',label:'X-lab'}] : [])
     .concat(CU && CU.apexEnabled ? [{id:'apex',icon:'🏆',label:'APEX'}] : [])
     .concat([{id:'info',icon:'👤',label:'내 정보'}]);
@@ -977,6 +977,233 @@ function renderTabbar(){
     <span class="tb-ic">${_TBI[t.id]||''}</span><span>${t.label==='주간플랜'?'플랜':t.label==='챌린저 답안'?'답안':t.label}</span>
   </button>`).join('')}</div>`;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 🗂️ 내 현황 (2026-11-12 신규) — 학생이 희망진로·내신·모의고사·모의수시지원을 "한 곳에서 순서대로" 입력
+//  · 전체 학생에게 노출(기관·X-lab·LAB 설정과 무관). 접두어 MY_ — 기존 함수명과 충돌 없음.
+//  · 데이터: 내신=gradeDetail/extraSubjs/subjects, 모의고사=mockGrades/mockExtraSubjs (기존 「성적」 탭과 동일 필드 →
+//    어느 쪽에서 입력해도 같은 값). 희망·지원 6칸=students 문서의 myStatus 필드({profile,apps,updatedAt}).
+//    희망학과는 xlabDepartment에도 함께 기록(X-lab과 동일 값 유지).
+//  · LAB/X-lab 코드에 의존하지 않음(GitHub 버전에도 같은 블록을 그대로 사용).
+//  · 관리자 「입시전략상담」 현황판이 이 필드들을 읽는다(관리자 쪽은 다음 단계).
+// ══════════════════════════════════════════════════════════════════
+const MY_STEPS=[['1','기본·희망'],['2','내신'],['3','모의고사'],['4','모의수시지원']];
+const MY_SEMS=['1-1','1-2','2-1','2-2','3-1'];
+const MY_BASE_SUBJS=[['korean','국어'],['math','수학'],['english','영어'],['science','과학'],['social','사회']];
+const MY_MOCK_TESTS=['3월모의','5월학평','6월모의','7월학평','9월모의','10월학평','수능'];
+const MY_MOCK_OLD=['국어','수학','영어','탐구1','탐구2','한국사','제2외국어'];
+const MY_MOCK_NEW=['국어','수학','영어','한국사','통합사회','통합과학']; // 고1·2 신규 체계(관리자 성적 입력과 동일)
+function MY_msubj(){ var g=String((CU&&CU.grade)||'').trim(); var base=(g==='고1'||g==='고2')?MY_MOCK_NEW:MY_MOCK_OLD; var mg=(CU&&CU.mockGrades)||{};
+  var legacy=['탐구1','탐구2'].filter(function(k){ return base.indexOf(k)<0 && mg[k] && Object.keys(mg[k]).some(function(t){ var e=mg[k][t]||{}; return e.raw||e.grade||e.pct||e.std; }); });
+  return base.concat(legacy); }
+function MY_avgSubjs(list){ return list.filter(function(x){ return x!=='한국사'&&x!=='제2외국어'; }); }
+const MY_MOCK_FIELDS=[['raw','원점수'],['grade','등급'],['pct','백분위'],['std','표준점수']];
+const MY_FIELDS_CAREER=['인문·사회','자연·공학','상경','의약학','교육','예체능','미정'];
+const MY_TRACKS=['학생부종합','학생부교과','논술','실기/기타'];
+const MY_LEVELS=['상향','적정','안정','모르겠음'];
+var MY={step:1,test:'3월모의',extra:null,timer:null,savedAt:0,saving:false};
+
+function MY_q(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function MY_gv(cv){ if(cv==null||cv==='') return null; if(typeof cv==='object'){ var g=cv.grade; return (g==null||g==='')?null:+g; } return +cv; }
+function MY_rv(cv){ return (cv&&typeof cv==='object'&&cv.raw!=null&&cv.raw!=='')?cv.raw:''; }
+function MY_ms(){ return (CU&&CU.myStatus)||{}; }
+function MY_names(){ // 과목 표시명: 학생 직접 설정 > 관리자 설정 > 기본 (기존 「성적」 입력과 동일 규칙)
+  var cu=(CU&&CU._customNames)||{}, ad=(CU&&CU.customSubjNames)||{};
+  return MY_BASE_SUBJS.map(function(p){ return cu[p[1]]||ad[p[0]]||p[1]; });
+}
+function MY_extra(){ if(!MY.extra) MY.extra=((CU&&CU.extraSubjs)||[]).slice(); return MY.extra; }
+function MY_avg(a){ a=a.filter(function(x){ return x!=null&&!isNaN(x)&&x>0; }); return a.length?(a.reduce(function(s,x){return s+x;},0)/a.length):null; }
+function MY_fmt(v){ return v==null?'–':(+v).toFixed(2); }
+function MY_hasGrade(){ var gd=(CU&&CU.gradeDetail)||{}; return Object.keys(gd).some(function(k){ return MY_SEMS.some(function(m){ return MY_gv(gd[k][m])!=null; }); }); }
+function MY_hasMock(){ var mg=(CU&&CU.mockGrades)||{}; return Object.keys(mg).some(function(k){ return Object.keys(mg[k]||{}).some(function(t){ var e=mg[k][t]||{}; return e.raw||e.grade||e.pct||e.std; }); }); }
+function MY_done(n){
+  var m=MY_ms(), p=m.profile||{};
+  if(n===1) return !!(p.dept||p.career||p.field);
+  if(n===2) return MY_hasGrade();
+  if(n===3) return MY_hasMock();
+  if(n===4) return (m.apps||[]).some(function(a){ return a&&(a.univ||a.dept); });
+  return false;
+}
+
+// ── 저장 ──
+async function MY_persist(fields){
+  CU=Object.assign({},CU,fields);
+  if(!FB()) return;
+  var ref=window._db.collection('students').doc(String(CU.id));
+  var data=Object.assign({},fields,{_t:Date.now()});
+  try{ await ref.update(data); }
+  catch(e){
+    var m=(e&&(e.code||'')+' '+(e&&e.message||''));
+    if(/not-found|NOT_FOUND|No document/.test(m)) await ref.set(data,{merge:true});
+    else throw e;
+  }
+}
+function MY_stamp(){ var t=new Date(); MY.savedAt=t.getTime(); var el=document.getElementById('my_saved'); if(el) el.textContent='자동 저장됨 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'); }
+function MY_val(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; }
+function MY_has(id){ return !!document.getElementById(id); }
+
+// 화면의 입력값 → 데이터(동기). 반환: 저장할 필드 객체(없으면 null)
+function MY_collect(){
+  var st=MY.step, ms=MY_ms();
+  if(st===1 && MY_has('my_dept')){
+    var p={ career:MY_val('my_career'), field:MY_val('my_field'), dept:MY_val('my_dept'), reason:MY_val('my_reason'), electives:MY_val('my_electives') };
+    var f={ myStatus:Object.assign({},ms,{profile:p,updatedAt:Date.now()}) };
+    if(p.dept) f.xlabDepartment=p.dept;
+    return f;
+  }
+  if(st===2 && MY_has('my_gtbl')){ var g=MY_collectGrades(); return { subjects:g.subjects, gradeDetail:g.gd, extraSubjs:g.extra.filter(Boolean), _gradeLastEditRole:'student', _gradeLastEditAt:Date.now() }; }
+  if(st===3 && MY_has('my_mtbl')){
+    var mg=JSON.parse(JSON.stringify((CU&&CU.mockGrades)||{})), ex=JSON.parse(JSON.stringify((CU&&CU.mockExtraSubjs)||{})), t=MY.test;
+    MY_msubj().forEach(function(sb,i){
+      var entry={}; MY_MOCK_FIELDS.forEach(function(fd){ var v=MY_val('my_m_'+i+'_'+fd[0]); if(v) entry[fd[0]]=v; });
+      if(!mg[sb]) mg[sb]={};
+      if(Object.keys(entry).length) mg[sb][t]=entry; else delete mg[sb][t];
+      if(sb==='탐구1'||sb==='탐구2'){ var nm=MY_val('my_mn_'+i); if(!ex[sb]) ex[sb]={}; if(nm) ex[sb][t]=nm; else delete ex[sb][t]; }
+    });
+    return { mockGrades:mg, mockExtraSubjs:ex, _gradeLastEditRole:'student', _gradeLastEditAt:Date.now() };
+  }
+  if(st===4 && MY_has('my_a0_univ')){
+    var apps=[]; for(var i=0;i<6;i++){ apps.push({ univ:MY_val('my_a'+i+'_univ'), dept:MY_val('my_a'+i+'_dept'), track:MY_val('my_a'+i+'_track'), level:MY_val('my_a'+i+'_level') }); }
+    return { myStatus:Object.assign({},ms,{apps:apps,updatedAt:Date.now()}) };
+  }
+  return null;
+}
+function MY_collectGrades(){
+  var extra=MY_extra(), names=MY_names(), gd={}, subjects={};
+  // 기존 「성적」 입력과 동일: 기본 과목은 기본 라벨(국어/수학/…)을 키로 저장, 추가 과목은 입력한 이름이 키
+  MY_BASE_SUBJS.forEach(function(p,i){ gd[p[1]]={}; MY_SEMS.forEach(function(sem){ var g=MY_val('my_g_'+i+'_'+sem), r=MY_val('my_r_'+i+'_'+sem); if(g||r) gd[p[1]][sem]={grade:g?+g:null,raw:r?+r:null}; }); });
+  extra.forEach(function(lb,ei){ var nameEl=document.getElementById('my_en_'+ei); if(nameEl){ lb=String(nameEl.value||'').trim(); extra[ei]=lb; } if(!lb) return; var i=MY_BASE_SUBJS.length+ei; gd[lb]={}; MY_SEMS.forEach(function(sem){ var g=MY_val('my_g_'+i+'_'+sem), r=MY_val('my_r_'+i+'_'+sem); if(g||r) gd[lb][sem]={grade:g?+g:null,raw:r?+r:null}; }); });
+  MY_BASE_SUBJS.forEach(function(p){ var auto=null; ['3-1','2-2','2-1','1-2','1-1'].some(function(sem){ var g=MY_gv((gd[p[1]]||{})[sem]); if(g!=null){ auto=g; return true; } return false; }); subjects[p[0]]=auto; });
+  return {gd:gd,extra:extra,subjects:subjects,names:names};
+}
+
+// 입력 중 자동 저장(0.8초 지연) / 단계 이동 시 즉시 저장
+function MY_onInput(){
+  if(MY.step===2) MY_updateGradeSummary();
+  if(MY.step===3) MY_updateMockSummary();
+  clearTimeout(MY.timer); MY.timer=setTimeout(function(){ MY_save(true); },800);
+}
+async function MY_save(silent){
+  clearTimeout(MY.timer);
+  var f=MY_collect(); if(!f) return true;
+  try{ CU=Object.assign({},CU,f); await MY_persist(f); MY_stamp(); if(!silent) toast('✅ 저장되었습니다'); return true; }
+  catch(e){ alert('저장 실패: '+(e&&e.message||e)); return false; }
+}
+function MY_go(n){
+  var f=MY_collect(); if(f){ CU=Object.assign({},CU,f); MY_persist(f).then(MY_stamp).catch(function(e){ alert('저장 실패: '+(e&&e.message||e)); }); }
+  clearTimeout(MY.timer); MY.step=n; render(); try{ window.scrollTo(0,0); var m=document.querySelector('.main,#main,#content'); if(m) m.scrollTop=0; }catch(e){}
+}
+function MY_pickTest(t){ var f=MY_collect(); if(f){ CU=Object.assign({},CU,f); MY_persist(f).catch(function(){}); } MY.test=t; render(); }
+function MY_addSubj(){ var f=MY_collect(); if(f) CU=Object.assign({},CU,f); MY_extra().push(''); render(); setTimeout(function(){ var e=document.getElementById('my_en_'+(MY_extra().length-1)); if(e) e.focus(); },60); }
+function MY_delSubj(i){ var f=MY_collect(); if(f) CU=Object.assign({},CU,f); var ex=MY_extra(); var lb=ex[i]; ex.splice(i,1); if(lb&&CU.gradeDetail&&CU.gradeDetail[lb]){ var gd=Object.assign({},CU.gradeDetail); delete gd[lb]; CU=Object.assign({},CU,{gradeDetail:gd}); }
+  var f2=null; MY.extra=ex; render(); // 삭제 후 저장은 다음 입력/이동 시 반영되지 않으므로 즉시 저장
+  MY_persist({ gradeDetail:CU.gradeDetail||{}, extraSubjs:ex.filter(Boolean), _gradeLastEditRole:'student', _gradeLastEditAt:Date.now() }).then(MY_stamp).catch(function(){}); }
+function MY_finish(){ MY_save(true).then(function(ok){ if(!ok) return; MY.step=5; render(); toast('✅ 내 현황이 저장되었습니다'); }); }
+
+// ── 화면 ──
+function MY_css(){
+  if(document.getElementById('my_css')) return '';
+  var st=document.createElement('style'); st.id='my_css';
+  st.textContent='.my-steps{display:flex;gap:6px;margin:0 0 12px}.my-st{flex:1;border:1.5px solid #e1e5f0;background:#fff;border-radius:12px;padding:8px 2px;font-size:11.5px;font-weight:700;color:#7a8296;text-align:center;cursor:pointer;font-family:inherit;line-height:1.25}'
+   +'.my-st b{display:block;font-size:15px;color:#aab1c3}.my-st.on{border-color:#3b5bdb;color:#3b5bdb;background:#eef1ff}.my-st.on b{color:#3b5bdb}.my-st.ok b{color:#16a34a}'
+   +'.my-card{background:#fff;border:1.5px solid #e8eaf6;border-radius:14px;padding:14px 14px;margin-bottom:12px}.my-h{font-size:14px;font-weight:800;margin:0 0 4px;color:#1a1a2e}.my-sub{font-size:11.5px;color:#7a8296;margin:0 0 10px;line-height:1.5}'
+   +'.my-lb{display:block;font-size:12px;font-weight:700;color:#4e5968;margin:10px 0 4px}.my-in{width:100%;box-sizing:border-box;border:1.5px solid #dde1f0;border-radius:9px;padding:10px 11px;font-size:14px;font-family:inherit;outline:none;background:#fff}.my-in:focus{border-color:#3b5bdb}'
+   +'.my-nav{display:flex;gap:8px;margin:14px 0 6px}.my-btn{flex:1;border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}.my-b1{background:#3b5bdb;color:#fff}.my-b0{background:#eef0f6;color:#4e5968}'
+   +'.my-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}.my-chip{border:1.5px solid #dde1f0;background:#fff;border-radius:16px;padding:6px 11px;font-size:12px;font-weight:700;color:#5b6478;cursor:pointer;font-family:inherit}.my-chip.on{background:#3b5bdb;border-color:#3b5bdb;color:#fff}.my-chip.ok:not(.on){border-color:#86efac;color:#15803d}'
+   +'.my-tbl{border-collapse:collapse;width:100%;table-layout:fixed;font-size:12px}.my-tbl th,.my-tbl td{border:1px solid #eceff3;padding:3px;text-align:center}.my-tbl th{background:#f8f9fb;font-size:11.5px;color:#4e5968;padding:7px 2px}'
+   +'.my-tbl input{width:100%;box-sizing:border-box;border:1px solid #e5e8f2;border-radius:6px;padding:6px 2px;font-size:12.5px;text-align:center;font-family:inherit;outline:none}.my-tbl input:focus{border-color:#3b5bdb}.my-tbl .raw{margin-top:3px;color:#7a8296;font-size:11px}'
+   +'.my-sum{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.my-pill{background:#f4f6fb;border-radius:9px;padding:6px 10px;font-size:12px;color:#4e5968}.my-pill b{color:#3b5bdb;font-size:14px;margin-left:4px}'
+   +'.my-app{border:1.5px solid #e8eaf6;border-radius:12px;padding:10px;margin-bottom:10px;background:#fafbff}.my-app .no{font-size:12px;font-weight:800;color:#3b5bdb;margin-bottom:6px}.my-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}'
+   +'.my-saved{font-size:11px;color:#9aa3b5;text-align:right;margin:2px 2px 0}';
+  document.head.appendChild(st); return '';
+}
+function MY_stepper(){
+  return '<div class="my-steps">'+MY_STEPS.map(function(s){ var n=+s[0]; return '<button class="my-st'+(MY.step===n?' on':'')+(MY_done(n)?' ok':'')+'" onclick="MY_go('+n+')"><b>'+(MY_done(n)&&MY.step!==n?'✓':s[0])+'</b>'+s[1]+'</button>'; }).join('')+'</div>';
+}
+function MY_nav(n){
+  var prev=n>1?'<button class="my-btn my-b0" onclick="MY_go('+(n-1)+')">이전</button>':'';
+  var next=n<4?'<button class="my-btn my-b1" onclick="MY_go('+(n+1)+')">저장하고 다음</button>':'<button class="my-btn my-b1" onclick="MY_finish()">저장하고 완료</button>';
+  return '<div class="my-nav">'+prev+next+'</div><div class="my-saved" id="my_saved">입력하면 자동으로 저장됩니다</div>';
+}
+function MY_step1(){
+  var p=MY_ms().profile||{}; var dept=p.dept||CU.xlabDepartment||'';
+  return '<div class="my-card"><div class="my-h">희망 진로·학과</div><div class="my-sub">지금 생각하는 대로 적어주세요. 나중에 언제든 바꿀 수 있어요.</div>'
+   +'<label class="my-lb">희망 진로(직업·분야)</label><input class="my-in" id="my_career" value="'+MY_q(p.career)+'" placeholder="예: 소프트웨어 개발자, 화학 연구원">'
+   +'<label class="my-lb">희망 계열</label><select class="my-in" id="my_field"><option value="">선택</option>'+MY_FIELDS_CAREER.map(function(o){ return '<option'+(p.field===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select>'
+   +'<label class="my-lb">희망 학과</label><input class="my-in" id="my_dept" value="'+MY_q(dept)+'" placeholder="예: 컴퓨터공학과">'
+   +'<label class="my-lb">희망 이유·관심 키워드</label><textarea class="my-in" id="my_reason" rows="3" placeholder="이 학과/진로를 생각하게 된 계기나 관심 분야">'+MY_q(p.reason)+'</textarea>'
+   +'<label class="my-lb">이수했거나 이수할 진로선택과목·심화과목</label><textarea class="my-in" id="my_electives" rows="2" placeholder="예: 화학Ⅱ, 생명과학Ⅱ, 확률과 통계">'+MY_q(p.electives)+'</textarea></div>';
+}
+function MY_gradeSummaryHtml(g){
+  var semAvg=MY_SEMS.map(function(sem){ var a=[]; Object.keys(g.gd).forEach(function(k){ a.push(MY_gv(g.gd[k][sem])); }); return [sem,MY_avg(a)]; });
+  var subjAvg=Object.keys(g.gd).map(function(k){ return [k,MY_avg(MY_SEMS.map(function(sem){ return MY_gv(g.gd[k][sem]); }))]; }).filter(function(x){ return x[1]!=null; });
+  var all=MY_avg(Object.keys(g.gd).reduce(function(a,k){ return a.concat(MY_SEMS.map(function(sem){ return MY_gv(g.gd[k][sem]); })); },[]));
+  if(all==null) return '<div style="font-size:12px;color:#9aa3b5;margin-top:10px">등급을 입력하면 평균이 여기에 표시됩니다.</div>';
+  return '<div class="my-sum"><span class="my-pill">전체 평균<b>'+MY_fmt(all)+'</b></span></div>'
+   +'<div class="my-sum">'+semAvg.filter(function(x){ return x[1]!=null; }).map(function(x){ return '<span class="my-pill">'+x[0]+' 평균<b>'+MY_fmt(x[1])+'</b></span>'; }).join('')+'</div>'
+   +'<div class="my-sum">'+subjAvg.map(function(x){ return '<span class="my-pill">'+MY_q(x[0])+'<b>'+MY_fmt(x[1])+'</b></span>'; }).join('')+'</div>';
+}
+function MY_updateGradeSummary(){ var el=document.getElementById('my_gsum'); if(!el) return; try{ el.innerHTML=MY_gradeSummaryHtml(MY_collectGrades()); }catch(e){} }
+function MY_step2(){
+  var gd=CU.gradeDetail||{}, names=MY_names(), extra=MY_extra();
+  var rows=MY_BASE_SUBJS.map(function(p,i){ return MY_gradeRow(i,names[i],false,gd[p[1]]||{}); }).concat(extra.map(function(lb,ei){ return MY_gradeRow(MY_BASE_SUBJS.length+ei,lb,true,gd[lb]||{},ei); })).join('');
+  var g={gd:gd};
+  return '<div class="my-card"><div class="my-h">내신 성적 (학기별)</div><div class="my-sub">학기별로 등급과 원점수를 입력하세요(소수점 가능). 아직 끝나지 않은 학기는 비워 두세요. 과학·사회 외 과목은 <b>+ 과목 추가</b>로 넣을 수 있어요.</div>'
+   +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="my-tbl" id="my_gtbl"><tr><th style="width:64px">과목</th>'+MY_SEMS.map(function(s){ return '<th>'+s+'</th>'; }).join('')+'<th style="width:26px"></th></tr>'+rows+'</table></div>'
+   +'<button class="my-chip" style="margin-top:10px" onclick="MY_addSubj()">+ 과목 추가</button>'
+   +'<div id="my_gsum">'+MY_gradeSummaryHtml(g)+'</div></div>';
+}
+function MY_gradeRow(i,label,isExtra,sd,ei){
+  var nameCell=isExtra?'<input id="my_en_'+ei+'" value="'+MY_q(label)+'" placeholder="과목명" style="font-weight:700;text-align:left;padding:6px 4px">':'<b style="font-size:12.5px">'+MY_q(label)+'</b>';
+  var cells=MY_SEMS.map(function(sem){ var cv=sd[sem]; var g=MY_gv(cv), r=MY_rv(cv); return '<td><input id="my_g_'+i+'_'+sem+'" type="number" inputmode="decimal" min="1" max="9" step="0.01" placeholder="등급" value="'+(g==null?'':g)+'"><input class="raw" id="my_r_'+i+'_'+sem+'" type="number" inputmode="decimal" step="0.01" placeholder="원점수" value="'+(r===''?'':MY_q(r))+'"></td>'; }).join('');
+  return '<tr><td>'+nameCell+'</td>'+cells+'<td>'+(isExtra?'<button onclick="MY_delSubj('+ei+')" style="background:#fff0f0;color:#e53935;border:1px solid #fecaca;border-radius:5px;padding:2px 5px;font-size:11px;cursor:pointer">✕</button>':'')+'</td></tr>';
+}
+function MY_mockAvgHtml(t,mg){
+  var a=MY_avgSubjs(MY_msubj()).map(function(sb){ var e=((mg||{})[sb]||{})[t]||{}; return e.grade?+e.grade:null; });
+  var v=MY_avg(a); return v==null?'<span style="color:#9aa3b5;font-size:12px">등급을 입력하면 이 회차의 평균 등급이 표시됩니다(국·수·영·탐(통합) 기준).</span>':'<span class="my-pill">'+t+' 평균 등급<b>'+MY_fmt(v)+'</b></span>';
+}
+function MY_updateMockSummary(){ var el=document.getElementById('my_msum'); if(!el) return; var mg={}, t=MY.test; MY_msubj().forEach(function(sb,i){ mg[sb]={}; mg[sb][t]={grade:MY_val('my_m_'+i+'_grade')}; }); el.innerHTML=MY_mockAvgHtml(t,mg); }
+function MY_step3(){
+  var mg=CU.mockGrades||{}, ex=CU.mockExtraSubjs||{}, t=MY.test;
+  var has=function(tt){ return MY_msubj().some(function(sb){ var e=(mg[sb]||{})[tt]||{}; return e.raw||e.grade||e.pct||e.std; }); };
+  var chips='<div class="my-chips">'+MY_MOCK_TESTS.map(function(tt){ return '<button class="my-chip'+(tt===t?' on':'')+(has(tt)?' ok':'')+'" onclick="MY_pickTest(\''+tt+'\')">'+tt+(has(tt)?' ✓':'')+'</button>'; }).join('')+'</div>';
+  var rows=MY_msubj().map(function(sb,i){
+    var isT=(sb==='탐구1'||sb==='탐구2'); var e=(mg[sb]||{})[t]||{};
+    var nm=isT?'<div style="font-size:10px;color:#9aa3b5">'+sb+'</div><input id="my_mn_'+i+'" value="'+MY_q(((ex[sb]||{})[t])||'')+'" placeholder="과목명" style="text-align:left;padding:4px">':'<b style="font-size:12.5px">'+sb+'</b>';
+    return '<tr><td style="width:70px">'+nm+'</td>'+MY_MOCK_FIELDS.map(function(fd){ return '<td><input id="my_m_'+i+'_'+fd[0]+'" type="text" inputmode="decimal" placeholder="–" value="'+MY_q(e[fd[0]]||'')+'"></td>'; }).join('')+'</tr>';
+  }).join('');
+  return '<div class="my-card"><div class="my-h">모의고사 성적</div><div class="my-sub">회차를 고르고 과목별 점수를 입력하세요. 아직 보지 않은 회차는 비워 두면 됩니다. 입력한 회차에는 ✓가 표시돼요.</div>'+chips
+   +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="my-tbl" id="my_mtbl"><tr><th>과목</th>'+MY_MOCK_FIELDS.map(function(fd){ return '<th>'+fd[1]+'</th>'; }).join('')+'</tr>'+rows+'</table></div>'
+   +'<div class="my-sum" id="my_msum">'+MY_mockAvgHtml(t,mg)+'</div></div>';
+}
+function MY_step4(){
+  var apps=MY_ms().apps||[]; var h='';
+  for(var i=0;i<6;i++){ var a=apps[i]||{};
+    h+='<div class="my-app"><div class="no">지원 '+(i+1)+'</div><div class="my-2"><input class="my-in" id="my_a'+i+'_univ" value="'+MY_q(a.univ)+'" placeholder="대학"><input class="my-in" id="my_a'+i+'_dept" value="'+MY_q(a.dept)+'" placeholder="학과"></div>'
+     +'<div class="my-2" style="margin-top:8px"><select class="my-in" id="my_a'+i+'_track"><option value="">전형 선택</option>'+MY_TRACKS.map(function(o){ return '<option'+(a.track===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select>'
+     +'<select class="my-in" id="my_a'+i+'_level"><option value="">지원 구분</option>'+MY_LEVELS.map(function(o){ return '<option'+(a.level===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></div></div>';
+  }
+  return '<div class="my-card"><div class="my-h">모의 수시지원 (6칸)</div><div class="my-sub">수시 원서 6장을 쓴다고 생각하고 지원하고 싶은 대학·학과를 적어보세요. 비워 둔 칸은 나중에 채워도 됩니다.</div>'+h+'</div>';
+}
+function MY_step5(){
+  var m=MY_ms(), p=m.profile||{}, apps=(m.apps||[]).filter(function(a){ return a&&(a.univ||a.dept); });
+  var gd=CU.gradeDetail||{}; var all=MY_avg(Object.keys(gd).reduce(function(a,k){ return a.concat(MY_SEMS.map(function(s){ return MY_gv(gd[k][s]); })); },[]));
+  var mg=CU.mockGrades||{}; var last=null; MY_MOCK_TESTS.forEach(function(t){ var v=MY_avg(MY_avgSubjs(MY_msubj()).map(function(sb){ var e=(mg[sb]||{})[t]||{}; return e.grade?+e.grade:null; })); if(v!=null) last=[t,v]; });
+  var row=function(l,v,n){ return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f0f2f8;font-size:13px"><span style="color:#7a8296">'+l+'</span><span style="font-weight:700;text-align:right">'+(v||'<span style="color:#c0c6d4">미입력</span>')+'</span></div>'; };
+  return '<div class="my-card"><div class="my-h">✅ 입력한 내용 요약</div><div class="my-sub">선생님이 이 내용을 바탕으로 학생 현황판을 확인합니다. 고칠 부분은 위 단계를 눌러 수정하세요.</div>'
+   +row('희망 진로',MY_q(p.career))+row('희망 학과',MY_q(p.dept||CU.xlabDepartment))+row('내신 전체 평균',all==null?'':MY_fmt(all)+'등급')+row('최근 모의고사',last?(MY_q(last[0])+' 평균 '+MY_fmt(last[1])+'등급'):'')
+   +row('모의 수시지원',apps.length?apps.map(function(a){ return MY_q((a.univ||'')+' '+(a.dept||'')); }).join('<br>'):'')+'</div>'
+   +'<div class="my-nav"><button class="my-btn my-b0" onclick="MY_go(1)">처음부터 다시 보기</button></div>';
+}
+function MY_render(){
+  MY_css();
+  var body=MY.step===1?MY_step1():MY.step===2?MY_step2():MY.step===3?MY_step3():MY.step===4?MY_step4():MY_step5();
+  var foot=MY.step<=4?MY_nav(MY.step):'';
+  return '<div id="my_root" oninput="MY_onInput()" onchange="MY_onInput()"><div class="stitle">내 현황</div>'
+   +'<div style="font-size:12px;color:#7a8296;margin:-6px 0 12px;line-height:1.5">희망 진로부터 모의수시지원까지 한 곳에서 순서대로 입력하세요.</div>'
+   +MY_stepper()+body+foot+'</div>';
+}
+_TBI.my='<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9z"/><path d="M8 5.5H6.5A1.5 1.5 0 0 0 5 7v12a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V7a1.5 1.5 0 0 0-1.5-1.5H16"/><path d="M8.5 13.2l2.4 2.4 4.6-5"/></svg>';
 
 const SC={국어:'#3b82f6',수학:'#ef4444',영어:'#10b981',과학:'#f59e0b',사회:'#8b5cf6',한국사:'#f97316',논술:'#ec4899',자습:'#64748b',휴식:'#475569'};
 
