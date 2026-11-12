@@ -5285,22 +5285,35 @@ function SV_mockTests(){ try{ if(typeof MOCK_TESTS!=='undefined') return MOCK_TE
 function SV_mockLabel(s,sb){ if(sb==='탐구1'||sb==='탐구2'){ var ex=(s.mockExtraSubjs||{})[sb]||{}; var v=Object.keys(ex).map(function(k){ return ex[k]; }).filter(Boolean)[0]; return v?sb+'('+v+')':sb; } return sb; }
 
 // ── SVG 꺾은선 그래프 (등급: 1등급이 위) — 인쇄·공유에도 그대로 나오도록 라이브러리 없이 직접 그림 ──
+// 상담조사서(로드맵)의 「주요 과목별 내신 변화 추이」와 같은 줄(레인) 그래프 — 과목마다 한 줄, 학기(회차)는 세로 칸, 오른쪽에 평균 배지.
 function SV_chart(labels,series){
   var any=series.some(function(se){ return se.v.some(function(x){ return x!=null; }); });
   if(!any) return '<div class="sv-empty">입력된 성적이 없어 그래프를 그릴 수 없습니다.</div>';
-  var W=640,H=240,pl=34,pr=16,pt=16,pb=30;
-  var X=function(i){ return pl+(labels.length<2?(W-pl-pr)/2:i*(W-pl-pr)/(labels.length-1)); };
-  var Y=function(v){ return pt+(v-1)/(9-1)*(H-pt-pb); };
-  var h='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" style="display:block;max-width:100%">';
-  for(var g=1;g<=9;g++){ h+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(g)+'" y2="'+Y(g)+'" stroke="#e6e9f2" stroke-width="1"/><text x="'+(pl-6)+'" y="'+(Y(g)+3.5)+'" font-size="10" fill="#8a93a8" text-anchor="end">'+g+'</text>'; }
-  labels.forEach(function(l,i){ h+='<text x="'+X(i)+'" y="'+(H-10)+'" font-size="10.5" fill="#4e5968" text-anchor="middle">'+SV_q(l)+'</text>'; });
-  series.forEach(function(se){
-    var seg=[], cur=[]; se.v.forEach(function(v,i){ if(v==null){ if(cur.length) seg.push(cur); cur=[]; } else cur.push([X(i),Y(v),v]); }); if(cur.length) seg.push(cur);
-    seg.forEach(function(sg){ if(sg.length>1) h+='<polyline fill="none" stroke="'+se.c+'" stroke-width="'+(se.main?3:1.6)+'" '+(se.main?'':'stroke-opacity=".8" ')+'points="'+sg.map(function(p){ return p[0]+','+p[1]; }).join(' ')+'"/>'; });
-    seg.forEach(function(sg){ sg.forEach(function(p){ h+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(se.main?4:2.6)+'" fill="'+se.c+'"/>'; if(se.main) h+='<text x="'+p[0]+'" y="'+(p[1]-8)+'" font-size="10.5" font-weight="700" fill="'+se.c+'" text-anchor="middle">'+(+p[2]).toFixed(2)+'</text>'; }); });
-  });
-  h+='</svg><div class="sv-legend">'+series.map(function(se){ return '<span><i style="background:'+se.c+'"></i>'+SV_q(se.n)+'</span>'; }).join('')+'</div>';
-  return h;
+  var all=[]; series.forEach(function(se){ se.v.forEach(function(x){ if(x!=null) all.push(+x); }); });
+  var yMin=Math.min.apply(null,all), yMax=Math.max.apply(null,all);
+  if(yMin===yMax){ yMin=Math.max(1,yMin-0.5); yMax=yMax+0.5; }
+  yMin=Math.max(1,Math.floor(yMin*2)/2-0.3); yMax=Math.ceil(yMax*2)/2+0.3;
+  var W=480,padL=10,padR=10,n=labels.length,xStep=n>1?(W-padL-padR)/(n-1):0,rowH=50,pT=11,pB=11,headH=24;
+  var X=function(i){ return n>1?padL+i*xStep:W/2; };
+  var Y=function(v){ return pT+(v-yMin)/(yMax-yMin)*(rowH-pT-pB); };
+  var f1=function(x){ return (+x).toFixed(1); };
+  var grid=function(h){ var s=''; labels.forEach(function(_,i){ if(i%2===1&&n>1){ var xa=padL+(i-0.5)*xStep, xb=Math.min(W,padL+(i+0.5)*xStep); s+='<rect x="'+f1(xa)+'" y="0" width="'+f1(xb-xa)+'" height="'+h+'" fill="#f5f6fa"/>'; } }); labels.forEach(function(_,i){ s+='<line x1="'+f1(X(i))+'" y1="0" x2="'+f1(X(i))+'" y2="'+h+'" stroke="#e6e8f0" stroke-width="1"/>'; }); return s; };
+  var avgOf=function(v){ var a=v.filter(function(x){ return x!=null; }); return a.length?a.reduce(function(p,q){ return p+q; },0)/a.length:null; };
+  var badge=function(a){ if(a==null) return '<span style="display:inline-block;min-width:34px;text-align:center;font-size:11px;color:#bbb">—</span>'; var c=a<2.5?['#DCF3EA','#1F7A5C']:a<3.5?['#FDEFD9','#92620B']:['#FBE4E4','#B23A3A']; return '<span style="display:inline-block;min-width:34px;text-align:center;padding:3px 8px;border-radius:8px;font-size:11.5px;font-weight:800;background:'+c[0]+';color:'+c[1]+'">'+a.toFixed(1)+'</span>'; };
+  var spark=function(v,col){
+    var segs=[],cur=[]; v.forEach(function(x,i){ if(x==null){ if(cur.length){ segs.push(cur); cur=[]; } return; } cur.push([X(i),Y(+x)]); }); if(cur.length) segs.push(cur);
+    var poly=segs.map(function(sg){ return sg.length<2?'':'<polyline fill="none" stroke="'+col+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="'+sg.map(function(p){ return f1(p[0])+','+f1(p[1]); }).join(' ')+'"/>'; }).join('');
+    var dots=v.map(function(x,i){ return x==null?'':'<circle cx="'+f1(X(i))+'" cy="'+f1(Y(+x))+'" r="5" fill="'+col+'" stroke="#fff" stroke-width="1.5"/>'; }).join('');
+    return '<svg viewBox="0 0 '+W+' '+rowH+'" style="width:100%;height:'+rowH+'px;display:block">'+grid(rowH)+poly+dots+'</svg>';
+  };
+  var tpl='minmax(48px,64px) 1fr minmax(40px,54px)';
+  var head='<svg viewBox="0 0 '+W+' '+headH+'" style="width:100%;height:'+headH+'px;display:block">'+grid(headH)+labels.map(function(lb,i){ return '<text x="'+f1(X(i))+'" y="16" text-anchor="middle" font-size="11" font-weight="800" fill="#5b6472">'+SV_q(lb)+'</text>'; }).join('')+'</svg>';
+  var h='<div class="sv-lane" style="border:1px solid #e6e8ee;border-radius:12px;padding:12px 14px 8px;background:#fff"><div style="display:grid;grid-template-columns:'+tpl+';gap:8px;align-items:center;margin-bottom:2px"><div></div>'+head+'<div></div></div>';
+  var avg=null; series.forEach(function(se){ if(se.main) avg=se; });
+  series.forEach(function(se){ if(se.main||!se.v.some(function(x){ return x!=null; })) return;
+    h+='<div style="display:grid;grid-template-columns:'+tpl+';gap:8px;align-items:center;padding:5px 0;border-top:1px solid #f2f3f6"><div style="font-size:11.5px;font-weight:700;color:#1a1a2e;white-space:nowrap">'+SV_q(se.n)+'</div>'+spark(se.v,se.c)+'<div style="text-align:center">'+badge(avgOf(se.v))+'</div></div>'; });
+  if(avg) h+='<div style="display:grid;grid-template-columns:'+tpl+';gap:8px;align-items:center;padding:9px 0 2px;border-top:2px solid #5f5e5a;margin-top:5px"><div style="font-size:11.5px;font-weight:800;color:#1a1a2e;white-space:nowrap">'+(/평균/.test(avg.n)&&/한국사/.test(avg.n)?'평균':'전과목')+'</div>'+spark(avg.v,'#5f5e5a')+'<div style="text-align:center">'+badge(avgOf(avg.v))+'</div></div>';
+  return h+'</div>';
 }
 
 // ── 화면/인쇄 공용 조각 ──
@@ -59474,6 +59487,7 @@ var SG_NAV_ICONS={
  apex:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
  challenger:'<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5"/>',
  xlab:'<path d="M9 3h6M10 3v6.5L4.5 19a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L14 9.5V3"/><path d="M7.5 15h9"/>',
+ strategy:'<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8.5 16v-3M12 16V8.5M15.5 16v-5.5"/>',
  roadmap:'<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
  susi:'<path d="M3 21h18M5 21V9.5l7-5.5 7 5.5V21"/><path d="M9.5 21v-6h5v6M12 10v.01"/>',
  jeongsi:'<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/>',
@@ -59500,6 +59514,7 @@ var SG_NAV_META={
  apex:{label:'APEX진단',bg:'#fff3dc',fg:'#d97706'},
  challenger:{label:'챌린저',bg:'#ffe8ee',fg:'#e11d48'},
  xlab:{label:'X-lab',bg:'#f0e8ff',fg:'#7c3aed'},
+ strategy:{label:'입시전략상담',bg:'#fdeedd',fg:'#c2570c'},
  roadmap:{label:'상담조사서',bg:'#e2f3fd',fg:'#0284c7'},
  susi:{label:'수시',bg:'#fff0e4',fg:'#ea580c'},
  jeongsi:{label:'정시',bg:'#e8ecff',fg:'#4338ca'},
@@ -59507,7 +59522,7 @@ var SG_NAV_META={
  jonghap:{label:'종합분석',bg:'#f3e8ff',fg:'#9333ea'},
  nulsul:{label:'논술분석',bg:'#ffe6e6',fg:'#dc2626'}
 };
-var SG_NAV_MAIN=['overview','grade','weekly','consult','apex','challenger','xlab','roadmap'];
+var SG_NAV_MAIN=['overview','strategy','grade','weekly','consult','apex','challenger','xlab','roadmap'];
 var SG_NAV_MORE=['susi','jeongsi','gyogwa','jonghap','nulsul'];
 var _sgNavMem={};
 function _sgNavIsMobile(){ return window.innerWidth<768; }
@@ -59527,7 +59542,7 @@ function _sgNavAllowed(){
     }catch(e){return null;}
   })();
   return function(key){
-    if(!key||key==='overview') return true;
+    if(!key||key==='overview'||key==='strategy') return true;
     if(isAdmin2) return true;
     if(orgPerms&&orgPerms.indexOf(key)<0) return false;
     if(isOrgAdmin2) return true;
