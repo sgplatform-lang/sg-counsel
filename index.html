@@ -4904,7 +4904,7 @@ function renderDetail(s){
   };
   const mainTabs = [
     {id:'overview',  label:'개요',       icon:'📋', sub:false,  perm:null},
-    {id:'strategy',  label:'입시전략상담', icon:'🧭', sub:false,  perm:null},
+    {id:'strategy',  label:'입시현황', icon:'🧭', sub:false,  perm:null},
     {id:'grade',     label:'성적',       icon:'📊', sub:false,  perm:'grade'},
     {id:'weekly',    label:'주간플랜',   icon:'📅', sub:true,   perm:'weekly'},
     {id:'consult',   label:'학습상담',   icon:'📈', sub:false,  perm:'consult'},
@@ -5219,7 +5219,7 @@ function _ovPairRows(items){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// 🧭 입시전략상담 (2026-11-12 신규) — 학생 현황판 + 학생부 평가 입력 + A4 인쇄 + 학부모 공유 링크
+// 🧭 입시현황 (2026-11-12 신규) — 학생 현황판 + 학생부 평가 입력 + A4 인쇄 + 학부모 공유 링크
 //  · 접두어 SV_ — 기존 함수명과 충돌 없음. 도메인/GitHub 관리자 파일 공통(LAB 코드에 의존하지 않음).
 //  · 학생이 학생용 「내 현황」에 입력한 값(myStatus·gradeDetail·mockGrades)을 읽어 표·그래프로 표시.
 //  · 컨설턴트 입력(학생부 평가)은 학생 문서의 recordEval 필드에 저장:
@@ -5265,6 +5265,29 @@ function SV_canEdit(){
   return !!(t&&(t.permissions||[]).indexOf('strategy')>=0);
 }
 function SV_re(s){ return (s&&s.recordEval)||{}; }
+
+// ── 다니는 학원(학생 입력) + 강사명(컨설턴트 입력) ──
+const SV_AC_ORDER=['국어','수학','영어','사회','과학','한국사'];
+function SV_acCfg(s){ var a=SV_re(s).academy||{}; return {teachers:a.teachers||{},rows:a.rows||[],showPrint:!!a.showPrint,showTeacher:a.showTeacher!==false}; }
+function SV_acKey(sb,nm){ return String(sb||'')+'|'+String(nm||'').replace(/\s+/g,''); }
+function SV_acTime(from,to){ return (from&&to)?from+'~'+to:(from||to||''); }
+function SV_acRows(s){
+  var cfg=SV_acCfg(s), out=[];
+  ((s.myStatus||{}).academies||[]).forEach(function(a){ if(a&&a.name) out.push({src:'s',subj:a.subj||'기타',name:a.name,days:(a.days||[]).join('·'),from:a.from||'',to:a.to||'',teacher:cfg.teachers[SV_acKey(a.subj||'기타',a.name)]||''}); });
+  cfg.rows.forEach(function(a,j){ if(a) out.push({src:'c',j:j,subj:a.subj||'',name:a.name||'',days:a.days||'',from:a.from||'',to:a.to||'',teacher:a.teacher||''}); });
+  return out;
+}
+function SV_acHtml(s,pv){
+  var cfg=SV_acCfg(s); if(pv&&!cfg.showPrint) return '';
+  var rows=SV_acRows(s).filter(function(r){ return r.name; });
+  var ord=function(r){ var i=SV_AC_ORDER.indexOf(r.subj); return i<0?99:i; };
+  rows=rows.map(function(r,i){ return {r:r,i:i}; }).sort(function(a,b){ return ord(a.r)-ord(b.r)||a.i-b.i; }).map(function(x){ return x.r; });
+  var head='<h3 class="sv-h">다니는 학원'+(pv?'':' <small>(학부모 인쇄·PDF·공유에는 위쪽 「학원 정보 포함」을 켰을 때만 표시됩니다)</small>')+'</h3>';
+  if(!rows.length) return pv?'':head+'<div class="sv-empty" style="padding:12px">학생이 입력한 학원이 아직 없습니다.</div>';
+  var showT=!pv||cfg.showTeacher;
+  return head+'<div class="sv-wrap"><table class="sv-t sv-grid sv-ac"><tr><th style="width:15%">과목</th><th>학원명</th><th style="width:16%">요일</th><th style="width:20%">시간</th>'+(showT?'<th style="width:16%">강사</th>':'')+'</tr>'
+   +rows.map(function(r){ return '<tr><td class="sv-cn">'+SV_q(r.subj)+'</td><td class="l">'+SV_q(r.name)+'</td><td>'+SV_q(r.days)+'</td><td>'+SV_q(SV_acTime(r.from,r.to))+'</td>'+(showT?'<td class="l">'+SV_q(r.teacher)+'</td>':'')+'</tr>'; }).join('')+'</table></div>';
+}
 
 // ── 데이터 정리 ──
 function SV_gradeRows(s){
@@ -5344,8 +5367,8 @@ function SV_p1(s,pv){
   var stars='<table class="sv-t sv-star-t"><tr><th>학생부</th>'+SV_COMP.map(function(c){ return '<th style="background:'+c.color+';color:#fff">'+c.name+'</th>'; }).join('')+'</tr>';
   SV_STAR_ROWS.forEach(function(r){ stars+='<tr><td class="sv-cn">'+r[1]+'</td>'+SV_COMP.map(function(c){ return '<td>'+SV_stars(((st[c.k]||{})[r[0]])||'')+'</td>'; }).join('')+'</tr>'; });
   stars+='</table>';
-  return '<section class="sv-page">'+SV_pageHead(s,'입시전략상담 현황판 · 기본 정보와 대학 평가 역량',1,4)
-   +'<h3 class="sv-h">희망 진로·학과</h3>'+prof+'<h3 class="sv-h">대학이 평가하는 3대 역량</h3>'+comp+'<h3 class="sv-h">학생부 항목별 역량 평가</h3>'+stars+'</section>';
+  return '<section class="sv-page">'+SV_pageHead(s,'입시현황판 · 기본 정보와 대학 평가 역량',1,4)
+   +'<h3 class="sv-h">희망 진로·학과</h3>'+prof+'<h3 class="sv-h">대학이 평가하는 3대 역량</h3>'+comp+'<h3 class="sv-h">학생부 항목별 역량 평가</h3>'+stars+SV_acHtml(s,pv)+'</section>';
 }
 function SV_gradeTable(s){
   var rows=SV_gradeRows(s), gd=s.gradeDetail||{};
@@ -5390,33 +5413,74 @@ function SV_p4(s,pv){
   var re=SV_re(s), yrs=re.years||{};
   var yt='<h3 class="sv-h">학년별 학생부 평가</h3><div class="sv-wrap"><table class="sv-t sv-grid sv-yr"><tr><th>학년</th><th>세특</th><th>창체</th><th>행특</th><th>진로선택과목</th><th>심화과목</th><th>진로변화</th><th>비고</th></tr>'
    +SV_YEARS.map(function(y){ var d=yrs[y]||{}; return '<tr><td class="sv-cn">'+y+'</td><td>'+SV_chip(d.sehuk)+'</td><td>'+SV_chip(d.changche)+'</td><td>'+SV_chip(d.haeng)+'</td><td class="l">'+SV_q(d.electives||'')+'</td><td class="l">'+SV_q(d.advanced||'')+'</td><td class="l">'+SV_q(d.careerChange||'')+'</td><td class="l">'+SV_q(d.note||'')+'</td></tr>'; }).join('')+'</table></div>';
-  var ov='<h3 class="sv-h">총평</h3><div class="sv-overall">'+(re.overall?SV_q(re.overall).replace(/\n/g,'<br>'):'<span class="sv-no">컨설턴트 총평이 아직 입력되지 않았습니다.</span>')+'</div>';
   var names=SV_SEHUK_BASE.concat(re.sehukExtra||[]).filter(Boolean);
   var stuS=pv?null:(s.sehukGrades&&Object.keys(s.sehukGrades).length?s.sehukGrades:null), stuC=pv?null:(s.changcheGrades&&Object.keys(s.changcheGrades).length?s.changcheGrades:null);
   var mx=SV_matrix('과목별 세특 학점',names,re.sehuk,pv,stuS)+SV_matrix('창의적 체험활동 학점',SV_CHANG,re.changche,pv,stuC);
   var apps=(re.apps||[]).slice(0,8); while(apps.length<8) apps.push({});
   var at='<h3 class="sv-h">수시지원 대학</h3><div class="sv-wrap"><table class="sv-t sv-grid sv-ap"><tr><th>no</th><th>지원대학</th><th>지원학과</th><th>전형명</th><th>학업<br>역량</th><th>진로<br>역량</th><th>공동체<br>역량</th><th>비고</th></tr>'
    +apps.map(function(a,i){ if(i>=6&&!(a.univ||a.dept)) return ''; var pc=function(v){ return (v!==''&&v!=null)?SV_q(v)+'%':''; }; return '<tr><td>'+(i+1)+'</td><td class="l">'+SV_q(a.univ||'')+'</td><td class="l">'+SV_q(a.dept||'')+'</td><td class="l">'+SV_q(a.track||'')+'</td><td>'+pc(a.w1)+'</td><td>'+pc(a.w2)+'</td><td>'+pc(a.w3)+'</td><td class="l">'+SV_q(a.note||'')+'</td></tr>'; }).join('')+'</table></div>';
-  return '<section class="sv-page">'+SV_pageHead(s,'학생부 평가와 수시지원',4,4)+yt+ov+mx+at+'</section>';
+  return '<section class="sv-page">'+SV_pageHead(s,'학생부 평가와 수시지원',4,4)+yt+mx+at+SV_ntHtml(s,pv)+'</section>';
 }
-function SV_pagesHtml(s,pv){ return SV_p1(s)+SV_p2(s)+SV_p3(s)+SV_p4(s,pv); }
+
+// ── 총평(상담·수업 기록): 날짜·과목·작성자별로 계속 쌓는 방식 ──
+const SV_NT_SUBJ=['국어','수학','영어','과학','컨설팅'];
+function SV_ymd(ts){ var d=ts?new Date(ts):new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function SV_me(){ var u=ST.currentUser||{}; return String(u.teacherId||u.id||u.name||''); }
+function SV_meName(){ var u=ST.currentUser||{}; return u.name||''; }
+function SV_notes(s){ var re=SV_re(s), n=(re.notes||[]).slice(); if(!n.length&&re.overall) n=[{id:'legacy',date:SV_ymd(re.updatedAt),subj:'컨설팅',author:re.updatedBy||'',text:re.overall,parent:true,by:''}]; return n; }
+function SV_ntSorted(n){ return n.slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||''))||String(b.id).localeCompare(String(a.id)); }); }
+function SV_ntCan(e){ return SV_canEdit()||(e.by&&e.by===SV_me()); }
+function SV_ntCollect(list){
+  return list.map(function(e){ var t=document.getElementById('sv_nt_'+e.id+'_text'); if(!t) return e;
+    var sel=SV_v('sv_nt_'+e.id+'_subj'), c=SV_v('sv_nt_'+e.id+'_subjc'), pe=document.getElementById('sv_nt_'+e.id+'_parent');
+    return Object.assign({},e,{date:SV_v('sv_nt_'+e.id+'_date')||e.date,subj:sel==='직접입력'?(c||'직접입력'):sel,author:SV_v('sv_nt_'+e.id+'_author'),text:String(t.value||'').trim(),parent:pe?pe.checked:e.parent!==false}); });
+}
+function SV_ntHtml(s,pv){
+  var all=SV_ntSorted(SV_notes(s));
+  if(pv){
+    var vis=all.filter(function(e){ return e.parent!==false&&e.text; });
+    if(!vis.length) return '';
+    return '<h3 class="sv-h">총평</h3>'+vis.map(function(e){ return '<div class="sv-nt-p"><div class="m">'+SV_q((e.date||'').replace(/-/g,'.'))+'<span class="sv-sj">'+SV_q(e.subj||'')+'</span>'+(e.author?' <span class="a">'+SV_q(e.author)+'</span>':'')+'</div><div>'+SV_q(e.text).replace(/\n/g,'<br>')+'</div></div>'; }).join('');
+  }
+  var h='<h3 class="sv-h">총평 <small>(상담·수업 내용을 날짜별로 쌓아 두면 모든 선생님이 보고 지도에 활용할 수 있습니다)</small></h3><div class="sv-hint">본인이 쓴 총평은 직접 수정할 수 있습니다(컨설턴트는 모두 수정 가능). 「학부모 자료에 포함」을 체크한 총평만 학부모 인쇄·PDF·공유에 나옵니다.</div>'
+   +'<div id="sv_nt_root" oninput="SV_ntInput()" onchange="SV_ntInput()">';
+  if(!all.length) h+='<div class="sv-empty" style="padding:12px">아직 입력된 총평이 없습니다.</div>';
+  all.forEach(function(e){
+    var id=e.id;
+    if(!SV_ntCan(e)){ h+='<div class="sv-nt"><div class="m">'+SV_q((e.date||'').replace(/-/g,'.'))+'<span class="sv-sj">'+SV_q(e.subj||'')+'</span> '+SV_q(e.author||'')+(e.parent===false?' <small style="color:#9aa3b5">· 학부모 자료 제외</small>':'')+'</div><div>'+SV_q(e.text).replace(/\n/g,'<br>')+'</div></div>'; return; }
+    var inList=SV_NT_SUBJ.indexOf(e.subj)>=0, selv=inList?e.subj:'직접입력';
+    h+='<div class="sv-nt"><div class="sv-nt-h"><input type="date" class="sv-in" style="width:132px" id="sv_nt_'+id+'_date" value="'+SV_q(e.date||'')+'">'
+     +'<select class="sv-in" style="width:96px" id="sv_nt_'+id+'_subj" onchange="SV_ntSubj(\''+id+'\')">'+SV_NT_SUBJ.concat(['직접입력']).map(function(o){ return '<option'+(selv===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select>'
+     +'<input class="sv-in" style="width:96px;'+(inList?'display:none':'')+'" id="sv_nt_'+id+'_subjc" value="'+SV_q(inList?'':e.subj)+'" placeholder="과목 직접입력">'
+     +'<input class="sv-in" style="width:110px" id="sv_nt_'+id+'_author" value="'+SV_q(e.author||'')+'" placeholder="작성자">'
+     +'<label class="sv-opt" style="padding:4px 8px"><input type="checkbox" id="sv_nt_'+id+'_parent"'+(e.parent===false?'':' checked')+'> 학부모 자료에 포함</label><button class="sv-x" onclick="SV_ntDel(\''+id+'\')">✕</button></div>'
+     +'<textarea class="sv-in" rows="4" id="sv_nt_'+id+'_text" placeholder="상담·수업 내용을 입력하세요">'+SV_q(e.text||'')+'</textarea></div>';
+  });
+  return h+'</div><button class="sv-btn2" onclick="SV_ntAdd()">+ 총평 추가</button>';
+}
+function SV_ntSubj(id){ var sel=document.getElementById('sv_nt_'+id+'_subj'), c=document.getElementById('sv_nt_'+id+'_subjc'); if(sel&&c){ c.style.display=sel.value==='직접입력'?'':'none'; if(sel.value==='직접입력') c.focus(); } }
+function SV_ntBase(){ var s=ST.sel, re=SV_collect(); if(!re){ re=JSON.parse(JSON.stringify(SV_re(s))); re.academy=SV_acCollect(s,re); re.notes=SV_ntCollect(SV_notes(s)); } re.overall=''; re.updatedAt=Date.now(); return re; }
+function SV_ntInput(){ clearTimeout(SV.ntTimer); SV.ntTimer=setTimeout(function(){ if(!ST.sel) return; SV_apply(SV_ntBase(),false); },800); }
+function SV_ntAdd(){ if(!ST.sel) return; var re=SV_ntBase(), id=String(Date.now()); re.notes=(re.notes||[]).concat([{id:id,date:SV_ymd(),subj:'컨설팅',author:SV_meName(),text:'',parent:true,by:SV_me()}]); SV_apply(re,true); setTimeout(function(){ var e=document.getElementById('sv_nt_'+id+'_text'); if(e){ e.focus(); try{ e.scrollIntoView({block:'center'}); }catch(x){} } },80); }
+function SV_ntDel(id){ if(!confirm('이 총평을 삭제할까요?')) return; var re=SV_ntBase(); re.notes=(re.notes||[]).filter(function(e){ return String(e.id)!==String(id); }); SV_apply(re,true); }
+function SV_pagesHtml(s,pv){ return SV_p1(s,pv)+SV_p2(s)+SV_p3(s)+SV_p4(s,pv); }
 
 var SV_CSS='.sv-page{background:#fff;color:#1a2233;font-family:"Pretendard","Malgun Gothic",sans-serif;font-size:12px;line-height:1.45;padding:18px 20px;margin:0 auto 16px;max-width:820px;box-sizing:border-box;border:1px solid #e3e7f1;border-radius:10px}'
  +'.sv-ph{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:2.5px solid #1f3a8a;padding-bottom:8px;margin-bottom:12px}.sv-ph b{font-size:16px}.sv-ph span{color:#5b6478;font-size:12px;margin-left:6px}.sv-pt{font-weight:800;color:#1f3a8a;font-size:13px;text-align:center;flex:1}.sv-pd{color:#8a93a8;font-size:11px;white-space:nowrap}'
  +'.sv-h{font-size:13px;font-weight:800;margin:14px 0 6px;color:#1a2233;border-left:4px solid #3b5bdb;padding-left:7px}.sv-h small{font-weight:500;color:#8a93a8;font-size:11px}'
  +'.sv-t{border-collapse:collapse;width:100%;table-layout:auto}.sv-t th,.sv-t td{border:1px solid #d6dbe8;padding:5px 6px;vertical-align:middle;text-align:center}.sv-t th{background:#f1f4fb;font-weight:700;font-size:11.5px}'
  +'.sv-prof th{text-align:left;background:#f1f4fb}.sv-prof td{text-align:left}.sv-cn{font-weight:700;background:#fafbff;text-align:left!important}.sv-cq{text-align:left!important;font-size:11px;padding:4px 8px}.sv-cq ul{margin:0;padding-left:14px}.sv-cq li{margin:1px 0}'
- +'.sv-grid td small{display:block;color:#7a8296;font-size:10px}.sv-grid td b{font-size:13px}.sv-avg{font-weight:800;color:#3b5bdb}.sv-sum td{background:#f5f7ff}.sv-grid td.l{text-align:left;font-size:11px}'
+ +'.sv-grid td small{display:block;color:#7a8296;font-size:10px}.sv-grid td b{font-size:13px}.sv-avg{font-weight:800;color:#3b5bdb}.sv-sum td{background:#f5f7ff}.sv-grid td.l{text-align:left;font-size:11px}.sv-ac td,.sv-ac th{padding:3px 6px!important;font-size:11px}'
  +'.sv-chip{display:inline-block;min-width:26px;padding:1px 6px;border-radius:99px;font-weight:800;font-size:11.5px}.sv-chip.a{background:#e8f7ee;color:#15803d}.sv-chip.b{background:#e8f0fe;color:#1d4ed8}.sv-chip.c{background:#fff4e0;color:#b45309}.sv-chip.d{background:#fee2e2;color:#b91c1c}.sv-no{color:#b6bdcc}'
  +'.sv-star{color:#e11d48;letter-spacing:1px;font-size:13px}.sv-star .off{color:#d9dde7}.sv-star:not(.hi){color:#9aa3b5}.sv-lv{font-size:11px;margin-left:2px}.sv-star-t td{text-align:left;padding:6px 10px}'
  +'.sv-pc{padding:3px 2px!important}.sv-pr{display:flex;align-items:center;justify-content:space-between;gap:3px;padding:1px 3px}.sv-pr .k{font-size:9.5px;color:#7a8296;font-weight:700}.sv-pr.st{opacity:.75}'
- +'.sv-overall{border:1px solid #d6dbe8;border-radius:8px;padding:10px 12px;background:#fafbff;min-height:60px;font-size:12.5px}.sv-empty{padding:22px;text-align:center;color:#9aa3b5;background:#f7f8fc;border-radius:8px}.sv-note{font-size:10.5px;color:#8a93a8;margin-top:4px}'
+ +'.sv-nt,.sv-nt-p{border:1px solid #d6dbe8;border-radius:8px;padding:8px 10px;margin-bottom:8px;background:#fafbff;break-inside:avoid;page-break-inside:avoid}.sv-nt .m,.sv-nt-p .m{font-weight:800;color:#1f3a8a;margin-bottom:3px;font-size:11.5px}.sv-nt-p .a{color:#4e5968;font-weight:700}.sv-sj{display:inline-block;background:#e8f0fe;color:#1d4ed8;border-radius:99px;padding:0 8px;font-weight:800;margin-left:6px;font-size:11px}.sv-nt-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}.sv-overall{border:1px solid #d6dbe8;border-radius:8px;padding:10px 12px;background:#fafbff;min-height:60px;font-size:12.5px}.sv-empty{padding:22px;text-align:center;color:#9aa3b5;background:#f7f8fc;border-radius:8px}.sv-note{font-size:10.5px;color:#8a93a8;margin-top:4px}'
  +'.sv-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:#4e5968;margin-top:4px}.sv-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.sv-wrap{overflow-x:auto}'
  +'@media print{@page{size:A4 portrait;margin:9mm}body{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sv-page{border:none!important;border-radius:0!important;margin:0!important;padding:0!important;max-width:none!important;page-break-after:always;break-after:page;font-size:10.5px}.sv-page:last-child{page-break-after:auto;break-after:auto}.sv-t th,.sv-t td{padding:3px 4px}.sv-grid td b{font-size:11.5px}.sv-h{margin:9px 0 4px}.sv-cq{font-size:9.5px}.sv-pr{padding:0 2px}.sv-pr .k{font-size:8.5px}.sv-chip{font-size:10px;padding:0 5px}}'
  +'@media(max-width:600px){.sv-page{padding:12px 10px}.sv-ph{flex-wrap:wrap}.sv-pt{order:3;flex-basis:100%;text-align:left}}';
 
 // ── 인쇄 / 공유 ──
-function SV_title(s){ var d=new Date(); return [s.name||'', '입시전략상담 현황판', d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')].filter(Boolean).join('_').replace(/[\\/:*?"<>|]/g,''); }
+function SV_title(s){ var d=new Date(); return [s.name||'', '입시현황판', d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')].filter(Boolean).join('_').replace(/[\\/:*?"<>|]/g,''); }
 function SV_print(){
   var s=ST.sel; if(!s) return;
   var w=window.open('','_blank','width=900,height=1000'); if(!w){ alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
@@ -5430,7 +5494,7 @@ async function SV_share(){
   try{
     var token=s._strategyShareToken;
     if(!token){ token='st_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); await window._fb.set('students',s.id,{_strategyShareToken:token}); ST.students=ST.students.map(function(x){ return String(x.id)===String(s.id)?Object.assign({},x,{_strategyShareToken:token}):x; }); ST.sel=Object.assign({},ST.sel,{_strategyShareToken:token}); }
-    await window._fb.set('reportShares',token,{token:token,studentId:String(s.id),orgId:s.orgId||null,studentName:s.name||'',testDate:'',testName:'입시전략상담 현황판',styleHtml:'<style>'+SV_CSS+'body{background:#f0f2f8}</style>',bodyHtml:SV_pagesHtml(s,true),publishedAt:Date.now(),publishedBy:(ST.currentUser&&ST.currentUser.name)||'',revoked:false});
+    await window._fb.set('reportShares',token,{token:token,studentId:String(s.id),orgId:s.orgId||null,studentName:s.name||'',testDate:'',testName:'입시현황판',styleHtml:'<style>'+SV_CSS+'body{background:#f0f2f8}</style>',bodyHtml:SV_pagesHtml(s,true),publishedAt:Date.now(),publishedBy:(ST.currentUser&&ST.currentUser.name)||'',revoked:false});
     var path=location.pathname.replace(/[^/]*$/,'');
     var url=_sgFormOrigin()+path+encodeURIComponent('챌린저_결과리포트_공유.html')+'?token='+encodeURIComponent(token);
     if(typeof _sgShowReportShareModal==='function') _sgShowReportShareModal(url,s.name||'',''); else prompt('학부모 공유 링크',url);
@@ -5442,8 +5506,8 @@ function SV_sel(id,val,opts,ph){ return '<select class="sv-in" id="'+id+'"><opti
 function SV_inp(id,val,ph,cls){ return '<input class="sv-in '+(cls||'')+'" id="'+id+'" value="'+SV_q(val)+'" placeholder="'+SV_q(ph||'')+'">'; }
 function SV_v(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; }
 function SV_collect(){
-  var s=ST.sel, old=SV_re(s); if(!document.getElementById('sv_overall')) return null;
-  var re={stars:{},years:{},overall:SV_v('sv_overall'),sehukExtra:[],sehuk:{},changche:{},apps:[],aiDetail:old.aiDetail||null,updatedAt:Date.now(),updatedBy:(ST.currentUser&&ST.currentUser.name)||''};
+  var s=ST.sel, old=SV_re(s); if(!document.getElementById('sv_st_0_0')) return null;
+  var re={stars:{},years:{},overall:'',notes:SV_ntCollect(SV_notes(s)),sehukExtra:[],sehuk:{},changche:{},apps:[],aiDetail:old.aiDetail||null,academy:SV_acCollect(s,old),updatedAt:Date.now(),updatedBy:(ST.currentUser&&ST.currentUser.name)||''};
   SV_COMP.forEach(function(c,ci){ re.stars[c.k]={}; SV_STAR_ROWS.forEach(function(r,ri){ re.stars[c.k][r[0]]=SV_v('sv_st_'+ci+'_'+ri); }); });
   SV_YEARS.forEach(function(y,yi){ re.years[y]={sehuk:SV_v('sv_y_'+yi+'_sehuk'),changche:SV_v('sv_y_'+yi+'_changche'),haeng:SV_v('sv_y_'+yi+'_haeng'),electives:SV_v('sv_y_'+yi+'_electives'),advanced:SV_v('sv_y_'+yi+'_advanced'),careerChange:SV_v('sv_y_'+yi+'_careerChange'),note:SV_v('sv_y_'+yi+'_note')}; });
   var extra=(old.sehukExtra||[]).length, names=SV_SEHUK_BASE.slice();
@@ -5452,6 +5516,22 @@ function SV_collect(){
   SV_CHANG.forEach(function(n,ri){ re.changche[n]={}; SV_SEMS.forEach(function(m,si){ var ai=SV_v('sv_ch_'+ri+'_'+si+'_ai'), con=SV_v('sv_ch_'+ri+'_'+si+'_con'); if(ai||con) re.changche[n][m]={ai:ai,con:con}; }); });
   for(var i=0;i<8;i++) re.apps.push({univ:SV_v('sv_ap_'+i+'_univ'),dept:SV_v('sv_ap_'+i+'_dept'),track:SV_v('sv_ap_'+i+'_track'),w1:SV_v('sv_ap_'+i+'_w1'),w2:SV_v('sv_ap_'+i+'_w2'),w3:SV_v('sv_ap_'+i+'_w3'),note:SV_v('sv_ap_'+i+'_note')});
   return re;
+}
+
+function SV_acCollect(s,old){
+  var o=(old&&old.academy)||{}, cfg=SV_acCfg(s), pe=document.getElementById('sv_ac_showPrint'), te=document.getElementById('sv_ac_showTeacher');
+  var out={teachers:Object.assign({},cfg.teachers),rows:cfg.rows.slice(),showPrint:pe?pe.checked:!!o.showPrint,showTeacher:te?te.checked:(o.showTeacher!==false)};
+  var sr=SV_acRows(s).filter(function(r){ return r.src==='s'; });
+  sr.forEach(function(r,i){ if(!document.getElementById('sv_ac_'+i+'_teacher')) return; var k=SV_acKey(r.subj,r.name), v=SV_v('sv_ac_'+i+'_teacher'); if(v) out.teachers[k]=v; else delete out.teachers[k]; });
+  if(document.getElementById('sv_acc_n')){ var n=+document.getElementById('sv_acc_n').value||0, rows=[]; for(var j=0;j<n;j++){ rows.push({subj:SV_v('sv_acc_'+j+'_subj'),name:SV_v('sv_acc_'+j+'_name'),days:SV_v('sv_acc_'+j+'_days'),from:SV_v('sv_acc_'+j+'_from'),to:SV_v('sv_acc_'+j+'_to'),teacher:SV_v('sv_acc_'+j+'_teacher')}); } out.rows=rows; }
+  return out;
+}
+function SV_acAdd(){ var re=SV_collect(); if(!re) return; re.academy.rows.push({subj:'',name:'',days:'',from:'',to:'',teacher:''}); SV_apply(re,true); }
+function SV_acDel(j){ var re=SV_collect(); if(!re) return; re.academy.rows.splice(j,1); SV_apply(re,true); }
+function SV_acOpt(){
+  var s=ST.sel; if(!s||!SV_canEdit()) return; var re=SV_collect();
+  if(!re){ re=JSON.parse(JSON.stringify(SV_re(s))); re.academy=SV_acCollect(s,re); re.notes=SV_ntCollect(SV_notes(s)); re.overall=''; }
+  re.updatedAt=Date.now(); SV_apply(re,false);
 }
 function SV_apply(re,doRender){ // 화면 새로고침 없이(또는 있이) 저장
   var s=ST.sel; if(!s) return; var s2=Object.assign({},s,{recordEval:re});
@@ -5481,8 +5561,7 @@ function SV_form(s){
   var h=SV_aiCard(re)+'<div class="sv-card"><h3 class="sv-h">① 학생부 항목별 역량 평가 <small>(높음 / 보통 / 낮음)</small></h3><table class="sv-t"><tr><th>학생부</th>'+SV_COMP.map(function(c){ return '<th style="background:'+c.color+';color:#fff">'+c.name+'</th>'; }).join('')+'</tr>'
    +SV_STAR_ROWS.map(function(r,ri){ return '<tr><td class="sv-cn">'+r[1]+'</td>'+SV_COMP.map(function(c,ci){ return '<td>'+SV_sel('sv_st_'+ci+'_'+ri,((st[c.k]||{})[r[0]])||'',SV_LVL,'–')+'</td>'; }).join('')+'</tr>'; }).join('')+'</table></div>';
   h+='<div class="sv-card"><h3 class="sv-h">② 학년별 학생부 평가</h3><div class="sv-wrap"><table class="sv-t"><tr><th>학년</th><th>세특</th><th>창체</th><th>행특</th><th>진로선택과목</th><th>심화과목</th><th>진로변화</th><th>비고</th></tr>'
-   +SV_YEARS.map(function(y,yi){ var d=yrs[y]||{}; return '<tr><td class="sv-cn" style="white-space:nowrap">'+y+'</td><td>'+SV_sel('sv_y_'+yi+'_sehuk',d.sehuk||'',SV_GR)+'</td><td>'+SV_sel('sv_y_'+yi+'_changche',d.changche||'',SV_GR)+'</td><td>'+SV_sel('sv_y_'+yi+'_haeng',d.haeng||'',SV_GR)+'</td><td>'+SV_inp('sv_y_'+yi+'_electives',d.electives)+'</td><td>'+SV_inp('sv_y_'+yi+'_advanced',d.advanced)+'</td><td>'+SV_inp('sv_y_'+yi+'_careerChange',d.careerChange)+'</td><td>'+SV_inp('sv_y_'+yi+'_note',d.note)+'</td></tr>'; }).join('')+'</table></div>'
-   +'<h3 class="sv-h" style="margin-top:12px">총평</h3><textarea class="sv-in" id="sv_overall" rows="5" placeholder="학생부 전반에 대한 총평을 입력하세요">'+SV_q(re.overall||'')+'</textarea></div>';
+   +SV_YEARS.map(function(y,yi){ var d=yrs[y]||{}; return '<tr><td class="sv-cn" style="white-space:nowrap">'+y+'</td><td>'+SV_sel('sv_y_'+yi+'_sehuk',d.sehuk||'',SV_GR)+'</td><td>'+SV_sel('sv_y_'+yi+'_changche',d.changche||'',SV_GR)+'</td><td>'+SV_sel('sv_y_'+yi+'_haeng',d.haeng||'',SV_GR)+'</td><td>'+SV_inp('sv_y_'+yi+'_electives',d.electives)+'</td><td>'+SV_inp('sv_y_'+yi+'_advanced',d.advanced)+'</td><td>'+SV_inp('sv_y_'+yi+'_careerChange',d.careerChange)+'</td><td>'+SV_inp('sv_y_'+yi+'_note',d.note)+'</td></tr>'; }).join('')+'</table></div>'+'</div>';
   var names=SV_SEHUK_BASE.concat(re.sehukExtra||[]);
   var cellSel=function(pfx,ri,si,c){ return '<div class="sv-pr"><span class="k">AI</span>'+SV_sel(pfx+'_'+ri+'_'+si+'_ai',(c&&c.ai)||'',SV_GR)+'</div><div class="sv-pr"><span class="k">컨설턴트</span>'+SV_sel(pfx+'_'+ri+'_'+si+'_con',(c&&c.con)||'',SV_GR)+'</div>'; };
   h+='<div class="sv-card"><h3 class="sv-h">③ 과목별 세특 학점 <small>(AI 평가 · 컨설턴트 평가)</small></h3><div class="sv-hint">AI 평가 칸은 학생부 파일 자동 분석 결과가 들어갈 자리이며, 지금은 직접 입력할 수 있습니다. 학부모용 인쇄·공유에는 「분석」과 「컨설턴트」 두 가지만 표시됩니다.</div><div class="sv-wrap"><table class="sv-t sv-mx"><tr><th style="width:92px">과목</th>'+SV_SEMS.map(function(m){ return '<th>'+m+'</th>'; }).join('')+'</tr>'
@@ -5493,6 +5572,15 @@ function SV_form(s){
   var hasStu=(s.myStatus&&(s.myStatus.apps||[]).some(function(a){ return a&&(a.univ||a.dept); })), hasT=(s.targets||[]).length>0;
   h+='<div class="sv-card"><h3 class="sv-h">⑤ 수시지원 대학 <small>(전형별 평가 비율 %)</small></h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="sv-btn2" onclick="SV_importApps(\'student\')"'+(hasStu?'':' style="opacity:.55"')+'>학생이 입력한 지원 대학 불러오기</button><button class="sv-btn2" onclick="SV_importApps(\'targets\')"'+(hasT?'':' style="opacity:.55"')+'>수시 분석 대상에서 불러오기</button></div><div class="sv-wrap"><table class="sv-t"><tr><th>no</th><th>지원대학</th><th>지원학과</th><th>전형명</th><th>학업%</th><th>진로%</th><th>공동체%</th><th>비고</th></tr>'
    +ap.map(function(a,i){ return '<tr><td>'+(i+1)+'</td><td>'+SV_inp('sv_ap_'+i+'_univ',a.univ)+'</td><td>'+SV_inp('sv_ap_'+i+'_dept',a.dept)+'</td><td>'+SV_inp('sv_ap_'+i+'_track',a.track)+'</td><td>'+SV_inp('sv_ap_'+i+'_w1',a.w1,'','sv-n')+'</td><td>'+SV_inp('sv_ap_'+i+'_w2',a.w2,'','sv-n')+'</td><td>'+SV_inp('sv_ap_'+i+'_w3',a.w3,'','sv-n')+'</td><td>'+SV_inp('sv_ap_'+i+'_note',a.note)+'</td></tr>'; }).join('')+'</table></div></div>';
+
+  var sr=SV_acRows(s), stuRows=sr.filter(function(r){ return r.src==='s'; }), conRows=sr.filter(function(r){ return r.src==='c'; }), cfg=SV_acCfg(s);
+  h+='<div class="sv-card"><h3 class="sv-h">⑥ 다니는 학원·강사 <small>(학원은 학생이 「내 현황」에서 입력 · 강사명은 여기서 입력)</small></h3><div class="sv-hint">학원 정보를 학부모용 인쇄·PDF·공유에 넣을지는 위쪽 「학원 정보 포함」 체크로 선택합니다. 학생이 학원명을 고치면 해당 줄의 강사명은 다시 입력해야 합니다.</div>'
+   +(stuRows.length?'<div class="sv-wrap"><table class="sv-t"><tr><th style="width:84px">과목</th><th>학원명</th><th style="width:88px">요일</th><th style="width:104px">시간</th><th style="width:150px">강사명 <small>(해당 학원일 때)</small></th></tr>'
+     +stuRows.map(function(r,i){ return '<tr><td class="sv-cn">'+SV_q(r.subj)+'</td><td style="text-align:left">'+SV_q(r.name)+'</td><td>'+SV_q(r.days)+'</td><td>'+SV_q(SV_acTime(r.from,r.to))+'</td><td>'+SV_inp('sv_ac_'+i+'_teacher',r.teacher,'강사명')+'</td></tr>'; }).join('')+'</table></div>':'<div class="sv-empty" style="padding:12px">학생이 「내 현황 → 학원」에 입력한 학원이 아직 없습니다.</div>')
+   +'<h3 class="sv-h" style="margin-top:14px">컨설턴트가 직접 추가한 학원 <small>(학생이 입력하지 않은 경우)</small></h3><input type="hidden" id="sv_acc_n" value="'+conRows.length+'">'
+   +(conRows.length?'<div class="sv-wrap"><table class="sv-t"><tr><th style="width:84px">과목</th><th>학원명</th><th style="width:88px">요일</th><th style="width:150px">시간</th><th style="width:120px">강사명</th><th style="width:30px"></th></tr>'
+     +conRows.map(function(r,j){ return '<tr><td>'+SV_inp('sv_acc_'+j+'_subj',r.subj,'과목')+'</td><td>'+SV_inp('sv_acc_'+j+'_name',r.name,'학원명')+'</td><td>'+SV_inp('sv_acc_'+j+'_days',r.days,'월·수')+'</td><td style="white-space:nowrap"><input class="sv-in" type="time" style="width:70px" id="sv_acc_'+j+'_from" value="'+SV_q(r.from)+'"> ~ <input class="sv-in" type="time" style="width:70px" id="sv_acc_'+j+'_to" value="'+SV_q(r.to)+'"></td><td>'+SV_inp('sv_acc_'+j+'_teacher',r.teacher,'강사명')+'</td><td><button class="sv-x" onclick="SV_acDel('+j+')">✕</button></td></tr>'; }).join('')+'</table></div>':'')
+   +'<button class="sv-btn2" onclick="SV_acAdd()">+ 학원 직접 추가</button></div>';
   return h;
 }
 function SV_screenCss(){
@@ -5502,14 +5590,14 @@ function SV_screenCss(){
    +'.sv-act{border:1.5px solid #c7d0ea;background:#fff;color:#1f3a8a;border-radius:9px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit}.sv-act.p{background:#1f3a8a;color:#fff;border-color:#1f3a8a}.sv-card{background:#fff;border:1px solid #e3e7f1;border-radius:12px;padding:14px 16px;margin-bottom:12px;max-width:980px}'
    +'.sv-in{width:100%;box-sizing:border-box;border:1.5px solid #dde1f0;border-radius:7px;padding:6px 7px;font-size:12px;font-family:inherit;background:#fff;outline:none}.sv-in:focus{border-color:#3b5bdb}select.sv-in{min-width:60px}.sv-n{width:56px;text-align:center}.sv-nm{width:calc(100% - 26px);font-weight:700}.sv-x{border:1px solid #fecaca;background:#fff0f0;color:#e53935;border-radius:5px;font-size:11px;cursor:pointer;margin-left:3px;padding:2px 5px}'
    +'.sv-btn2{border:1.5px solid #c5cae9;background:#eef1ff;color:#3b5bdb;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px}.sv-hint{font-size:11.5px;color:#7a8296;margin:0 0 8px;line-height:1.5}.sv-mx .sv-in{padding:3px 2px;font-size:11.5px;min-width:52px}.sv-mx .sv-pr{margin-bottom:2px}.sv-saved{font-size:11.5px;color:#8a93a8}'
-   +'.sv-page{border-radius:12px}';
+   +'.sv-page{border-radius:12px}.sv-opt{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#4e5968;background:#f4f6fb;border-radius:8px;padding:6px 9px;cursor:pointer}.sv-opt input{margin:0}';
   document.head.appendChild(st); return '';
 }
 function SV_render(s){
   SV_screenCss();
   var can=SV_canEdit(); if(!can) SV.view='board';
   var bar='<div class="sv-bar"><div class="sv-seg"><button class="'+(SV.view==='board'?'on':'')+'" onclick="SV_view(\'board\')">현황판</button>'+(can?'<button class="'+(SV.view==='record'?'on':'')+'" onclick="SV_view(\'record\')">학생부 평가 입력</button>':'')+'</div>'
-   +'<button class="sv-act" onclick="SV_print()">🖨 인쇄 / PDF (A4 세로 4쪽)</button><button class="sv-act p" onclick="SV_share()">🔗 학부모 공유 링크</button><span class="sv-saved" id="sv_saved">'+(SV.view==='record'?'입력하면 자동으로 저장됩니다':'')+'</span></div>';
+   +'<button class="sv-act" onclick="SV_print()">🖨 인쇄 / PDF (A4 세로 4쪽)</button><button class="sv-act p" onclick="SV_share()">🔗 학부모 공유 링크</button>'+(can?'<label class="sv-opt"><input type="checkbox" id="sv_ac_showPrint" onchange="SV_acOpt()"'+(SV_acCfg(s).showPrint?' checked':'')+'> 학부모 자료에 학원 정보 포함</label><label class="sv-opt"><input type="checkbox" id="sv_ac_showTeacher" onchange="SV_acOpt()"'+(SV_acCfg(s).showTeacher?' checked':'')+'> 강사명 포함</label>':'')+'<span class="sv-saved" id="sv_saved">'+(SV.view==='record'?'입력하면 자동으로 저장됩니다':'')+'</span></div>';
   var body;
   if(SV.view==='record'&&can) body='<div id="sv_root" oninput="SV_onInput()" onchange="SV_onInput()">'+SV_form(s)+'</div>';
   else body=SV_pagesHtml(s,false)+(can?'':'<div class="sv-hint" style="text-align:center">학생부 평가는 입력 권한이 있는 컨설턴트가 입력합니다.</div>');
@@ -5539,7 +5627,7 @@ function SV_aiApply(re,res,fileNames){
   (res.changche||[]).forEach(function(c){ [(c.year-1)+'-1',(c.year-1)+'-2'].forEach(function(sem){ /* 학년 단위 평가를 해당 학년의 학기에 모두 반영 */ var m=(c.year)+'-'+(sem.slice(-1)); if(SV_SEMS.indexOf(m)<0) return; if(!re.changche[c.item]) re.changche[c.item]={}; var cell=re.changche[c.item][m]||(re.changche[c.item][m]={ai:'',con:''}); cell.ai=c.grade; }); });
   if(!re.years) re.years={};
   (res.years||[]).forEach(function(y){ var k=y.year===3?'3-1학년':y.year+'학년'; var d=re.years[k]||(re.years[k]={}); if(!d.sehuk&&y.sehuk) d.sehuk=y.sehuk; if(!d.changche&&y.changche) d.changche=y.changche; if(!d.haeng&&y.haeng) d.haeng=y.haeng; });
-  if(!re.overall&&res.overall) re.overall=res.overall;
+  if(res.overall&&!(re.notes||[]).length) re.notes=[{id:String(Date.now()),date:SV_ymd(),subj:'컨설팅',author:'',text:res.overall,parent:false,by:'ai'}];
   re.aiDetail={at:Date.now(),files:fileNames||[],courses:(res.courses||[]).slice(0,80),changche:(res.changche||[]).slice(0,30)};
   return re;
 }
@@ -22507,7 +22595,7 @@ function openTForm(t){
     {key:'challenger',label:'🎯 챌린저(모의고사 분석)'},
     {key:'xlab',      label:'🔬 X-lab(월별 주제활동)'},
     {key:'roadmap',   label:'🧭 상담조사서(로드맵 리포트)'},
-    {key:'strategy',  label:'🗂 입시전략상담(학생부 평가 입력)'},
+    {key:'strategy',  label:'🗂 입시현황(학생부 평가 입력)'},
   ];
   const curPerms=t?.permissions||PERMS.map(p=>p.key); // 기본: 전체 허용
   // 소속 기관의 허용 권한 (기관 권한 범위 내에서만 선택 가능)
@@ -59514,7 +59602,7 @@ var SG_NAV_META={
  apex:{label:'APEX진단',bg:'#fff3dc',fg:'#d97706'},
  challenger:{label:'챌린저',bg:'#ffe8ee',fg:'#e11d48'},
  xlab:{label:'X-lab',bg:'#f0e8ff',fg:'#7c3aed'},
- strategy:{label:'입시전략상담',bg:'#fdeedd',fg:'#c2570c'},
+ strategy:{label:'입시현황',bg:'#fdeedd',fg:'#c2570c'},
  roadmap:{label:'상담조사서',bg:'#e2f3fd',fg:'#0284c7'},
  susi:{label:'수시',bg:'#fff0e4',fg:'#ea580c'},
  jeongsi:{label:'정시',bg:'#e8ecff',fg:'#4338ca'},
