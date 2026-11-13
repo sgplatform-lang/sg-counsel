@@ -5282,11 +5282,12 @@ function SV_acHtml(s,pv){
   var rows=SV_acRows(s).filter(function(r){ return r.name; });
   var ord=function(r){ var i=SV_AC_ORDER.indexOf(r.subj); return i<0?99:i; };
   rows=rows.map(function(r,i){ return {r:r,i:i}; }).sort(function(a,b){ return ord(a.r)-ord(b.r)||a.i-b.i; }).map(function(x){ return x.r; });
+  var wrapS='<div class="sv-keep">', wrapE='</div>';
   var head='<h3 class="sv-h">다니는 학원'+(pv?'':' <small>(학부모 인쇄·PDF·공유에는 위쪽 「학원 정보 포함」을 켰을 때만 표시됩니다)</small>')+'</h3>';
-  if(!rows.length) return pv?'':head+'<div class="sv-empty" style="padding:12px">학생이 입력한 학원이 아직 없습니다.</div>';
+  if(!rows.length) return pv?'':wrapS+head+'<div class="sv-empty" style="padding:12px">학생이 입력한 학원이 아직 없습니다.</div>'+wrapE;
   var showT=!pv||cfg.showTeacher;
-  return head+'<div class="sv-wrap"><table class="sv-t sv-grid sv-ac"><tr><th style="width:15%">과목</th><th>학원명</th><th style="width:16%">요일</th><th style="width:20%">시간</th>'+(showT?'<th style="width:16%">강사</th>':'')+'</tr>'
-   +rows.map(function(r){ return '<tr><td class="sv-cn">'+SV_q(r.subj)+'</td><td class="l">'+SV_q(r.name)+'</td><td>'+SV_q(r.days)+'</td><td>'+SV_q(SV_acTime(r.from,r.to))+'</td>'+(showT?'<td class="l">'+SV_q(r.teacher)+'</td>':'')+'</tr>'; }).join('')+'</table></div>';
+  return wrapS+head+'<div class="sv-wrap"><table class="sv-t sv-grid sv-ac"><tr><th style="width:15%">과목</th><th>학원명</th><th style="width:16%">요일</th><th style="width:20%">시간</th>'+(showT?'<th style="width:16%">강사</th>':'')+'</tr>'
+   +rows.map(function(r){ return '<tr><td class="sv-cn">'+SV_q(r.subj)+'</td><td class="l">'+SV_q(r.name)+'</td><td>'+SV_q(r.days)+'</td><td>'+SV_q(SV_acTime(r.from,r.to))+'</td>'+(showT?'<td class="l">'+SV_q(r.teacher)+'</td>':'')+'</tr>'; }).join('')+'</table></div>'+wrapE;
 }
 
 // ── 데이터 정리 ──
@@ -5368,7 +5369,7 @@ function SV_p1(s,pv){
   SV_STAR_ROWS.forEach(function(r){ stars+='<tr><td class="sv-cn">'+r[1]+'</td>'+SV_COMP.map(function(c){ return '<td>'+SV_stars(((st[c.k]||{})[r[0]])||'')+'</td>'; }).join('')+'</tr>'; });
   stars+='</table>';
   return '<section class="sv-page">'+SV_pageHead(s,'입시현황판 · 기본 정보와 대학 평가 역량',1,4)
-   +'<h3 class="sv-h">희망 진로·학과</h3>'+prof+'<h3 class="sv-h">대학이 평가하는 3대 역량</h3>'+comp+'<h3 class="sv-h">학생부 항목별 역량 평가</h3>'+stars+SV_acHtml(s,pv)+'</section>';
+   +'<h3 class="sv-h">희망 진로·학과</h3>'+prof+'<h3 class="sv-h">대학이 평가하는 3대 역량</h3>'+comp+'<h3 class="sv-h">학생부 항목별 역량 평가</h3>'+stars+'</section>';
 }
 function SV_gradeTable(s){
   var rows=SV_gradeRows(s), gd=s.gradeDetail||{};
@@ -5419,7 +5420,7 @@ function SV_p4(s,pv){
   var apps=(re.apps||[]).slice(0,8); while(apps.length<8) apps.push({});
   var at='<h3 class="sv-h">수시지원 대학</h3><div class="sv-wrap"><table class="sv-t sv-grid sv-ap"><tr><th>no</th><th>지원대학</th><th>지원학과</th><th>전형명</th><th>학업<br>역량</th><th>진로<br>역량</th><th>공동체<br>역량</th><th>비고</th></tr>'
    +apps.map(function(a,i){ if(i>=6&&!(a.univ||a.dept)) return ''; var pc=function(v){ return (v!==''&&v!=null)?SV_q(v)+'%':''; }; return '<tr><td>'+(i+1)+'</td><td class="l">'+SV_q(a.univ||'')+'</td><td class="l">'+SV_q(a.dept||'')+'</td><td class="l">'+SV_q(a.track||'')+'</td><td>'+pc(a.w1)+'</td><td>'+pc(a.w2)+'</td><td>'+pc(a.w3)+'</td><td class="l">'+SV_q(a.note||'')+'</td></tr>'; }).join('')+'</table></div>';
-  return '<section class="sv-page">'+SV_pageHead(s,'학생부 평가와 수시지원',4,4)+yt+mx+at+SV_ntHtml(s,pv)+'</section>';
+  return '<section class="sv-page">'+SV_pageHead(s,'학생부 평가와 수시지원',4,4)+yt+mx+at+SV_acHtml(s,pv)+SV_ntHtml(s,pv)+'</section>';
 }
 
 // ── 총평(상담·수업 기록): 날짜·과목·작성자별로 계속 쌓는 방식 ──
@@ -5470,7 +5471,7 @@ var SV_CSS='.sv-page{background:#fff;color:#1a2233;font-family:"Pretendard","Mal
  +'.sv-h{font-size:13px;font-weight:800;margin:14px 0 6px;color:#1a2233;border-left:4px solid #3b5bdb;padding-left:7px}.sv-h small{font-weight:500;color:#8a93a8;font-size:11px}'
  +'.sv-t{border-collapse:collapse;width:100%;table-layout:auto}.sv-t th,.sv-t td{border:1px solid #d6dbe8;padding:5px 6px;vertical-align:middle;text-align:center}.sv-t th{background:#f1f4fb;font-weight:700;font-size:11.5px}'
  +'.sv-prof th{text-align:left;background:#f1f4fb}.sv-prof td{text-align:left}.sv-cn{font-weight:700;background:#fafbff;text-align:left!important}.sv-cq{text-align:left!important;font-size:11px;padding:4px 8px}.sv-cq ul{margin:0;padding-left:14px}.sv-cq li{margin:1px 0}'
- +'.sv-grid td small{display:block;color:#7a8296;font-size:10px}.sv-grid td b{font-size:13px}.sv-avg{font-weight:800;color:#3b5bdb}.sv-sum td{background:#f5f7ff}.sv-grid td.l{text-align:left;font-size:11px}.sv-ac td,.sv-ac th{padding:3px 6px!important;font-size:11px}'
+ +'.sv-grid td small{display:block;color:#7a8296;font-size:10px}.sv-grid td b{font-size:13px}.sv-avg{font-weight:800;color:#3b5bdb}.sv-sum td{background:#f5f7ff}.sv-grid td.l{text-align:left;font-size:11px}.sv-ac td,.sv-ac th{padding:3px 6px!important;font-size:11px}.sv-keep{break-inside:avoid;page-break-inside:avoid}.sv-ac tr{break-inside:avoid;page-break-inside:avoid}'
  +'.sv-chip{display:inline-block;min-width:26px;padding:1px 6px;border-radius:99px;font-weight:800;font-size:11.5px}.sv-chip.a{background:#e8f7ee;color:#15803d}.sv-chip.b{background:#e8f0fe;color:#1d4ed8}.sv-chip.c{background:#fff4e0;color:#b45309}.sv-chip.d{background:#fee2e2;color:#b91c1c}.sv-no{color:#b6bdcc}'
  +'.sv-star{color:#e11d48;letter-spacing:1px;font-size:13px}.sv-star .off{color:#d9dde7}.sv-star:not(.hi){color:#9aa3b5}.sv-lv{font-size:11px;margin-left:2px}.sv-star-t td{text-align:left;padding:6px 10px}'
  +'.sv-pc{padding:3px 2px!important}.sv-pr{display:flex;align-items:center;justify-content:space-between;gap:3px;padding:1px 3px}.sv-pr .k{font-size:9.5px;color:#7a8296;font-weight:700}.sv-pr.st{opacity:.75}'
