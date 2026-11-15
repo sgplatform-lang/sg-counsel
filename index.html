@@ -59855,6 +59855,195 @@ function xlabAdminSwitchTopMode(mode){
 }
 function xsubAdminSetSubTab(k){ _xsubAdminSubTab = k; render(); }
 function xfinAdminSetSubTab(k){ _xfinAdminSubTab = k; render(); }
+/* ===== X-lab 사용설명서 ===== */
+/* X-lab 사용설명서 데이터 — 관리자 화면(앱 안)과 웹 매뉴얼(xlab_manual.html)이 같은 내용을 씁니다. */
+var XH_DOC={
+ title:'X-lab 사용설명서', ver:'2026.11',
+ intro:'X-lab은 학생이 학생용 페이지에서 쓴 탐구·활동 기록을 선생님이 한곳에서 확인하고, 수업·첨삭·인쇄까지 이어서 쓰는 화면입니다. 처음 쓰시는 분은 아래 「처음 30분 가이드」부터 따라 해 보세요.',
+ start:{
+  title:'처음 30분 가이드', sub:'로그인부터 학생 한 명의 기록을 확인하고 인쇄하기까지',
+  steps:[
+   {t:'학생 먼저 고르기', d:'X-lab은 학생 한 명의 기록을 보여주는 화면입니다. 관리자 페이지에 로그인한 뒤 학생 목록에서 확인할 학생을 먼저 선택하세요. 학생을 바꾸면 모든 탭의 내용이 그 학생 기준으로 바뀝니다.'},
+   {t:'X-lab 탭 열기', d:'선택한 학생 화면의 탭 줄에서 「🔬 X-lab」을 누릅니다. 탭이 보이지 않으면 기관에 X-lab 사용 권한이 꺼져 있는 것이니, 최종 관리자에게 「기관 관리 → 권한」에서 X-lab을 켜 달라고 요청하세요.'},
+   {t:'9개 상위 탭 지도 보기', d:'화면 위의 보라색 버튼 9개가 X-lab의 큰 메뉴입니다. 📘월별주제활동 · 📗월별교과활동 · 🏆최종예상세특 · 🚀예상세특 빌드업 · 📓월별셀프활동 · 🎯X-lab_AAR · 📝모의수시지원 · 📚수업자료 · 📌수행평가·파일. 앞의 7개는 「학생이 쓴 기록을 보는 곳」, 뒤의 2개는 「수업과 첨삭을 운영하는 곳」이라고 기억하시면 쉽습니다.'},
+   {t:'학생 기록 한 건 열어 보기', d:'「📘 월별주제활동」을 누르고 「📝 기본입력」 목록에서 한 줄을 눌러 상세 화면을 엽니다. 보고서(선정이유·개념·실사례·문제점·교내활동)와 예상 세특이 한 화면에 나옵니다. 「보고서 미작성」으로 표시된 건은 학생이 아직 쓰지 않은 것입니다.'},
+   {t:'인쇄/PDF로 내보내기', d:'상세 화면 오른쪽 위의 「🖨 인쇄/PDF」를 누르면 새 창이 열립니다. 인쇄하거나 「PDF로 저장」을 고르면 상담·수업 자료로 쓸 수 있습니다.'},
+   {t:'표로 모아 보기', d:'같은 탭의 「📊 주제통계표」「🧭 주제확장표」「🗂 예상세특표」는 학생의 여러 건을 한 장 표로 모아 줍니다. 상담 때 한 장으로 보여 드리기 좋습니다.'},
+   {t:'AAR로 학생 상태 확인하기', d:'「🎯 X-lab_AAR」의 「학생별 현황」에서 ⚠️ 표시가 붙은 줄을 먼저 열어 보세요. 학생이 스스로 점검한 내용 중 우선 확인이 필요한 신호가 모여 있고, 맨 아래에서 교사 검토를 저장할 수 있습니다.'},
+   {t:'수업·첨삭은 마지막에', d:'수업을 운영하실 때는 「📚 수업자료」(커리큘럼·워크북·기출)와 「📌 수행평가·파일」(트래커·첨삭)을 쓰세요. 처음에는 앞의 단계까지만 익히셔도 충분합니다.'}
+  ],
+  tips:['한 번에 다 익히려 하지 말고, 오늘은 「학생 선택 → X-lab 탭 → 월별주제활동 한 건 열기 → 인쇄」까지만 해 보세요.','화면이 비어 있다면 대부분 학생이 아직 입력하지 않은 것입니다. 오류가 아니니 학생에게 입력을 안내하면 됩니다.','막히면 각 탭 오른쪽 위의 「❓ 이 탭 사용법」을 누르세요. 지금 보고 있는 탭의 설명이 바로 열립니다.']
+ },
+ groups:[
+  {key:'rec',title:'학생이 쓴 기록 보기',sub:'앞 7개 상위 탭 — 학생 기록을 확인·인쇄하는 곳'},
+  {key:'run',title:'수업·첨삭 운영',sub:'뒤 2개 상위 탭 — 선생님이 직접 운영하는 곳'}
+ ],
+ pages:[
+  {key:'topic', grp:'rec', icon:'📘', title:'월별주제활동', mode:'topic',
+   what:'학생이 월별로 한 주제를 정해 쓴 탐구 보고서와 예상 세특을 확인합니다. X-lab의 기본이 되는 탭입니다.',
+   who:'입력은 학생(학생용 페이지의 X-lab). 선생님은 확인·인쇄 위주입니다.',
+   when:'월말 점검, 학부모 상담 전, 학생이 주제를 정했는지 확인할 때',
+   subs:[
+    {k:'기본입력',t:'기본입력 (목록·상세)',steps:['학생을 선택한 뒤 「📘 월별주제활동 → 📝 기본입력」을 엽니다.','맨 위 「학생 기본 인적사항」 카드에서 학생의 희망학과를 확인합니다. 「미입력」이면 학생이 아직 희망학과를 쓰지 않은 것입니다.','「월별 주제보고서」 목록에서 확인할 줄을 누릅니다. 줄마다 보고서 완료/미작성, 예상세특 완료 표시가 붙습니다.','상세 화면에서 교과목·교과개념·심화 확장 주제, 주제탐구 보고서(선정이유·개념·실사례·문제점·교내활동 예시), 예상 세특을 읽습니다.','필요하면 「🖨 인쇄/PDF」로 내보냅니다. 「← 목록으로」로 돌아갑니다.'],result:'학생 한 명의 월별 탐구 한 편이 보고서와 예상 세특까지 한 화면에 보입니다.',tips:['제목 옆 「직접입력」은 학생이 교과목을 목록에서 고르지 않고 직접 쓴 것입니다.','「보고서가 아직 작성되지 않았습니다」는 오류가 아니라 학생이 아직 보고서를 쓰지 않았다는 뜻입니다.']},
+    {k:'주제통계표',t:'주제통계표',steps:['「📊 주제통계표」를 누릅니다.','학생이 올린 주제들이 한 장 표로 모여 나옵니다.','「🖨 인쇄/PDF」로 표를 그대로 출력합니다.'],result:'월별로 어떤 주제를 했는지 한눈에 보는 표',tips:['상담 자료로 쓰기 좋습니다. 학생을 바꾸면 표도 그 학생 것으로 바뀝니다.']},
+    {k:'주제확장표',t:'주제확장표',steps:['「🧭 주제확장표」를 누릅니다.','각 주제가 어떤 방향으로 확장·심화될 수 있는지 표로 확인합니다.','필요하면 「🖨 인쇄/PDF」로 출력합니다.'],result:'주제별 확장 방향을 모은 표',tips:[]},
+    {k:'예상세특표',t:'예상세특표',steps:['「🗂 예상세특표」를 누릅니다.','학생이 쓴(또는 고친) 예상 세특이 과목·주제별로 표로 모입니다.','「🖨 인쇄/PDF」로 출력합니다.'],result:'예상 세특 문장을 한 장에 모은 표',tips:['표 맨 아래에서 비어 있는 칸은 학생이 아직 쓰지 않은 항목입니다.']},
+    {k:'워크북',t:'워크북',steps:['「📓 워크북」을 누릅니다.','항목별로 「학생워크북」(저장된 내용 참고용 인쇄)이나 「빈 워크북 인쇄/PDF」를 고릅니다.','인쇄해서 수업 시간에 학생이 밑줄 칸에 손으로 직접 써 보게 합니다.'],result:'수업용 워크북 인쇄물',tips:['저장된 내용을 참고 자료로 넣은 워크북과, 아무것도 채우지 않은 빈 워크북 두 종류가 있습니다.']}
+   ],
+   mistakes:['학생을 선택하지 않고 들어와서 화면이 비어 있는 경우 — 먼저 학생을 고르세요.','목록이 비어 있는 경우 — 그 학생이 아직 월별주제활동을 등록하지 않은 것입니다.']},
+  {key:'subject', grp:'rec', icon:'📗', title:'월별교과활동', mode:'subject',
+   what:'학생이 교과 수업과 연결해 쓴 월별 교과활동 보고서와 교과 예상 세특을 확인합니다.',
+   who:'입력은 학생. 선생님은 확인·인쇄 위주입니다.',
+   when:'교과 세특 소재를 점검할 때, 독서·심화 활동까지 함께 볼 때',
+   subs:[
+    {k:'기본입력',t:'기본입력 (목록·상세)',steps:['「📗 월별교과활동 → 📝 기본입력」을 엽니다.','목록에서 확인할 줄을 누릅니다. 교과목을 고르지 않은 건은 「교과목 미선택」으로 표시됩니다.','상세 화면에서 개념·원리·이론, 실사례 예시, 문제점·개선점, 배운 점·느낀 점·알게 된 점, 독서활동 기록, 심화·확장 주제를 읽습니다.','맨 아래 「교과 예상 세특」을 확인하고 필요하면 「🖨 인쇄/PDF」로 내보냅니다.'],result:'교과 한 건이 보고서·독서·예상 세특까지 보입니다.',tips:['월별주제활동과 달리 「배운 점·느낀 점」과 「독서활동 기록」 항목이 있습니다.']},
+    {k:'교과활동표',t:'교과활동표',steps:['「📊 교과활동표」를 누릅니다.','교과별 심화·확장 주제와 독서활동이 한 표에 모입니다. 비어 있으면 「미작성」으로 보입니다.','「🖨 인쇄/PDF」로 출력합니다.'],result:'교과별 활동 일람표',tips:[]},
+    {k:'예상세특표',t:'예상세특표',steps:['「🗂 예상세특표」를 누릅니다.','교과 예상 세특을 과목별로 모아 봅니다.','「🖨 인쇄/PDF」로 출력합니다.'],result:'교과 예상 세특 모음표',tips:['과목이 비어 있는 건은 「과목 미지정」으로 나옵니다.']},
+    {k:'워크북',t:'워크북',steps:['「📓 워크북」에서 항목별 「워크북 인쇄/PDF」나 「빈 워크북 인쇄/PDF」를 누릅니다.'],result:'수업용 워크북',tips:[]}
+   ],
+   mistakes:['「등록된 교과활동이 없습니다」 — 학생이 아직 월별교과활동을 입력하지 않은 것입니다.']},
+  {key:'final', grp:'rec', icon:'🏆', title:'최종예상세특', mode:'final',
+   what:'월별 활동들을 모아 과목별로 완성한 최종 예상 세특과, 그 근거가 된 항목들을 확인합니다.',
+   who:'생성·입력은 학생. 선생님은 확인·인쇄·수업 활용 위주입니다.',
+   when:'학기말 세특 점검, 학생·학부모 최종 상담',
+   subs:[
+    {k:'기본입력',t:'기본입력 (목록·상세)',steps:['「🏆 최종예상세특 → 📝 기본입력」을 엽니다.','「과목별 최종예상세특」 목록에서 줄을 누릅니다. 「생성 완료」와 「작성 중」으로 진행 상태가 구분됩니다.','상세에서 항목별 구성 내용(주제 선정동기, 개념·원리·이론, 문제점·개선점, 배운 점·느낀 점, 독서활동)과 연계 활동을 확인합니다.','맨 위의 「최종 예상세특」을 읽고 필요하면 「🖨 인쇄/PDF」로 출력합니다.'],result:'과목별 최종 예상 세특과 근거 항목',tips:['「최종 예상세특이 아직 생성되지 않았습니다」는 「작성 중」인 건입니다.']},
+    {k:'과목별예상세특표',t:'과목별예상세특표',steps:['「📊 과목별예상세특표」를 누릅니다.','과목, 작성일시, 심화·확장 주제, 주요 활동 확인, 연계 활동 확인이 표로 나옵니다.','「과목순 ▲/▼」로 정렬하고 「🖨 인쇄/PDF」로 출력합니다.'],result:'과목별로 정리된 일람표',tips:[]},
+    {k:'최종예상세특표',t:'최종예상세특표',steps:['「🗂 최종예상세특표」를 누릅니다.','생성된 최종 예상 세특만 모아 봅니다.','「🖨 인쇄/PDF」로 출력합니다.'],result:'최종 예상 세특 모음표',tips:[]},
+    {k:'워크북',t:'워크북',steps:['「📓 워크북」에서 항목별 「워크북 인쇄/PDF」를 누릅니다.','수업에서 학생이 밑줄 칸에 직접 다듬어 써 보게 합니다.'],result:'최종 예상세특 다듬기용 워크북',tips:[]}
+   ],
+   mistakes:['목록이 비어 있으면 아직 학생이 최종예상세특을 만들지 않은 것입니다.']},
+  {key:'buildup', grp:'rec', icon:'🚀', title:'예상세특 빌드업', mode:'buildup',
+   what:'이미 쓴 예상 세특을 불러와 희망 대학·학과에 맞춰 다시 구성하고, 강점·약점 분석과 발전 주제를 받아 보는 기능입니다.',
+   who:'선생님과 학생 모두 만들 수 있습니다.',
+   when:'희망 대학·학과별로 세특 방향을 잡아 줄 때',
+   subs:[
+    {k:'기본입력',t:'기본입력 (목록·새로 만들기)',steps:['「🚀 예상세특 빌드업 → 📝 기본입력」을 엽니다. 이미 만든 것은 「예상세특 빌드업 작성 목록」에 나옵니다.','새로 만들려면 「새 예상세특 빌드업 만들기」를 누릅니다.','「불러올 예상세특 선택」에서 기존 예상 세특을 고릅니다. 목록이 비어 있으면 먼저 월별주제활동·월별교과활동에서 예상세특을 작성해야 합니다.','「희망 대학/학과」에 대학명과 학과명을 입력합니다. 최소 1개, 최대 3개이며 「대학/학과 추가」로 늘립니다.','「예상세특 빌드업 생성」을 누르고 기다립니다. 최대 1~2분 걸립니다.','결과는 목록의 줄을 눌러 상세에서 확인합니다. 기존 예상 세특, 강점·약점 분석, 진로 일관성·학종 경쟁력 분석, 대학·학과별 재구성 예상세특, 발전 주제와 연계활동 추천이 나옵니다.'],result:'대학·학과별로 다시 구성된 예상 세특과 분석',tips:['생성 중에는 화면을 닫거나 다른 탭으로 이동하지 마세요.','희망 대학이 여러 곳이면 한 번에 최대 3개까지 입력해 비교할 수 있습니다.']},
+    {k:'예상세특 빌드업표',t:'예상세특 빌드업표',steps:['「📊 예상세특 빌드업표」를 누릅니다.','현재 선택한 학생의 작성일시, 교과목, 주제, 확장·심화 주제, 발전 주제 추천, 연계활동 추천이 한 표로 보입니다.','「🖨 인쇄/PDF」로 출력합니다.'],result:'학생 한 명의 빌드업 요약표',tips:[]},
+    {k:'전체빌드업표',t:'전체빌드업표',steps:['「🗂 전체빌드업표」를 누릅니다.','학생 구분 없이 전체 빌드업이 한 표로 보입니다. 불러오는 데 시간이 걸릴 수 있습니다.','「🖨 인쇄/PDF」로 출력합니다.'],result:'전체 학생 빌드업 일람',tips:[]}
+   ],
+   mistakes:['「불러올 수 있는 예상세특이 없습니다」 — 월별주제활동·교과활동에서 예상 세특을 먼저 작성해야 합니다.']},
+  {key:'activity', grp:'rec', icon:'📓', title:'월별셀프활동', mode:'activity',
+   what:'학생이 스스로 기록한 활동(활동유형·관련 분야·관심 주제)을 월별로 확인합니다.',
+   who:'입력은 학생. 선생님은 확인·인쇄 위주입니다.',
+   when:'학생이 활동을 꾸준히 기록하는지 점검할 때, 창체·진로 소재를 찾을 때',
+   subs:[{k:'',t:'사용 방법',steps:['「📓 월별셀프활동」을 엽니다. 학생이 기록한 활동이 없으면 안내 문구가 나옵니다.','「활동유형별 현황」에서 활동유형별 최근 입력일, 누적 횟수, 최근 관련 분야·관심 주제를 확인합니다.','월별 목록에서 한 줄 오른쪽 「자세히 →」를 눌러 그 활동의 상세를 읽습니다.','「🖨 인쇄/PDF」나 「전체 기간 목록 인쇄」로 출력합니다.'],result:'학생의 활동 기록 흐름',tips:['특정 달을 눌렀을 때 「이 달에 기록된 셀프활동이 없습니다」가 나오면 그 달에 입력이 없다는 뜻입니다.']}],
+   mistakes:[]},
+  {key:'aar', grp:'rec', icon:'🎯', title:'X-lab_AAR', mode:'aar',
+   what:'학생이 월별 활동을 마치고 스스로 점검(AAR)한 내용을 확인하고, 선생님이 검토 의견을 남깁니다. 개념·자료 카드도 여기서 관리합니다.',
+   who:'AAR 입력은 학생. 검토 저장과 카드 관리는 선생님입니다.',
+   when:'학생 상태를 빠르게 파악하고 싶을 때, 상담 우선순위를 정할 때',
+   subs:[
+    {k:'list',t:'학생별 현황',steps:['「🎯 X-lab_AAR → 📋 학생별 현황」을 엽니다.','표에서 입력일, 구분, 주제명, AAR 입력 유무를 봅니다. 「있음 N회」는 학생이 AAR을 쓴 횟수이고, 「없음」은 아직 쓰지 않은 것입니다.','⚠️ 표시가 붙은 줄은 우선 확인이 필요한 신호가 있는 건입니다. 먼저 눌러 보세요.','상세에서 「우선 확인이 필요한 신호」, 보고서·기록 내용, 입력 이력을 읽습니다.','맨 아래 교사 검토(확인·상담·행동 변경·작업물 확인)를 선택하고 저장합니다. 「저장 실패」가 나오면 인터넷 연결을 확인하고 다시 저장하세요.'],result:'학생이 스스로 점검한 내용과 교사 검토 기록',tips:['⚠️ 줄부터 보면 상담 우선순위를 빨리 정할 수 있습니다.','학생이 AAR을 쓰기 전이라면 표에서 「없음」으로만 보입니다.']},
+    {k:'cards',t:'카드관리 (개념·자료)',steps:['「🗂 카드관리(개념·자료)」를 엽니다.','여기서 등록한 카드는 모든 학생의 AAR 「교과 심화하기」 단계에 함께 보입니다. 개념 카드와 유형별 자료 카드는 각각 학생에게 최대 5개까지 노출됩니다.','「개념 카드 추가」로 교과 개념과 설명을 등록합니다. 파일(교과서 목차·성취기준·수업자료 등)로 후보를 자동으로 채우는 기능도 있습니다.','「자료 카드 추가」로 저자·기관, 자료 종류, 서지정보, 확인 날짜, 연결할 교과 개념을 입력합니다.','수정은 카드를 눌러 하고, 필요 없으면 삭제합니다.'],result:'모든 학생에게 공통으로 보이는 학습 카드',tips:['카드는 전체 학생에게 보이니 내용을 한 번 더 확인하고 저장하세요.']}
+   ],
+   mistakes:['「등록된 월별주제활동·… 이 없습니다」 — AAR은 학생의 활동 기록이 있어야 만들 수 있습니다.']},
+  {key:'mockapply', grp:'rec', icon:'📝', title:'모의수시지원', mode:'mockapply',
+   what:'학생이 학생용 페이지에서 입력·저장한 모의 수시 지원서를 확인하고 누적 현황표로 뽑습니다.',
+   who:'입력은 학생. 선생님은 확인·인쇄 위주입니다.',
+   when:'지원 전략 상담, 월별 지원 변화를 비교할 때',
+   subs:[{k:'',t:'사용 방법',steps:['「📝 모의수시지원」을 엽니다. 학생이 지원서를 작성하지 않았으면 안내 문구만 나옵니다.','목록에서 지원서 한 건을 누르면 상세가 열립니다. 「인쇄/PDF」로 출력할 수 있고 「목록으로」로 돌아옵니다.','「누적 현황표 인쇄/PDF」를 누르면 월별 변화를 한 장에 모아 출력합니다.','「새로고침」은 학생이 방금 저장한 내용을 다시 불러올 때 씁니다.'],result:'학생의 모의 수시 지원서와 누적 현황표',tips:['여기에 입력된 대학은 「수업자료 → 대학 기출DB」의 「이 학생 6칸 대학만」 보기와 연결됩니다.']}],
+   mistakes:[]},
+  {key:'xclass', grp:'run', icon:'📚', title:'수업자료', mode:'xclass',
+   what:'수업을 운영하는 곳입니다. 대학 기출 DB, 수업 커리큘럼, 워크북 배정과 코멘트, 파일 올리기, 제시문 배정, 생기부 면접 질문, 학점·평가가 7개 하위 탭에 들어 있습니다.',
+   who:'선생님이 직접 운영합니다. 학생은 공개·배정된 것만 학생용 페이지에서 봅니다.',
+   when:'수업 준비, 학생에게 기출·워크북·제시문을 나눠 줄 때, 평가를 정리할 때',
+   notice:'대학 기출DB는 관리자 전용입니다. 학생 화면에는 워크북에 배정한 「오늘의 기출 2문항」만 보입니다.',
+   subs:[
+    {k:'db',t:'🏛 대학 기출DB',steps:['「📚 수업자료 → 🏛 대학 기출DB」를 엽니다.','처음에는 「📥 기본 20개 대학 기출 가져오기」를 한 번 누릅니다. 이후에는 「기본 20개 중 없는 대학 추가」로 빠진 곳만 채웁니다.','대학·특목·자사를 직접 넣으려면 「＋ 기관 직접 추가」를, 기출 PDF나 문서가 있으면 「📄 기출 PDF·문서로 추가」를 씁니다.','검색창에 대학명·질문 내용을 넣거나 면접유형·유형 필터로 좁혀 봅니다.','대학 한 곳을 열면 면접 시간, 선발방법, 평가방법, 면접 형식, 유의사항과 기출 문항이 나옵니다. 「문항 추가」로 기출을 더하고 「이 대학 인쇄·PDF」로 출력합니다.','제시문 기출이 필요하면 「📖 제시문 기출·면접방식 갱신(2026 자료집)」을 눌러 반영합니다.'],result:'수업에서 쓸 대학 기출 자료 창고',tips:['「이 학생 6칸 대학만」은 학생이 모의수시지원서에 대학을 입력해야 켤 수 있습니다.','잘못 등록한 대학은 상세 화면의 「대학 삭제」로 지웁니다. 지우면 되돌릴 수 없습니다.']},
+    {k:'curri',t:'🗓 수업 커리큘럼',steps:['「🗓 수업 커리큘럼」을 엽니다.','주차마다 단계, 수업명, 수업 활동, 중점 기출 유형(자동 배정 기준)을 적습니다. 「주차 추가」로 늘리고 「기본값으로 되돌리기」로 처음 상태로 돌립니다.','학생에게 보이게 하려면 주차의 「공개」를 켜고 시작일을 정합니다. 시작일을 넣으면 그 날짜부터 자동 공개됩니다.','주차별 「공개 반」에서 어느 반에 보일지 고릅니다.','마지막에 반드시 「커리큘럼 저장」을 누릅니다.','「수업 커리큘럼 인쇄·PDF」와 「전체 빈 워크북 인쇄·PDF」로 출력할 수 있습니다.'],result:'학생 화면 수업 탭에 주차가 나타납니다.',tips:['공개 반을 정하지 않으면 학생 화면에 주차가 나타나지 않을 수 있습니다.','수정한 뒤 저장을 잊으면 내용이 사라집니다.']},
+    {k:'wb',t:'📓 워크북 배정·열람',steps:['「📓 워크북 배정·열람」을 엽니다. 「이 학생의 반에 공개된 주차가 없습니다」가 나오면 먼저 커리큘럼에서 그 반에 주차를 공개하세요.','주차를 고릅니다.','「오늘의 서류기반 기출연습 2문항 배정」에서 「칸 대학·이번 주 유형으로 자동 2문항」을 누르거나 「직접 고르기」로 문항을 정합니다. 학생에게는 배정한 문항만 보입니다.','학생이 워크북을 쓰면 「학생 작성본」에 나타납니다. 읽고 「교사 코멘트」에 1~2줄, 가능하면 질문 형태로 적은 뒤 「코멘트 저장」을 누릅니다.','「빈 워크북(배정 기출 포함)」을 인쇄해 수업에 쓸 수 있습니다. 배정을 바꾸려면 「배정 비우기」를 누릅니다.'],result:'학생별 오늘의 기출 2문항과 코멘트',tips:['코멘트는 답을 알려 주기보다 생각을 넓히는 질문 한 줄이 효과적입니다.','「저장했습니다」가 보이면 저장이 끝난 것입니다.']},
+    {k:'files',t:'📎 워크북 파일·인쇄',steps:['「📎 워크북 파일·인쇄」를 엽니다.','직접 만든 워크북 파일(docx·pdf·hwp·이미지 등)의 제목을 적고 공통 또는 주차를 고른 뒤 파일을 올립니다.','학생에게 내려받게 하려면 「학생에게 공개」를 켭니다.','올린 목록에서 「원본 받기」나 「인쇄·PDF 저장」을 누릅니다.'],result:'수업에서 쓸 워크북 파일 보관함',tips:['docx는 올릴 때 인쇄용으로 자동 변환되고, pdf와 이미지는 바로 인쇄됩니다. hwp는 원본 받기만 되니 PDF로 저장해서 올려 주세요.','일부 docx는 변환이 실패할 수 있습니다. 원본은 올라가 있으니 PDF로 다시 올리면 됩니다.','삭제하면 학생 화면에서도 사라집니다.']},
+    {k:'pass',t:'📖 제시문 배정·현황',steps:['「📖 제시문 배정·현황」을 엽니다. 제시문 기출이 등록된 대학이 없다고 나오면 「대학 기출DB」에서 「제시문 기출·면접방식 갱신」을 먼저 실행하세요.','「학생 배정·풀이」에서 대학과 제시문 세트를 고르고 필요하면 다른 학생도 함께 선택한 뒤 「선택한 제시문 배정하기」를 누릅니다. 이미 배정된 세트는 풀이를 유지하고 건너뜁니다.','학생에게는 제시문·문제·그림만 보이고 출제 의도와 예시 답안은 보이지 않습니다.','학생이 푼 내용(한 줄 요약, 구조, 말하기 답변, 꼬리질문 대답 등)을 열어 읽고 「선생님 코멘트」를 저장합니다.','교실 화면(빔·TV)에는 「송출 창 열기」로 새 창을 띄운 뒤 원하는 답변의 「📺 송출」을 누릅니다. 학생 이름 표시는 켜고 끌 수 있습니다.','「전체 학생 현황」에서는 모든 학생의 배정·풀이 진행을 한 표로 봅니다.'],result:'학생별 제시문 풀이와 수업 송출',tips:['배정을 취소하면 학생이 쓴 풀이도 함께 삭제됩니다. 신중히 누르세요.','배정 실패 메시지가 나오면 관리자에게 알려 데이터베이스 권한 설정을 확인받아야 합니다.']},
+    {k:'recq',t:'🧾 생기부 면접질문',steps:['「🧾 생기부 면접질문」을 엽니다. 두 가지 방식이 있습니다.','「학생 워크북에서 불러오기」: 학생이 쓴 월별주제·교과활동, 최종예상세특, 셀프활동을 불러옵니다. 「필수 질문 한꺼번에 만들기」를 누르면 동기·과정·근거·한계 질문이 만들어지고, 그 밖의 질문은 각 활동 아래 「질문 1개 더」로 유형과 초점을 골라 추가합니다.','「생기부 원문 붙여넣기」: 학생 생기부 원문을 붙여 넣습니다. 이름·학교명 등은 자동으로 가려져 전송되며 「가림 결과」로 미리 볼 수 있고, 가릴 단어를 더 적을 수 있습니다.','희망 학과·진로를 입력하고 「생성하기」를 눌러 질문을 만듭니다. 유형을 골라 그 유형만 다시 만들 수도 있습니다.','질문은 직접 추가·수정할 수 있고 「송출 창 열기」로 교실 화면에 띄울 수 있습니다. 「인쇄·PDF」「전체 복사」도 가능합니다.'],result:'학생 생기부를 바탕으로 한 면접 예상 질문',tips:['학생 화면에는 나오지 않는 선생님용 도구입니다.','다시 만들면 해당 유형의 기존 질문이 새 질문으로 바뀝니다. 직접 쓴 질문은 「질문 추가」로 따로 넣어 두세요.','생성에는 시간이 걸립니다. 「생성 중」이 끝날 때까지 기다리세요.']},
+    {k:'grade',t:'🎓 학점·평가',steps:['「🎓 학점·평가」를 엽니다. 학생이 작성한 활동이나 수행평가 파일이 아직 없으면 평가할 것이 없다고 안내됩니다.','평가할 학생의 항목을 열어 항목별 점수 버튼을 고릅니다. 「🤖 AI 점수 제안(최고 A)」을 누르면 참고용 점수를 받을 수 있지만, 최종 점수는 선생님이 정합니다. 1~3분 걸릴 수 있습니다.','A+는 95점 이상이면서 선생님 승인(사유 필수)일 때만 부여됩니다. A+를 주려면 「A+ 부여 사유」를 반드시 적으세요.','학생에게 보여줄 총평을 쓰고 「💾 평가 저장」을 누릅니다. 이 단계까지는 관리자만 볼 수 있습니다.','학생에게 보이려면 「👁 학생에게 공개」를 누릅니다. 취소는 「🙈 공개 취소」입니다. 목록에서는 「전체 공개」「전체 비공개」로 한꺼번에 바꿀 수도 있습니다. 잘못 만든 평가는 「🗑 평가 삭제」로 지웁니다.','「🖨 학점표 인쇄/PDF」로 출력합니다. 목록 위쪽에는 평점평균, 평균 점수, 평가 완료 건수, 학생 공개 건수가 요약됩니다.'],result:'학생별 월 평점과 학점표',tips:['전체 평가가 10건 이상일 때 A+ 비율이 권장 상한을 넘으면 경고가 나옵니다. 기준을 다시 점검하세요.','공개 버튼을 누르기 전에는 학생이 결과를 볼 수 없습니다.']}
+   ],
+   mistakes:['커리큘럼을 고치고 「커리큘럼 저장」을 누르지 않아 변경이 사라지는 경우','주차를 공개하지 않아 학생 화면에 수업이 안 나타나는 경우 — 공개와 공개 반을 함께 확인하세요.']},
+  {key:'xperf', grp:'run', icon:'📌', title:'수행평가·파일', mode:'xperf',
+   what:'학생의 수행평가 일정을 관리하고, 학생이 올린 수행평가 파일에 질문 중심 첨삭을 돌려주는 곳입니다.',
+   who:'학생이 일정과 파일을 올리고 선생님이 확인·첨삭합니다.',
+   when:'수업 시작 때 수행평가 일정 점검, 수행평가 초안 첨삭',
+   subs:[
+    {k:'tracker',t:'📌 수행평가 트래커',steps:['「📌 수행평가·파일 → 📌 수행평가 트래커」를 엽니다.','과목·수행평가명, 일정, 유형, 배점이 목록으로 보입니다. 학기 2주차까지 학생이 일정·유형·배점을 올립니다. 선생님은 「수행평가 추가」로 직접 넣을 수도 있습니다.','수업 0~10분에 「화면 공유 모드」를 눌러 화면에 띄웁니다. 「이 학생」 또는 「전체 학생 D-21」 중 고릅니다.','D-21 이내 수행평가를 같이 확인하고, D-7 학생은 그날 초안 점검을 받게 합니다.'],result:'다가오는 수행평가 일정 한눈에',tips:['등록된 수행평가가 없다고 나오면 학생이 아직 일정을 올리지 않은 것입니다.']},
+    {k:'files',t:'📁 파일함·AI 첨삭',steps:['「📁 파일함·AI 첨삭」을 엽니다. 이름 옆 숫자는 아직 처리하지 않은 파일 수입니다.','학생이 올린 파일 목록에서 하나를 엽니다. 파일명 규칙은 「학생명_과목_수행평가명_v1_학생」입니다. 학생이 못 올렸다면 「학생 대신 파일 올리기」로 올릴 수 있습니다.','파일 종류(수행평가 보고서, 발표·토론 자료, 실험 설계, 예상세특)와 희망 학과를 확인합니다. 학교의 평가기준이 있으면 입력해 두면 그 기준으로 점검합니다.','「첨삭 초안 만들기」를 누릅니다. 첨삭은 문장을 고쳐 써 주지 않고 원문 인용 + 기호 + 질문만 만듭니다. 만들어진 초안은 학생에게 보이지 않습니다.','첨삭 항목을 검토합니다. 「원문 확인 안 됨」이 붙은 항목은 원문에서 문장을 찾지 못한 것이니 수정하거나 제외하고, 항목마다 「공유에 포함」을 고릅니다. 「직접 추가」로 항목을 더할 수 있습니다.','필요하면 전체 코멘트 1~2줄과 주석 단 파일(PDF·문서 등)을 첨부합니다. 「초안 저장」으로 저장합니다.','검토가 끝나면 「검토 완료·학생에게 공유」를 누릅니다. 공유한 뒤에도 「공유 취소」나 「수정본 다시 공유」가 가능합니다. 학생이 「반영했어요」를 누르면 알림으로 보입니다.'],result:'학생이 질문만 받아 스스로 고쳐 쓰는 첨삭',tips:['공유 전 초안은 학생에게 보이지 않으니 편하게 고치셔도 됩니다.','학생 원문은 항상 학생이 쓴 그대로 남습니다.']}
+   ],
+   mistakes:['초안을 만든 뒤 「공유」를 누르지 않아 학생이 첨삭을 못 보는 경우']}
+ ],
+ faq:[
+  {q:'X-lab 탭이 보이지 않아요.',a:'기관에 X-lab 사용 권한이 꺼져 있습니다. 최종 관리자에게 「기관 관리 → 권한」에서 X-lab을 켜 달라고 요청하세요.'},
+  {q:'화면이 비어 있어요.',a:'학생을 먼저 선택했는지 확인하세요. 선택했는데도 비어 있으면 그 학생이 아직 입력하지 않은 것입니다.'},
+  {q:'학생 화면에 수업이 안 보여요.',a:'「수업자료 → 수업 커리큘럼」에서 주차의 「공개」와 「공개 반」을 확인하고 「커리큘럼 저장」을 눌렀는지 보세요.'},
+  {q:'저장 실패가 나와요.',a:'인터넷 연결을 확인하고 한 번 더 저장하세요. 계속되면 화면을 캡처해 관리자에게 알려 주세요.'},
+  {q:'인쇄 창이 안 열려요.',a:'브라우저의 팝업 차단을 풀어 주세요. 주소창 오른쪽에 팝업 차단 표시가 뜹니다.'},
+  {q:'학생이 쓴 내용을 선생님이 고칠 수 있나요?',a:'대부분의 X-lab 화면은 확인·인쇄용입니다. 수정이 필요하면 학생에게 학생용 페이지에서 고치도록 안내하세요.'}
+ ]
+};
+
+/* X-lab 사용설명서 렌더링(공용: 앱 안 패널 + 웹 매뉴얼) */
+function XH_E(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+var XH_CSS='.xh{font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;color:#1a2340;line-height:1.65;font-size:14px}'
++'.xh *{box-sizing:border-box}.xh h1{font-size:22px;margin:0 0 6px;letter-spacing:-.5px}.xh h2{font-size:18px;margin:0 0 4px;letter-spacing:-.4px}.xh h3{font-size:14.5px;margin:18px 0 6px;color:#5b21b6}'
++'.xh .xh_sub{color:#64748b;font-size:13px;margin:0 0 12px}.xh .xh_box{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:11px 14px;margin:10px 0;font-size:13.5px}'
++'.xh .xh_meta{display:grid;grid-template-columns:70px 1fr;gap:4px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin:10px 0;font-size:13px}.xh .xh_meta b{color:#7c3aed}'
++'.xh ol.xh_st{list-style:none;counter-reset:s;margin:6px 0;padding:0}.xh ol.xh_st>li{counter-increment:s;position:relative;padding:9px 12px 9px 46px;margin:7px 0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;min-height:44px}'
++'.xh ol.xh_st>li:before{content:counter(s);position:absolute;left:11px;top:9px;width:25px;height:25px;border-radius:50%;background:#7c3aed;color:#fff;font-weight:800;font-size:13px;text-align:center;line-height:25px}'
++'.xh ol.xh_st>li b.xh_t{display:block;color:#1a2340;margin-bottom:1px}.xh .xh_res{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}'
++'.xh ul.xh_tp{margin:4px 0 0;padding-left:20px;font-size:13px;color:#475569}.xh .xh_warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0;color:#9a3412}'
++'.xh .xh_note{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 12px;font-size:12.5px;margin:8px 0;color:#92400e}.xh .xh_sec{margin-bottom:26px;padding-bottom:6px}'
++'.xh .xh_q{font-weight:800;margin-top:12px}.xh .xh_a{color:#475569;margin:2px 0 0}.xh .xh_ic{font-size:20px;margin-right:6px}.xh .xh_hr{border:0;border-top:1px dashed #ddd6fe;margin:18px 0}'
++'@media print{.xh .xh_sec{page-break-inside:avoid;break-inside:avoid-page}.xh ol.xh_st>li{break-inside:avoid}.xh_noprint{display:none!important}}';
+function XH_steps(a){ return '<ol class="xh_st">'+a.map(function(x){ return typeof x==='string'?'<li>'+XH_E(x)+'</li>':'<li><b class="xh_t">'+XH_E(x.t)+'</b>'+XH_E(x.d)+'</li>'; }).join('')+'</ol>'; }
+function XH_tips(a,lab){ return (a&&a.length)?'<div class="xh_note"><b>'+(lab||'알아 두면 좋아요')+'</b><ul class="xh_tp">'+a.map(function(t){ return '<li>'+XH_E(t)+'</li>'; }).join('')+'</ul></div>':''; }
+function XH_startHtml(){ var s=XH_DOC.start; return '<section class="xh_sec" id="xh_start"><h2><span class="xh_ic">🚀</span>'+XH_E(s.title)+'</h2><p class="xh_sub">'+XH_E(s.sub)+'</p>'+XH_steps(s.steps)+XH_tips(s.tips,'처음 쓰시는 분께')+'</section>'; }
+function XH_pageHtml(p,onlySub){
+  var subs=onlySub!=null?p.subs.filter(function(x){ return x.k===onlySub; }):p.subs; if(!subs.length) subs=p.subs;
+  var h='<section class="xh_sec" id="xh_'+p.key+'"><h2><span class="xh_ic">'+p.icon+'</span>'+XH_E(p.title)+'</h2><p class="xh_sub">'+XH_E(p.what)+'</p>'
+   +'<div class="xh_meta"><b>누가</b><span>'+XH_E(p.who)+'</span><b>언제</b><span>'+XH_E(p.when)+'</span></div>'+(p.notice?'<div class="xh_warn">'+XH_E(p.notice)+'</div>':'');
+  subs.forEach(function(x){ h+=(p.subs.length>1||x.t!=='사용 방법'?'<h3>'+XH_E(x.t)+'</h3>':'<h3>사용 방법</h3>')+XH_steps(x.steps)+'<div class="xh_res"><b>결과</b> · '+XH_E(x.result)+'</div>'+XH_tips(x.tips); });
+  if(onlySub!=null&&p.subs.length>1) h+='<p class="xh_sub xh_noprint">이 탭의 다른 하위 화면 설명은 아래 「전체 목차」에서 볼 수 있어요.</p>';
+  if(p.mistakes&&p.mistakes.length) h+=XH_tips(p.mistakes,'자주 하는 실수');
+  return h+'</section>'; }
+function XH_faqHtml(){ return '<section class="xh_sec" id="xh_faq"><h2><span class="xh_ic">💬</span>자주 묻는 질문</h2>'+XH_DOC.faq.map(function(f){ return '<div class="xh_q">Q. '+XH_E(f.q)+'</div><div class="xh_a">'+XH_E(f.a)+'</div>'; }).join('')+'</section>'; }
+function XH_mapHtml(){ return '<section class="xh_sec" id="xh_map"><h2><span class="xh_ic">🗺</span>X-lab 한눈에 보기</h2><p class="xh_sub">상위 탭은 모두 9개입니다. 학생을 선택한 뒤 X-lab 탭에서 아래 순서로 만나게 됩니다.</p>'
+  +XH_DOC.groups.map(function(g){ return '<h3>'+XH_E(g.title)+' <span style="font-weight:600;color:#64748b;font-size:12px">'+XH_E(g.sub)+'</span></h3><div class="xh_box">'+XH_DOC.pages.filter(function(p){ return p.grp===g.key; }).map(function(p){ return '<div style="margin:4px 0">'+p.icon+' <b>'+XH_E(p.title)+'</b> — '+XH_E(p.what)+'</div>'; }).join('')+'</div>'; }).join('')+'</section>'; }
+function XH_allHtml(){ return '<div class="xh"><h1>'+XH_E(XH_DOC.title)+'</h1><p class="xh_sub">'+XH_E(XH_DOC.intro)+' <span style="color:#94a3b8">('+XH_E(XH_DOC.ver)+')</span></p>'+XH_startHtml()+XH_mapHtml()+XH_DOC.pages.map(function(p){ return XH_pageHtml(p); }).join('')+XH_faqHtml()+'</div>'; }
+
+/* ===== X-lab 사용설명서 (앱 안 패널) — 관리자 X-lab 화면의 「❓ 이 탭 사용법」 ===== */
+function XH_cur(){ try{ var m=typeof _xlabAdminTopMode!=='undefined'?_xlabAdminTopMode:'topic', sub=null;
+  if(m==='topic') sub=typeof _xlabAdminSubTab!=='undefined'?_xlabAdminSubTab:null;
+  else if(m==='subject') sub=typeof _xsubAdminSubTab!=='undefined'?_xsubAdminSubTab:null;
+  else if(m==='final') sub=typeof _xfinAdminSubTab!=='undefined'?_xfinAdminSubTab:null;
+  else if(m==='buildup') sub=typeof _xbupAdminSubTab!=='undefined'?_xbupAdminSubTab:null;
+  else if(m==='aar') sub=typeof _xaarAdminSubView!=='undefined'?_xaarAdminSubView:null;
+  else if(m==='xclass') sub=typeof _xcaTab!=='undefined'?_xcaTab:null;
+  else if(m==='xperf') sub=typeof _xcaPerfTab!=='undefined'?_xcaPerfTab:null;
+  return {key:m,sub:sub}; }catch(e){ return {key:'topic',sub:null}; } }
+function XH_webUrl(){ try{ if(typeof _sgFormOrigin==='function') return _sgFormOrigin()+'/xlab_manual.html'; }catch(e){} return location.href.replace(/[?#].*$/,'').replace(/[^\/]*$/,'')+'xlab_manual.html'; }
+function XH_toc(active){ var b=function(k,t){ var on=active===k; return '<button type="button" onclick="XH_open(\''+k+'\')" style="display:block;width:100%;text-align:left;border:none;background:'+(on?'#ede9fe':'transparent')+';color:'+(on?'#5b21b6':'#334155')+';font-weight:'+(on?800:600)+';font-size:13px;padding:8px 10px;border-radius:8px;cursor:pointer">'+t+'</button>'; };
+  return b('start','🚀 처음 30분 가이드')+b('map','🗺 X-lab 한눈에 보기')+XH_DOC.groups.map(function(g){ return '<div style="font-size:11px;font-weight:800;color:#94a3b8;margin:10px 10px 2px">'+XH_E(g.title)+'</div>'+XH_DOC.pages.filter(function(p){ return p.grp===g.key; }).map(function(p){ return b(p.key,p.icon+' '+XH_E(p.title)); }).join(''); }).join('')+b('faq','💬 자주 묻는 질문')+b('all','📄 전체 보기'); }
+function XH_open(key,sub){ try{
+  if(key==null){ var c=XH_cur(); key=c.key; sub=c.sub; }
+  var body, ov=document.getElementById('xh_ov'), keep=key;
+  if(key==='start') body=XH_startHtml(); else if(key==='map') body=XH_mapHtml(); else if(key==='faq') body=XH_faqHtml(); else if(key==='all'){ body=XH_allHtml().replace(/^<div class="xh">/,'').replace(/<\/div>$/,''); }
+  else{ var p=XH_DOC.pages.find(function(x){ return x.key===key; }); if(!p){ p=XH_DOC.pages[0]; keep=p.key; } body=XH_pageHtml(p,sub==null||sub===''?null:sub); }
+  if(!ov){ ov=document.createElement('div'); ov.id='xh_ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:14px'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) XH_close(); };
+  ov.innerHTML='<style>'+XH_CSS+'#xh_ov .xh_toc{width:210px;flex:0 0 210px;overflow:auto;border-right:1px solid #e5e7eb;padding:8px}@media(max-width:700px){#xh_ov .xh_toc{display:none}}</style><div style="background:#fff;border-radius:16px;width:min(980px,100%);height:min(88vh,860px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
+   +'<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap"><b style="font-size:16px">❓ '+XH_E(XH_DOC.title)+'</b><span style="flex:1"></span>'
+   +'<button type="button" onclick="XH_print()" style="border:1px solid #c4b5fd;background:#f5f3ff;color:#5b21b6;border-radius:9px;padding:7px 12px;font-weight:800;font-size:12.5px;cursor:pointer">🖨 전체 인쇄/PDF</button>'
+   +'<button type="button" onclick="window.open(XH_webUrl(),\'_blank\')" style="border:1px solid #c4b5fd;background:#f5f3ff;color:#5b21b6;border-radius:9px;padding:7px 12px;font-weight:800;font-size:12.5px;cursor:pointer">🔗 웹 매뉴얼 열기</button>'
+   +'<button type="button" onclick="XH_copyWeb()" style="border:1px solid #c4b5fd;background:#f5f3ff;color:#5b21b6;border-radius:9px;padding:7px 12px;font-weight:800;font-size:12.5px;cursor:pointer">📋 링크 복사</button>'
+   +'<button type="button" onclick="XH_close()" style="border:none;background:none;font-size:22px;cursor:pointer;color:#64748b">✕</button></div>'
+   +'<div style="display:flex;flex:1;min-height:0"><div class="xh_toc">'+XH_toc(keep)+'</div><div id="xh_body" class="xh" style="flex:1;overflow:auto;padding:16px 20px">'+body+'</div></div></div>';
+  var b=document.getElementById('xh_body'); if(b) b.scrollTop=0; }catch(e){ alert('설명서를 열지 못했어요: '+(e&&e.message||e)); } }
+function XH_close(){ var o=document.getElementById('xh_ov'); if(o) o.remove(); }
+function XH_copyWeb(){ var u=XH_webUrl(), done=function(){ alert('웹 매뉴얼 링크를 복사했어요.\n'+u); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(u).then(done).catch(function(){ prompt('아래 링크를 복사하세요',u); }); else prompt('아래 링크를 복사하세요',u); }
+function XH_print(){ var w=window.open('','_blank'); if(!w){ alert('팝업이 차단되어 있어요. 주소창 오른쪽의 팝업 차단을 풀어 주세요.'); return; }
+  w.document.open(); w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>X-lab 사용설명서</title><style>body{margin:0;padding:22px;background:#fff}'+XH_CSS+'@page{margin:14mm}</style></head><body>'+XH_allHtml()+'</body></html>'); w.document.close();
+  setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },400); }
+function XH_btns(){ return '<div class="xh_noprint" style="position:absolute;right:16px;top:14px;z-index:3;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button type="button" onclick="XH_open(\'start\')" style="border:1.5px solid #7c3aed;background:#fff;color:#7c3aed;border-radius:999px;padding:7px 13px;font-weight:800;font-size:12.5px;cursor:pointer">🚀 처음 30분 가이드</button><button type="button" onclick="XH_open()" style="border:none;background:#7c3aed;color:#fff;border-radius:999px;padding:7px 13px;font-weight:800;font-size:12.5px;cursor:pointer">❓ 이 탭 사용법</button></div>'; }
+
 function renderXlabAdminHeader(){
   const tabs=[['기본입력','📝'],['주제통계표','📊'],['주제확장표','🧭'],['예상세특표','🗂'],['워크북','📓']];
   const xsubTabs=[['기본입력','📝'],['교과활동표','📊'],['예상세특표','🗂'],['워크북','📓']];
@@ -59863,6 +60052,7 @@ function renderXlabAdminHeader(){
   const topModes=[['topic','📘 월별주제활동'],['subject','📗 월별교과활동'],['final','🏆 최종예상세특'],['buildup','🚀 예상세특 빌드업'],['activity','📓 월별셀프활동'],['aar','🎯 X-lab_AAR'],['mockapply','📝 모의수시지원'],['xclass','📚 수업자료'],['xperf','📌 수행평가·파일']];
   return `<div style="position:relative;overflow:hidden;background:#fff;border:1px solid #e0e3ef;border-top:7px solid #7c3aed;border-radius:18px;padding:22px;margin-bottom:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)">
     <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;border:32px solid rgba(124,58,237,.05)"></div>
+    ${typeof XH_btns==='function'?XH_btns():''}
     <div style="position:relative;z-index:2">
       <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(124,58,237,.30);color:#7c3aed;background:rgba(124,58,237,.06);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900;letter-spacing:1.2px;margin-bottom:12px">🔬 X-LAB · 월별 주제활동</div>
       <h1 style="margin:0;font-size:24px;color:#1a2340;letter-spacing:-.8px;line-height:1.2">X-lab 월별 주제활동 관리</h1>
