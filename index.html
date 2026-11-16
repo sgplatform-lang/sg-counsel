@@ -39150,6 +39150,683 @@ function chgDirectiveListHtml(s){
     <tbody>${rows}</tbody>
   </table></div>`;
 }
+/* ===== 챌린저 사용설명서 ===== */
+/* 챌린저 사용설명서 데이터(GitHub 버전) */
+var CH_DOC={
+ "title": "챌린저 사용설명서",
+ "ver": "2026.11",
+ "intro": "챌린저는 실전모의고사 결과를 학생별로 입력·채점하고, 오답 원인과 행동강령, 학부모에게 보내는 결과리포트까지 이어서 만드는 화면입니다. 처음 쓰시는 분은 아래 「처음 30분 가이드」부터 따라 해 보세요.",
+ "start": {
+  "title": "처음 30분 가이드",
+  "sub": "학생 선택 → 시험 등록 → 채점·입력 → 결과리포트 → 학부모 공유까지",
+  "steps": [
+   {
+    "t": "학생 먼저 고르기",
+    "d": "챌린저는 학생 한 명 단위로 보는 화면입니다. 관리자 페이지에 로그인해 학생 목록에서 학생을 선택하고, 탭 줄에서 「🎯 챌린저」를 누르세요. 탭이 보이지 않으면 기관에 챌린저 권한이 꺼져 있는 것이니 최종 관리자에게 켜 달라고 요청하세요."
+   },
+   {
+    "t": "시험이 등록돼 있는지 확인",
+    "d": "학생에게 보여 줄 시험은 먼저 등록돼 있어야 합니다. 위쪽의 「📚 시험 카탈로그 관리」를 열어 이번 시험이 목록에 있는지 봅니다. 없으면 같은 화면에서 새 시험을 등록하세요. 이미 등록된 시험이면 이 단계는 건너뜁니다."
+   },
+   {
+    "t": "채점 결과 넣기",
+    "d": "가장 쉬운 방법은 「📋 결과 일괄반영」입니다. 학원에서 받은 채점 결과(O/X 표)를 그대로 복사해 붙여넣으면 학생 여러 명에게 한 번에 반영됩니다. 학생 한 명만 직접 채점하려면 「🔧 부가기능 → 단일 자동채점」에서 정답표와 학생 답안을 넣으세요."
+   },
+   {
+    "t": "「📝 기본 입력」에서 확인",
+    "d": "학생명·학교/학년·응시일·시험명·담당 매니저가 맞는지 보고, 과목 카드를 펼쳐 오답 문항과 성적을 확인합니다. 오답마다 「1차 원인」과 배점을 채우면 손실점수·교정가능점수가 자동 계산됩니다."
+   },
+   {
+    "t": "「💾 현재 회차 저장 후 누적 반영」",
+    "d": "입력이 끝나면 기본 입력의 「과거 저장 회차」 줄에서 「💾 현재 회차 저장 후 누적 반영」을 누르세요. 저장해야 결과리포트와 학생 통계에 이번 회차가 쌓입니다. 저장 전에 다른 회차를 불러오면 입력 중인 내용이 사라지니 주의하세요."
+   },
+   {
+    "t": "「📄 결과리포트」 열기",
+    "d": "탭 줄의 「📄 결과리포트」를 누르면 PART 1(과목별 결과·시험 전후 진단) → PART 2(이번 시험 분석과 행동강령) → PART 3(오답유형 정밀 분석) → PART 4(누적 변화)가 한 장으로 나옵니다. 내용을 확인한 뒤 「한 번에 인쇄/PDF」로 출력합니다."
+   },
+   {
+    "t": "학부모 공유 링크 만들기",
+    "d": "결과리포트 맨 위 「🔗 학부모 공유 링크」를 눌러 링크를 만들고 복사해서 보냅니다. 학부모는 로그인 없이 그 링크로 리포트를 볼 수 있습니다."
+   },
+   {
+    "t": "부가기능은 필요할 때 하나씩",
+    "d": "OMR 자동화, 다학생 일괄채점, QR 회차, 학생 복기·복기 반영, 매니저 AAR은 「🔧 부가기능」 메뉴에 모여 있습니다. 처음에는 위 7단계까지만 익히셔도 충분합니다."
+   }
+  ],
+  "tips": [
+   "오늘은 「시험 확인 → 결과 일괄반영 → 기본 입력에서 저장 → 결과리포트 인쇄」까지만 해 보세요.",
+   "리포트의 「집계할 응시생 데이터 부족」 문구는 오류가 아니라, 같은 시험을 본 학생 수가 아직 적어 순위를 낼 수 없다는 뜻입니다.",
+   "막히면 위쪽의 「❓ 이 탭 사용법」을 누르세요. 지금 보고 있는 탭의 설명이 바로 열립니다."
+  ]
+ },
+ "groups": [
+  {
+   "key": "top",
+   "title": "위쪽 버튼 (시험 등록·결과 반영)",
+   "sub": "챌린저 화면 맨 위의 3개 버튼"
+  },
+  {
+   "key": "main",
+   "title": "기본 화면 3개 탭",
+   "sub": "입력 → 결과리포트 → 학생 통계"
+  },
+  {
+   "key": "extra",
+   "title": "🔧 부가기능 (7개)",
+   "sub": "채점·OMR·QR 복기·AAR 같은 보조 도구"
+  }
+ ],
+ "pages": [
+  {
+   "key": "catalog",
+   "grp": "top",
+   "icon": "📚",
+   "title": "시험 카탈로그 관리",
+   "what": "학생에게 공개할 시험(문제·정답·단원·배점)을 등록하고 공개/비공개, 수정, 복사, 삭제를 하는 화면입니다.",
+   "who": "선생님·관리자. 학생은 여기서 공개된 시험만 고를 수 있습니다.",
+   "when": "새 시험을 열기 전, 학생에게 시험이 안 보인다는 문의가 왔을 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      "챌린저 화면 위쪽의 「📚 시험 카탈로그 관리」를 누릅니다.",
+      "목록에서 이번 시험이 있는지, 학생에게 보이는 상태(공개)인지 확인합니다.",
+      "없으면 화면의 등록 양식에 시험명·문항 정보(정답·단원·유형·배점)를 입력해 등록합니다.",
+      "고칠 시험은 「수정」으로 열어 고칩니다.",
+      "학생에게 숨기고 싶으면 비공개로 바꿉니다."
+     ],
+     "result": "공개된 시험만 학생이 시험 선택 화면에서 보게 됩니다.",
+     "tips": [
+      "기관관리자 화면에서는 우리 기관(또는 전체 공개)으로 등록된 시험만 보입니다."
+     ]
+    }
+   ],
+   "mistakes": [
+    "시험을 등록만 하고 「비공개」로 둬서 학생에게 안 보이는 경우",
+    "공개 대상 반을 잘못 골라 다른 반 학생에게만 보이는 경우"
+   ]
+  },
+  {
+   "key": "bulk",
+   "grp": "top",
+   "icon": "📋",
+   "title": "결과 일괄반영",
+   "what": "학원에서 받은 채점 결과를 복사해 붙여넣어 여러 학생의 점수·오답을 한 번에 챌린저에 반영합니다.",
+   "who": "선생님·관리자",
+   "when": "시험 직후 채점 결과표를 받았을 때, 학생을 한 명씩 입력하기 힘들 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "모달 열기",
+       "d": "위쪽의 「📋 결과 일괄반영」을 누릅니다."
+      },
+      {
+       "t": "1. 어떤 시험의 결과인가요?",
+       "d": "「등록된 시험에서 선택」으로 이번 시험을 고르면 단원·유형·배점이 자동으로 채워집니다. 등록 안 된 시험이면 「직접 입력」을 고르세요."
+      },
+      {
+       "t": "2. 채점결과 붙여넣기",
+       "d": "「학원 원본 (O/X)」을 고르고 엑셀 표를 가공 없이 복사해 붙여넣으면 자동으로 정리됩니다(오답·미응답은 모두 오답 처리). 이미 정리한 표라면 「정리된 표」를 고릅니다. 국어·수학처럼 과목이 정해진 표는 과목을 선택하세요."
+      },
+      {
+       "t": "추가 자료(선택)",
+       "d": "문항별 단원·유형·배점·정답·해설을 따로 붙여넣을 수 있습니다. 시험을 골랐다면 대부분 자동이라 열지 않아도 됩니다."
+      },
+      {
+       "t": "미리보기 확인 후 반영",
+       "d": "학생 이름이 우리 학생과 맞게 매칭됐는지 확인하고 반영 버튼을 누릅니다."
+      }
+     ],
+     "result": "매칭된 모든 학생의 챌린저 회차가 만들어지고, 결과리포트·학생 통계에 바로 쌓입니다.",
+     "tips": [
+      "같은 회차를 본 학생 전체에 한 번에 적용되므로 학생마다 따로 단원/유형을 넣을 필요가 없습니다.",
+      "이미 학생이 직접 입력해 둔 단원/유형은 그 값이 우선 유지됩니다.",
+      "배점(맨 끝 칸)을 채워 두면 학생이 오답 1차 원인만 입력해도 실질 완주율·손실점수가 자동 계산됩니다.",
+      "「학생 직접제출 답안 CSV 내보내기」로 학생이 직접 낸 답안을 표로 받아 쓸 수도 있습니다."
+     ]
+    }
+   ],
+   "mistakes": [
+    "같은 시험을 서로 다른 시험명으로 두 번 반영해 중복 회차가 생기는 경우 — 시험은 목록에서 골라 쓰세요.",
+    "학생 이름 표기가 달라 매칭되지 않는 경우"
+   ]
+  },
+  {
+   "key": "input",
+   "grp": "main",
+   "icon": "📝",
+   "title": "기본 입력",
+   "what": "학생 정보와 이번 회차 과목별 성적·오답을 입력하고 저장하는 챌린저의 시작 화면입니다.",
+   "who": "선생님·담당 매니저",
+   "when": "시험 직후, 상담 전에 기록을 정리할 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "기본 정보 확인",
+       "d": "학생명·학교/학년·응시일·시험명/회차·담당 매니저·목표 대학/전공·전체 이행률을 확인하고 고칩니다. 「학생정보 불러오기」를 누르면 등록된 학생 정보가 채워집니다."
+      },
+      {
+       "t": "변경사항·특이사항·다음 회차 확인 포인트",
+       "d": "직접 쓰거나 아래의 추천 칩(예: 오답 과다, 시간 배분 불안정, 미션 이행)을 눌러 빠르게 넣습니다."
+      },
+      {
+       "t": "과목별 입력",
+       "d": "「이번 회차 과목별 입력」의 과목 카드를 「펼치기」해 성적·오답 문항·오답 원인을 입력합니다. 과목이 더 있으면 「+ 과목 추가」, 필요 없으면 「삭제」."
+      },
+      {
+       "t": "1차 원인과 배점 채우기",
+       "d": "오답 문항마다 배점과 1차 원인(K/T/M/J/C/U)을 넣으면 실질 완주율·손실점수·교정가능점수가 자동 계산됩니다."
+      },
+      {
+       "t": "저장",
+       "d": "「💾 현재 회차 저장 후 누적 반영」을 누르면 이번 회차가 학생의 누적 기록에 저장됩니다."
+      },
+      {
+       "t": "지난 회차 불러오기",
+       "d": "「과거 저장 회차」에서 회차를 고르고 「선택 회차 불러오기」로 열어 고치거나, 「선택 회차 삭제」로 지웁니다."
+      }
+     ],
+     "result": "저장된 회차가 결과리포트와 학생 통계의 재료가 됩니다.",
+     "tips": [
+      "불러오기를 누르면 현재 입력 중인 내용이 사라집니다. 먼저 저장하세요.",
+      "화면 아래 「요약만 저장됨」이라고 표시된 회차는 문항 상세 없이 요약만 보관된 오래된 회차입니다.",
+      "데이터는 자동으로 서버(SG)에 저장·누적됩니다."
+     ]
+    }
+   ],
+   "mistakes": [
+    "저장 버튼을 누르지 않고 다른 학생으로 넘어가는 경우",
+    "응시일을 비워 두어 회차 순서가 뒤섞이는 경우"
+   ]
+  },
+  {
+   "key": "weekly",
+   "grp": "main",
+   "icon": "📄",
+   "title": "결과리포트",
+   "what": "상담용 분석 + 학생 처방전 + 누적 변화를 한 장으로 합친 리포트입니다. 인쇄하거나 학부모에게 링크로 보낼 수 있습니다.",
+   "who": "선생님이 확인·출력, 학부모는 공유 링크로 열람",
+   "when": "학부모·학생 상담 직전, 시험 결과를 전달할 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "탭 열기",
+       "d": "「📄 결과리포트」를 누르면 저장된 회차를 바탕으로 리포트가 자동으로 만들어집니다."
+      },
+      {
+       "t": "PART 1 · 과목별 결과와 시험 전후 상황분석",
+       "d": "과목별 성적·오답 수·시험 순위, 그리고 시험 전후 상황에서 본 무너진 원인과 「다음 시험 행동강령」이 나옵니다."
+      },
+      {
+       "t": "PART 2 · 이번 시험 분석과 다음 시험 처방",
+       "d": "오답원인별 세부 행동강령, 우선 확인할 필수권장 문항(최대 2개), 다음 시험 행동 지침이 나옵니다. 행동 지침이 비어 있으면 「부가기능 → 매니저 AAR」를 채우세요."
+      },
+      {
+       "t": "PART 3 · 과목별 오답유형 정밀 분석, PART 4 · 누적 변화",
+       "d": "오답 유형 분석과, 회차별 성적·오답 수 추이 그래프, 누적 통계표가 이어집니다."
+      },
+      {
+       "t": "출력",
+       "d": "맨 위 「한 번에 인쇄/PDF」를 누르면 한 번에 인쇄하거나 PDF로 저장할 수 있습니다."
+      },
+      {
+       "t": "학부모 공유",
+       "d": "「🔗 학부모 공유 링크」로 링크를 만들어 복사해 보냅니다. 학부모는 로그인 없이 열람합니다."
+      }
+     ],
+     "result": "학부모·학생에게 그대로 전달할 수 있는 결과 리포트",
+     "tips": [
+      "「시험순위: 집계할 응시생 데이터 부족」은 같은 시험을 본 학생이 아직 적을 때 나오는 안내입니다.",
+      "「AAR 입력값이 없어 행동 지침을 자동 생성할 수 없습니다」는 매니저 AAR을 아직 채우지 않았다는 뜻입니다.",
+      "공유 링크를 만든 뒤 회차를 고쳤다면, 링크를 다시 만들어 최신 내용으로 보내세요."
+     ]
+    }
+   ],
+   "mistakes": [
+    "회차를 저장하지 않아 리포트가 비어 있는 경우 — 먼저 「기본 입력」에서 저장하세요.",
+    "공유 링크를 만든 뒤 내용을 고치고 이전 링크를 그대로 보내는 경우"
+   ]
+  },
+  {
+   "key": "statsPanel",
+   "grp": "main",
+   "icon": "📊",
+   "title": "학생 통계",
+   "what": "학생이 지금까지 치른 모든 챌린저 회차의 과목별 누적 성적과 회차별 상세 기록을 한 화면에서 봅니다.",
+   "who": "선생님",
+   "when": "성적 흐름을 설명할 때, 반복되는 오답 원인(태그)을 찾을 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "탭 열기",
+       "d": "「📊 학생 통계」를 누릅니다. 「기본 입력」의 학생명을 기준으로 자동 집계됩니다."
+      },
+      {
+       "t": "과목별 누적 통계 보기",
+       "d": "총 응시회차, 성적 평균, 최고·최저 성적, 가장 자주 나온 오답 태그를 과목별로 확인합니다."
+      },
+      {
+       "t": "과목별 상세 기록 보기",
+       "d": "회차별 성적·오답 수·오답 태그가 날짜순으로 나옵니다."
+      },
+      {
+       "t": "인쇄",
+       "d": "오른쪽 위 「인쇄/PDF」로 출력합니다."
+      }
+     ],
+     "result": "상담 때 보여 주기 좋은 누적 성적 한 장",
+     "tips": [
+      "학생 이름이 회차마다 다르게 저장돼 있으면 따로 집계되니, 기본 입력의 학생명을 일정하게 유지하세요."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "answerKeyPanel",
+   "grp": "extra",
+   "icon": "✅",
+   "title": "단일 자동채점",
+   "what": "정답표를 만들고 학생 한 명의 답안을 넣으면 점수·오답번호·단답형 오답을 자동 계산해 기본 입력에 반영합니다.",
+   "who": "선생님·매니저",
+   "when": "학생 한 명을 OMR 답안으로 바로 채점할 때",
+   "notice": "「🔧 부가기능」 메뉴 → 「단일 자동채점」에서 엽니다.",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "1. 정답표 기본 정보",
+       "d": "시험명, 과목 구분(국어·수학·영어·한국사·탐구1·탐구2)을 고르고 문항 수·기본 배점이 맞는지 확인합니다. 「정답표 생성」을 누릅니다. 연습은 「샘플 정답표」."
+      },
+      {
+       "t": "2. 정답표 입력",
+       "d": "「표로 입력」 또는 「숫자열로 입력」으로 문항별 정답·배점·단원/유형·난이도·킬러 여부를 넣습니다. 수학 단답형은 문항유형을 「단답형」으로 바꾸고 숫자 정답을 직접 입력합니다. 아래 「배점 합계」가 정상(100점)인지 확인하세요."
+      },
+      {
+       "t": "정답표 저장",
+       "d": "「정답표 저장」으로 저장해 두면 다음에 다시 쓸 수 있습니다."
+      },
+      {
+       "t": "3. 학생 답안 빠른 입력",
+       "d": "「매니저 숫자열 입력」을 고르고 답안을 1,3,5,24,2…처럼 넣습니다(단답형이 섞인 수학은 쉼표로 구분). 「클릭형 입력표 보기」로 클릭해서 입력해도 됩니다."
+      },
+      {
+       "t": "4. 자동 채점",
+       "d": "「자동 채점」을 누르면 점수와 오답번호가 표시됩니다."
+      },
+      {
+       "t": "5. 기본 입력에 반영",
+       "d": "「오답번호 자동 반영」을 누르면 오답번호가 「기본 입력」의 과목 카드로 들어갑니다. 「입력 화면 확인」으로 이동해 오답 원인을 고르고 저장하세요."
+      }
+     ],
+     "result": "채점 결과가 기본 입력으로 넘어가 바로 저장·리포트까지 이어집니다.",
+     "tips": [
+      "1차 운영은 매니저가 OMR을 보며 숫자열로 입력하는 방식이 가장 안정적입니다.",
+      "단원/난이도는 정답표의 문항정보를 사용하고, 오답원인은 상담 중에 선택합니다."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "batchGradingPanel",
+   "grp": "extra",
+   "icon": "👥",
+   "title": "다학생 일괄채점",
+   "what": "한 시험 회차의 전체 학생 답안을 한꺼번에 채점하고, 문항별 정답률·오답률과 학생별 상황 분석을 만듭니다.",
+   "who": "선생님·매니저",
+   "when": "반 전체 모의고사를 한 번에 채점·분석할 때",
+   "notice": "현재 파일은 같은 컴퓨터 브라우저에 회차 데이터를 저장합니다. 여러 기기에서 자동 수집하려면 별도 서버 연동이 필요합니다.",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "1. 회차와 정답표 확인",
+       "d": "회차 ID·시험명·응시일·과목을 확인하고 먼저 「단일 자동채점」에서 만든 정답표를 「현재 정답표 가져오기」로 불러옵니다."
+      },
+      {
+       "t": "2. 전체 학생 답안 불러오기",
+       "d": "엑셀 범위를 복사해 붙여넣거나 CSV를 올립니다. 권장 열 순서: 학생명, 학생코드, 답안, 준비도, 미학습단원, 시간상태, 집중상태, 주요오답원인. 「입력 양식 CSV」「32명 형식 샘플」로 형식을 확인할 수 있습니다."
+      },
+      {
+       "t": "채점 실행",
+       "d": "「전체 학생 일괄채점」을 누르고, 나중을 위해 「회차 저장」을 눌러 둡니다."
+      },
+      {
+       "t": "3. 회차 전체 통계 확인",
+       "d": "문항별 정답·오답·미응답 인원과 정답률·오답률·해석을 봅니다. 「결과 CSV 내보내기」로 저장할 수 있습니다."
+      },
+      {
+       "t": "4. 학생별 결과·AAR 연결",
+       "d": "학생을 선택해 본인 결과와 전체 오답률을 비교하고, 「선택 학생을 AAR 기본 입력에 반영」 또는 「전체 학생 AAR 일괄 반영」으로 챌린저에 넘깁니다. 「일괄 반영 백업 CSV」로 백업하세요."
+      }
+     ],
+     "result": "문항별 오답률과 학생별 행동강령이 만들어지고 챌린저 기본 입력으로 이어집니다.",
+     "tips": [
+      "수학 단답형이 포함된 답안은 1|3|5|24|2처럼 세로막대(|)로 구분하면 가장 안전합니다.",
+      "전체 반영 전에 일부 학생만 선택 반영해 보며 결과를 확인하세요."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "omrAutomationPanel",
+   "grp": "extra",
+   "icon": "📇",
+   "title": "OMR 자동화",
+   "what": "외부 OMR 인식 결과나 표준 CSV를 불러와 자동채점·오답률·학생별 자동 오답노트·반복/개선 추이·랭킹까지 한 번에 만듭니다.",
+   "who": "선생님·운영 담당",
+   "when": "OMR 업체 결과 파일이 있을 때, 반 전체 오답노트를 한 번에 만들 때",
+   "notice": "스캔 이미지 판독은 OMR 업체의 결과(CSV/JSON)를 받아 그 이후 과정을 자동화하는 방식입니다. 이 화면 자체가 스캐너 이미지를 읽지는 않습니다.",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "1. 구현 범위 확인",
+       "d": "지금 바로 되는 것(CSV 입력 채점·오답률·랭킹·자동 오답노트·처방전 데이터)과 업체 연동이 필요한 것을 확인합니다."
+      },
+      {
+       "t": "2. 시험·문항 마스터 입력",
+       "d": "시험 ID·시험명·회차·응시일을 넣고 문항 마스터 CSV, 학생 답안 CSV(또는 OMR 업체 결과), 학생 체크리스트·복기 CSV, 이전 회차 누적 CSV를 붙여넣습니다. 「CSV 양식 내려받기」「예시 데이터 넣기」로 먼저 연습하세요."
+      },
+      {
+       "t": "전체 자동 분석 실행",
+       "d": "「전체 자동 분석 실행」을 누릅니다."
+      },
+      {
+       "t": "3~6. 결과 보기",
+       "d": "과목별 성적·오답률·행동 데이터 랭킹, 학생별 반복·개선 추이(학생·과목·보기 기준 선택), 학생 수준별 자동 오답노트·처방전, 선생님용 운영 요약(반별 공통 약점·고위험 학생·개선 학생)이 생성됩니다."
+      },
+      {
+       "t": "표준 OMR 답안지",
+       "d": "「표준 OMR 답안지 인쇄」로 업체 연동용 표준 답안지를 인쇄할 수 있습니다."
+      }
+     ],
+     "result": "반 전체의 오답률 랭킹과 학생별 자동 오답노트",
+     "tips": [
+      "처음에는 「예시 데이터 넣기」로 화면이 어떻게 나오는지 본 뒤 실제 파일을 넣으세요."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "qrAdminPanel",
+   "grp": "extra",
+   "icon": "🔲",
+   "title": "QR 회차",
+   "what": "시험 직후 학생이 과목별 체감·운영 신호·멘탈 신호를 휴대폰으로 3분 안에 남기는 QR을 만듭니다.",
+   "who": "선생님이 QR 생성, 학생이 접속해 입력",
+   "when": "시험 직전 준비, 시험 종료 직후 현장에서",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "회차 정보 입력",
+       "d": "시험 회차 ID, 시험명, 응시일, 학생 안내 문구를 넣습니다. 「2회차 국어·수학 설정」으로 과목 구성을 맞춥니다."
+      },
+      {
+       "t": "QR 생성",
+       "d": "「QR 생성」을 누르면 QR과 학생 접속 링크가 만들어집니다."
+      },
+      {
+       "t": "현장에 안내",
+       "d": "QR을 출력해 시험장에 붙이거나 「링크 복사」로 학생에게 보냅니다. 「학생 화면 열기」로 학생이 보는 화면을 미리 볼 수 있습니다."
+      },
+      {
+       "t": "학생 입력",
+       "d": "학생은 시험 종료 후 QR을 찍어 이름·학생코드·시험명을 확인하고, 가장 아쉬운 과목과 문항만 짧게 입력합니다."
+      },
+      {
+       "t": "수집 확인",
+       "d": "제출된 복기는 「학생 복기 반영」 메뉴에서 같은 회차 ID로 조회합니다."
+      }
+     ],
+     "result": "학생 복기 데이터가 회차 ID별로 쌓입니다.",
+     "tips": [
+      "회차 ID를 QR 생성 때와 반영 때 똑같이 써야 조회됩니다.",
+      "학생 입력 내용은 매니저 상담과 주간 처방전에 반영됩니다."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "studentReflectionPanel",
+   "grp": "extra",
+   "icon": "📱",
+   "title": "학생 복기 화면",
+   "what": "학생이 QR로 들어와 시험 직후 3분 복기를 제출하는 화면입니다(선생님은 어떤 화면인지 미리 볼 때 사용).",
+   "who": "학생이 입력, 선생님은 미리보기",
+   "when": "QR 안내 전에 학생이 보는 화면을 확인할 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "미리보기",
+       "d": "「부가기능 → 학생 복기」를 열면 학생이 보게 될 화면이 나옵니다. 학생 정보(이름·학생코드/휴대폰 뒷자리·시험명) 확인 후 「다음」으로 진행합니다."
+      },
+      {
+       "t": "학생이 하는 일",
+       "d": "점수보다 먼저, 기억이 사라지기 전에 붙잡힌·못 본·찍은 문항을 짧게 남깁니다."
+      },
+      {
+       "t": "제출 후",
+       "d": "제출된 복기는 같은 회차 ID로 저장되고 「복기 반영」 탭에서 조회됩니다."
+      }
+     ],
+     "result": "학생 복기 데이터가 회차별로 제출됩니다.",
+     "tips": [
+      "실제 학생은 선생님이 만든 QR/링크로 들어옵니다. 이 화면을 직접 학생에게 열어 줄 필요는 없습니다."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "reflectionApplyPanel",
+   "grp": "extra",
+   "icon": "🔗",
+   "title": "복기 반영",
+   "what": "학생이 QR로 낸 복기를 불러와 과목 입력·오답원인·매니저 메모의 후보값으로 반영합니다.",
+   "who": "선생님·매니저",
+   "when": "학생들이 QR 복기를 제출한 뒤, 상담·리포트 만들기 전",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "회차 조회",
+       "d": "조회할 회차 ID를 넣고 「복기 목록 조회」를 누릅니다. 연습은 「샘플 넣기」."
+      },
+      {
+       "t": "학생 선택",
+       "d": "제출 학생 목록에서 학생을 고르면 복기 요약이 보입니다."
+      },
+      {
+       "t": "반영",
+       "d": "버튼으로 과목/문항 후보, 운영·멘탈 후보를 반영합니다. 반영 상태에 「미반영/반영됨」이 표시됩니다. 잘못 반영했다면 「이 학생 반영 초기화」."
+      },
+      {
+       "t": "마스터 확인 요청",
+       "d": "「마스터 확인 요청」 초안을 확인해 보냅니다."
+      },
+      {
+       "t": "분석 생성으로 이동",
+       "d": "「분석 생성으로 이동」을 누르면 기본 입력에서 분석/행동강령을 만들어 상담용·처방전·주간 패키지로 이어집니다."
+      }
+     ],
+     "result": "학생 복기가 후보값으로 입력에 반영됩니다.",
+     "tips": [
+      "중복 누적을 막기 위해 복기 요약은 한 번만 정리됩니다. 버튼을 여러 번 눌러도 같은 내용이 계속 붙지 않습니다."
+     ]
+    }
+   ]
+  },
+  {
+   "key": "aarPanel",
+   "grp": "extra",
+   "icon": "🧭",
+   "title": "매니저 AAR",
+   "what": "과목별로 표준 항목을 선택하면 「이 내용으로 메모 생성」이 매니저 메모를 만들고, 행동강령·상담용·처방전에 그대로 반영합니다.",
+   "who": "담당 매니저",
+   "when": "시험 전후 학생 상태를 상담하며 정리할 때, 결과리포트 「다음시험 행동 지침」을 채울 때",
+   "subs": [
+    {
+     "k": "main",
+     "t": "사용 방법",
+     "steps": [
+      {
+       "t": "과목 카드 찾기",
+       "d": "「부가기능 → 매니저 AAR」을 열면 과목마다 「매니저 AAR」 카드가 나옵니다(예: 국어, 수학)."
+      },
+      {
+       "t": "시험 직전 입력",
+       "d": "선택과목 준비도, 문학·독서(수학은 단원) 준비도, 시험 전 예상 취약 영역/단원(국어 최대 2개, 수학 최대 3개)을 고릅니다."
+      },
+      {
+       "t": "시험 직후 입력",
+       "d": "풀이 순서·전략, 가장 크게 시간이 무너진 영역, 시간 부족 정도, 핵심 불안정 원인(최대 2개), 가장 위험했던 행동, 집중 붕괴 시점, 학생 점수 자가해석, 학생 선택 행동을 고릅니다."
+      },
+      {
+       "t": "OMR 카드로 빠르게 입력",
+       "d": "「📇 OMR 카드로 빠르게 입력」에 문항 번호만 넣어 빠르게 채울 수도 있습니다."
+      },
+      {
+       "t": "메모 생성",
+       "d": "매니저 최종 행동강령을 고른 뒤 「이 내용으로 메모 생성 → 매니저 메모에 반영」을 누릅니다."
+      },
+      {
+       "t": "리포트 확인",
+       "d": "「결과리포트」로 돌아가 「다음시험 행동 지침」이 채워졌는지 확인합니다."
+      }
+     ],
+     "result": "손으로 반복 입력하지 않고도 행동강령·메모가 만들어집니다.",
+     "tips": [
+      "모든 항목을 채우지 않아도 됩니다. 상담에서 확인된 항목만 선택해도 메모가 생성됩니다.",
+      "수학은 선택과목(확률과통계·미적분·기하)을 먼저 고르세요."
+     ]
+    }
+   ]
+  }
+ ],
+ "faq": [
+  {
+   "q": "챌린저 탭이 보이지 않아요.",
+   "a": "기관에 챌린저 사용 권한이 꺼져 있습니다. 최종 관리자에게 「기관 관리 → 권한」에서 챌린저를 켜 달라고 요청하세요."
+  },
+  {
+   "q": "학생에게 시험이 안 보여요.",
+   "a": "「시험 카탈로그 관리」에서 그 시험이 「공개」 상태인지, 공개 대상 반에 그 학생이 포함돼 있는지 확인하세요."
+  },
+  {
+   "q": "결과리포트가 비어 있어요.",
+   "a": "「기본 입력」에서 「💾 현재 회차 저장 후 누적 반영」을 눌렀는지 확인하세요. 저장된 회차가 있어야 리포트가 만들어집니다."
+  },
+  {
+   "q": "결과 일괄반영에서 학생이 매칭되지 않아요.",
+   "a": "붙여넣은 이름과 SG에 등록된 학생 이름이 같은지 확인하세요(띄어쓰기·오타)."
+  },
+  {
+   "q": "리포트의 시험순위가 「집계할 응시생 데이터 부족」으로 나와요.",
+   "a": "같은 시험을 본 학생 수가 아직 적어서입니다. 오류가 아니며, 응시생이 더 반영되면 순위가 나옵니다."
+  },
+  {
+   "q": "「다음시험 행동 지침」이 비어 있어요.",
+   "a": "「부가기능 → 매니저 AAR」에서 과목별 항목을 선택하고 「이 내용으로 메모 생성」을 눌러 주세요."
+  },
+  {
+   "q": "학부모 링크를 보냈는데 내용을 고쳤어요.",
+   "a": "결과리포트에서 공유 링크를 다시 만들어 최신 링크를 보내세요."
+  },
+  {
+   "q": "인쇄 창이 안 열려요.",
+   "a": "브라우저의 팝업 차단을 풀어 주세요. 주소창 오른쪽에 팝업 차단 표시가 뜹니다."
+  },
+  {
+   "q": "저장 실패가 나와요.",
+   "a": "인터넷 연결을 확인하고 한 번 더 저장하세요. 계속되면 화면을 캡처해 관리자에게 알려 주세요."
+  }
+ ]
+};
+
+/* 챌린저 사용설명서 렌더링(공용: 앱 안 패널 + 웹 매뉴얼) */
+function CH_E(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+var CH_CSS='.ch{font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;color:#1a2340;line-height:1.65;font-size:14px}'
++'.ch *{box-sizing:border-box}.ch h1{font-size:22px;margin:0 0 6px;letter-spacing:-.5px}.ch h2{font-size:18px;margin:0 0 4px;letter-spacing:-.4px}.ch h3{font-size:14.5px;margin:18px 0 6px;color:#115e59}'
++'.ch .ch_sub{color:#64748b;font-size:13px;margin:0 0 12px}.ch .ch_box{background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:11px 14px;margin:10px 0;font-size:13.5px}'
++'.ch .ch_meta{display:grid;grid-template-columns:70px 1fr;gap:4px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin:10px 0;font-size:13px}.ch .ch_meta b{color:#0f766e}'
++'.ch ol.ch_st{list-style:none;counter-reset:s;margin:6px 0;padding:0}.ch ol.ch_st>li{counter-increment:s;position:relative;padding:9px 12px 9px 46px;margin:7px 0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;min-height:44px}'
++'.ch ol.ch_st>li:before{content:counter(s);position:absolute;left:11px;top:9px;width:25px;height:25px;border-radius:50%;background:#0f766e;color:#fff;font-weight:800;font-size:13px;text-align:center;line-height:25px}'
++'.ch ol.ch_st>li b.ch_t{display:block;color:#1a2340;margin-bottom:1px}.ch .ch_res{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}'
++'.ch ul.ch_tp{margin:4px 0 0;padding-left:20px;font-size:13px;color:#475569}.ch .ch_warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0;color:#9a3412}'
++'.ch .ch_note{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 12px;font-size:12.5px;margin:8px 0;color:#92400e}.ch .ch_sec{margin-bottom:26px;padding-bottom:6px}'
++'.ch .ch_q{font-weight:800;margin-top:12px}.ch .ch_a{color:#475569;margin:2px 0 0}.ch .ch_ic{font-size:20px;margin-right:6px}.ch .ch_hr{border:0;border-top:1px dashed #99f6e4;margin:18px 0}'
++'@media print{.ch .ch_sec{page-break-inside:avoid;break-inside:avoid-page}.ch ol.ch_st>li{break-inside:avoid}.ch_noprint{display:none!important}}';
+function CH_steps(a){ return '<ol class="ch_st">'+a.map(function(x){ return typeof x==='string'?'<li>'+CH_E(x)+'</li>':'<li><b class="ch_t">'+CH_E(x.t)+'</b>'+CH_E(x.d)+'</li>'; }).join('')+'</ol>'; }
+function CH_tips(a,lab){ return (a&&a.length)?'<div class="ch_note"><b>'+(lab||'알아 두면 좋아요')+'</b><ul class="ch_tp">'+a.map(function(t){ return '<li>'+CH_E(t)+'</li>'; }).join('')+'</ul></div>':''; }
+function CH_startHtml(){ var s=CH_DOC.start; return '<section class="ch_sec" id="ch_start"><h2><span class="ch_ic">🚀</span>'+CH_E(s.title)+'</h2><p class="ch_sub">'+CH_E(s.sub)+'</p>'+CH_steps(s.steps)+CH_tips(s.tips,'처음 쓰시는 분께')+'</section>'; }
+function CH_pageHtml(p,onlySub){
+  var subs=onlySub!=null?p.subs.filter(function(x){ return x.k===onlySub; }):p.subs; if(!subs.length) subs=p.subs;
+  var h='<section class="ch_sec" id="ch_'+p.key+'"><h2><span class="ch_ic">'+p.icon+'</span>'+CH_E(p.title)+'</h2><p class="ch_sub">'+CH_E(p.what)+'</p>'
+   +'<div class="ch_meta"><b>누가</b><span>'+CH_E(p.who)+'</span><b>언제</b><span>'+CH_E(p.when)+'</span></div>'+(p.notice?'<div class="ch_warn">'+CH_E(p.notice)+'</div>':'');
+  subs.forEach(function(x){ h+=(p.subs.length>1||x.t!=='사용 방법'?'<h3>'+CH_E(x.t)+'</h3>':'<h3>사용 방법</h3>')+CH_steps(x.steps)+'<div class="ch_res"><b>결과</b> · '+CH_E(x.result)+'</div>'+CH_tips(x.tips); });
+  if(onlySub!=null&&p.subs.length>1) h+='<p class="ch_sub ch_noprint">이 탭의 다른 하위 화면 설명은 아래 「전체 목차」에서 볼 수 있어요.</p>';
+  if(p.mistakes&&p.mistakes.length) h+=CH_tips(p.mistakes,'자주 하는 실수');
+  return h+'</section>'; }
+function CH_faqHtml(){ return '<section class="ch_sec" id="ch_faq"><h2><span class="ch_ic">💬</span>자주 묻는 질문</h2>'+CH_DOC.faq.map(function(f){ return '<div class="ch_q">Q. '+CH_E(f.q)+'</div><div class="ch_a">'+CH_E(f.a)+'</div>'; }).join('')+'</section>'; }
+function CH_mapHtml(){ return '<section class="ch_sec" id="ch_map"><h2><span class="ch_ic">🗺</span>챌린저 한눈에 보기</h2><p class="ch_sub">위쪽 버튼 3개, 기본 화면 탭 3개, 부가기능 7개로 이루어져 있습니다.</p>'
+  +CH_DOC.groups.map(function(g){ return '<h3>'+CH_E(g.title)+' <span style="font-weight:600;color:#64748b;font-size:12px">'+CH_E(g.sub)+'</span></h3><div class="ch_box">'+CH_DOC.pages.filter(function(p){ return p.grp===g.key; }).map(function(p){ return '<div style="margin:4px 0">'+p.icon+' <b>'+CH_E(p.title)+'</b> — '+CH_E(p.what)+'</div>'; }).join('')+'</div>'; }).join('')+'</section>'; }
+function CH_allHtml(){ return '<div class="ch"><h1>'+CH_E(CH_DOC.title)+'</h1><p class="ch_sub">'+CH_E(CH_DOC.intro)+' <span style="color:#94a3b8">('+CH_E(CH_DOC.ver)+')</span></p>'+CH_startHtml()+CH_mapHtml()+CH_DOC.pages.map(function(p){ return CH_pageHtml(p); }).join('')+CH_faqHtml()+'</div>'; }
+
+/* ===== 챌린저 사용설명서 (앱 안 패널) — 「❓ 이 탭 사용법」 ===== */
+function CH_cur(){ try{ var f=document.getElementById('challenger-iframe'), d=f&&f.contentDocument, a=d&&d.querySelector('.tab.active[data-tabid]'); var k=a&&a.getAttribute('data-tabid'); return {key:k||'input',sub:null}; }catch(e){ return {key:'input',sub:null}; } }
+function CH_webUrl(){ try{ if(typeof _sgFormOrigin==='function') return _sgFormOrigin()+'/challenger_manual.html'; }catch(e){} return location.href.replace(/[?#].*$/,'').replace(/[^\/]*$/,'')+'challenger_manual.html'; }
+function CH_toc(active){ var b=function(k,t){ var on=active===k; return '<button type="button" onclick="CH_open(\''+k+'\')" style="display:block;width:100%;text-align:left;border:none;background:'+(on?'#ccfbf1':'transparent')+';color:'+(on?'#115e59':'#334155')+';font-weight:'+(on?800:600)+';font-size:13px;padding:8px 10px;border-radius:8px;cursor:pointer">'+t+'</button>'; };
+  return b('start','🚀 처음 30분 가이드')+b('map','🗺 챌린저 한눈에 보기')+CH_DOC.groups.map(function(g){ return '<div style="font-size:11px;font-weight:800;color:#94a3b8;margin:10px 10px 2px">'+CH_E(g.title)+'</div>'+CH_DOC.pages.filter(function(p){ return p.grp===g.key; }).map(function(p){ return b(p.key,p.icon+' '+CH_E(p.title)); }).join(''); }).join('')+b('faq','💬 자주 묻는 질문')+b('all','📄 전체 보기'); }
+function CH_open(key,sub){ try{
+  if(key==null){ var c=CH_cur(); key=c.key; sub=c.sub; }
+  var body, ov=document.getElementById('ch_ov'), keep=key;
+  if(key==='start') body=CH_startHtml(); else if(key==='map') body=CH_mapHtml(); else if(key==='faq') body=CH_faqHtml(); else if(key==='all'){ body=CH_allHtml().replace(/^<div class="ch">/,'').replace(/<\/div>$/,''); }
+  else{ var p=CH_DOC.pages.find(function(x){ return x.key===key; }); if(!p){ p=CH_DOC.pages[0]; keep=p.key; } body=CH_pageHtml(p,null); }
+  if(!ov){ ov=document.createElement('div'); ov.id='ch_ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:14px'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) CH_close(); };
+  var bs='border:1px solid #5eead4;background:#f0fdfa;color:#115e59;border-radius:9px;padding:7px 12px;font-weight:800;font-size:12.5px;cursor:pointer';
+  ov.innerHTML='<style>'+CH_CSS+'#ch_ov .ch_toc{width:210px;flex:0 0 210px;overflow:auto;border-right:1px solid #e5e7eb;padding:8px}@media(max-width:700px){#ch_ov .ch_toc{display:none}}</style><div style="background:#fff;border-radius:16px;width:min(980px,100%);height:min(88vh,860px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
+   +'<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap"><b style="font-size:16px">❓ '+CH_E(CH_DOC.title)+'</b><span style="flex:1"></span>'
+   +'<button type="button" onclick="CH_print()" style="'+bs+'">🖨 전체 인쇄/PDF</button>'
+   +'<button type="button" onclick="window.open(CH_webUrl(),\'_blank\')" style="'+bs+'">🔗 웹 매뉴얼 열기</button>'
+   +'<button type="button" onclick="CH_copyWeb()" style="'+bs+'">📋 링크 복사</button>'
+   +'<button type="button" onclick="CH_close()" style="border:none;background:none;font-size:22px;cursor:pointer;color:#64748b">✕</button></div>'
+   +'<div style="display:flex;flex:1;min-height:0"><div class="ch_toc">'+CH_toc(keep)+'</div><div id="ch_body" class="ch" style="flex:1;overflow:auto;padding:16px 20px">'+body+'</div></div></div>';
+  var b=document.getElementById('ch_body'); if(b) b.scrollTop=0; }catch(e){ alert('설명서를 열지 못했어요: '+(e&&e.message||e)); } }
+function CH_close(){ var o=document.getElementById('ch_ov'); if(o) o.remove(); }
+function CH_copyWeb(){ var u=CH_webUrl(), done=function(){ alert('웹 매뉴얼 링크를 복사했어요.\n'+u); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(u).then(done).catch(function(){ prompt('아래 링크를 복사하세요',u); }); else prompt('아래 링크를 복사하세요',u); }
+function CH_print(){ var w=window.open('','_blank'); if(!w){ alert('팝업이 차단되어 있어요. 주소창 오른쪽의 팝업 차단을 풀어 주세요.'); return; }
+  w.document.open(); w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>챌린저 사용설명서</title><style>body{margin:0;padding:22px;background:#fff}'+CH_CSS+'@page{margin:14mm}</style></head><body>'+CH_allHtml()+'</body></html>'); w.document.close();
+  setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },400); }
+function CH_btns(){ return '<div class="ch_noprint" style="display:flex;gap:6px;flex-wrap:wrap;margin-left:12px"><button type="button" onclick="CH_open(\'start\')" style="border:1.5px solid #0f766e;background:#fff;color:#0f766e;border-radius:999px;padding:6px 13px;font-weight:800;font-size:12px;cursor:pointer">🚀 처음 30분 가이드</button><button type="button" onclick="CH_open()" style="border:none;background:#0f766e;color:#fff;border-radius:999px;padding:6px 13px;font-weight:800;font-size:12px;cursor:pointer">❓ 이 탭 사용법</button></div>'; }
+
 function renderChallenger(s){
   // ★ iframe을 매번 재생성하지 않도록, body에 고정된 영구 컨테이너를 사용한다.
   // ★★ 2026-07 재설계: iframe을 화면 자리(#challenger-slot) "안으로 옮겨 넣는" 방식은
@@ -39425,6 +40102,7 @@ function renderChallenger(s){
   return `<div class="chg-outer" style="background:#fff;border-radius:14px;border:1.5px solid #e8eaf6;overflow:hidden">
     <div style="padding:12px 16px;background:#f0fdfa;border-bottom:1.5px solid #99f6e4;display:flex;align-items:center;gap:8px">
       <span style="font-size:15px;font-weight:800;color:#0f766e">🎯 챌린저 · 실전모의고사 정밀분석</span>
+      ${typeof CH_btns==='function'?CH_btns():''}
       <button onclick="window.__SG_forceChallengerRefresh=true;window.__challengerLoadedFor=null;render();" style="margin-left:auto;background:#fff;color:#0f766e;border:1.5px solid #0f766e;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">🔄 학생 입력 새로고침</button>
       <button onclick="openChallengerBulkReflect()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📋 결과 일괄반영</button>
       <button onclick="openExamCatalog()" style="background:#fff;color:#0369a1;border:1.5px solid #0369a1;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700">📚 시험 카탈로그 관리</button>
