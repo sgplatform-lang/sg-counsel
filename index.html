@@ -39915,6 +39915,24 @@ function renderChallenger(s){
             _incLast.forEach(function(x){ if(x&&x._studentSelfInput) _kn.k[_sk(x)]=1; });
           }
         }catch(_e2){ console.warn('보존 병합 실패',_e2); }
+        // ★ 2026-11-21: 관리자가 '학생 답안'에서 삭제한 과목이 챌린저 화면의 옛 상태 때문에 되살아나지 않도록 거른다.
+        try{
+          const _dl=(window.__sgDelSubj||[]).filter(function(d){return d.sid===String(sid);});
+          if(_dl.length){
+            const _tr=function(v){return String(v==null?'':v).trim();};
+            const _isDel=function(x,date,name){ return x && _dl.some(function(d){ return d.date===_tr(date) && d.name===_tr(name) && d.subject===x.subject && d.detail===_cbrNormalizeDetail(x.detail||''); }); };
+            const _ld=ev.data.meta&&ev.data.meta.lastTestDate, _ln=ev.data.meta&&ev.data.meta.lastTestName;
+            _incLast=_incLast.filter(function(x){ return !_isDel(x,_ld,_ln); });
+            for(let _i=0;_i<_mergedHist.length;_i++){
+              const _h=_mergedHist[_i]; if(!_h) continue;
+              ['subjects','fullSubjects'].forEach(function(f){
+                if(Array.isArray(_h[f]) && _h[f].some(function(x){return _isDel(x,_h.date,_h.test);})){
+                  _mergedHist[_i]=Object.assign({},_mergedHist[_i]); _mergedHist[_i][f]=_h[f].filter(function(x){return !_isDel(x,_h.date,_h.test);});
+                }
+              });
+            }
+          }
+        }catch(_e3){ console.warn(_e3); }
         const newChallengerData = {
           history: _mergedHist,
           lastSubjects: _incLast,
@@ -57738,6 +57756,25 @@ function generateReport() {
         if(Array.isArray(h[k])) h[k]=h[k].filter(function(x){ return !_isSameSubject(x); });
       });
     });
+    // ★ 2026-11-21: 챌린저 화면(iframe)은 예전 상태를 들고 있다가 나중에 저장하면서 삭제한 과목을
+    // 되살리는 경우가 있어, 삭제 기록(묘비)을 남겨 저장 시 걸러낸다. 또 학생 문서가 다른 객체로
+    // 교체돼 있어도 지워지도록 ST.students의 실제 문서에서도 한 번 더 제거한다.
+    window.__sgDelSubj=window.__sgDelSubj||[];
+    window.__sgDelSubj.push({sid:String(cur.id), date:String(roundDate||'').trim(), name:String(roundName||'').trim(), subject:s.subject, detail:_cbrNormalizeDetail(s.detail||'')});
+    try{
+      var _live=(ST.students||[]).find(function(z){return String(z.id)===String(cur.id);});
+      if(_live && _live!==cur && _live.challengerData){
+        var _lc=_live.challengerData;
+        if(String(_lc.lastTestDate||'').trim()===String(roundDate||'').trim() && String(_lc.lastTestName||'').trim()===String(roundName||'').trim()){
+          _lc.lastSubjects=(_lc.lastSubjects||[]).filter(function(x){return !_isSameSubject(x);});
+        }
+        (_lc.history||[]).forEach(function(h){
+          if(String(h.date||'').trim()!==String(roundDate||'').trim() || String(h.test||'').trim()!==String(roundName||'').trim()) return;
+          ['subjects','fullSubjects'].forEach(function(k){ if(Array.isArray(h[k])) h[k]=h[k].filter(function(x){return !_isSameSubject(x);}); });
+        });
+        cur=_live;
+      }
+    }catch(_e){ console.warn(_e); }
     if(FB_USE()){
       try{ await fbSave('students', cur.id, cur); }
       catch(e){ alert('삭제 중 오류가 발생했습니다: '+e.message); return; }
