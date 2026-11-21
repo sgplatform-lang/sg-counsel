@@ -4389,6 +4389,10 @@ async function chgAnsGradeAndSave(){
   // 과목이 있으면 제출을 막고(응시하지 않은 과목은 체크 해제 안내), 일부만 비어 있으면 미입력 수를
   // 보여주며 한 번 더 확인받는다.
   const _emptySubs=[], _partialSubs=[];
+  // ★ 2026-11-21: 제출 확인창 이후 await(네트워크 조회) 중에 화면 갱신으로 입력값이 비워지면
+  // 빈 답안이 0점으로 채점·잠금되는 사고가 있어, 입력값을 이 시점에 복사해 두고 그 복사본으로만 채점한다.
+  const _ansSnap={}, _detSnap={};
+  for(const x of enabledSlots){ _ansSnap[x.slot]=Object.assign({}, st.answers[x.slot]||{}); _detSnap[x.slot]=st.detail[x.slot]||''; }
   for(const x of enabledSlots){
     const def=CHG_ANS_SUBJ_DEFS[x.code];
     const _det=st.detail[x.slot]||_chgAnsAutoDetail(x.code, examMeta)||'';
@@ -4415,10 +4419,10 @@ async function chgAnsGradeAndSave(){
   const newSubjects=[];
   for(const x of enabledSlots){
     const def=CHG_ANS_SUBJ_DEFS[x.code];
-    const detail=st.detail[x.slot]||_chgAnsAutoDetail(x.code, examMeta)||'';
+    const detail=_detSnap[x.slot]||_chgAnsAutoDetail(x.code, examMeta)||'';
     const normDetail=_cbrNormalizeDetail(detail);
     const resolvedCount=_chgAnsResolvedCount(x.code, detail, examMeta, def.count);
-    const ans=st.answers[x.slot]||{};
+    const ans=_ansSnap[x.slot]||{};
     // ★ 385 정리: 정답 조회 로직을 render 쪽과 공유하는 _chgAnsGetAnswerMaps로 통일한다
     // (예전엔 이 함수 안에서만 따로 만든 지역 함수를 썼는데, 문항 형식(단일/복수선택)을
     // 미리보기 화면에서도 판단해야 해서 공용 함수로 옮겼다 — 동작은 동일).
@@ -4470,6 +4474,10 @@ async function chgAnsGradeAndSave(){
     // "영어,탐구" 카탈로그를 선택해 놓고 수학 답안을 낸 경우), 예전엔 채점할 대상이 없다는
     // 이유로 모든 문항을 "정답"으로 잘못 표시해버렸다. 이제는 그런 경우를 명확한 오류로
     // 막고, 어떤 시험을 선택해야 하는지 안내한다 — 저장 자체를 하지 않는다.
+    if(!Object.keys(rawAnswers).some(function(k){ return String(rawAnswers[k]||'').trim(); })){
+      alert('⚠️ 입력된 답안을 확인하지 못해 제출을 중단했습니다. 답안이 그대로 있는지 확인한 뒤 다시 제출해주세요.');
+      return;
+    }
     if(foundAnswerCount===0){
       alert('⚠️ 선택하신 시험("'+st.test+'")에는 '+(x.slot.indexOf('INQ')===0?'탐구('+detail+')':def.name)+' 과목의 정답 데이터가 등록되어 있지 않습니다.\n\n시험을 잘못 선택하지 않으셨는지 확인해주세요('+def.name+' 답안은 이 과목이 포함된 올바른 시험을 선택한 뒤에 입력해야 합니다).\n\n이 과목은 저장되지 않았습니다.');
       return;
